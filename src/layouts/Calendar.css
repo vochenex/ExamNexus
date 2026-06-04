@@ -1,0 +1,74 @@
+.rdp-root {
+  --rdp-accent-color: #10b981;
+  --rdp-accent-background-color: rgba(16, 185, 129, 0.25);
+}
+
+/* Month title */
+.rdp-caption_label {
+  color: #10b981 !important;
+  font-weight: 700 !important;
+}
+
+/* Weekdays */
+.rdp-weekday {
+  color: #34d399 !important;
+}
+
+/* Navigation arrows */
+.rdp-chevron {
+  fill: #10b981 !important;
+}
+
+.rdp-button_previous,
+.rdp-button_next {
+  border-radius: 12px !important;
+}
+
+.rdp-button_previous:hover,
+.rdp-button_next:hover {
+  background: rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Day buttons */
+.rdp-day_button {
+  border-radius: 12px !important;
+  transition: all 0.25s ease !important;
+}
+
+.rdp-day_button:hover {
+  background: rgba(16, 185, 129, 0.15) !important;
+}
+
+/* TODAY */
+.rdp-today .rdp-day_button {
+  border: 1px solid #10b981 !important;
+}
+
+/* SELECTED DAYS */
+.rdp-selected .rdp-day_button {
+  background: #10b981 !important;
+  color: white !important;
+}
+
+/* RANGE START */
+.rdp-range_start .rdp-day_button {
+  background: #10b981 !important;
+  color: white !important;
+}
+
+/* RANGE END */
+.rdp-range_end .rdp-day_button {
+  background: #10b981 !important;
+  color: white !important;
+}
+
+/* RANGE MIDDLE */
+.rdp-range_middle .rdp-day_button {
+  background: rgba(16, 185, 129, 0.25) !important;
+  color: white !important;
+}
+
+/* Dark mode text */
+.rdp-root {
+  color: white;
+}

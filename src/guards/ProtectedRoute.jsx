@@ -1,0 +1,44 @@
+import { Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
+
+export default function ProtectedRoute({ children, allowedRoles }) {
+  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState(null);
+  const [auth, setAuth] = useState(false);
+
+  useEffect(() => {
+    const check = async () => {
+      const { data } = await supabase.auth.getUser();
+
+      if (!data.user) {
+        setAuth(false);
+        setLoading(false);
+        return;
+      }
+
+      setAuth(true);
+
+      const { data: profile } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      setRole(profile?.role);
+      setLoading(false);
+    };
+
+    check();
+  }, []);
+
+  if (loading) return <div className="text-white p-10">Loading...</div>;
+
+  if (!auth) return <Navigate to="/" />;
+
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    return <Navigate to="/" />;
+  }
+
+  return children;
+}
