@@ -1,26 +1,21 @@
-import { Activity, ClipboardCheck, GraduationCap } from "lucide-react";
-
 const sizeMap = {
   sm: {
     wrap: "w-10 h-10 rounded-xl",
-    mainIcon: "w-5 h-5",
-    sideIcon: "w-3.5 h-3.5",
+    markIcon: "w-6 h-6",
     textWrap: "gap-0.5",
     title: "text-2xl",
     subtitle: "text-xs",
   },
   md: {
     wrap: "w-14 h-14 rounded-2xl",
-    mainIcon: "w-7 h-7",
-    sideIcon: "w-4 h-4",
+    markIcon: "w-9 h-9",
     textWrap: "gap-1",
     title: "text-3xl",
     subtitle: "text-sm",
   },
   hero: {
     wrap: "w-24 h-24 rounded-3xl",
-    mainIcon: "w-11 h-11",
-    sideIcon: "w-5 h-5",
+    markIcon: "w-16 h-16",
     textWrap: "gap-1.5",
     title: "text-5xl",
     subtitle: "text-base",
@@ -54,12 +49,6 @@ export default function BrandLogo({
     ? "text-emerald-300"
     : "text-teal-700";
 
-  const accentIconClass = onColor
-    ? "text-cyan-100"
-    : theme === "dark"
-    ? "text-cyan-300"
-    : "text-emerald-600";
-
   const titleClass = onColor
     ? "from-white via-cyan-100 to-emerald-100"
     : theme === "dark"
@@ -85,15 +74,50 @@ export default function BrandLogo({
         `}
       >
         <div className={`absolute inset-0 bg-gradient-to-br ${glowClass}`} />
-        <Activity
-          strokeWidth={2.1}
-          className={`absolute top-2 left-2 ${ui.sideIcon} ${accentIconClass} opacity-90`}
-        />
-        <GraduationCap strokeWidth={2.1} className={`relative ${ui.mainIcon} ${primaryIconClass}`} />
-        <ClipboardCheck
-          strokeWidth={2.1}
-          className={`absolute bottom-2 right-2 ${ui.sideIcon} ${accentIconClass} opacity-90`}
-        />
+        <svg
+          viewBox="0 0 64 64"
+          className={`relative ${ui.markIcon} ${primaryIconClass}`}
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="ExamNexus icon"
+        >
+          {/* Mortarboard top */}
+          <path d="M32 6L56 16L32 27L8 16L32 6Z" fill="currentColor" />
+
+          {/* Mortarboard band */}
+          <path d="M16 21L32 29L48 21V33L32 41L16 33V21Z" fill="currentColor" opacity="0.9" />
+
+          {/* Shield body */}
+          <path
+            d="M13 23V43L32 54L51 43V23"
+            stroke="currentColor"
+            strokeWidth="3.2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {/* Inner book / N-style strokes */}
+          <path
+            d="M20 34L28 37C31 38 33 40 33 43V45"
+            stroke="currentColor"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M44 34L36 37C33 38 31 40 31 43V45"
+            stroke="currentColor"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M24 47L19 48.5M40 47L45 48.5"
+            stroke="currentColor"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+          />
+        </svg>
       </div>
 
       <div className={`flex flex-col ${ui.textWrap}`}>
