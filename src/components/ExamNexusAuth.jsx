@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../layouts/ThemeContext";
+import BrandLogo from "./BrandLogo";
 
 
 export default function ExamNexusAuth() {
@@ -283,85 +284,7 @@ if (userData.role === "faculty") {
         
         {/* Left Branding Panel */}
         <div className="hidden md:flex flex-col justify-center items-center p-10 bg-gradient-to-b from-emerald-400 to-teal-400 text-white w-1/2 relative">
-          <div className="group relative mb-8">
-  <div
-    className="
-      absolute
-      inset-0
-
-      bg-emerald-400/30
-
-      blur-3xl
-
-      scale-150
-
-      opacity-70
-
-      group-hover:opacity-100
-
-      transition-all
-      duration-500
-    "
-  />
-
-  <div
-    className="
-      relative
-      w-24
-      h-24
-      rounded-3xl
-      bg-white/10
-      flex
-      items-center
-      justify-center
-      shadow-[0_0_40px_rgba(52,211,153,0.45)]
-      group-hover:scale-110
-      group-hover:rotate-6
-      transition-all
-      duration-500
-    "
-  >
-    <img
-      src="/favicon.svg"
-      alt="ExamNexus logo"
-      className="w-14 h-14 object-contain"
-    />
-  </div>
-</div>
-
-          <h1
-  className="
-    text-5xl
-    font-black
-
-    bg-gradient-to-r
-    from-white
-    via-emerald-100
-    to-cyan-100
-
-    bg-clip-text
-    text-transparent
-
-    mb-3
-
-    hover:scale-105
-
-    transition-all
-  "
->
-  ExamNexus
-</h1>
-          <p
-  className="
-    text-white/80
-
-    text-base
-
-    tracking-wide
-  "
->
-  Intelligent Assessment Platform
-</p>
+          <BrandLogo theme={theme} size="hero" showTagline onColor />
         </div>
 
         {/* Right Form Panel */}
@@ -370,21 +293,8 @@ if (userData.role === "faculty") {
             theme === "dark" ? "text-white" : "text-gray-900"
           }`}
         >
-          <div className="md:hidden mb-6 flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.35)]">
-              <img
-                src="/favicon.svg"
-                alt="ExamNexus logo"
-                className="w-10 h-10 object-contain"
-              />
-            </div>
-            <h2
-              className={`mt-3 text-xl font-black ${
-                theme === "dark" ? "text-emerald-300" : "text-teal-700"
-              }`}
-            >
-              ExamNexus
-            </h2>
+          <div className="md:hidden mb-6">
+            <BrandLogo theme={theme} size="md" showTagline centered />
           </div>
 
           <h2

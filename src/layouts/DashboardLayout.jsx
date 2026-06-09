@@ -8,6 +8,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useTheme } from "./ThemeContext";
+import BrandLogo from "../components/BrandLogo";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -58,21 +59,7 @@ React.useEffect(() => {
       >
         {/* LOGO */}
         <div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.35)]">
-              <img
-                src="/favicon.svg"
-                alt="ExamNexus logo"
-                className="w-6 h-6 object-contain"
-              />
-            </div>
-            <h1 className="text-3xl font-black bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-              ExamNexus
-            </h1>
-          </div>
-          <p className={`${theme === "dark" ? "text-gray-400" : "text-gray-900"} text-xs mt-1`}>
-            Intelligent Assessment Platform
-          </p>
+          <BrandLogo theme={theme} size="sm" showTagline />
         </div>
 
         {/* NAVIGATION */}
