@@ -84,9 +84,6 @@ export default function BrandLogo({
           {/* Mortarboard top */}
           <path d="M32 6L56 16L32 27L8 16L32 6Z" fill="currentColor" />
 
-          {/* Mortarboard band */}
-          <path d="M20 22L32 28L44 22V31L32 37L20 31V22Z" fill="currentColor" opacity="0.9" />
-
           {/* Shield body */}
           <path
             d="M13 23V43L32 54L51 43V23"
@@ -98,21 +95,14 @@ export default function BrandLogo({
 
           {/* Inner eye-like marks */}
           <path
-            d="M22 36C24 34.6 27 34.6 29 36"
+            d="M21.5 36.5C24 34.3 27.5 34.3 30 36.5"
             stroke="currentColor"
             strokeWidth="3.2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
-            d="M35 36C37 34.6 40 34.6 42 36"
-            stroke="currentColor"
-            strokeWidth="3.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M30 40L32 42L34 40M24 46L20.5 47.5M40 46L43.5 47.5"
+            d="M34 36.5C36.5 34.3 40 34.3 42.5 36.5"
             stroke="currentColor"
             strokeWidth="3.2"
             strokeLinecap="round"
