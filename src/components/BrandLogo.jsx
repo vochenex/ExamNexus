@@ -85,7 +85,7 @@ export default function BrandLogo({
           <path d="M32 6L56 16L32 27L8 16L32 6Z" fill="currentColor" />
 
           {/* Mortarboard band */}
-          <path d="M16 21L32 29L48 21V33L32 41L16 33V21Z" fill="currentColor" opacity="0.9" />
+          <path d="M20 22L32 28L44 22V31L32 37L20 31V22Z" fill="currentColor" opacity="0.9" />
 
           {/* Shield body */}
           <path
@@ -96,26 +96,27 @@ export default function BrandLogo({
             strokeLinecap="round"
           />
 
-          {/* Inner book / N-style strokes */}
+          {/* Inner eye-like marks */}
           <path
-            d="M20 34L28 37C31 38 33 40 33 43V45"
+            d="M22 36C24 34.6 27 34.6 29 36"
             stroke="currentColor"
             strokeWidth="3.2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
-            d="M44 34L36 37C33 38 31 40 31 43V45"
+            d="M35 36C37 34.6 40 34.6 42 36"
             stroke="currentColor"
             strokeWidth="3.2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
-            d="M24 47L19 48.5M40 47L45 48.5"
+            d="M30 40L32 42L34 40M24 46L20.5 47.5M40 46L43.5 47.5"
             stroke="currentColor"
             strokeWidth="3.2"
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
       </div>
