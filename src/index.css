@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Soft mint light-mode palette — easy on the eyes, no pure white */
+html.light {
+  --en-bg-page-from: #dcefea;
+  --en-bg-page-to: #c8e8de;
+  --en-bg-surface: #e0f5ef;
+  --en-bg-elevated: #ecf8f4;
+  --en-bg-muted: #d8efe8;
+  --en-bg-input: #edfbf7;
+  --en-bg-skeleton: #cce8de;
+  --en-bg-hover: #d6ede6;
+  --en-border: rgba(110, 196, 172, 0.45);
+}
+
+html.light body {
+  background-color: var(--en-bg-page-from);
+  color: #1e3a34;
+}
+
+html.light .en-bg-page {
+  background: linear-gradient(to bottom right, var(--en-bg-page-from), var(--en-bg-page-to));
+}
+
+html.light .en-bg-surface {
+  background-color: var(--en-bg-surface);
+}
+
+html.light .en-bg-elevated {
+  background-color: var(--en-bg-elevated);
+}
+
+html.light .en-bg-muted {
+  background-color: var(--en-bg-muted);
+}
+
+html.light .en-bg-input {
+  background-color: var(--en-bg-input);
+}
+
+html.light .en-bg-skeleton {
+  background-color: var(--en-bg-skeleton);
+}
+
+html.light .en-hover:hover {
+  background-color: var(--en-bg-hover);
+}
+
+html.light .en-bg-surface-soft {
+  background-color: color-mix(in srgb, var(--en-bg-surface) 88%, var(--en-bg-page-from));
+}
+
+html.light .en-bg-elevated-soft {
+  background-color: color-mix(in srgb, var(--en-bg-elevated) 92%, var(--en-bg-page-from));
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: #0a0f0c;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Keep auth inputs themed when browsers autofill email/name fields */
+html:not(.light) .examnexus-auth-input:-webkit-autofill,
+html:not(.light) .examnexus-auth-input:-webkit-autofill:hover,
+html:not(.light) .examnexus-auth-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #1f2937 inset !important;
+  box-shadow: 0 0 0 1000px #1f2937 inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff;
+  transition: background-color 9999s ease-out 0s;
+}
+
+html.light .examnexus-auth-input:-webkit-autofill,
+html.light .examnexus-auth-input:-webkit-autofill:hover,
+html.light .examnexus-auth-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--en-bg-input) inset !important;
+  box-shadow: 0 0 0 1000px var(--en-bg-input) inset !important;
+  -webkit-text-fill-color: #1e3a34 !important;
+  caret-color: #1e3a34;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* Unified select / dropdown option colors */
+html:not(.light) .en-select option {
+  background-color: #0f1a18;
+  color: #ecfdf5;
+}
+
+html.light .en-select option {
+  background-color: var(--en-bg-input);
+  color: #1e3a34;
+}
+
+html:not(.light) .en-select option:checked,
+html:not(.light) .en-select option:hover {
+  background-color: #134e41;
+  color: #ecfdf5;
+}
+
+html.light .en-select option:checked,
+html.light .en-select option:hover {
+  background-color: #cce8de;
+  color: #0f5132;
+}
