@@ -40,6 +40,25 @@ const [endTime, setEndTime] = useState("10:00");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const selectFieldClass = `
+    w-full
+    p-3
+    rounded-xl
+    text-sm
+    focus:outline-none
+    focus:ring-2
+    focus:ring-emerald-400
+    transition-all
+    ${
+      theme === "dark"
+        ? "bg-white/10 border border-white/10 text-white"
+        : "bg-white border border-emerald-200 text-gray-900"
+    }
+  `;
+
+  const selectOptionClass =
+    theme === "dark" ? "bg-[#031d1f] text-white" : "bg-white text-gray-900";
+
 const isLastQuestionComplete = () => {
   if (questions.length === 0) return true;
 
@@ -356,59 +375,15 @@ const isLastQuestionComplete = () => {
             onChange={(e) =>
               setExam({ ...exam, exam_type: e.target.value })
             }
-            className={`
-  w-full
-  p-3
-  rounded-xl
-  text-sm
-
-  ${
-    theme === "dark"
-      ? `
-          bg-white/10
-          border border-white/10
-          text-white
-        `
-      : `
-          bg-white
-          border border-emerald-200
-          text-gray-900
-        `
-  }
-
-  focus:outline-none
-  focus:ring-2
-  focus:ring-emerald-400
-`}
+            className={selectFieldClass}
           >
-            <option
-  className={
-    theme === "dark"
-      ? "bg-[#031d1f]"
-      : "bg-white text-black"
-  }
-  value="multiple_choice"
->
+            <option className={selectOptionClass} value="multiple_choice">
               Multiple Choice
             </option>
-            <option
-  className={
-    theme === "dark"
-      ? "bg-[#031d1f]"
-      : "bg-white text-black"
-  }
-  value="enumeration"
->
+            <option className={selectOptionClass} value="enumeration">
               Enumeration
             </option>
-            <option
-  className={
-    theme === "dark"
-      ? "bg-[#031d1f]"
-      : "bg-white text-black"
-  }
-  value="identification"
->
+            <option className={selectOptionClass} value="identification">
               Identification
             </option>
           </select>

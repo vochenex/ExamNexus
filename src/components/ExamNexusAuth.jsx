@@ -57,6 +57,23 @@ export default function ExamNexusAuth() {
     }
   `;
 
+  const selectClass = `
+    w-full
+    px-4
+    py-3
+    rounded-xl
+    border
+    transition-all
+    ${
+      theme === "dark"
+        ? "bg-white/5 border-white/10 text-white"
+        : "bg-white border-emerald-300 text-gray-900"
+    }
+  `;
+
+  const selectOptionClass =
+    theme === "dark" ? "bg-[#0b1114] text-white" : "bg-white text-gray-900";
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setErrors({ ...errors, [e.target.name]: "" });
@@ -290,38 +307,25 @@ if (userData.role === "faculty") {
   <div
     className="
       relative
-
       w-24
       h-24
-
       rounded-3xl
-
-      bg-gradient-to-br
-      from-emerald-400
-      via-teal-400
-      to-cyan-400
-
+      bg-white/10
       flex
       items-center
       justify-center
-
       shadow-[0_0_40px_rgba(52,211,153,0.45)]
-
       group-hover:scale-110
       group-hover:rotate-6
-
       transition-all
       duration-500
     "
   >
-    <svg
-      viewBox="0 0 64 64"
-      className="w-12 h-12 fill-white"
-    >
-      <path d="M32 2L2 18v28l30 16 30-16V18L32 2z"/>
-      <path d="M14 24L32 14L50 24L32 34L14 24z"/>
-      <path d="M20 34L32 40L44 34V44L32 50L20 44V34z"/>
-    </svg>
+    <img
+      src="/favicon.svg"
+      alt="ExamNexus logo"
+      className="w-14 h-14 object-contain"
+    />
   </div>
 </div>
 
@@ -367,12 +371,12 @@ if (userData.role === "faculty") {
           }`}
         >
           <div className="md:hidden mb-6 flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.35)]">
-              <svg viewBox="0 0 64 64" className="w-9 h-9 fill-white">
-                <path d="M32 2L2 18v28l30 16 30-16V18L32 2z" />
-                <path d="M14 24L32 14L50 24L32 34L14 24z" />
-                <path d="M20 34L32 40L44 34V44L32 50L20 44V34z" />
-              </svg>
+            <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.35)]">
+              <img
+                src="/favicon.svg"
+                alt="ExamNexus logo"
+                className="w-10 h-10 object-contain"
+              />
             </div>
             <h2
               className={`mt-3 text-xl font-black ${
@@ -425,18 +429,11 @@ if (userData.role === "faculty") {
                     name="role"
                     value={form.role}
                     onChange={handleChange}
-                    className={`
-                      w-full px-4 py-3 rounded-xl border transition-all
-                      ${
-                        theme === "dark"
-                          ? "bg-white/5 border-white/10 text-white"
-                          : "bg-white border-emerald-300 text-gray-900"
-                      }
-                    `}
+                    className={selectClass}
                   >
-                    <option value="faculty">Faculty</option>
-                    <option value="student">Student</option>
-                    <option value="admin">Admin</option>
+                    <option className={selectOptionClass} value="faculty">Faculty</option>
+                    <option className={selectOptionClass} value="student">Student</option>
+                    <option className={selectOptionClass} value="admin">Admin</option>
                   </select>
                 </div>
 

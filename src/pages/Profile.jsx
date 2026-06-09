@@ -239,18 +239,12 @@ export default function Profile() {
           <select
   value={profile.gender}
   onChange={(e) => handleChange("gender", e.target.value)}
-  className={inputStyle(theme)}
-  style={{
-    backgroundColor:
-      theme === "dark"
-        ? "#0b1114"
-        : "#f4fffc",
-  }}
+  className={selectStyle(theme)}
 >
-            <option value="">Select Gender</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Prefer not to say">Prefer not to say</option>
+            <option className={selectOptionStyle(theme)} value="">Select Gender</option>
+            <option className={selectOptionStyle(theme)} value="Male">Male</option>
+            <option className={selectOptionStyle(theme)} value="Female">Female</option>
+            <option className={selectOptionStyle(theme)} value="Prefer not to say">Prefer not to say</option>
             </select>
         </div>
 
@@ -271,12 +265,12 @@ export default function Profile() {
       handleChange("department", e.target.value);
       handleChange("course", ""); // reset course when department changes
     }}
-    className={inputStyle(theme)}
+    className={selectStyle(theme)}
   >
-    <option value="">Select Department</option>
-    <option value="CCS">College of Computer Studies</option>
-    <option value="CCJE">College of Criminal and Justice Education</option>
-    <option value="CBE">College of Business Education</option>
+    <option className={selectOptionStyle(theme)} value="">Select Department</option>
+    <option className={selectOptionStyle(theme)} value="CCS">College of Computer Studies</option>
+    <option className={selectOptionStyle(theme)} value="CCJE">College of Criminal and Justice Education</option>
+    <option className={selectOptionStyle(theme)} value="CBE">College of Business Education</option>
   </select>
 
           {profile.role === "Student" && (
@@ -286,22 +280,22 @@ export default function Profile() {
                 <select
                 value={profile.course}
                 onChange={(e) => handleChange("course", e.target.value)}
-                className={inputStyle(theme)}
+                className={selectStyle(theme)}
                 >
-                <option value="">Select Course</option>
+                <option className={selectOptionStyle(theme)} value="">Select Course</option>
                 {profile.department === "CCS" && (
-                    <option value="BSIT">Bachelor of Science in Information Technology</option>
+                    <option className={selectOptionStyle(theme)} value="BSIT">Bachelor of Science in Information Technology</option>
                 )}
                 {profile.department === "CBE" && (
                     <>
-                    <option value="BSA">Bachelor of Science in Accountancy</option>
-                    <option value="TM">Tourism Management</option>
-                    <option value="FM">Financial Management</option>
-                    <option value="HM">Hospitality Management</option>
+                    <option className={selectOptionStyle(theme)} value="BSA">Bachelor of Science in Accountancy</option>
+                    <option className={selectOptionStyle(theme)} value="TM">Tourism Management</option>
+                    <option className={selectOptionStyle(theme)} value="FM">Financial Management</option>
+                    <option className={selectOptionStyle(theme)} value="HM">Hospitality Management</option>
                     </>
                 )}
                 {profile.department === "CCJE" && (
-                    <option value="BSCRIM">Bachelor of Science in Criminal Justice</option>
+                    <option className={selectOptionStyle(theme)} value="BSCRIM">Bachelor of Science in Criminal Justice</option>
                 )}
                 </select>
             )}
@@ -311,13 +305,13 @@ export default function Profile() {
     <select
       value={profile.year_level}
       onChange={(e) => handleChange("year_level", e.target.value)}
-      className={inputStyle(theme)}
+      className={selectStyle(theme)}
     >
-      <option value="">Select Year Level</option>
-      <option value="1st Year">1st Year</option>
-      <option value="2nd Year">2nd Year</option>
-      <option value="3rd Year">3rd Year</option>
-      <option value="4th Year">4th Year</option>
+      <option className={selectOptionStyle(theme)} value="">Select Year Level</option>
+      <option className={selectOptionStyle(theme)} value="1st Year">1st Year</option>
+      <option className={selectOptionStyle(theme)} value="2nd Year">2nd Year</option>
+      <option className={selectOptionStyle(theme)} value="3rd Year">3rd Year</option>
+      <option className={selectOptionStyle(theme)} value="4th Year">4th Year</option>
     </select>
   )} 
             </>
@@ -394,4 +388,29 @@ function inputStyle(theme) {
     duration-300
     hover:shadow-md
   `;
+}
+
+function selectStyle(theme) {
+  return `
+    w-full
+    p-3
+    rounded-xl
+    outline-none
+    appearance-none
+    cursor-pointer
+
+    ${
+      theme === "dark"
+        ? "bg-[#0b1114] border border-white/10 text-white"
+        : "bg-white border border-emerald-200 text-gray-900"
+    }
+
+    transition-all
+    duration-300
+    hover:shadow-md
+  `;
+}
+
+function selectOptionStyle(theme) {
+  return theme === "dark" ? "bg-[#0b1114] text-white" : "bg-white text-gray-900";
 }
