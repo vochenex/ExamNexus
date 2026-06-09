@@ -1,11 +1,10 @@
-import { GraduationCap, ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, ClipboardCheck, GraduationCap } from "lucide-react";
 
 const sizeMap = {
   sm: {
     wrap: "w-10 h-10 rounded-xl",
     mainIcon: "w-5 h-5",
-    shieldIcon: "w-7 h-7",
-    sparkIcon: "w-3.5 h-3.5",
+    sideIcon: "w-3.5 h-3.5",
     textWrap: "gap-0.5",
     title: "text-2xl",
     subtitle: "text-xs",
@@ -13,8 +12,7 @@ const sizeMap = {
   md: {
     wrap: "w-14 h-14 rounded-2xl",
     mainIcon: "w-7 h-7",
-    shieldIcon: "w-10 h-10",
-    sparkIcon: "w-4 h-4",
+    sideIcon: "w-4 h-4",
     textWrap: "gap-1",
     title: "text-3xl",
     subtitle: "text-sm",
@@ -22,8 +20,7 @@ const sizeMap = {
   hero: {
     wrap: "w-24 h-24 rounded-3xl",
     mainIcon: "w-11 h-11",
-    shieldIcon: "w-16 h-16",
-    sparkIcon: "w-5 h-5",
+    sideIcon: "w-5 h-5",
     textWrap: "gap-1.5",
     title: "text-5xl",
     subtitle: "text-base",
@@ -88,14 +85,14 @@ export default function BrandLogo({
         `}
       >
         <div className={`absolute inset-0 bg-gradient-to-br ${glowClass}`} />
-        <ShieldCheck
-          strokeWidth={1.8}
-          className={`absolute ${ui.shieldIcon} ${primaryIconClass} opacity-35`}
+        <Activity
+          strokeWidth={2.1}
+          className={`absolute top-2 left-2 ${ui.sideIcon} ${accentIconClass} opacity-90`}
         />
         <GraduationCap strokeWidth={2.1} className={`relative ${ui.mainIcon} ${primaryIconClass}`} />
-        <Sparkles
-          strokeWidth={2.2}
-          className={`absolute top-2 right-2 ${ui.sparkIcon} ${accentIconClass}`}
+        <ClipboardCheck
+          strokeWidth={2.1}
+          className={`absolute bottom-2 right-2 ${ui.sideIcon} ${accentIconClass} opacity-90`}
         />
       </div>
 
