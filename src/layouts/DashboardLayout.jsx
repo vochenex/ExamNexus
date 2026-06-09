@@ -58,9 +58,18 @@ React.useEffect(() => {
       >
         {/* LOGO */}
         <div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-            ExamNexus
-          </h1>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.35)]">
+              <svg viewBox="0 0 64 64" className="w-6 h-6 fill-white">
+                <path d="M32 2L2 18v28l30 16 30-16V18L32 2z" />
+                <path d="M14 24L32 14L50 24L32 34L14 24z" />
+                <path d="M20 34L32 40L44 34V44L32 50L20 44V34z" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-black bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
+              ExamNexus
+            </h1>
+          </div>
           <p className={`${theme === "dark" ? "text-gray-400" : "text-gray-900"} text-xs mt-1`}>
             Intelligent Assessment Platform
           </p>

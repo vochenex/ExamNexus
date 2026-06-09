@@ -5,7 +5,7 @@ import { useTheme } from "../layouts/ThemeContext";
 
 export default function ExamNexusAuth() {
   const navigate = useNavigate();
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const [isLogin, setIsLogin] = useState(true);
   const [form, setForm] = useState({
@@ -19,6 +19,43 @@ export default function ExamNexusAuth() {
 
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
+
+  const labelClass = `block text-sm mb-1 ${
+    theme === "dark" ? "text-gray-200" : "text-gray-700"
+  }`;
+
+  const fieldClass = `
+    w-full
+    px-4
+    py-3
+    rounded-xl
+    border
+    backdrop-blur-xl
+    transition-all
+    ${
+      theme === "dark"
+        ? `
+            border-white/10
+            bg-white/5
+            text-white
+            placeholder:text-gray-400
+            hover:border-emerald-400
+            focus:border-emerald-400
+            focus:ring-4
+            focus:ring-emerald-400/20
+          `
+        : `
+            border-emerald-300
+            bg-white
+            text-gray-900
+            placeholder:text-gray-500
+            hover:border-emerald-400
+            focus:border-emerald-500
+            focus:ring-4
+            focus:ring-emerald-400/20
+          `
+    }
+  `;
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -140,6 +177,21 @@ if (userData.role === "faculty") {
     }
   `}
 >
+  <button
+    type="button"
+    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+    className={`
+      absolute top-6 right-6 z-20
+      px-4 py-2 rounded-xl text-sm font-medium transition-all
+      ${
+        theme === "dark"
+          ? "bg-white/10 text-white border border-white/20 hover:bg-white/20"
+          : "bg-white text-gray-900 border border-emerald-300 hover:bg-emerald-50"
+      }
+    `}
+  >
+    {theme === "dark" ? "Light Mode" : "Dark Mode"}
+  </button>
   {/* Background Orb 1 */}
 <div
   className="
@@ -309,72 +361,78 @@ if (userData.role === "faculty") {
         </div>
 
         {/* Right Form Panel */}
-        <div className="w-full md:w-1/2 p-10">
-          <h2 className="text-2xl font-bold mb-6 text-center">{isLogin ? "Login" : "Sign Up"}</h2>
+        <div
+          className={`w-full md:w-1/2 p-10 ${
+            theme === "dark" ? "text-white" : "text-gray-900"
+          }`}
+        >
+          <div className="md:hidden mb-6 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.35)]">
+              <svg viewBox="0 0 64 64" className="w-9 h-9 fill-white">
+                <path d="M32 2L2 18v28l30 16 30-16V18L32 2z" />
+                <path d="M14 24L32 14L50 24L32 34L14 24z" />
+                <path d="M20 34L32 40L44 34V44L32 50L20 44V34z" />
+              </svg>
+            </div>
+            <h2
+              className={`mt-3 text-xl font-black ${
+                theme === "dark" ? "text-emerald-300" : "text-teal-700"
+              }`}
+            >
+              ExamNexus
+            </h2>
+          </div>
+
+          <h2
+            className={`text-2xl font-bold mb-6 text-center ${
+              theme === "dark" ? "text-white" : "text-teal-800"
+            }`}
+          >
+            {isLogin ? "Login" : "Sign Up"}
+          </h2>
 
           <form onSubmit={handleSubmit}>
             {!isLogin && (
               <>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
-                    <label className="block text-sm mb-1">First Name</label>
+                    <label className={labelClass}>First Name</label>
                     <input
                       type="text"
                       name="firstName"
                       value={form.firstName}
                       onChange={handleChange}
-                    className="
-                      w-full
-                      px-4
-                      py-3
-                      rounded-xl
-                      border
-                      border-white/10
-                      bg-white/5
-                      backdrop-blur-xl
-                      hover:border-emerald-400
-                      focus:border-emerald-400
-                      focus:ring-4
-                      focus:ring-emerald-400/20
-                      transition-all
-                    "
+                    className={fieldClass}
                     />
                     {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm mb-1">Last Name</label>
+                    <label className={labelClass}>Last Name</label>
                     <input
                       type="text"
                       name="lastName"
                       value={form.lastName}
                       onChange={handleChange}
-                      className="
-                      w-full
-                      px-4
-                      py-3
-                      rounded-xl
-                      border
-                      border-white/10
-                      bg-white/5
-                      backdrop-blur-xl
-                      hover:border-emerald-400
-                      focus:border-emerald-400
-                      focus:ring-4
-                      focus:ring-emerald-400/20
-                      transition-all
-                    "
+                      className={fieldClass}
                     />
                     {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
                   </div>
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-sm mb-1">Role</label>
+                  <label className={labelClass}>Role</label>
                   <select
                     name="role"
                     value={form.role}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border rounded-lg"
+                    className={`
+                      w-full px-4 py-3 rounded-xl border transition-all
+                      ${
+                        theme === "dark"
+                          ? "bg-white/5 border-white/10 text-white"
+                          : "bg-white border-emerald-300 text-gray-900"
+                      }
+                    `}
                   >
                     <option value="faculty">Faculty</option>
                     <option value="student">Student</option>
@@ -383,28 +441,14 @@ if (userData.role === "faculty") {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-sm mb-1">School ID</label>
+                  <label className={labelClass}>School ID</label>
                   <input
                     type="text"
                     name="schoolId"
                     value={form.schoolId}
                     onChange={handleChange}
                     placeholder="2024-12345"
-                    className="
-                      w-full
-                      px-4
-                      py-3
-                      rounded-xl
-                      border
-                      border-white/10
-                      bg-white/5
-                      backdrop-blur-xl
-                      hover:border-emerald-400
-                      focus:border-emerald-400
-                      focus:ring-4
-                      focus:ring-emerald-400/20
-                      transition-all
-                    "
+                    className={fieldClass}
                   />
                   {errors.schoolId && <p className="text-red-500 text-xs mt-1">{errors.schoolId}</p>}
                 </div>
@@ -412,53 +456,25 @@ if (userData.role === "faculty") {
             )}
 
             <div className="mb-4">
-              <label className="block text-sm mb-1">Email</label>
+              <label className={labelClass}>Email</label>
               <input
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                className="
-                      w-full
-                      px-4
-                      py-3
-                      rounded-xl
-                      border
-                      border-white/10
-                      bg-white/5
-                      backdrop-blur-xl
-                      hover:border-emerald-400
-                      focus:border-emerald-400
-                      focus:ring-4
-                      focus:ring-emerald-400/20
-                      transition-all
-                    "
+                className={fieldClass}
               />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm mb-1">Password</label>
+              <label className={labelClass}>Password</label>
               <input
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
-                className="
-                      w-full
-                      px-4
-                      py-3
-                      rounded-xl
-                      border
-                      border-white/10
-                      bg-white/5
-                      backdrop-blur-xl
-                      hover:border-emerald-400
-                      focus:border-emerald-400
-                      focus:ring-4
-                      focus:ring-emerald-400/20
-                      transition-all
-                    "
+                className={fieldClass}
               />
               {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
             </div>
@@ -492,18 +508,32 @@ if (userData.role === "faculty") {
             </button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-gray-500">
+          <p
+            className={`mt-4 text-center text-sm ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
             {isLogin ? (
               <>
                 Don't have an account?{" "}
-                <span className="text-teal-600 cursor-pointer" onClick={() => setIsLogin(false)}>
+                <span
+                  className={`cursor-pointer font-semibold ${
+                    theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                  }`}
+                  onClick={() => setIsLogin(false)}
+                >
                   Sign Up
                 </span>
               </>
             ) : (
               <>
                 Already have an account?{" "}
-                <span className="text-teal-600 cursor-pointer" onClick={() => setIsLogin(true)}>
+                <span
+                  className={`cursor-pointer font-semibold ${
+                    theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                  }`}
+                  onClick={() => setIsLogin(true)}
+                >
                   Login
                 </span>
               </>
