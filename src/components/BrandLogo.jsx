@@ -95,16 +95,16 @@ export default function BrandLogo({
 
           {/* Inner eye-like marks */}
           <path
-            d="M21.5 36.5C24 34.3 27.5 34.3 30 36.5"
+            d="M21 37L26.2 33L30.2 34.8"
             stroke="currentColor"
-            strokeWidth="3.2"
+            strokeWidth="3.4"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
-            d="M34 36.5C36.5 34.3 40 34.3 42.5 36.5"
+            d="M33.8 34.8L37.8 33L43 37"
             stroke="currentColor"
-            strokeWidth="3.2"
+            strokeWidth="3.4"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
