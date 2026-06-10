@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Megaphone } from "lucide-react";
 import BackButton from "../../components/BackButton";
@@ -16,6 +16,8 @@ import {
   fetchStudentEnrollmentSection,
 } from "../../utils/supabaseData";
 import { resolveStudentId } from "../../utils/authUser";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 
 export default function StudentSubjectSocial() {
   const { theme } = useTheme();
@@ -30,9 +32,9 @@ export default function StudentSubjectSocial() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadPage = async () => {
+  const loadPage = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
 
       const studentId = await resolveStudentId();
@@ -57,13 +59,11 @@ export default function StudentSubjectSocial() {
       console.error(err);
       setError(err.message || "Failed to load announcements.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadPage();
   }, [subjectId]);
+
+  usePolling(loadPage, [subjectId]);
 
   useEffect(() => {
     if (!highlightId || loading) return;
@@ -78,14 +78,7 @@ export default function StudentSubjectSocial() {
   }, [highlightId, loading, announcements.length]);
 
   if (loading) {
-    return (
-      <div className={pageShellClass(theme)}>
-        <div className="mx-auto max-w-7xl animate-pulse space-y-4">
-          <div className={`h-10 w-64 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
-          <div className={`h-48 rounded-2xl ${theme === "dark" ? "bg-white/5" : "en-bg-surface"}`} />
-        </div>
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 
   return (

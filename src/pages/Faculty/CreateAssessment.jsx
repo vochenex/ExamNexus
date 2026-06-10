@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
+import { useAppModal } from "../../contexts/AppModalContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import { ClipboardList, Settings } from "lucide-react";
@@ -45,6 +46,7 @@ export default function CreateAssessment() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  const { warning: showWarning, success: showSuccess } = useAppModal();
 
   const assessmentType = location.state?.type || "exam";
   const assessmentLabel = getAssessmentCategoryLabel(assessmentType);
@@ -111,7 +113,7 @@ export default function CreateAssessment() {
 
   useEffect(() => {
     if (isFacultyRole(facultyProfile.role) && !facultyCanManage) {
-      alert(FACULTY_AVATAR_REQUIRED_MESSAGE);
+      showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       navigate("/faculty/profile");
     }
   }, [facultyProfile.role, facultyCanManage, navigate]);
@@ -178,7 +180,7 @@ export default function CreateAssessment() {
         formattedQuestions
       );
 
-      alert(`${assessmentLabel} created successfully.`);
+      showSuccess(`${assessmentLabel} created successfully.`);
       navigate("/faculty/dashboard");
     } catch (err) {
       setError(err.message || "Failed to publish assessment.");

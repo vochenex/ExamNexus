@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ProfileAvatar from "./ProfileAvatar";
+import { useAppModal } from "../contexts/AppModalContext";
 import { formatTargetSectionsLabel } from "../utils/sections";
 import {
   fetchAnnouncementComments,
@@ -20,6 +21,7 @@ export default function AnnouncementCard({
   onUpdated,
 }) {
   const { theme } = useTheme();
+  const { error, confirm } = useAppModal();
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
 
   const [heartCount, setHeartCount] = useState(announcement.heart_count || 0);
@@ -73,7 +75,7 @@ export default function AnnouncementCard({
       setHeartCount(result.heart_count);
       onUpdated?.();
     } catch (err) {
-      alert(err.message || "Could not update reaction.");
+      error(err.message || "Could not update reaction.");
     }
   };
 
@@ -90,20 +92,29 @@ export default function AnnouncementCard({
       setShowComments(true);
       onUpdated?.();
     } catch (err) {
-      alert(err.message || "Could not post comment.");
+      error(err.message || "Could not post comment.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!canDelete || !window.confirm("Delete this announcement?")) return;
+    if (!canDelete) return;
+
+    const confirmed = await confirm({
+      title: "Delete announcement?",
+      message: "This announcement will be permanently removed.",
+      tone: "danger",
+      confirmLabel: "Delete",
+      cancelLabel: "Keep",
+    });
+    if (!confirmed) return;
 
     try {
       await deleteAnnouncement(announcement.id);
       onDeleted?.(announcement.id);
     } catch (err) {
-      alert(err.message || "Could not delete announcement.");
+      error(err.message || "Could not delete announcement.");
     }
   };
 

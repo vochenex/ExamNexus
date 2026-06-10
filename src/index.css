@@ -108,3 +108,50 @@ html.light .en-select option:hover {
   background-color: #cce8de;
   color: #0f5132;
 }
+
+/* Assessment submission success check animation */
+.submission-check-svg {
+  overflow: visible;
+}
+
+.submission-check-circle {
+  stroke: #10b981;
+  stroke-dasharray: 201;
+  stroke-dashoffset: 201;
+  transform-origin: center;
+  animation: submission-check-circle 0.65s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.submission-check-mark {
+  stroke: #34d399;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: submission-check-mark 0.35s cubic-bezier(0.65, 0, 0.45, 1) 0.55s forwards;
+}
+
+.submission-check-ring {
+  animation: submission-check-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes submission-check-circle {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes submission-check-mark {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes submission-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

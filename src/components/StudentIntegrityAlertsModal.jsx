@@ -44,7 +44,8 @@ export default function StudentIntegrityAlertsModal({
               {studentName}
             </h2>
             <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              {alerts.length} alert{alerts.length === 1 ? "" : "s"} recorded during the assessment
+              {alerts.length} alert{alerts.length === 1 ? "" : "s"} recorded across all attempts
+              (first try and retakes)
             </p>
           </div>
           <button
@@ -78,9 +79,22 @@ export default function StudentIntegrityAlertsModal({
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className={`font-semibold text-sm ${theme === "dark" ? "text-amber-200" : "text-amber-900"}`}>
-                      {formatIntegrityEventLabel(alert.event_type)}
-                    </p>
+                    <div className="min-w-0">
+                      <p className={`font-semibold text-sm ${theme === "dark" ? "text-amber-200" : "text-amber-900"}`}>
+                        {formatIntegrityEventLabel(alert.event_type)}
+                      </p>
+                      {alert.metadata?.attempt === "retake" && (
+                        <span
+                          className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            theme === "dark"
+                              ? "bg-purple-500/20 text-purple-300"
+                              : "bg-purple-100 text-purple-800"
+                          }`}
+                        >
+                          Retake attempt
+                        </span>
+                      )}
+                    </div>
                     {alert.created_at && (
                       <span className={`shrink-0 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
                         {new Date(alert.created_at).toLocaleString("en-PH", {

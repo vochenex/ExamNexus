@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Megaphone } from "lucide-react";
 import BackButton from "../../components/BackButton";
@@ -10,6 +10,7 @@ import Textarea from "../../components/ui/Textarea";
 import Button from "../../components/ui/Button";
 import ChipToggle from "../../components/ui/ChipToggle";
 import { useTheme } from "../../layouts/ThemeContext";
+import { useAppModal } from "../../contexts/AppModalContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { getSectionsForSubjects, normalizeTargetSections } from "../../utils/sections";
 import {
@@ -21,9 +22,12 @@ import {
   FACULTY_AVATAR_REQUIRED_MESSAGE,
   isFacultyRole,
 } from "../../utils/avatar";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 
 export default function FacultyAnnouncementsHub() {
   const { theme } = useTheme();
+  const { warning: showWarning } = useAppModal();
   const navigate = useNavigate();
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
 
@@ -56,27 +60,26 @@ export default function FacultyAnnouncementsHub() {
 
   const facultyCanManage = canFacultyManageSubjects(cachedUser);
 
+  const load = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const rows = await fetchTeacherSubjects(cachedUser.school_id);
+      setSubjects(rows || []);
+    } catch (err) {
+      setError(err.message || "Failed to load subjects.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [cachedUser.school_id]);
+
   useEffect(() => {
     if (isFacultyRole(cachedUser.role) && !facultyCanManage) {
-      alert(FACULTY_AVATAR_REQUIRED_MESSAGE);
+      showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       navigate("/faculty/profile");
-      return;
     }
+  }, [cachedUser.role, facultyCanManage, navigate]);
 
-    const load = async () => {
-      try {
-        setLoading(true);
-        const rows = await fetchTeacherSubjects(cachedUser.school_id);
-        setSubjects(rows || []);
-      } catch (err) {
-        setError(err.message || "Failed to load subjects.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-  }, []);
+  usePolling(load, [cachedUser.school_id]);
 
   const toggleSubject = (subjectId) => {
     setSelectedSubjectIds((prev) =>
@@ -90,7 +93,7 @@ export default function FacultyAnnouncementsHub() {
     event.preventDefault();
 
     if (!facultyCanManage) {
-      alert(FACULTY_AVATAR_REQUIRED_MESSAGE);
+      showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       return;
     }
 
@@ -126,13 +129,7 @@ export default function FacultyAnnouncementsHub() {
   };
 
   if (loading) {
-    return (
-      <div className={pageShellClass(theme)}>
-        <div className="mx-auto max-w-3xl animate-pulse">
-          <div className={`h-10 w-72 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
-        </div>
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 
   return (

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import { useTheme } from "../../layouts/ThemeContext";
+import { useAppModal } from "../../contexts/AppModalContext";
 import { secondaryButtonSm } from "../../utils/themeButtons";
 import { Pencil, Trash2 } from "lucide-react";
 import AssessmentQuestionsReview from "../../components/AssessmentQuestionsReview";
@@ -16,6 +17,8 @@ import {
   fetchExamWithQuestions,
 } from "../../utils/supabaseData";
 import { getAssessmentStatus } from "../../utils/assessmentStatus";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 
 const formatDate = (date) => {
   if (!date) return "Not set";
@@ -58,6 +61,7 @@ export default function AssessmentDetails() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { error: showError } = useAppModal();
 
   const [exam, setExam] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -68,50 +72,49 @@ export default function AssessmentDetails() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const reloadAnalytics = async (questionList, examRecord, { silent = false } = {}) => {
-    if (!silent) setAnalyticsLoading(true);
-    try {
-      const analyticsData = await fetchExamFacultyAnalytics(
-        examId,
-        questionList || questions,
-        (examRecord || exam)?.exam_type
-      );
-      setAnalytics(analyticsData);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      if (!silent) setAnalyticsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const load = async () => {
+  const reloadAnalytics = useCallback(
+    async (questionList, examRecord, { silent = false } = {}) => {
+      if (!silent) setAnalyticsLoading(true);
       try {
-        setLoading(true);
+        const analyticsData = await fetchExamFacultyAnalytics(
+          examId,
+          questionList || questions,
+          (examRecord || exam)?.exam_type
+        );
+        setAnalytics(analyticsData);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!silent) setAnalyticsLoading(false);
+      }
+    },
+    [exam, examId, questions]
+  );
+
+  const load = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) setLoading(true);
         setError("");
 
         const data = await fetchExamWithQuestions(examId);
         setExam(data.exam);
         setQuestions(data.questions);
-
-        setAnalyticsLoading(true);
-        const analyticsData = await fetchExamFacultyAnalytics(
-          examId,
-          data.questions,
-          data.exam.exam_type
-        );
-        setAnalytics(analyticsData);
+        await reloadAnalytics(data.questions, data.exam, { silent: true });
       } catch (err) {
         console.error(err);
         setError(err.message || "Failed to load assessment.");
       } finally {
-        setLoading(false);
-        setAnalyticsLoading(false);
+        if (!silent) {
+          setLoading(false);
+          setAnalyticsLoading(false);
+        }
       }
-    };
+    },
+    [examId, reloadAnalytics]
+  );
 
-    load();
-  }, [examId]);
+  usePolling(load, [examId]);
 
   const handleDelete = async () => {
     try {
@@ -121,18 +124,14 @@ export default function AssessmentDetails() {
       navigate(-1);
     } catch (err) {
       console.error(err);
-      alert(err.message || "Delete failed.");
+      showError(err.message || "Delete failed.");
     } finally {
       setDeleting(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className={`min-h-screen p-6 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-        Loading assessment...
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 
   if (error || !exam) {

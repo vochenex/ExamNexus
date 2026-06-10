@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useTheme } from "../layouts/ThemeContext";
+import { useAppModal } from "../contexts/AppModalContext";
 import { primaryButtonFull } from "../utils/themeButtons";
 
 export default function StudentEnroll() {
   const { theme } = useTheme();
+  const { success: showSuccess } = useAppModal();
   const [code, setCode] = useState("");
 
   const enroll = async () => {
@@ -17,7 +19,7 @@ export default function StudentEnroll() {
       }),
     });
 
-    alert("Enrolled successfully!");
+    showSuccess("Enrolled successfully!");
   };
 
   return (

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
+import { useAppModal } from "../../contexts/AppModalContext";
 import { primaryButton, secondaryButtonSm } from "../../utils/themeButtons";
 import {
   fetchSubject,
@@ -32,6 +33,8 @@ import EditSubjectModal from "../../components/EditSubjectModal";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPanel";
 import { pageShellWithBellClass } from "../../utils/themeInputs";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 
 function getAssessmentStatus(assessment) {
   const now = new Date();
@@ -55,6 +58,7 @@ function getAssessmentStatus(assessment) {
 
 export default function SubjectDetails() {
   const { theme } = useTheme();
+  const { error: showError, warning: showWarning } = useAppModal();
   const { subjectId } = useParams();
   const navigate = useNavigate();
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
@@ -68,11 +72,12 @@ export default function SubjectDetails() {
   const [activeSection, setActiveSection] = useState("All");
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
   const [facultyProfile, setFacultyProfile] = useState(cachedUser);
+  const [loading, setLoading] = useState(true);
   const facultyCanManage = canFacultyManageSubjects(facultyProfile);
 
   const requireFacultyAvatar = () => {
     if (facultyCanManage) return true;
-    alert(FACULTY_AVATAR_REQUIRED_MESSAGE);
+    showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
     navigate("/faculty/profile");
     return false;
   };
@@ -89,33 +94,43 @@ export default function SubjectDetails() {
     },
   });
 };
-  useEffect(() => {
-    fetchSubject(subjectId)
-      .then(async (data) => {
-        setSubject(data);
-        const [facultyData, classmatesData] = await Promise.all([
-          fetchSubjectFaculty(data),
-          fetchSubjectClassmates(subjectId),
-        ]);
-        setFaculty(facultyData);
-        setClassmates(classmatesData);
-      })
-      .catch((err) => {
-        console.error(err);
-        alert(err.message || "Failed to load subject");
-      });
+  const loadSubjectPage = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const data = await fetchSubject(subjectId);
+      setSubject(data);
 
-    fetchSubjectAssessments(subjectId)
-      .then((data) => setAssessments(data))
-      .catch(console.error);
+      const [facultyData, classmatesData, assessmentData] = await Promise.all([
+        fetchSubjectFaculty(data),
+        fetchSubjectClassmates(subjectId),
+        fetchSubjectAssessments(subjectId),
+      ]);
 
-    setAnalyticsLoading(true);
-    fetchSubjectClassAnalytics(subjectId)
-      .then((data) => setClassAnalytics(data))
-      .catch(console.error)
-      .finally(() => setAnalyticsLoading(false));
-
+      setFaculty(facultyData);
+      setClassmates(classmatesData);
+      setAssessments(assessmentData);
+    } catch (err) {
+      console.error(err);
+      if (!silent) showError(err.message || "Failed to load subject");
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [subjectId]);
+
+  const loadAnalytics = useCallback(async (silent = false) => {
+    if (!silent) setAnalyticsLoading(true);
+    try {
+      const data = await fetchSubjectClassAnalytics(subjectId);
+      setClassAnalytics(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (!silent) setAnalyticsLoading(false);
+    }
+  }, [subjectId]);
+
+  usePolling(loadSubjectPage, [subjectId]);
+  usePolling(loadAnalytics, [subjectId]);
 
   useEffect(() => {
     const loadFacultyProfile = async () => {
@@ -136,10 +151,14 @@ export default function SubjectDetails() {
     loadFacultyProfile();
   }, [cachedUser.id, cachedUser.role]);
 
+  if (loading && !subject) {
+    return <PageLoadingSkeleton theme={theme} variant="detail" />;
+  }
+
   if (!subject) {
     return (
       <div className={`p-6 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-        Loading...
+        Subject not found.
       </div>
     );
   }

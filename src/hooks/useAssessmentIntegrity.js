@@ -18,6 +18,7 @@ const EXTERNAL_APP_CHECK_MS = 700;
 export default function useAssessmentIntegrity({
   examId,
   active,
+  isRetakeAttempt = false,
   onAlert,
   onFocusViolation,
   suppressAlerts = false,
@@ -61,13 +62,16 @@ export default function useAssessmentIntegrity({
           examId,
           eventType,
           description: message,
-          metadata,
+          metadata: {
+            ...metadata,
+            attempt: isRetakeAttempt ? "retake" : "initial",
+          },
         });
       } catch (error) {
         console.error("Failed to log integrity event:", error);
       }
     },
-    [examId, onAlert, shouldIgnoreEvent]
+    [examId, isRetakeAttempt, onAlert, shouldIgnoreEvent]
   );
 
   const flagFocusViolation = useCallback(

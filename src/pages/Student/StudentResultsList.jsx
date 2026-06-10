@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { ClipboardCheck, Trophy, Eye, EyeOff } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { resolveStudentId } from "../../utils/authUser";
 import PageHeader from "../../components/ui/PageHeader";
-import { pageShellWithBellClass, panelClass, emptyStateClass } from "../../utils/themeInputs";
+import { pageShellWithBellClass, panelClass, emptyStateClass, staggerGridClass } from "../../utils/themeInputs";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
+import {
+  canStudentAccessResults,
+  getStudentResultsReleaseLabel,
+} from "../../utils/assessmentStatus";
 
 function scoreLabel(score, total) {
   if (score === total) return { text: "Perfect", className: "text-emerald-500" };
@@ -20,55 +26,37 @@ export default function StudentResultsList() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadResults = async () => {
-      try {
-        const resolvedId = await resolveStudentId();
-        if (!resolvedId) {
-          setResults([]);
-          return;
-        }
-
-        setStudentId(resolvedId);
-
-        const { data: examResults, error } = await supabase
-          .from("exam_results")
-          .select("*, exam(*)")
-          .eq("student_id", resolvedId)
-          .order("id", { ascending: false });
-
-        if (error) throw error;
-
-        const visibleResults = (examResults || []).filter(
-          (row) => row.exam?.allow_student_view !== false
-        );
-        setResults(visibleResults);
-      } catch (err) {
-        console.error("Failed to fetch results:", err);
-      } finally {
-        setLoading(false);
+  const loadResults = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const resolvedId = await resolveStudentId();
+      if (!resolvedId) {
+        setResults([]);
+        return;
       }
-    };
 
-    loadResults();
+      setStudentId(resolvedId);
+
+      const { data: examResults, error } = await supabase
+        .from("exam_results")
+        .select("*, exam(*)")
+        .eq("student_id", resolvedId)
+        .order("id", { ascending: false });
+
+      if (error) throw error;
+
+      setResults(examResults || []);
+    } catch (err) {
+      console.error("Failed to fetch results:", err);
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, []);
 
+  usePolling(loadResults, []);
+
   if (loading) {
-    return (
-      <div className={pageShellWithBellClass(theme)}>
-        <div className="mx-auto max-w-7xl animate-pulse space-y-6">
-          <div className={`h-10 w-72 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className={`h-40 rounded-2xl ${theme === "dark" ? "bg-white/5" : "en-bg-surface"}`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="cards" />;
   }
 
   return (
@@ -78,7 +66,7 @@ export default function StudentResultsList() {
           theme={theme}
           icon={Trophy}
           title="Completed Assessments"
-          subtitle="Review scores and answers for finished assessments your teacher has released."
+          subtitle="All assessments you have finished appear here. Scores and review details depend on what your teacher has released."
         />
 
         {!results.length ? (
@@ -91,35 +79,49 @@ export default function StudentResultsList() {
             <p className="mt-1 text-sm">You have not completed any assessments yet.</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className={staggerGridClass("grid md:grid-cols-2 lg:grid-cols-3 gap-5")}>
             {results.map((r) => {
+              const canAccess = canStudentAccessResults(r.exam);
+              const releaseLabel = getStudentResultsReleaseLabel(r.exam);
               const label = scoreLabel(r.score, r.total);
               const pct = r.total ? Math.round((r.score / r.total) * 100) : 0;
-              const fullReview = r.exam?.allow_question_review !== false;
+              const showFullReviewBadge = releaseLabel === "Full review";
+              const showReviewBadge = releaseLabel === "Review (no answers)";
+              const panelClasses = panelClass(
+                theme,
+                canAccess ? "text-left cursor-pointer" : "text-left"
+              );
 
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() =>
-                    navigate(`/student/results/${r.exam_id}/${studentId}`)
-                  }
-                  className={`${panelClass(theme, "text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer")}`}
-                >
+              const cardBody = (
+                <>
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        fullReview
+                        !canAccess
                           ? theme === "dark"
-                            ? "bg-emerald-500/15 text-emerald-300"
-                            : "bg-emerald-100 text-emerald-800"
-                          : theme === "dark"
-                            ? "bg-amber-500/15 text-amber-300"
-                            : "bg-amber-100 text-amber-900"
+                            ? "bg-white/10 text-gray-300"
+                            : "bg-gray-100 text-gray-700"
+                          : showFullReviewBadge
+                            ? theme === "dark"
+                              ? "bg-emerald-500/15 text-emerald-300"
+                              : "bg-emerald-100 text-emerald-800"
+                            : showReviewBadge
+                              ? theme === "dark"
+                                ? "bg-cyan-500/15 text-cyan-300"
+                                : "bg-cyan-100 text-cyan-900"
+                              : theme === "dark"
+                                ? "bg-amber-500/15 text-amber-300"
+                                : "bg-amber-100 text-amber-900"
                       }`}
                     >
-                      {fullReview ? <Eye size={12} /> : <EyeOff size={12} />}
-                      {fullReview ? "Full review" : "Score only"}
+                      {!canAccess ? (
+                        <EyeOff size={12} />
+                      ) : showFullReviewBadge ? (
+                        <Eye size={12} />
+                      ) : (
+                        <EyeOff size={12} />
+                      )}
+                      {releaseLabel}
                     </span>
                   </div>
                   <h2
@@ -140,25 +142,72 @@ export default function StudentResultsList() {
                   )}
 
                   <div className="mt-4 flex items-end justify-between gap-3">
-                    <div>
-                      <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                        Score
+                    {canAccess ? (
+                      <>
+                        <div>
+                          <p
+                            className={`text-xs ${
+                              theme === "dark" ? "text-gray-500" : "text-gray-500"
+                            }`}
+                          >
+                            Score
+                          </p>
+                          <p className="text-xl font-bold">
+                            {r.score}
+                            <span
+                              className={`text-sm font-normal ${
+                                theme === "dark" ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
+                              {" "}
+                              / {r.total}
+                            </span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-semibold ${label.className}`}>
+                            {label.text}
+                          </p>
+                          <p
+                            className={`text-xs ${
+                              theme === "dark" ? "text-gray-500" : "text-gray-500"
+                            }`}
+                          >
+                            {pct}%
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <p
+                        className={`text-sm ${
+                          theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Score not released by your instructor yet.
                       </p>
-                      <p className="text-xl font-bold">
-                        {r.score}
-                        <span className={`text-sm font-normal ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                          {" "}
-                          / {r.total}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-semibold ${label.className}`}>{label.text}</p>
-                      <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                        {pct}%
-                      </p>
-                    </div>
+                    )}
                   </div>
+                </>
+              );
+
+              if (!canAccess) {
+                return (
+                  <div key={r.id} className={panelClasses}>
+                    {cardBody}
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() =>
+                    navigate(`/student/results/${r.exam_id}/${studentId}`)
+                  }
+                  className={panelClasses}
+                >
+                  {cardBody}
                 </button>
               );
             })}

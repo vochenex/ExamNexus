@@ -16,6 +16,7 @@ const { createClient } = require("@supabase/supabase-js");
 // Routes
 const subjectsRoute = require("./routes/subjectsRoute");
 const analyticsRoute = require("./routes/analyticsRoute");
+const passwordResetRoute = require("./routes/passwordResetRoute");
 const { getSupabaseAdmin } = require("./lib/supabaseAdmin");
 
 // ================= INIT APP =================
@@ -347,6 +348,7 @@ app.delete("/exam/:examId", async (req, res) => {
 
 app.use("/subjects", subjectsRoute);
 app.use("/analytics", analyticsRoute);
+app.use("/password-reset", passwordResetRoute);
 app.use((err, req, res, next) => {
   console.error("GLOBAL EXPRESS ERROR:", err);
 

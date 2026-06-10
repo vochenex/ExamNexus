@@ -1,5 +1,5 @@
 export const GRADE_WEIGHT_PRESETS = {
-  major: { exam: 60, standing: 30, attendance: 10, label: "Major subject" },
+  major: { exam: 70, standing: 20, attendance: 10, label: "Major subject" },
   minor: { exam: 70, standing: 20, attendance: 10, label: "Minor subject" },
 };
 

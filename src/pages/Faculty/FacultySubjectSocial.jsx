@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Megaphone } from "lucide-react";
 import BackButton from "../../components/BackButton";
@@ -11,6 +11,7 @@ import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Button from "../../components/ui/Button";
 import { useTheme } from "../../layouts/ThemeContext";
+import { useAppModal } from "../../contexts/AppModalContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { getSubjectSections } from "../../utils/sections";
 import {
@@ -24,9 +25,12 @@ import {
   FACULTY_AVATAR_REQUIRED_MESSAGE,
   isFacultyRole,
 } from "../../utils/avatar";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 
 export default function FacultySubjectSocial() {
   const { theme } = useTheme();
+  const { warning: showWarning } = useAppModal();
   const { subjectId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -46,9 +50,9 @@ export default function FacultySubjectSocial() {
 
   const facultyCanManage = canFacultyManageSubjects(cachedUser);
 
-  const loadPage = async () => {
+  const loadPage = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
 
       const subjectData = await fetchSubject(subjectId);
@@ -67,19 +71,18 @@ export default function FacultySubjectSocial() {
       console.error(err);
       setError(err.message || "Failed to load social page.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [subjectId]);
 
   useEffect(() => {
     if (isFacultyRole(cachedUser.role) && !facultyCanManage) {
-      alert(FACULTY_AVATAR_REQUIRED_MESSAGE);
+      showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       navigate("/faculty/profile");
-      return;
     }
+  }, [cachedUser.role, facultyCanManage, navigate]);
 
-    loadPage();
-  }, [subjectId]);
+  usePolling(loadPage, [subjectId]);
 
   useEffect(() => {
     if (!highlightId || loading) return;
@@ -97,7 +100,7 @@ export default function FacultySubjectSocial() {
     event.preventDefault();
 
     if (!facultyCanManage) {
-      alert(FACULTY_AVATAR_REQUIRED_MESSAGE);
+      showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       return;
     }
 
@@ -130,14 +133,7 @@ export default function FacultySubjectSocial() {
   };
 
   if (loading) {
-    return (
-      <div className={pageShellClass(theme)}>
-        <div className="mx-auto max-w-7xl animate-pulse space-y-4">
-          <div className={`h-10 w-64 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
-          <div className={`h-64 rounded-2xl ${theme === "dark" ? "bg-white/5" : "en-bg-surface"}`} />
-        </div>
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 
   return (

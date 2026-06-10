@@ -60,6 +60,23 @@ export function canStudentTakeAssessment(assessment) {
   );
 }
 
+export function canStudentAccessResults(exam) {
+  return exam?.allow_student_view !== false;
+}
+
+export function canStudentViewResultsFromCard(assessment) {
+  if (getStudentAssessmentStatus(assessment) !== "completed") return false;
+  if (assessment?.allow_student_view === false) return false;
+  return assessment?.allow_show_correct_answers !== false;
+}
+
+export function getStudentResultsReleaseLabel(exam) {
+  if (!canStudentAccessResults(exam)) return "Completed";
+  if (exam?.allow_question_review === false) return "Score only";
+  if (exam?.allow_show_correct_answers === false) return "Review (no answers)";
+  return "Full review";
+}
+
 export function canRequestRetake(assessment) {
   if (!assessment) return false;
   if (assessment.retake_status === "pending") return false;

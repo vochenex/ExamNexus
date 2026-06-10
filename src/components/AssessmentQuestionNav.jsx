@@ -1,4 +1,4 @@
-import { Flag, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 
 export default function AssessmentQuestionNav({
@@ -12,7 +12,6 @@ export default function AssessmentQuestionNav({
   isIndexNavigable,
   isSectionLocked,
   onSelect,
-  onToggleFlag,
 }) {
   const { theme } = useTheme();
 
@@ -145,19 +144,6 @@ export default function AssessmentQuestionNav({
           Section locked until current section is complete
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={onToggleFlag}
-        className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
-          theme === "dark"
-            ? "bg-white/5 text-amber-300 hover:bg-amber-500/10"
-            : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-        }`}
-      >
-        <Flag size={15} />
-        Toggle flag on current item
-      </button>
     </aside>
   );
 }

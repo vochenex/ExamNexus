@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useTheme } from "../layouts/ThemeContext";
+import { motion } from "../utils/motion";
 
 function navLinkClass(theme, isActive) {
   if (isActive) {
@@ -33,7 +34,7 @@ export default function SidebarNavLink({ to, icon: Icon, label, end = false }) {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${navLinkClass(
+        `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${motion.navItem} ${navLinkClass(
           theme,
           isActive
         )}`

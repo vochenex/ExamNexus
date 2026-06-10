@@ -78,13 +78,6 @@ export default function AssessmentSettingsPanel({
           >
             Time limit
           </label>
-          <p
-            className={`mb-2 text-xs ${
-              theme === "dark" ? "text-gray-500" : "text-gray-500"
-            }`}
-          >
-            Click the field to select the value, then type the minutes you want.
-          </p>
           <input
             type="number"
             min="1"

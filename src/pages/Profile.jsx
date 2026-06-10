@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../layouts/ThemeContext";
+import { useAppModal } from "../contexts/AppModalContext";
 import {
   Pencil,
   Lock,
   Mail,
   Shield,
+  Users,
   BookOpen,
   ClipboardList,
   Megaphone,
@@ -27,6 +29,7 @@ import {
 import { isStudentRole, resolveStudentId } from "../utils/authUser";
 import { loadProfileForUser, resolveSchoolId } from "../utils/authProfile";
 import { isFacultyRole, hasCustomProfilePhoto } from "../utils/avatar";
+import { isAdminUser } from "../utils/adminData";
 import { primaryButton, secondaryButton, dangerButton } from "../utils/themeButtons";
 import {
   DEPARTMENTS,
@@ -37,6 +40,7 @@ import {
 import { YEAR_LEVELS, normalizeYearLevel, getYearLevelLabel } from "../utils/yearLevels";
 import ProfileAvatar from "../components/ProfileAvatar";
 import AvatarLightbox from "../components/AvatarLightbox";
+import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
 
 function inputStyle(theme) {
   return inputClass(theme);
@@ -134,6 +138,7 @@ function QuickLink({ icon: Icon, label, onClick, theme }) {
 
 export default function Profile() {
   const { theme } = useTheme();
+  const { error: showError } = useAppModal();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
@@ -176,85 +181,109 @@ export default function Profile() {
   });
   const [passwordStatus, setPasswordStatus] = useState("idle");
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const isStudent = isStudentRole(profile.role);
   const isFaculty = isFacultyRole(profile.role);
+  const isAdmin = isAdminUser(profile);
   const courses = getCoursesForDepartment(editProfile.department);
   const displaySchoolId =
     resolveSchoolId(authUser, editProfile) || editProfile.school_id || "";
 
-  const loadStudentStats = async (studentId, role) => {
+  const loadStudentStats = useCallback(async (studentId, role, silent = false) => {
     if (!studentId || !isStudentRole(role)) return;
 
     try {
-      setStatsError("");
+      if (!silent) setStatsError("");
       const stats = await getStudentDashboardStats(studentId);
       setStudentStats(stats);
     } catch (err) {
       console.error("Failed to load student stats:", err);
-      setStatsError(
-        "Could not load your stats. Run database/enroll_student.sql in Supabase, then refresh."
-      );
+      if (!silent) {
+        setStatsError(
+          "Could not load your stats. Run database/enroll_student.sql in Supabase, then refresh."
+        );
+      }
     }
-  };
+  }, []);
 
-  const loadFacultyStats = async (schoolId, role) => {
+  const loadFacultyStats = useCallback(async (schoolId, role, silent = false) => {
     if (!schoolId || !isFacultyRole(role)) return;
 
     try {
-      setStatsError("");
+      if (!silent) setStatsError("");
       const stats = await getFacultyDashboardStats(schoolId);
       setFacultyStats(stats);
     } catch (err) {
       console.error("Failed to load faculty stats:", err);
-      setStatsError("Could not load your faculty stats. Please refresh.");
+      if (!silent) setStatsError("Could not load your faculty stats. Please refresh.");
     }
-  };
-
-  useEffect(() => {
-    resolveStudentId().then((id) => {
-      if (id) loadStudentStats(id, user.role);
-    });
-  }, [user.id, user.role]);
-
-  useEffect(() => {
-    const loadProfile = async () => {
-      const studentId = await resolveStudentId();
-      if (!studentId) {
-        setLoadError("Could not find your session. Please log out and log in again.");
-        return;
-      }
-
-      const { profile: loadedProfile, error } = await loadProfileForUser(supabase);
-      const {
-        data: { user: currentAuthUser },
-      } = await supabase.auth.getUser();
-
-      if (currentAuthUser) {
-        setAuthUser(currentAuthUser);
-      }
-
-      if (error || !loadedProfile) {
-        console.error("Failed to fetch user:", error);
-        setLoadError(
-          error?.message ||
-            "Could not load your profile. Run database/users_signup_policies.sql in Supabase, then log in again."
-        );
-        return;
-      }
-
-      setLoadError("");
-      setProfile(loadedProfile);
-      setEditProfile(loadedProfile);
-      if (isStudentRole(loadedProfile.role)) {
-        await loadStudentStats(studentId, loadedProfile.role);
-      } else if (isFacultyRole(loadedProfile.role)) {
-        await loadFacultyStats(loadedProfile.school_id, loadedProfile.role);
-      }
-    };
-
-    loadProfile();
   }, []);
+
+  const refreshStats = useCallback(
+    async (silent = true) => {
+      const studentId = await resolveStudentId();
+      if (!studentId) return;
+
+      if (isStudentRole(profile.role)) {
+        await loadStudentStats(studentId, profile.role, silent);
+      } else if (isFacultyRole(profile.role)) {
+        await loadFacultyStats(profile.school_id, profile.role, silent);
+      }
+    },
+    [loadFacultyStats, loadStudentStats, profile.role, profile.school_id]
+  );
+
+  const loadProfile = useCallback(async (silent = false) => {
+    const studentId = await resolveStudentId();
+    if (!studentId) {
+      setLoadError("Could not find your session. Please log out and log in again.");
+      if (!silent) setProfileLoading(false);
+      return;
+    }
+
+    const { profile: loadedProfile, error } = await loadProfileForUser(supabase);
+    const {
+      data: { user: currentAuthUser },
+    } = await supabase.auth.getUser();
+
+    if (currentAuthUser) {
+      setAuthUser(currentAuthUser);
+    }
+
+    if (error || !loadedProfile) {
+      console.error("Failed to fetch user:", error);
+      setLoadError(
+        error?.message ||
+          "Could not load your profile. Run database/users_signup_policies.sql in Supabase, then log in again."
+      );
+      if (!silent) setProfileLoading(false);
+      return;
+    }
+
+    setLoadError("");
+    setProfile(loadedProfile);
+    setEditProfile(loadedProfile);
+    if (isStudentRole(loadedProfile.role)) {
+      await loadStudentStats(studentId, loadedProfile.role, silent);
+    } else if (isFacultyRole(loadedProfile.role)) {
+      await loadFacultyStats(loadedProfile.school_id, loadedProfile.role, silent);
+    }
+
+    if (!silent) setProfileLoading(false);
+  }, [loadFacultyStats, loadStudentStats]);
+
+  useEffect(() => {
+    loadProfile(false);
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (profileLoading) return undefined;
+
+    refreshStats(true);
+    const timer = setInterval(() => refreshStats(true), 5000);
+    return () => clearInterval(timer);
+  }, [profileLoading, refreshStats]);
 
   useEffect(() => {
     if (!editing) {
@@ -278,7 +307,7 @@ export default function Profile() {
 
       if (uploadError) {
         console.error("UPLOAD ERROR:", uploadError);
-        alert(`Upload failed:\n${uploadError.message}`);
+        showError(`Upload failed:\n${uploadError.message}`, "Upload failed");
         return;
       }
 
@@ -302,7 +331,7 @@ export default function Profile() {
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error("Failed to save avatar:", err);
-      alert(err.message || "Failed to save avatar to profile.");
+      showError(err.message || "Failed to save avatar to profile.");
     } finally {
       setAvatarUploading(false);
       event.target.value = "";
@@ -344,7 +373,7 @@ export default function Profile() {
     } catch (err) {
       console.error("Failed to save profile:", err);
       setSaveStatus("error");
-      alert(err.message || "Error saving profile. Please try again.");
+      showError(err.message || "Error saving profile. Please try again.");
     }
   };
 
@@ -432,6 +461,10 @@ export default function Profile() {
     : null;
 
   const roleLabel = isStudent ? "Student" : isFaculty ? "Faculty" : profile.role || "User";
+
+  if (profileLoading) {
+    return <PageLoadingSkeleton theme={theme} variant="profile" />;
+  }
 
   return (
     <div
@@ -1074,7 +1107,22 @@ export default function Profile() {
             </div>
 
             <div className="space-y-2">
-              {isStudent ? (
+              {isAdmin ? (
+                <>
+                  <QuickLink
+                    icon={Shield}
+                    label="Admin dashboard"
+                    onClick={() => navigate("/admin/dashboard")}
+                    theme={theme}
+                  />
+                  <QuickLink
+                    icon={Users}
+                    label="Manage accounts"
+                    onClick={() => navigate("/admin/accounts")}
+                    theme={theme}
+                  />
+                </>
+              ) : isStudent ? (
                 <>
                   <QuickLink
                     icon={BookOpen}

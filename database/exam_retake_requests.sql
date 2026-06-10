@@ -272,11 +272,6 @@ BEGIN
       DELETE FROM public.exam_results
       WHERE exam_id = p_exam_id AND student_id = v_student_id;
 
-      IF to_regclass('public.exam_integrity_events') IS NOT NULL THEN
-        DELETE FROM public.exam_integrity_events
-        WHERE exam_id = p_exam_id AND student_id = v_student_id;
-      END IF;
-
       UPDATE public.exam_retake_requests
       SET status = 'approved',
           faculty_note = NULLIF(trim(p_note), ''),

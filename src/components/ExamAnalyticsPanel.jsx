@@ -157,8 +157,8 @@ function QuestionTimeChart({ groups, theme, hasTimedData, overallAvgSeconds }) {
   if (!hasTimedData) {
     return (
       <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-        Time-per-question data appears after students submit assessments taken with the
-        latest exam player. Older submissions may not include timing.
+        No per-question timing yet. New submissions from the exam player include time spent
+        on each item once the database migration for answer timing is applied in Supabase.
       </p>
     );
   }

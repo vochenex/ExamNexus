@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
-import { resolveStudentId } from "../../utils/authUser";
+import { resolveStudentId, isAuthSessionError } from "../../utils/authUser";
 import { fetchStudentAnalytics } from "../../utils/supabaseData";
 import { getAssessmentCategoryLabel } from "../../utils/assessmentCategories";
 import {
@@ -20,6 +20,9 @@ import {
   StatCard,
 } from "../../components/StudentAnalyticsCharts";
 import StudentGradeCalculator from "../../components/StudentGradeCalculator";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
+import { staggerGridClass } from "../../utils/themeInputs";
 
 export default function StudentDashboard() {
   const { theme } = useTheme();
@@ -31,50 +34,40 @@ export default function StudentDashboard() {
   const [error, setError] = useState("");
   const [studentId, setStudentId] = useState(null);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const load = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      setError("");
 
-        const resolvedId = await resolveStudentId();
-        if (!resolvedId) {
-          setError("Please log in again.");
-          return;
-        }
-
-        setStudentId(resolvedId);
-        const data = await fetchStudentAnalytics(resolvedId);
-        setAnalytics(data);
-      } catch (err) {
-        console.error(err);
-        setError(err.message || "Failed to load dashboard analytics.");
-      } finally {
-        setLoading(false);
+      const resolvedId = await resolveStudentId();
+      if (!resolvedId) {
+        localStorage.removeItem("examnexus_user");
+        navigate("/auth", { replace: true });
+        return;
       }
-    };
 
-    load();
+      setStudentId(resolvedId);
+      const data = await fetchStudentAnalytics(resolvedId);
+      setAnalytics(data);
+    } catch (err) {
+      console.error(err);
+      if (isAuthSessionError(err)) {
+        localStorage.removeItem("examnexus_user");
+        navigate("/auth", { replace: true });
+        return;
+      }
+      setError(err.message || "Failed to load dashboard analytics.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, []);
+
+  usePolling(load, []);
 
   const greetingName = user.first_name || user.full_name?.split(" ")[0] || "Student";
 
   if (loading) {
-    return (
-      <div className={`min-h-full p-6 md:p-8 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-        <div className="mx-auto max-w-7xl animate-pulse space-y-6">
-          <div className={`h-10 w-64 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className={`h-28 rounded-2xl ${theme === "dark" ? "bg-white/5" : "en-bg-surface"}`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="dashboard" />;
   }
 
   if (error) {
@@ -148,7 +141,7 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className={staggerGridClass("grid gap-4 md:grid-cols-2 xl:grid-cols-4")}>
           <StatCard
             label="Enrolled Subjects"
             value={analytics.stats.enrolledSubjects}

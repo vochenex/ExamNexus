@@ -2,6 +2,7 @@ export default function ExamNexusLogo({
   size = 44,
   className = "",
   showGlow = true,
+  animated = false,
   idSuffix = "default",
 }) {
   const gradientId = `enLogoGradient-${idSuffix}`;
@@ -15,7 +16,7 @@ export default function ExamNexusLogo({
       height={size}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`shrink-0 ${className}`}
+      className={`shrink-0 ${animated ? "en-logo-animated" : ""} ${className}`}
       aria-hidden="true"
     >
       <defs>
@@ -46,6 +47,7 @@ export default function ExamNexusLogo({
 
       {/* Orbital arc */}
       <path
+        className={animated ? "en-logo-orbit-arc" : undefined}
         d="M 8 28 A 16 16 0 0 1 40 28"
         stroke={`url(#${ringId})`}
         strokeWidth="1.75"
@@ -76,16 +78,16 @@ export default function ExamNexusLogo({
       />
 
       {/* Nexus hub */}
-      <circle cx="24" cy="24" r="3.25" fill={`url(#${gradientId})`} />
+      <circle className={animated ? "en-logo-hub" : undefined} cx="24" cy="24" r="3.25" fill={`url(#${gradientId})`} />
 
       {/* Satellite nodes + connectors */}
       <line x1="24" y1="24" x2="24" y2="9" stroke={`url(#${gradientId})`} strokeWidth="1.5" strokeLinecap="round" opacity="0.85" />
       <line x1="24" y1="24" x2="35.5" y2="30" stroke={`url(#${gradientId})`} strokeWidth="1.5" strokeLinecap="round" opacity="0.85" />
       <line x1="24" y1="24" x2="12.5" y2="30" stroke={`url(#${gradientId})`} strokeWidth="1.5" strokeLinecap="round" opacity="0.85" />
 
-      <circle cx="24" cy="8" r="2.75" fill="#22d3ee" />
-      <circle cx="36.5" cy="30.5" r="2.75" fill="#34d399" />
-      <circle cx="11.5" cy="30.5" r="2.75" fill="#2dd4bf" />
+      <circle className={animated ? "en-logo-node" : undefined} cx="24" cy="8" r="2.75" fill="#22d3ee" />
+      <circle className={animated ? "en-logo-node" : undefined} cx="36.5" cy="30.5" r="2.75" fill="#34d399" />
+      <circle className={animated ? "en-logo-node" : undefined} cx="11.5" cy="30.5" r="2.75" fill="#2dd4bf" />
 
       {/* Corner accents */}
       <rect x="22" y="37.5" width="4" height="4" rx="1" transform="rotate(45 24 39.5)" fill={`url(#${gradientId})`} opacity="0.9" />

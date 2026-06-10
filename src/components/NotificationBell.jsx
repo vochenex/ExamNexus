@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { fetchUserNotifications } from "../utils/supabaseData";
+import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
 import { formatTargetSectionsLabel } from "../utils/sections";
 import { getNotificationDestination } from "../utils/notificationRoutes";
 import {
@@ -18,6 +19,7 @@ import {
   filterVisibleNotifications,
 } from "../utils/notificationDismissals";
 import { secondaryButtonSm } from "../utils/themeButtons";
+import { motion } from "../utils/motion";
 
 function statusLabel(item) {
   if (item.kind === "announcement") return "Announcement";
@@ -89,21 +91,21 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await fetchUserNotifications();
       setItems(filterVisibleNotifications(data));
     } catch (err) {
       console.error("Failed to load notifications:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 60000);
+    loadNotifications(false);
+    const interval = setInterval(() => loadNotifications(true), REALTIME_POLL_MS);
     return () => clearInterval(interval);
   }, []);
 
@@ -155,6 +157,8 @@ export default function NotificationBell() {
           if (!open) loadNotifications();
         }}
         className={`relative p-3.5 rounded-2xl transition-all duration-200 ${
+          open ? "en-bell-ring" : ""
+        } ${
           open
             ? theme === "dark"
               ? "bg-emerald-500/20 ring-2 ring-emerald-500/40 text-emerald-300"
@@ -168,7 +172,7 @@ export default function NotificationBell() {
       >
         <Bell size={30} strokeWidth={2.25} />
         {recentCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center ring-2 ring-white dark:ring-[#0b1114]">
+          <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center ring-2 ring-white dark:ring-[#0b1114] en-badge-pulse">
             {recentCount > 99 ? "99+" : recentCount}
           </span>
         )}
@@ -176,7 +180,7 @@ export default function NotificationBell() {
 
       {open && (
         <div
-          className={`absolute right-0 mt-3 w-[min(92vw,400px)] max-h-[75vh] overflow-hidden rounded-2xl border shadow-2xl z-50 ${
+          className={`${motion.dropdown} absolute right-0 mt-3 w-[min(92vw,400px)] max-h-[75vh] overflow-hidden rounded-2xl border shadow-2xl z-50 ${
             theme === "dark"
               ? "bg-[#0b1114] border-white/10"
               : "en-bg-elevated border-emerald-200"

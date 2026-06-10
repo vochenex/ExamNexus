@@ -1,0 +1,362 @@
+/* ExamNexus motion system — subtle, consistent, respects reduced motion */
+
+@keyframes en-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes en-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes en-fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes en-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes en-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes en-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes en-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  70% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes en-check-draw {
+  0% {
+    stroke-dashoffset: 48;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes en-check-circle-draw {
+  0% {
+    stroke-dashoffset: 166;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.en-success-check-circle {
+  stroke: currentColor;
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  animation: en-check-circle-draw 0.55s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.en-success-check-mark {
+  stroke: currentColor;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: en-check-draw 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.35s forwards;
+}
+
+.en-success-check {
+  color: rgb(16, 185, 129);
+}
+
+html.light .en-success-check {
+  color: rgb(13, 148, 136);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .en-success-check-circle,
+  .en-success-check-mark {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+@keyframes en-bell-ring {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(12deg);
+  }
+  30% {
+    transform: rotate(-10deg);
+  }
+  45% {
+    transform: rotate(8deg);
+  }
+  60% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes en-badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes en-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Page & section entrances */
+.en-page-enter {
+  animation: en-fade-in-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-fade-in {
+  animation: en-fade-in 0.35s ease-out both;
+}
+
+.en-fade-in-up {
+  animation: en-fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-fade-in-down {
+  animation: en-fade-in-down 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-scale-in {
+  animation: en-scale-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-pop-in {
+  animation: en-pop-in 0.42s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.en-slide-in-left {
+  animation: en-slide-in-left 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-slide-in-right {
+  animation: en-slide-in-right 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-delay-1 {
+  animation-delay: 0.06s;
+}
+.en-delay-2 {
+  animation-delay: 0.12s;
+}
+.en-delay-3 {
+  animation-delay: 0.18s;
+}
+.en-delay-4 {
+  animation-delay: 0.24s;
+}
+
+/* Interactive surfaces */
+.en-interactive-card {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.en-interactive-card:hover {
+  transform: translateY(-3px);
+}
+
+html:not(.light) .en-interactive-card:hover {
+  box-shadow: 0 14px 36px rgba(16, 185, 129, 0.1);
+}
+
+html.light .en-interactive-card:hover {
+  box-shadow: 0 12px 28px rgba(16, 185, 129, 0.14);
+}
+
+.en-interactive-card:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+.en-nav-item {
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.en-nav-item:hover {
+  transform: translateX(3px);
+}
+
+.en-nav-item:active {
+  transform: translateX(1px) scale(0.99);
+}
+
+.en-dropdown-enter {
+  animation: en-scale-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top right;
+}
+
+.en-overlay-enter {
+  animation: en-fade-in 0.22s ease-out both;
+}
+
+.en-bell-ring {
+  animation: en-bell-ring 0.55s ease-in-out;
+}
+
+.en-badge-pulse {
+  animation: en-badge-pulse 2s ease-in-out infinite;
+}
+
+/* Staggered list / grid children */
+.en-stagger-grid > *,
+.en-stagger-list > * {
+  animation: en-fade-in-up 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-stagger-grid > *:nth-child(1),
+.en-stagger-list > *:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.en-stagger-grid > *:nth-child(2),
+.en-stagger-list > *:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.en-stagger-grid > *:nth-child(3),
+.en-stagger-list > *:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.en-stagger-grid > *:nth-child(4),
+.en-stagger-list > *:nth-child(4) {
+  animation-delay: 0.16s;
+}
+.en-stagger-grid > *:nth-child(5),
+.en-stagger-list > *:nth-child(5) {
+  animation-delay: 0.2s;
+}
+.en-stagger-grid > *:nth-child(6),
+.en-stagger-list > *:nth-child(6) {
+  animation-delay: 0.24s;
+}
+.en-stagger-grid > *:nth-child(7),
+.en-stagger-list > *:nth-child(7) {
+  animation-delay: 0.28s;
+}
+.en-stagger-grid > *:nth-child(8),
+.en-stagger-list > *:nth-child(8) {
+  animation-delay: 0.32s;
+}
+.en-stagger-grid > *:nth-child(9),
+.en-stagger-list > *:nth-child(9) {
+  animation-delay: 0.36s;
+}
+.en-stagger-grid > *:nth-child(10),
+.en-stagger-list > *:nth-child(10) {
+  animation-delay: 0.4s;
+}
+.en-stagger-grid > *:nth-child(11),
+.en-stagger-list > *:nth-child(11) {
+  animation-delay: 0.44s;
+}
+.en-stagger-grid > *:nth-child(12),
+.en-stagger-list > *:nth-child(12) {
+  animation-delay: 0.48s;
+}
+.en-stagger-grid > *:nth-child(n + 13) {
+  animation-delay: 0.52s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .en-page-enter,
+  .en-fade-in,
+  .en-fade-in-up,
+  .en-fade-in-down,
+  .en-scale-in,
+  .en-pop-in,
+  .en-slide-in-left,
+  .en-slide-in-right,
+  .en-dropdown-enter,
+  .en-overlay-enter,
+  .en-stagger-grid > *,
+  .en-stagger-list > *,
+  .en-bell-ring,
+  .en-badge-pulse,
+  .en-success-check-circle,
+  .en-success-check-mark {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .en-interactive-card:hover,
+  .en-interactive-card:active,
+  .en-nav-item:hover,
+  .en-nav-item:active {
+    transform: none !important;
+  }
+}

@@ -1,5 +1,6 @@
 import { useTheme } from "../../layouts/ThemeContext";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { motion } from "../../utils/motion";
 
 export default function ActionDialog({
   open,
@@ -31,9 +32,9 @@ export default function ActionDialog({
           : "border-emerald-200/80 en-bg-elevated";
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-[120] flex items-center justify-center p-4 ${motion.overlay}`}>
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm en-fade-in"
         onClick={showCancel && !loading ? onCancel : undefined}
         aria-hidden="true"
       />
@@ -42,7 +43,7 @@ export default function ActionDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="action-dialog-title"
-        className={`relative z-10 w-full max-w-md rounded-2xl border p-6 shadow-2xl ${toneStyles}`}
+        className={`${motion.scaleIn} relative z-10 w-full max-w-md rounded-2xl border p-6 shadow-2xl ${toneStyles}`}
         onClick={(e) => e.stopPropagation()}
       >
         <h2

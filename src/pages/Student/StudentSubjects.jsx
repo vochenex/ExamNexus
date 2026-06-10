@@ -1,16 +1,24 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
-import { CheckCircle2, XCircle, BookOpen, ChevronRight, Plus } from "lucide-react";
+import { CheckCircle2, XCircle, BookOpen, ChevronRight, Plus, LogOut } from "lucide-react";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
 import { resolveStudentId } from "../../utils/authUser";
-import { getStudentEnrolledSubjects, findSubjectByInviteCode, isStudentEnrolledInSubject } from "../../utils/supabaseData";
+import {
+  getStudentEnrolledSubjects,
+  findSubjectByInviteCode,
+  isStudentEnrolledInSubject,
+  unenrollStudentFromSubject,
+} from "../../utils/supabaseData";
 import FacultyProfileChip from "../../components/FacultyProfileChip";
 import YearLevelBadge from "../../components/YearLevelBadge";
+import ActionDialog from "../../components/ui/ActionDialog";
 import { getSectionsForCount, formatSectionLabel } from "../../utils/sections";
-import { pageShellWithBellClass } from "../../utils/themeInputs";
+import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 const API_BASE = "http://localhost:5000";
 
 export default function StudentSubjects() {
@@ -29,6 +37,8 @@ export default function StudentSubjects() {
   const [enrollSection, setEnrollSection] = useState("A");
   const [enrollSectionCount, setEnrollSectionCount] = useState(3);
   const [enrolling, setEnrolling] = useState(false);
+  const [unenrollTarget, setUnenrollTarget] = useState(null);
+  const [unenrolling, setUnenrolling] = useState(false);
 
   const getAuthContext = async () => {
     let { data: { session } } = await supabase.auth.getSession();
@@ -56,9 +66,9 @@ export default function StudentSubjects() {
     };
   };
 
-  const loadSubjects = async () => {
+  const loadSubjects = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setLoadError("");
 
       const studentId = await resolveStudentId();
@@ -78,13 +88,11 @@ export default function StudentSubjects() {
           "Could not load your subjects. Run database/student_rpc_functions.sql in Supabase SQL Editor, then refresh."
       );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadSubjects();
   }, []);
+
+  usePolling(loadSubjects, []);
 
   useEffect(() => {
     if (!showEnrollModal) return undefined;
@@ -258,12 +266,26 @@ export default function StudentSubjects() {
     setEnrollError("");
   };
 
+  const handleUnenroll = async () => {
+    if (!unenrollTarget) return;
+
+    try {
+      setUnenrolling(true);
+      await unenrollStudentFromSubject(unenrollTarget.id);
+      setSubjects((prev) => prev.filter((subject) => subject.id !== unenrollTarget.id));
+      setEnrollSuccess(`You have left ${unenrollTarget.name}.`);
+      setUnenrollTarget(null);
+    } catch (err) {
+      console.error(err);
+      setLoadError(err.message || "Failed to unenroll from this subject.");
+      setUnenrollTarget(null);
+    } finally {
+      setUnenrolling(false);
+    }
+  };
+
   if (loading) {
-    return (
-      <div className={pageShellWithBellClass(theme)}>
-        Loading subjects...
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="cards" />;
   }
 
   return (
@@ -321,13 +343,14 @@ export default function StudentSubjects() {
       )}
 
       {subjects.length > 0 && (
-        <div className="flex flex-wrap gap-4 items-start">
+        <div className={staggerGridClass("flex flex-wrap gap-4 items-start")}>
           {subjects.map((subject) => (
             <div
               key={subject.id}
               onClick={() => navigate(`/student/subject/${subject.id}`)}
               className={`
                 group
+                en-interactive-card
                 relative
                 w-full
                 md:w-[390px]
@@ -345,7 +368,26 @@ export default function StudentSubjects() {
                 }
               `}
             >
-              <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setUnenrollTarget(subject);
+                  setLoadError("");
+                }}
+                className={`absolute right-4 top-4 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                  theme === "dark"
+                    ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                    : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                }`}
+              >
+                <span className="inline-flex items-center gap-1">
+                  <LogOut size={14} />
+                  Unenroll
+                </span>
+              </button>
+
+              <div className="flex items-start justify-between gap-3 pr-24">
                 <div className="flex items-start gap-3 min-w-0">
                 <div
                   className={`
@@ -454,7 +496,8 @@ export default function StudentSubjects() {
                 theme === "dark" ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              Enter the invitation code provided by your instructor.
+              Enter the invitation code from your instructor. You can join subjects from any
+              year level (for example, a 1st year class while you are in 3rd year).
             </p>
 
             <input
@@ -525,6 +568,21 @@ export default function StudentSubjects() {
           </div>
         </div>
       )}
+
+      <ActionDialog
+        open={Boolean(unenrollTarget)}
+        title="Leave this subject?"
+        confirmLabel="Unenroll"
+        cancelLabel="Stay enrolled"
+        tone="danger"
+        loading={unenrolling}
+        onConfirm={handleUnenroll}
+        onCancel={() => setUnenrollTarget(null)}
+      >
+        {unenrollTarget
+          ? `You will leave ${unenrollTarget.name}. You can re-enroll later with the invite code and choose your section again.`
+          : ""}
+      </ActionDialog>
     </div>
   );
 }

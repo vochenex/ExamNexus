@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
+import { useAppModal } from "../contexts/AppModalContext";
 
 export default function CopyInviteCodeButton({
   inviteCode,
@@ -8,6 +9,7 @@ export default function CopyInviteCodeButton({
   side = "right",
 }) {
   const { theme } = useTheme();
+  const { alert: showAlert } = useAppModal();
   const [copied, setCopied] = useState(false);
 
   if (!inviteCode) return null;
@@ -21,7 +23,12 @@ export default function CopyInviteCodeButton({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.prompt("Copy invitation code:", inviteCode);
+      await showAlert({
+        title: "Copy invitation code",
+        message: inviteCode,
+        tone: "info",
+        confirmLabel: "OK",
+      });
     }
   };
 

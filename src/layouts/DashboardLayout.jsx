@@ -19,7 +19,9 @@ import ProfileAvatar from "../components/ProfileAvatar";
 import NotificationBell from "../components/NotificationBell";
 import ExamNexusLogo from "../components/ExamNexusLogo";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
+import AnimatedPage from "../components/ui/AnimatedPage";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
+import { motion } from "../utils/motion";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -47,7 +49,7 @@ export default function DashboardLayout() {
     >
       {!isLockdownActive && (
         <aside
-          className={`sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r p-4 backdrop-blur-xl ${
+          className={`${motion.slideInLeft} sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r p-4 backdrop-blur-xl ${
             theme === "dark"
               ? "border-[#10B981]/10 bg-[#0b1114]/95"
               : "en-bg-page border-emerald-300/60"
@@ -210,11 +212,13 @@ export default function DashboardLayout() {
         )}
 
         {!isLockdownActive && (
-          <div className="absolute right-8 top-6 z-40">
+          <div className={`absolute right-8 top-6 z-40 ${motion.fadeInDown} en-delay-2`}>
             <NotificationBell />
           </div>
         )}
-        <Outlet />
+        <AnimatedPage>
+          <Outlet />
+        </AnimatedPage>
       </main>
     </div>
   );

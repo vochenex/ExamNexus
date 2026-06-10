@@ -9,6 +9,7 @@ import {
   reviewExamRetakeRequests,
 } from "../utils/supabaseData";
 import { formatSectionLabel } from "../utils/sections";
+import { useAppModal } from "../contexts/AppModalContext";
 
 const STATUS_STYLES = {
   pending: {
@@ -40,6 +41,7 @@ function studentName(row) {
 
 export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
   const { theme } = useTheme();
+  const appModal = useAppModal();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -48,22 +50,26 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
   const [facultyNote, setFacultyNote] = useState("");
   const [processing, setProcessing] = useState(false);
 
-  const loadRequests = async () => {
+  const loadRequests = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
       const rows = await fetchExamRetakeRequests(examId);
       setRequests(rows);
-      setSelectedIds(new Set());
+      if (!silent) setSelectedIds(new Set());
     } catch (err) {
       setError(err.message || "Failed to load retake requests.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (examId) loadRequests();
+    if (!examId) return undefined;
+
+    loadRequests(false);
+    const timer = setInterval(() => loadRequests(true), 5000);
+    return () => clearInterval(timer);
   }, [examId]);
 
   const filtered = useMemo(() => {
@@ -112,22 +118,22 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
     );
 
     if (!ids.length) {
-      alert("Select at least one pending request.");
+      appModal.warning("Select at least one pending request.", "Nothing selected");
       return;
     }
 
     const verb = action === "approve" ? "approve" : "deny";
-    if (
-      !window.confirm(
-        `${action === "approve" ? "Approve" : "Deny"} ${ids.length} retake request(s)?${
-          action === "approve"
-            ? "\n\nApproved students will have their previous submission cleared so they can retake."
-            : ""
-        }`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await appModal.confirm({
+      title: `${action === "approve" ? "Approve" : "Deny"} retake requests?`,
+      message: `${action === "approve" ? "Approve" : "Deny"} ${ids.length} retake request(s)?${
+        action === "approve"
+          ? "\n\nApproved students will have their previous submission cleared so they can retake."
+          : ""
+      }`,
+      tone: action === "approve" ? "warning" : "danger",
+      confirmLabel: action === "approve" ? "Approve" : "Deny",
+    });
+    if (!confirmed) return;
 
     try {
       setProcessing(true);
@@ -135,7 +141,7 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
       await loadRequests();
       onUpdated?.();
     } catch (err) {
-      alert(err.message || `Failed to ${verb} retake requests.`);
+      appModal.error(err.message || `Failed to ${verb} retake requests.`);
     } finally {
       setProcessing(false);
     }
@@ -153,9 +159,11 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
 
   if (loading) {
     return (
-      <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-        Loading retake requests...
-      </p>
+      <div className={`animate-pulse space-y-3 ${panelClass(theme)}`}>
+        <div className={`h-5 w-40 rounded-lg ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
+        <div className={`h-16 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
+        <div className={`h-16 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
+      </div>
     );
   }
 

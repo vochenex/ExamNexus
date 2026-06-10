@@ -6,6 +6,7 @@ import {
   fetchStudentIntegrityAlerts,
 } from "../utils/supabaseData";
 import StudentIntegrityAlertsModal from "./StudentIntegrityAlertsModal";
+import { PageLoadingSkeleton } from "./ui/PageLoadingSkeleton";
 
 const tierStyles = {
   blue: {
@@ -40,10 +41,22 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
   useEffect(() => {
     if (!examId) return;
 
-    fetchExamSubmissionAlerts(examId)
-      .then(setSubmissions)
-      .catch((err) => setError(err.message || "Failed to load submission alerts."))
-      .finally(() => setLoading(false));
+    const load = async (silent = false) => {
+      try {
+        if (!silent) setLoading(true);
+        setError("");
+        const rows = await fetchExamSubmissionAlerts(examId);
+        setSubmissions(rows);
+      } catch (err) {
+        setError(err.message || "Failed to load submission alerts.");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    };
+
+    load(false);
+    const timer = setInterval(() => load(true), 5000);
+    return () => clearInterval(timer);
   }, [examId]);
 
   const openAlertsDetail = async (student) => {
@@ -67,11 +80,7 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
   };
 
   if (loading) {
-    return (
-      <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-        Loading submission alerts...
-      </p>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="list" className="!min-h-0 p-0" />;
   }
 
   if (error) {
@@ -93,8 +102,8 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
         </div>
 
         <p className={`mb-4 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-          Students who submitted (including retakes), ranked by integrity alerts. Click a row to
-          see each alert with timestamps. Blue = none, yellow = some, red = high.
+          Students who submitted (including retakes), ranked by total integrity alerts from the
+          first attempt plus any retake. Click a row to see each alert with timestamps.
         </p>
 
         {submissions.length === 0 ? (

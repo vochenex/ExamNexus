@@ -149,7 +149,11 @@ function normalizeClassmatesList(data, currentUserId) {
   }));
 }
 
-async function fetchSubjectClassmatesDirect(subjectId, currentUserId) {
+async function fetchSubjectClassmatesDirect(
+  subjectId,
+  currentUserId,
+  sectionFilter = null
+) {
   const { data: enrollments, error: enrollmentError } = await supabase
     .from("subject_students")
     .select("student_id, section")
@@ -157,8 +161,17 @@ async function fetchSubjectClassmatesDirect(subjectId, currentUserId) {
 
   if (enrollmentError) throw enrollmentError;
 
+  const normalizedSection = sectionFilter
+    ? String(sectionFilter).toUpperCase()
+    : null;
+
+  const scopedEnrollments = (enrollments || []).filter((row) => {
+    if (!normalizedSection) return true;
+    return String(row.section || "A").toUpperCase() === normalizedSection;
+  });
+
   const studentIds = [
-    ...new Set((enrollments || []).map((row) => row.student_id).filter(Boolean)),
+    ...new Set(scopedEnrollments.map((row) => row.student_id).filter(Boolean)),
   ];
 
   if (!studentIds.length) return [];
@@ -172,7 +185,7 @@ async function fetchSubjectClassmatesDirect(subjectId, currentUserId) {
 
   const usersById = new Map((users || []).map((user) => [user.id, user]));
   const sectionByStudent = new Map(
-    (enrollments || []).map((row) => [
+    scopedEnrollments.map((row) => [
       row.student_id,
       String(row.section || "A").toUpperCase(),
     ])
@@ -332,7 +345,7 @@ export async function fetchSubjectFaculty(subject) {
   return data;
 }
 
-export async function fetchSubjectClassmates(subjectId) {
+export async function fetchSubjectClassmates(subjectId, { sectionFilter = null } = {}) {
   const session = await requireSession();
   const currentUserId = session.user.id;
 
@@ -343,7 +356,7 @@ export async function fetchSubjectClassmates(subjectId) {
   if (!error && data) {
     const classmates = normalizeClassmatesList(data, currentUserId);
     if (classmates.length > 0) {
-      return classmates;
+      return filterClassmatesBySection(classmates, sectionFilter);
     }
   }
 
@@ -356,7 +369,50 @@ export async function fetchSubjectClassmates(subjectId) {
     console.warn("get_subject_classmates RPC failed, using direct query:", error.message);
   }
 
-  return fetchSubjectClassmatesDirect(subjectId, currentUserId);
+  const resolvedSection =
+    sectionFilter ||
+    (await fetchStudentEnrollmentSection(currentUserId, subjectId));
+
+  return fetchSubjectClassmatesDirect(
+    subjectId,
+    currentUserId,
+    resolvedSection
+  );
+}
+
+function filterClassmatesBySection(classmates, section) {
+  if (!section) return classmates;
+
+  const normalized = String(section).toUpperCase();
+  return classmates.filter(
+    (row) => String(row.section || "A").toUpperCase() === normalized
+  );
+}
+
+export async function unenrollStudentFromSubject(subjectId) {
+  await requireSession();
+
+  const { data, error } = await supabase.rpc("unenroll_student_from_subject", {
+    p_subject_id: subjectId,
+  });
+
+  if (error) {
+    if (error.message?.includes("unenroll_student_from_subject")) {
+      const session = await requireSession();
+      const { error: deleteError } = await supabase
+        .from("subject_students")
+        .delete()
+        .eq("subject_id", subjectId)
+        .eq("student_id", session.user.id);
+
+      if (deleteError) throw deleteError;
+      return { subject_id: subjectId };
+    }
+
+    throw error;
+  }
+
+  return data;
 }
 
 export async function fetchStudentEnrollmentSection(studentId, subjectId) {
@@ -998,6 +1054,8 @@ export async function submitStudentExam({
 
     if (Number.isFinite(timeSpent) && timeSpent >= 0) {
       log.time_spent_seconds = Math.round(timeSpent);
+    } else if (Object.prototype.hasOwnProperty.call(timeSpentByQuestionId, question.id)) {
+      log.time_spent_seconds = 0;
     }
 
     answerLogs.push(log);
@@ -1388,7 +1446,12 @@ export async function saveFacultyQuestionScores({
 
 export async function fetchStudentIntegrityAlerts(examId, studentId) {
   const events = await fetchExamIntegrityEvents(examId);
-  return events.filter((event) => event.student_id === studentId);
+  return events
+    .filter((event) => event.student_id === studentId)
+    .sort(
+      (a, b) =>
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    );
 }
 
 export async function deleteExam(examId) {

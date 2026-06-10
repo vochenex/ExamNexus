@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
+import { useAppModal } from "../../contexts/AppModalContext";
 import { fetchExamWithQuestions, fetchSubject, updateExam } from "../../utils/supabaseData";
 import { useNavigate, useParams } from "react-router-dom";
 import BackButton from "../../components/BackButton";
@@ -18,6 +19,8 @@ import QuestionSectionsPanel from "../../components/QuestionSectionsPanel";
 import { getSubjectSections, normalizeTargetSections } from "../../utils/sections";
 import { deserializeQuestion, serializeQuestionForDb } from "../../utils/assessmentQuestions";
 import { parseDurationValue, DEFAULT_DURATION_VALUE } from "../../utils/assessmentDuration";
+import useQuestionSections from "../../hooks/useQuestionSections";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 
 const defaultAssessment = {
   subject_id: "",
@@ -38,6 +41,7 @@ export default function EditAssessment() {
   const navigate = useNavigate();
   const { examId } = useParams();
   const { theme } = useTheme();
+  const { success: showSuccess } = useAppModal();
 
   const [dateRange, setDateRange] = useState();
   const [startTime, setStartTime] = useState("09:00");
@@ -203,7 +207,7 @@ export default function EditAssessment() {
 
       await updateExam(examId, updatedExam, formattedQuestions);
 
-      alert("Assessment updated successfully.");
+      showSuccess("Assessment updated successfully.");
       navigate("/faculty/dashboard");
     } catch (err) {
       setError(err.message || "Failed to save assessment.");
@@ -213,11 +217,7 @@ export default function EditAssessment() {
   };
 
   if (pageLoading) {
-    return (
-      <div className={`min-h-screen p-6 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-        Loading assessment...
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 
   return (

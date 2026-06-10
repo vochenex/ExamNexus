@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Flag } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAssessmentLockdown } from "../../contexts/AssessmentLockdownContext";
@@ -9,6 +10,8 @@ import AssessmentQuestionInput from "../../components/AssessmentQuestionInput";
 import AssessmentQuestionNav from "../../components/AssessmentQuestionNav";
 import AssessmentLockdownModal from "../../components/AssessmentLockdownModal";
 import ActionDialog from "../../components/ui/ActionDialog";
+import SubmissionSuccessOverlay from "../../components/SubmissionSuccessOverlay";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import AssessmentFocusGuard from "../../components/AssessmentFocusGuard";
 import IntegrityAlertToast from "../../components/IntegrityAlertToast";
 import useAssessmentIntegrity from "../../hooks/useAssessmentIntegrity";
@@ -76,6 +79,7 @@ export default function TakeAssessment() {
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const [resultDialog, setResultDialog] = useState(null);
   const [submitBlocked, setSubmitBlocked] = useState(false);
+  const [isRetakeAttempt, setIsRetakeAttempt] = useState(false);
   const alertTimerRef = useRef(null);
 
   const isActive = phase === "active";
@@ -104,6 +108,7 @@ export default function TakeAssessment() {
   const { clearFocusViolation } = useAssessmentIntegrity({
     examId: id,
     active: isActive,
+    isRetakeAttempt,
     onAlert: showIntegrityAlert,
     onFocusViolation: setFocusBlocked,
     suppressAlerts: interactionLocked,
@@ -117,6 +122,7 @@ export default function TakeAssessment() {
 
         const retakeStatus = await getStudentRetakeStatus(id);
         const isApprovedRetake = retakeStatus === "approved";
+        setIsRetakeAttempt(isApprovedRetake);
 
         if (isApprovedRetake) {
           clearExamSession(id);
@@ -341,7 +347,6 @@ export default function TakeAssessment() {
 
       setResultDialog({
         tone: "success",
-        title: "Submitted",
         message: hasEssayQuestions
           ? "Your answers were submitted. Essay responses are pending teacher review."
           : `Your score: ${result.score} / ${result.total}`,
@@ -386,6 +391,14 @@ export default function TakeAssessment() {
       navigate("/student/assessments");
     }
   }, [endLockdown, navigate, resultDialog]);
+
+  const handleSubmissionSuccessComplete = useCallback(async () => {
+    setResultDialog(null);
+    setSubmitBlocked(true);
+    endLockdown();
+    await exitAssessmentFullscreen();
+    navigate("/student/assessments");
+  }, [endLockdown, navigate]);
 
   const buildSubmitConfirmMessage = () => {
     const flagged = flaggedIndices.size;
@@ -477,11 +490,22 @@ export default function TakeAssessment() {
   const currentQ = questions[currentQuestion];
 
   const setAnswer = (value) => {
-    if (!currentQ?.id || !isActive || interactionLocked) return;
+    if (!currentQ?.id || !isActive || interactionLocked || !exam) return;
+
     setAnswers((prev) => ({
       ...prev,
       [currentQ.id]: value,
     }));
+
+    const questionType = getQuestionFormatType(currentQ, exam.exam_type);
+    if (isAnswerProvided(value, questionType)) {
+      setFlaggedIndices((prev) => {
+        if (!prev.has(currentQuestion)) return prev;
+        const next = new Set(prev);
+        next.delete(currentQuestion);
+        return next;
+      });
+    }
   };
 
   const toggleFlag = () => {
@@ -523,7 +547,7 @@ export default function TakeAssessment() {
   }`;
 
   if (loading || phase === "loading") {
-    return <div className={`${shellClass} p-8`}>Loading assessment...</div>;
+    return <PageLoadingSkeleton theme={theme} variant="assessment" />;
   }
 
   if (alreadySubmitted || phase === "done") {
@@ -687,7 +711,6 @@ export default function TakeAssessment() {
             isIndexNavigable={checkNavigable}
             isSectionLocked={checkSectionLocked}
             onSelect={goToQuestion}
-            onToggleFlag={toggleFlag}
           />
 
           <div>
@@ -698,7 +721,7 @@ export default function TakeAssessment() {
                   : "border-emerald-200/80 en-bg-elevated shadow-md"
               }`}
             >
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <span
                   className={`text-sm font-medium ${
                     theme === "dark" ? "text-gray-400" : "text-gray-500"
@@ -706,17 +729,23 @@ export default function TakeAssessment() {
                 >
                   Question {currentQuestion + 1}
                 </span>
-                {flaggedIndices.has(currentQuestion) && (
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      theme === "dark"
-                        ? "bg-amber-500/20 text-amber-300"
-                        : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    Flagged for review
-                  </span>
-                )}
+
+                <button
+                  type="button"
+                  onClick={toggleFlag}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                    flaggedIndices.has(currentQuestion)
+                      ? theme === "dark"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                        : "bg-amber-100 text-amber-900 border border-amber-300"
+                      : theme === "dark"
+                        ? "bg-white/5 text-gray-300 border border-white/10 hover:bg-amber-500/10 hover:text-amber-300"
+                        : "en-bg-elevated text-gray-700 border border-emerald-200 hover:bg-amber-50 hover:text-amber-900"
+                  }`}
+                >
+                  <Flag size={14} />
+                  Flag answer
+                </button>
               </div>
 
               <h2
@@ -784,12 +813,18 @@ export default function TakeAssessment() {
         {buildSubmitConfirmMessage()}
       </ActionDialog>
 
+      <SubmissionSuccessOverlay
+        open={resultDialog?.tone === "success"}
+        message={resultDialog?.message}
+        onComplete={handleSubmissionSuccessComplete}
+      />
+
       <ActionDialog
-        open={Boolean(resultDialog)}
+        open={Boolean(resultDialog && resultDialog.tone !== "success")}
         title={resultDialog?.title || ""}
-        confirmLabel={resultDialog?.tone === "success" ? "Done" : "OK"}
+        confirmLabel="OK"
         showCancel={false}
-        tone={resultDialog?.tone === "success" ? "success" : "danger"}
+        tone="danger"
         onConfirm={handleResultDialogClose}
         onCancel={handleResultDialogClose}
       >

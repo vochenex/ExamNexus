@@ -175,6 +175,7 @@ export function mergeProfileWithAuthMetadata(profile, authUser) {
       "",
     age: profile.age ?? meta.age ?? "",
     avatar_url: profile.avatar_url || meta.avatar_url || DEFAULT_AVATAR_PATH,
+    account_status: profile.account_status || "approved",
   };
 }
 

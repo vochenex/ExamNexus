@@ -25,9 +25,9 @@ export function getSubjectGradeSettings(studentId, subjectId, subjectType = "maj
   const defaults = getDefaultWeights(subjectType);
 
   return {
-    examWeight: saved?.examWeight ?? defaults.exam,
-    standingWeight: saved?.standingWeight ?? defaults.standing,
-    attendanceWeight: 10,
+    examWeight: defaults.exam,
+    standingWeight: defaults.standing,
+    attendanceWeight: defaults.attendance,
     classesMissed: saved?.classesMissed ?? 0,
     totalClasses: saved?.totalClasses ?? DEFAULT_TOTAL_CLASSES,
   };
@@ -47,20 +47,4 @@ export function updateSubjectGradeSettings(studentId, subjectId, patch) {
 
   saveGradeSettings(studentId, settings);
   return settings.bySubject[subjectId];
-}
-
-export function setExamWeight(studentId, subjectId, examWeight) {
-  const standingWeight = examWeight === 70 ? 20 : 30;
-  return updateSubjectGradeSettings(studentId, subjectId, {
-    examWeight,
-    standingWeight,
-  });
-}
-
-export function setStandingWeight(studentId, subjectId, standingWeight) {
-  const examWeight = standingWeight === 20 ? 70 : 60;
-  return updateSubjectGradeSettings(studentId, subjectId, {
-    examWeight,
-    standingWeight,
-  });
 }

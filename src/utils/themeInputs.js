@@ -1,4 +1,5 @@
 import { LIGHT_BG } from "./themeColors";
+import { motion } from "./motion";
 
 export function inputClass(theme, extra = "") {
   return `w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all duration-200 ${
@@ -25,7 +26,7 @@ export function textareaClass(theme, extra = "") {
 }
 
 export function cardClass(theme, extra = "") {
-  return `rounded-2xl border p-5 ${
+  return `rounded-2xl border p-5 ${motion.interactiveCard} ${
     theme === "dark"
       ? "bg-[#dff8f3]/5 border-white/10"
       : `${LIGHT_BG.surface} border-emerald-200/80 shadow-md`
@@ -33,7 +34,7 @@ export function cardClass(theme, extra = "") {
 }
 
 export function panelClass(theme, extra = "") {
-  return `rounded-2xl border p-5 ${
+  return `rounded-2xl border p-5 ${motion.interactiveCard} ${
     theme === "dark"
       ? "bg-white/[0.04] border-white/10"
       : `${LIGHT_BG.surface} border-emerald-200/80 shadow-sm`
@@ -52,11 +53,15 @@ export function pageShellWithBellClass(theme, extra = "") {
 }
 
 export function emptyStateClass(theme, extra = "") {
-  return `rounded-2xl border border-dashed p-10 text-center ${
+  return `rounded-2xl border border-dashed p-10 text-center en-scale-in ${
     theme === "dark"
       ? "border-white/10 text-gray-400"
       : `border-emerald-200/70 ${LIGHT_BG.muted} text-gray-600`
   } ${extra}`;
+}
+
+export function staggerGridClass(extra = "") {
+  return `${motion.staggerGrid} ${extra}`.trim();
 }
 
 export { LIGHT_BG } from "./themeColors";

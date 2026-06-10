@@ -1,21 +1,41 @@
 import { supabase } from "../supabaseClient";
 
+export function isAuthSessionError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return (
+    message.includes("auth session missing") ||
+    message.includes("session expired") ||
+    message.includes("not authenticated") ||
+    message.includes("jwt") ||
+    message.includes("invalid refresh token")
+  );
+}
+
 export async function getAuthSession() {
-  let {
+  const {
     data: { session },
     error,
   } = await supabase.auth.getSession();
 
-  if (error) throw error;
-
-  if (!session) {
-    const { data: refreshed, error: refreshError } =
-      await supabase.auth.refreshSession();
-    if (refreshError) throw refreshError;
-    session = refreshed.session;
+  if (error) {
+    console.warn("getSession error:", error);
+    return null;
   }
 
-  return session;
+  if (session) return session;
+
+  try {
+    const { data: refreshed, error: refreshError } =
+      await supabase.auth.refreshSession();
+
+    if (refreshError) {
+      return null;
+    }
+
+    return refreshed.session ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireAuthUser() {
@@ -28,8 +48,7 @@ export async function requireAuthUser() {
 
 export async function resolveStudentId() {
   const session = await getAuthSession();
-  const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
-  return session?.user?.id || cached.id || null;
+  return session?.user?.id ?? null;
 }
 
 export function isStudentRole(role) {

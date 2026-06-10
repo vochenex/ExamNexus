@@ -17,6 +17,8 @@ import {
   saveSignupProfile,
   saveSignupSchoolIdCache,
 } from "../utils/authProfile";
+import { isAccountApproved } from "../utils/adminData";
+import { submitPasswordResetRequest } from "../utils/passwordReset";
 import SignupFormFields from "./auth/SignupFormFields";
 import ExamNexusBrand from "./ExamNexusBrand";
 
@@ -26,6 +28,7 @@ const { theme, setTheme } = useTheme();
 const [showPassword, setShowPassword] = useState(false);
 const [successMessage, setSuccessMessage] = useState("");
 const [isLogin, setIsLogin] = useState(true);
+const [authView, setAuthView] = useState("login");
 const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
@@ -44,6 +47,7 @@ const [loading, setLoading] = useState(false);
 
   email: "",
   password: "",
+  resetMessage: "",
 });
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -103,8 +107,15 @@ function getAuthInputProps(theme) {
   const validate = () => {
     const errs = {};
     if (!form.email) errs.email = "Email is required";
+
+    if (authView === "forgot") {
+      if (!form.schoolId) errs.schoolId = "School ID is required";
+      setErrors(errs);
+      return Object.keys(errs).length === 0;
+    }
+
     if (!form.password) errs.password = "Password is required";
-    if (!isLogin) {
+    if (authView === "signup") {
       if (!form.firstName) errs.firstName = "First name is required";
       if (!form.lastName) errs.lastName = "Last name is required";
       if (!form.schoolId) errs.schoolId = "School ID is required";
@@ -113,11 +124,71 @@ function getAuthInputProps(theme) {
     return Object.keys(errs).length === 0;
   };
 
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    try {
+      setLoading(true);
+      setServerError("");
+      setSuccessMessage("");
+
+      const result = await submitPasswordResetRequest({
+        email: form.email.trim(),
+        schoolId: form.schoolId.trim(),
+        message: form.resetMessage.trim(),
+      });
+
+      setSuccessMessage(
+        result.message ||
+          "Your request was sent to an administrator. You will be able to log in after they reset your password."
+      );
+      setForm((current) => ({
+        ...current,
+        password: "",
+        resetMessage: "",
+      }));
+    } catch (err) {
+      setServerError(err.message || "Could not submit password reset request.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchToLogin = () => {
+    setAuthView("login");
+    setIsLogin(true);
+    setErrors({});
+    setServerError("");
+    setSuccessMessage("");
+  };
+
+  const switchToSignup = () => {
+    setAuthView("signup");
+    setIsLogin(false);
+    setErrors({});
+    setServerError("");
+    setSuccessMessage("");
+  };
+
+  const switchToForgot = () => {
+    setAuthView("forgot");
+    setIsLogin(true);
+    setErrors({});
+    setServerError("");
+    setSuccessMessage("");
+  };
+
   const handleSubmit = async (e) => {
   try {
     e.preventDefault();
 
     if (!validate()) return;
+
+    if (authView === "forgot") {
+      await handleForgotSubmit(e);
+      return;
+    }
 
     setLoading(true);
 
@@ -143,6 +214,18 @@ function getAuthInputProps(theme) {
         setServerError(
           profileError?.message ||
             "Your account exists but the profile could not be loaded. Run database/users_signup_policies.sql in Supabase, then try again."
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (!isAccountApproved(profile)) {
+        await supabase.auth.signOut();
+        localStorage.removeItem("examnexus_user");
+        setServerError(
+          profile.account_status === "rejected"
+            ? "Your registration was not approved. Contact your administrator if you believe this is a mistake."
+            : "Your account is pending admin approval. You can log in after an administrator approves your request."
         );
         setLoading(false);
         return;
@@ -222,10 +305,8 @@ function getAuthInputProps(theme) {
         return;
       }
 
-      localStorage.setItem(
-        "examnexus_user",
-        JSON.stringify(savedProfile)
-      );
+      await supabase.auth.signOut();
+      localStorage.removeItem("examnexus_user");
     } else {
       localStorage.setItem(
         "examnexus_user",
@@ -255,8 +336,8 @@ function getAuthInputProps(theme) {
 
     setSuccessMessage(
       data.session
-        ? "Account created successfully. Please log in."
-        : "Account created. Check your email to confirm, then log in."
+        ? "Registration submitted. An administrator must approve your account before you can log in."
+        : "Registration submitted. Confirm your email if required, then wait for admin approval before logging in."
     );
 
     setIsLogin(true);
@@ -368,63 +449,58 @@ function getAuthInputProps(theme) {
 >
         
         {/* Left Branding Panel */}
-<div
-  className="
-    hidden
-    md:flex
-    flex-col
-    justify-center
-    items-center
-    p-10
-    w-1/2
-    relative
+        <div
+          className={`hidden md:flex flex-col justify-center items-center p-10 w-1/2 relative overflow-hidden ${
+            theme === "dark"
+              ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
+              : "bg-gradient-to-br from-[#edfbf6] via-[#dff5ec] to-[#cceee3]"
+          }`}
+        >
+          <div
+            className={`pointer-events-none absolute inset-0 ${
+              theme === "dark"
+                ? "bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.12),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,0.08),transparent_40%)]"
+                : "bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.85),transparent_50%),radial-gradient(circle_at_75%_85%,rgba(167,243,208,0.45),transparent_45%)]"
+            }`}
+          />
+          <div
+            className={`pointer-events-none absolute inset-0 opacity-[0.035] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:32px_32px] ${
+              theme === "light" ? "opacity-[0.06]" : ""
+            }`}
+          />
 
-    bg-gradient-to-br
-    from-[#10B981]
-    via-[#14b8a6]
-    to-[#0891b2]
-  "
->          <div className="group relative mb-6">
-            <div className="absolute inset-0 bg-emerald-400/30 blur-3xl scale-150 opacity-70 group-hover:opacity-100 transition-all duration-500" />
-            <ExamNexusBrand variant="hero" idSuffix="auth" showTagline />
+          <div className="relative z-10 mb-6 max-w-sm">
+            <ExamNexusBrand
+              variant="hero"
+              idSuffix="auth"
+              showTagline
+              panelTone={theme === "dark" ? "dark" : "light"}
+            />
           </div>
 
-          <div className="mt-6">
-  <button
-    onClick={() =>
-      setTheme(theme === "dark" ? "light" : "dark")
-    }
-    className="
-      flex
-      items-center
-      gap-2
-      px-5
-      py-3
-      rounded-xl
-
-      bg-white/10
-      border
-      border-white/20
-
-      hover:bg-white/20
-
-      transition-all
-      duration-300
-    "
-  >
-    {theme === "dark" ? (
-      <>
-        <Sun size={18} />
-        Light Mode
-      </>
-    ) : (
-      <>
-        <Moon size={18} />
-        Dark Mode
-      </>
-    )}
-  </button>
-</div>
+          <div className="relative z-10 mt-2">
+            <button
+              type="button"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl border transition-all duration-300 ${
+                theme === "dark"
+                  ? "border-white/15 bg-white/10 text-emerald-50 hover:bg-white/15"
+                  : "border-emerald-300/70 bg-white/70 text-teal-900 shadow-sm hover:bg-white"
+              }`}
+            >
+              {theme === "dark" ? (
+                <>
+                  <Sun size={18} />
+                  Light Mode
+                </>
+              ) : (
+                <>
+                  <Moon size={18} />
+                  Dark Mode
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Right Form Panel */}
@@ -454,19 +530,89 @@ function getAuthInputProps(theme) {
       theme === "dark" ? "text-emerald-400" : "text-teal-700"
     }`}
   >
-    {isLogin ? "Welcome back" : "Create your account"}
+    {authView === "forgot"
+      ? "Forgot password?"
+      : isLogin
+        ? "Welcome back"
+        : "Create your account"}
   </h2>
   <p
     className={`mt-1 mb-6 text-sm ${
       theme === "dark" ? "text-gray-400" : "text-gray-600"
     }`}
   >
-    {isLogin
-      ? "Sign in to continue to ExamNexus."
-      : "Join ExamNexus as a student or faculty member."}
+    {authView === "forgot"
+      ? "Submit a request and an administrator will reset your password."
+      : isLogin
+        ? "Sign in to continue to ExamNexus."
+        : "Join ExamNexus as a student or faculty member."}
   </p>
 
           <form onSubmit={handleSubmit}>
+            {authView === "forgot" ? (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    className={`mb-1.5 block text-sm font-medium ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    autoComplete="email"
+                    placeholder="you@school.edu"
+                    {...authInputProps}
+                  />
+                  {errors.email && (
+                    <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`mb-1.5 block text-sm font-medium ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    School ID
+                  </label>
+                  <input
+                    type="text"
+                    name="schoolId"
+                    value={form.schoolId}
+                    onChange={handleChange}
+                    placeholder="Your school ID"
+                    {...authInputProps}
+                  />
+                  {errors.schoolId && (
+                    <p className="text-red-500 text-xs mt-1">{errors.schoolId}</p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`mb-1.5 block text-sm font-medium ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    Message (optional)
+                  </label>
+                  <textarea
+                    name="resetMessage"
+                    value={form.resetMessage}
+                    onChange={handleChange}
+                    rows={3}
+                    placeholder="Any details that help the admin verify your request"
+                    {...authInputProps}
+                    className={`${authInputProps.className} resize-none`}
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
             {!isLogin && (
               <SignupFormFields
                 form={form}
@@ -545,8 +691,21 @@ function getAuthInputProps(theme) {
                 {errors.password && (
                   <p className="text-red-500 text-xs mt-1">{errors.password}</p>
                 )}
+                {isLogin && authView === "login" && (
+                  <button
+                    type="button"
+                    onClick={switchToForgot}
+                    className={`mt-2 text-xs font-medium underline-offset-2 hover:underline ${
+                      theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                    }`}
+                  >
+                    Forgot password?
+                  </button>
+                )}
               </div>
             </div>
+              </>
+            )}
 
             {serverError && (
   <div
@@ -597,9 +756,11 @@ function getAuthInputProps(theme) {
 >
   {loading
     ? "Please wait..."
-    : isLogin
-    ? "Login"
-    : "Sign Up"}
+    : authView === "forgot"
+      ? "Send reset request"
+      : isLogin
+        ? "Login"
+        : "Sign Up"}
 </button>
           </form>
 
@@ -608,7 +769,20 @@ function getAuthInputProps(theme) {
             theme === "dark" ? "text-gray-400" : "text-gray-600"
           }`}
         >
-            {isLogin ? (
+            {authView === "forgot" ? (
+              <>
+                Remember your password?{" "}
+                <button
+                  type="button"
+                  className={`font-semibold underline-offset-2 hover:underline ${
+                    theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                  }`}
+                  onClick={switchToLogin}
+                >
+                  Back to login
+                </button>
+              </>
+            ) : isLogin ? (
               <>
                 Don&apos;t have an account?{" "}
                 <button
@@ -616,11 +790,7 @@ function getAuthInputProps(theme) {
                   className={`font-semibold underline-offset-2 hover:underline ${
                     theme === "dark" ? "text-emerald-400" : "text-teal-700"
                   }`}
-                  onClick={() => {
-                  setIsLogin(false);
-                  setErrors({});
-                  setServerError("");
-                }}
+                  onClick={switchToSignup}
                 >
                   Sign up
                 </button>
@@ -633,11 +803,7 @@ function getAuthInputProps(theme) {
                   className={`font-semibold underline-offset-2 hover:underline ${
                     theme === "dark" ? "text-emerald-400" : "text-teal-700"
                   }`}
-                  onClick={() => {
-                  setIsLogin(true);
-                  setErrors({});
-                  setServerError("");
-                }}
+                  onClick={switchToLogin}
                 >
                   Log in
                 </button>

@@ -69,6 +69,7 @@ DECLARE
   v_allowed boolean := false;
   v_has_answers boolean := to_regclass('public.student_answers') IS NOT NULL;
   v_has_integrity boolean := to_regclass('public.exam_integrity_events') IS NOT NULL;
+  v_has_time_column boolean := false;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -86,6 +87,16 @@ BEGIN
 
   IF NOT v_allowed THEN
     RAISE EXCEPTION 'Not authorized to view analytics for this assessment';
+  END IF;
+
+  IF v_has_answers THEN
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'student_answers'
+        AND column_name = 'time_spent_seconds'
+    ) INTO v_has_time_column;
   END IF;
 
   RETURN jsonb_build_object(
@@ -117,7 +128,11 @@ BEGIN
           jsonb_build_object(
             'question_id', sa.question_id,
             'student_id', sa.student_id,
-            'is_correct', sa.is_correct
+            'is_correct', sa.is_correct,
+            'time_spent_seconds', CASE
+              WHEN v_has_time_column THEN sa.time_spent_seconds
+              ELSE NULL
+            END
           )
         )
         FROM public.student_answers sa
@@ -133,9 +148,10 @@ BEGIN
             'student_id', eie.student_id,
             'event_type', eie.event_type,
             'description', eie.description,
+            'metadata', eie.metadata,
             'created_at', eie.created_at
           )
-          ORDER BY eie.created_at DESC
+          ORDER BY eie.created_at ASC
         )
         FROM public.exam_integrity_events eie
         WHERE eie.exam_id = p_exam_id

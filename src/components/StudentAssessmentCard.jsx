@@ -6,10 +6,13 @@ import { primaryButtonSm, secondaryButtonSm } from "../utils/themeButtons";
 import {
   canStudentTakeAssessment,
   canRequestRetake,
+  canStudentViewResultsFromCard,
   getStudentAssessmentStatus,
   getStudentAssessmentStatusLabel,
   getRetakeStatusLabel,
 } from "../utils/assessmentStatus";
+import { motion } from "../utils/motion";
+import { useAppModal } from "../contexts/AppModalContext";
 import { requestExamRetake } from "../utils/supabaseData";
 import { formatTargetSectionsLabel } from "../utils/sections";
 import {
@@ -52,6 +55,7 @@ export default function StudentAssessmentCard({
 }) {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const { error } = useAppModal();
   const [requesting, setRequesting] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
@@ -63,8 +67,7 @@ export default function StudentAssessmentCard({
   const retakeLabel = getRetakeStatusLabel(assessment.retake_status);
   const category = resolveAssessmentCategory(assessment);
   const categoryStyles = getAssessmentCategoryStyles(category, theme);
-  const canViewResults =
-    studentStatus === "completed" && assessment.allow_student_view !== false;
+  const canViewResults = canStudentViewResultsFromCard(assessment);
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
 
   const handleRequestRetake = async () => {
@@ -75,7 +78,7 @@ export default function StudentAssessmentCard({
       setRequestMessage("");
       onRetakeUpdated?.();
     } catch (err) {
-      alert(err.message || "Failed to submit retake request.");
+      error(err.message || "Failed to submit retake request.");
     } finally {
       setRequesting(false);
     }
@@ -84,7 +87,7 @@ export default function StudentAssessmentCard({
   return (
     <div
       id={`assessment-${assessment.id}`}
-      className={`rounded-2xl border border-l-4 transition ${
+      className={`${motion.interactiveCard} rounded-2xl border border-l-4 transition ${
         compact ? "p-4" : "p-5"
       } ${categoryStyles.accent} ${categoryStyles.card} ${
         highlighted

@@ -11,42 +11,8 @@ import {
 } from "../utils/gradeComputation";
 import {
   getSubjectGradeSettings,
-  setExamWeight,
-  setStandingWeight,
   updateSubjectGradeSettings,
 } from "../utils/studentGradeStorage";
-
-function WeightToggle({ options, value, onChange, theme }) {
-  return (
-    <div
-      className={`inline-flex rounded-lg p-0.5 ${
-        theme === "dark" ? "bg-white/10" : "en-bg-skeleton"
-      }`}
-    >
-      {options.map((option) => {
-        const active = value === option;
-        return (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onChange(option)}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-              active
-                ? theme === "dark"
-                  ? "bg-emerald-500 text-white shadow"
-                  : "en-bg-elevated text-teal-800 shadow-sm"
-                : theme === "dark"
-                  ? "text-gray-400 hover:text-gray-200"
-                  : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            {option}%
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function ScoreRing({ pct, label, theme, colorClass }) {
   const display = pct != null ? `${pct}%` : "—";
@@ -117,18 +83,6 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
   const finalGradeInfo = estimateGradeFromPercentage(finalGrade);
 
   const bumpSettings = () => setSettingsVersion((value) => value + 1);
-
-  const handleExamWeight = (weight) => {
-    if (!studentId || !selectedSubject) return;
-    setExamWeight(studentId, selectedSubject.subjectId, weight);
-    bumpSettings();
-  };
-
-  const handleStandingWeight = (weight) => {
-    if (!studentId || !selectedSubject) return;
-    setStandingWeight(studentId, selectedSubject.subjectId, weight);
-    bumpSettings();
-  };
 
   const handleAttendanceChange = (field, rawValue) => {
     if (!studentId || !selectedSubject) return;
@@ -219,9 +173,8 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
 
         {selectedSubject && settings && (
           <p className={`mt-3 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-            Default for {selectedSubject.subjectType === "minor" ? "minor" : "major"} subjects:{" "}
-            {defaults.exam}% exams · {defaults.standing}% class standing · {defaults.attendance}% attendance.
-            Use the weight toggles below to override.
+            Weights: {defaults.exam}% major exams · {defaults.standing}% class standing ·{" "}
+            {defaults.attendance}% attendance.
           </p>
         )}
       </div>
@@ -229,21 +182,9 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
       <div className="grid gap-5 lg:grid-cols-3">
         <AnalyticsPanel
           title="Major Exams"
-          subtitle={`${settings?.examWeight ?? 60}% of final grade · exam-category assessments`}
+          subtitle={`${settings?.examWeight ?? 70}% of final grade · exam-category assessments`}
         >
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                Weight
-              </span>
-              <WeightToggle
-                options={[60, 70]}
-                value={settings?.examWeight ?? 60}
-                onChange={handleExamWeight}
-                theme={theme}
-              />
-            </div>
-
             <div className="flex items-center gap-4">
               <ScoreRing
                 pct={selectedSubject?.majorExamPct}
@@ -272,21 +213,9 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
 
         <AnalyticsPanel
           title="Class Standing"
-          subtitle={`${settings?.standingWeight ?? 30}% of final grade · quizzes & activities`}
+          subtitle={`${settings?.standingWeight ?? 20}% of final grade · quizzes & activities`}
         >
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                Weight
-              </span>
-              <WeightToggle
-                options={[30, 20]}
-                value={settings?.standingWeight ?? 30}
-                onChange={handleStandingWeight}
-                theme={theme}
-              />
-            </div>
-
             <div className="flex items-center gap-4">
               <ScoreRing
                 pct={selectedSubject?.classStandingPct}

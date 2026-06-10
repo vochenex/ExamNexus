@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { fetchExamIntegrityEvents } from "../utils/supabaseData";
 import { formatIntegrityEventLabel } from "../utils/examIntegrity";
+import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
 
 function studentName(row) {
   const user = row.users;
@@ -16,20 +17,36 @@ export default function ExamIntegrityPanel({ examId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const loadEvents = useCallback(async (silent = false) => {
     if (!examId) return;
 
-    fetchExamIntegrityEvents(examId)
-      .then(setEvents)
-      .catch((err) => setError(err.message || "Failed to load integrity events."))
-      .finally(() => setLoading(false));
+    try {
+      if (!silent) setLoading(true);
+      setError("");
+      const rows = await fetchExamIntegrityEvents(examId);
+      setEvents(rows);
+    } catch (err) {
+      setError(err.message || "Failed to load integrity events.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [examId]);
+
+  useEffect(() => {
+    loadEvents(false);
+    const timer = setInterval(() => loadEvents(true), REALTIME_POLL_MS);
+    return () => clearInterval(timer);
+  }, [loadEvents]);
 
   if (loading) {
     return (
-      <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-        Loading integrity reports...
-      </p>
+      <div className={`animate-pulse space-y-3 rounded-2xl border p-5 ${
+        theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200/80 en-bg-elevated"
+      }`}>
+        <div className={`h-5 w-48 rounded-lg ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
+        <div className={`h-20 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
+        <div className={`h-20 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
+      </div>
     );
   }
 

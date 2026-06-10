@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useTheme } from "../../layouts/ThemeContext";
 import BackButton from "../../components/BackButton";
-import { pageShellWithBellClass } from "../../utils/themeInputs";
+import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
   formatQuestionCorrectAnswers,
   parseStoredAnswer,
@@ -109,43 +111,42 @@ export default function StudentResults() {
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [{ data: examData }, { data: resultData }, { data: questionData }, { data: answerData }] =
-          await Promise.all([
-            supabase.from("exams").select("*").eq("id", examId).single(),
-            supabase
-              .from("exam_results")
-              .select("*")
-              .eq("exam_id", examId)
-              .eq("student_id", studentId)
-              .single(),
-            supabase
-              .from("questions")
-              .select("*")
-              .eq("exam_id", examId)
-              .order("created_at", { ascending: true }),
-            supabase
-              .from("student_answers")
-              .select("*")
-              .eq("exam_id", examId)
-              .eq("student_id", studentId),
-          ]);
+  const load = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const [{ data: examData }, { data: resultData }, { data: questionData }, { data: answerData }] =
+        await Promise.all([
+          supabase.from("exams").select("*").eq("id", examId).single(),
+          supabase
+            .from("exam_results")
+            .select("*")
+            .eq("exam_id", examId)
+            .eq("student_id", studentId)
+            .single(),
+          supabase
+            .from("questions")
+            .select("*")
+            .eq("exam_id", examId)
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("student_answers")
+            .select("*")
+            .eq("exam_id", examId)
+            .eq("student_id", studentId),
+        ]);
 
-        setExam(examData);
-        setResult(resultData);
-        setQuestions(dedupeExamQuestions(questionData || []));
-        setAnswers(answerData || []);
-      } catch (err) {
-        console.error(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
+      setExam(examData);
+      setResult(resultData);
+      setQuestions(dedupeExamQuestions(questionData || []));
+      setAnswers(answerData || []);
+    } catch (err) {
+      console.error(err.message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [examId, studentId]);
+
+  usePolling(load, [examId, studentId]);
 
   const examType = exam?.exam_type || "multiple_choice";
 
@@ -186,13 +187,7 @@ export default function StudentResults() {
   };
 
   if (loading) {
-    return (
-      <div className={pageShellWithBellClass(theme)}>
-        <div className="mx-auto max-w-4xl animate-pulse">
-          <div className={`h-10 w-64 rounded-xl ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
-        </div>
-      </div>
-    );
+    return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 
   if (!exam || !result) {
@@ -245,7 +240,7 @@ export default function StudentResults() {
           )}
         </div>
 
-        <div className="mb-10 grid gap-4 sm:grid-cols-3">
+        <div className={staggerGridClass("mb-10 grid gap-4 sm:grid-cols-3")}>
           <div
             className={`rounded-2xl border p-5 ${
               theme === "dark"
