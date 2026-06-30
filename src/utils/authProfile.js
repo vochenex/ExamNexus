@@ -2,6 +2,9 @@ import { DEFAULT_AVATAR_PATH } from "./avatar";
 import { getAuthSession } from "./authUser";
 import { normalizeYearLevelForStorage } from "./yearLevels";
 
+import { formatSupabaseError } from "./supabaseErrors";
+import { canAccessPlatform } from "./adminData";
+
 const SIGNUP_SCHOOL_KEY_PREFIX = "examnexus_signup_school_";
 
 export function buildUserProfileRow(userId, form) {
@@ -16,6 +19,7 @@ export function buildUserProfileRow(userId, form) {
     department: emptyToNull(form.department),
     age: toIntOrNull(form.age),
     avatar_url: DEFAULT_AVATAR_PATH,
+    account_status: "pending",
   };
 
   if (form.role !== "Faculty") {
@@ -165,7 +169,7 @@ export function mergeProfileWithAuthMetadata(profile, authUser) {
     last_name: profile.last_name || meta.last_name || "",
     email: profile.email || authUser?.email || "",
     school_id: schoolId,
-    role: profile.role || meta.role || "",
+    role: resolveProfileRole(profile, meta),
     gender: profile.gender || meta.gender || "",
     department: profile.department || meta.department || "",
     course: profile.course || meta.course || "",
@@ -175,18 +179,22 @@ export function mergeProfileWithAuthMetadata(profile, authUser) {
       "",
     age: profile.age ?? meta.age ?? "",
     avatar_url: profile.avatar_url || meta.avatar_url || DEFAULT_AVATAR_PATH,
-    account_status: profile.account_status || "approved",
+    account_status:
+      String(resolveProfileRole(profile, meta) || "").toLowerCase() === "admin"
+        ? "approved"
+        : profile.account_status || "pending",
   };
 }
 
 async function persistSchoolIdToProfile(supabase, authUser, profile, schoolId) {
+  const meta = authUser.user_metadata || {};
   const rpcParams = buildUpsertSignupProfileParams({
     id: authUser.id,
-    first_name: profile.first_name || authUser.user_metadata?.first_name || "User",
-    last_name: profile.last_name || authUser.user_metadata?.last_name || "",
+    first_name: profile.first_name || meta.first_name || "User",
+    last_name: profile.last_name || meta.last_name || "",
     email: profile.email || authUser.email,
     school_id: schoolId,
-    role: profile.role || authUser.user_metadata?.role || "Student",
+    role: resolveProfileRole(profile, meta) || "Student",
     gender: profile.gender || authUser.user_metadata?.gender || null,
     department: profile.department || authUser.user_metadata?.department || null,
     course: profile.course || authUser.user_metadata?.course || null,
@@ -247,13 +255,22 @@ async function repairSchoolIdFromMetadata(supabase, authUser, profile) {
 }
 
 export function navigateForRole(navigate, role) {
-  if (role === "Faculty") {
+  const normalized = String(role || "").toLowerCase();
+  if (normalized === "faculty") {
     navigate("/faculty/dashboard");
-  } else if (role === "Admin") {
+  } else if (normalized === "admin") {
     navigate("/admin/dashboard");
   } else {
     navigate("/student/dashboard");
   }
+}
+
+function resolveProfileRole(profile, meta = {}) {
+  const dbRole = String(profile?.role || "").toLowerCase();
+  if (dbRole === "admin" || dbRole === "faculty") {
+    return profile.role;
+  }
+  return profile?.role || meta.role || "";
 }
 
 export async function syncProfileOnLogin(supabase) {
@@ -292,6 +309,15 @@ export async function syncProfileOnLogin(supabase) {
     return {
       profile: null,
       error: syncError || new Error("Profile not found"),
+      pendingApproval: false,
+    };
+  }
+
+  if (!canAccessPlatform(profile)) {
+    return {
+      profile: null,
+      error: null,
+      pendingApproval: true,
     };
   }
 
@@ -311,7 +337,7 @@ export async function syncProfileOnLogin(supabase) {
 
   localStorage.setItem("examnexus_user", JSON.stringify(profile));
 
-  return { profile, error: null };
+  return { profile, error: null, pendingApproval: false };
 }
 
 export async function loadProfileForUser(supabase) {
@@ -340,7 +366,13 @@ export async function saveSignupProfile(supabase, profileRow) {
     .single();
 
   if (upsertError) {
-    return { profile: null, error: upsertError || error };
+    const formatted = formatSupabaseError(upsertError || error, {
+      context: "signup",
+    });
+    return {
+      profile: null,
+      error: { ...(upsertError || error), message: formatted },
+    };
   }
 
   return { profile: upserted, error: null };

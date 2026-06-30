@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Moon,
   Sun,
@@ -17,21 +17,40 @@ import {
   saveSignupProfile,
   saveSignupSchoolIdCache,
 } from "../utils/authProfile";
-import { isAccountApproved } from "../utils/adminData";
+import { isAccountApproved, isAdminUser, fetchAccountAccess } from "../utils/adminData";
 import { submitPasswordResetRequest } from "../utils/passwordReset";
+import {
+  buildCrmcEmail,
+  authEmailError,
+  CRMCC_EMAIL_PLACEHOLDER,
+} from "../utils/schoolEmail";
+import { checkSignupCredentials } from "../utils/authSignup";
+import { formatSupabaseError } from "../utils/supabaseErrors";
+import {
+  buildPendingAuthNotice,
+  clearAuthNotice,
+  peekAuthNotice,
+  stashAuthNotice,
+} from "../utils/authNotice";
 import SignupFormFields from "./auth/SignupFormFields";
+import PendingApprovalModal from "./auth/PendingApprovalModal";
 import ExamNexusBrand from "./ExamNexusBrand";
+import LogoSplashScreen from "./LogoSplashScreen";
 
 export default function ExamNexusAuth() {
   const navigate = useNavigate();
-const { theme, setTheme } = useTheme();
+  const location = useLocation();
+  const { theme, setTheme } = useTheme();
+  const lastNoticeKeyRef = useRef(null);
 const [showPassword, setShowPassword] = useState(false);
 const [successMessage, setSuccessMessage] = useState("");
 const [isLogin, setIsLogin] = useState(true);
 const [authView, setAuthView] = useState("login");
 const [loading, setLoading] = useState(false);
+  const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
+  const [authNotice, setAuthNotice] = useState(null);
 
   const [form, setForm] = useState({
   firstName: "",
@@ -52,6 +71,10 @@ const [loading, setLoading] = useState(false);
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    if (name === "email") {
+      setEmailManuallyEdited(true);
+    }
+
     setForm((current) => {
       const next = { ...current, [name]: value };
 
@@ -65,6 +88,43 @@ const [loading, setLoading] = useState(false);
     setErrors({ ...errors, [e.target.name]: "" });
     setServerError("");
     setSuccessMessage("");
+  };
+
+  useEffect(() => {
+    if (authView !== "signup" || emailManuallyEdited) return;
+
+    const suggested = buildCrmcEmail(form.lastName, form.firstName);
+    if (!suggested) return;
+
+    setForm((current) =>
+      current.email === suggested ? current : { ...current, email: suggested }
+    );
+  }, [authView, emailManuallyEdited, form.firstName, form.lastName]);
+
+  useEffect(() => {
+    const notice = location.state?.authNotice || peekAuthNotice();
+    if (!notice) return;
+
+    const noticeKey = `${location.key}:${notice.title}:${notice.message}`;
+    if (lastNoticeKeyRef.current === noticeKey) return;
+    lastNoticeKeyRef.current = noticeKey;
+
+    clearAuthNotice();
+    setAuthNotice(notice);
+
+    if (location.state?.authNotice) {
+      navigate("/auth", { replace: true, state: {} });
+    }
+  }, [location.key, location.state, navigate]);
+
+  const blockPendingAccess = async (accessProfile) => {
+    const notice = buildPendingAuthNotice(accessProfile);
+    await supabase.auth.signOut();
+    localStorage.removeItem("examnexus_user");
+    setServerError("");
+    setLoading(false);
+    stashAuthNotice(notice);
+    setAuthNotice(notice);
   };
 
   const handleRoleChange = (role) => {
@@ -106,7 +166,12 @@ function getAuthInputProps(theme) {
 }
   const validate = () => {
     const errs = {};
-    if (!form.email) errs.email = "Email is required";
+    const schoolFormatRequired = authView !== "login";
+    const emailError = authEmailError(form.email, { schoolFormatRequired });
+
+    if (emailError) {
+      errs.email = emailError;
+    }
 
     if (authView === "forgot") {
       if (!form.schoolId) errs.schoolId = "School ID is required";
@@ -149,7 +214,12 @@ function getAuthInputProps(theme) {
         resetMessage: "",
       }));
     } catch (err) {
-      setServerError(err.message || "Could not submit password reset request.");
+      setServerError(
+        formatSupabaseError(err, {
+          context: "forgot-password",
+          fallback: "Could not submit password reset request.",
+        })
+      );
     } finally {
       setLoading(false);
     }
@@ -158,6 +228,7 @@ function getAuthInputProps(theme) {
   const switchToLogin = () => {
     setAuthView("login");
     setIsLogin(true);
+    setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
     setSuccessMessage("");
@@ -166,6 +237,7 @@ function getAuthInputProps(theme) {
   const switchToSignup = () => {
     setAuthView("signup");
     setIsLogin(false);
+    setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
     setSuccessMessage("");
@@ -174,6 +246,7 @@ function getAuthInputProps(theme) {
   const switchToForgot = () => {
     setAuthView("forgot");
     setIsLogin(true);
+    setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
     setSuccessMessage("");
@@ -201,33 +274,39 @@ function getAuthInputProps(theme) {
         });
 
       if (error) {
-        setServerError(error.message);
+        setServerError(formatSupabaseError(error, { context: "login" }));
         setLoading(false);
         return;
       }
 
-      const { profile, error: profileError } = await fetchOrCreateProfile(
-        supabase
-      );
+      const access = await fetchAccountAccess(supabase, data.user.id);
+      if (!access.allowed) {
+        await blockPendingAccess(access.profile);
+        return;
+      }
+
+      const { profile, error: profileError, pendingApproval } =
+        await fetchOrCreateProfile(supabase);
+
+      if (pendingApproval) {
+        await blockPendingAccess(access.profile);
+        return;
+      }
 
       if (profileError || !profile) {
         setServerError(
-          profileError?.message ||
-            "Your account exists but the profile could not be loaded. Run database/users_signup_policies.sql in Supabase, then try again."
+          formatSupabaseError(profileError, {
+            context: "profile",
+            fallback:
+              "Your account exists but the profile could not be loaded. Run database/users_signup_policies.sql in Supabase, then try again.",
+          })
         );
         setLoading(false);
         return;
       }
 
-      if (!isAccountApproved(profile)) {
-        await supabase.auth.signOut();
-        localStorage.removeItem("examnexus_user");
-        setServerError(
-          profile.account_status === "rejected"
-            ? "Your registration was not approved. Contact your administrator if you believe this is a mistake."
-            : "Your account is pending admin approval. You can log in after an administrator approves your request."
-        );
-        setLoading(false);
+      if (!isAccountApproved(profile) && !isAdminUser(profile)) {
+        await blockPendingAccess(profile);
         return;
       }
 
@@ -243,26 +322,14 @@ function getAuthInputProps(theme) {
       return;
     }
 
-    const {
-      data: duplicate,
-      error: duplicateError,
-    } = await supabase
-      .from("users")
-      .select("*")
-      .or(
-        `school_id.eq.${form.schoolId},email.eq.${form.email}`
-      );
+    const credentialCheck = await checkSignupCredentials(
+      supabase,
+      form.email,
+      form.schoolId
+    );
 
-    if (duplicateError) {
-      setServerError(duplicateError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (duplicate.length > 0) {
-      setServerError(
-        "School ID or Email already exists"
-      );
+    if (!credentialCheck.ok) {
+      setServerError(credentialCheck.message);
       setLoading(false);
       return;
     }
@@ -277,7 +344,7 @@ function getAuthInputProps(theme) {
       });
 
     if (error) {
-      setServerError(error.message);
+      setServerError(formatSupabaseError(error, { context: "signup" }));
       setLoading(false);
       return;
     }
@@ -300,7 +367,12 @@ function getAuthInputProps(theme) {
         await saveSignupProfile(supabase, profileRow);
 
       if (saveError || !savedProfile) {
-        setServerError(saveError?.message || "Could not save your profile.");
+        setServerError(
+          formatSupabaseError(saveError, {
+            context: "signup",
+            fallback: "Could not save your profile.",
+          })
+        );
         setLoading(false);
         return;
       }
@@ -341,6 +413,7 @@ function getAuthInputProps(theme) {
     );
 
     setIsLogin(true);
+    setAuthView("login");
     setTimeout(() => {
   setSuccessMessage("");
   }, 5000);
@@ -350,7 +423,9 @@ function getAuthInputProps(theme) {
     console.error(err);
 
     setServerError(
-      err.message || "Something went wrong."
+      formatSupabaseError(err, {
+        context: authView === "signup" ? "signup" : "login",
+      })
     );
 
     setLoading(false);
@@ -358,6 +433,7 @@ function getAuthInputProps(theme) {
 };
 
   const authInputProps = getAuthInputProps(theme);
+  const swapPanels = authView === "signup";
 
   return (
     <div
@@ -376,6 +452,14 @@ function getAuthInputProps(theme) {
     }
   `}
 >
+  <PendingApprovalModal
+    notice={authNotice}
+    onClose={() => {
+      clearAuthNotice();
+      setAuthNotice(null);
+    }}
+  />
+  {loading && <LogoSplashScreen theme={theme} />}
   {/* Background Orb 1 */}
 <div
   className="
@@ -423,6 +507,7 @@ function getAuthInputProps(theme) {
 />
       <div
   className={`
+    en-auth-card
     relative
 
     w-full
@@ -432,11 +517,11 @@ function getAuthInputProps(theme) {
 
     overflow-hidden
 
-    flex
-
     backdrop-blur-2xl
 
     border
+
+    ${swapPanels ? "en-auth-card--signup" : ""}
 
     ${
       theme === "dark"
@@ -448,9 +533,9 @@ function getAuthInputProps(theme) {
   `}
 >
         
-        {/* Left Branding Panel */}
+        {/* Branding Panel — desktop only; slides to the right on sign up */}
         <div
-          className={`hidden md:flex flex-col justify-center items-center p-10 w-1/2 relative overflow-hidden ${
+          className={`en-auth-panel-brand hidden md:flex flex-col items-center p-10 ${
             theme === "dark"
               ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
               : "bg-gradient-to-br from-[#edfbf6] via-[#dff5ec] to-[#cceee3]"
@@ -469,46 +554,49 @@ function getAuthInputProps(theme) {
             }`}
           />
 
-          <div className="relative z-10 mb-6 max-w-sm">
-            <ExamNexusBrand
-              variant="hero"
-              idSuffix="auth"
-              showTagline
-              panelTone={theme === "dark" ? "dark" : "light"}
-            />
-          </div>
+          <div className="relative z-10 flex w-full flex-col items-center">
+            <div className="mb-6 max-w-sm">
+              <ExamNexusBrand
+                variant="hero"
+                idSuffix="auth"
+                showTagline
+                panelTone={theme === "dark" ? "dark" : "light"}
+              />
+            </div>
 
-          <div className="relative z-10 mt-2">
-            <button
-              type="button"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl border transition-all duration-300 ${
-                theme === "dark"
-                  ? "border-white/15 bg-white/10 text-emerald-50 hover:bg-white/15"
-                  : "border-emerald-300/70 bg-white/70 text-teal-900 shadow-sm hover:bg-white"
-              }`}
-            >
-              {theme === "dark" ? (
-                <>
-                  <Sun size={18} />
-                  Light Mode
-                </>
-              ) : (
-                <>
-                  <Moon size={18} />
-                  Dark Mode
-                </>
-              )}
-            </button>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl border transition-all duration-300 ${
+                  theme === "dark"
+                    ? "border-white/15 bg-white/10 text-emerald-50 hover:bg-white/15"
+                    : "border-emerald-300/70 bg-white/70 text-teal-900 shadow-sm hover:bg-white"
+                }`}
+              >
+                {theme === "dark" ? (
+                  <>
+                    <Sun size={18} />
+                    Light Mode
+                  </>
+                ) : (
+                  <>
+                    <Moon size={18} />
+                    Dark Mode
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Form Panel */}
-<div
-  className={`w-full md:w-1/2 md:max-h-[92vh] overflow-y-auto p-8 md:p-10 ${
-    theme === "dark" ? "bg-[#101827] text-white" : "en-bg-elevated text-gray-900"
-  }`}
->
+        {/* Form Panel */}
+        <div
+          className={`en-auth-panel-form p-8 md:p-10 ${
+            theme === "dark" ? "bg-[#101827] text-white" : "en-bg-elevated text-gray-900"
+          }`}
+        >
+          <div className="en-auth-form-inner">
   <div className="mb-6 flex flex-col items-center gap-4 md:hidden">
     <ExamNexusBrand variant="panel" idSuffix="auth-mobile" />
     <button
@@ -565,7 +653,7 @@ function getAuthInputProps(theme) {
                     value={form.email}
                     onChange={handleChange}
                     autoComplete="email"
-                    placeholder="you@school.edu"
+                    placeholder={CRMCC_EMAIL_PLACEHOLDER}
                     {...authInputProps}
                   />
                   {errors.email && (
@@ -649,7 +737,7 @@ function getAuthInputProps(theme) {
                   value={form.email}
                   onChange={handleChange}
                   autoComplete="email"
-                  placeholder="you@school.edu"
+                  placeholder={CRMCC_EMAIL_PLACEHOLDER}
                   {...authInputProps}
                 />
                 {errors.email && (
@@ -810,6 +898,7 @@ function getAuthInputProps(theme) {
               </>
             )}
           </p>
+          </div>
         </div>
       </div>
     </div>

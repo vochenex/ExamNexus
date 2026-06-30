@@ -7,8 +7,21 @@ export function formatAdminError(err) {
   if (message.includes("Admin access required")) {
     return "Your account is not recognized as an admin. Run database/create_admin_account.sql in Supabase.";
   }
-  if (message.includes("Could not find the function")) {
-    return "Admin database functions are missing. Run database/admin_platform.sql and database/admin_platform_fixes.sql in Supabase SQL Editor.";
+  if (
+    message.includes("password_reset") ||
+    message.includes("admin_list_password_reset") ||
+    message.includes("Password reset functions") ||
+    message.includes("Password reset is not set up")
+  ) {
+    return "Password reset is not available yet. Run database/admin_platform_fixes.sql in Supabase SQL Editor, then Project Settings → API → Reload schema, and click Retry.";
+  }
+  if (
+    message.includes("Could not find the function") ||
+    message.includes("schema cache") ||
+    message.includes("does not exist") ||
+    message.includes("PGRST202")
+  ) {
+    return "A database function is missing or Supabase has a stale schema cache. Re-run database/admin_platform_fixes.sql, reload the API schema in Supabase, then click Retry.";
   }
   if (message.includes("JWT") || message.includes("session")) {
     return "Your session expired. Please log out and sign in again.";

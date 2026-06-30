@@ -2,13 +2,24 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { syncProfileOnLogin } from "../utils/authProfile";
-import { isAccountApproved } from "../utils/adminData";
+import { fetchAccountAccess } from "../utils/adminData";
 import { getAuthSession } from "../utils/authUser";
+import { useTheme } from "../layouts/ThemeContext";
+import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
+import {
+  buildPendingAuthNotice,
+  peekAuthNotice,
+  stashAuthNotice,
+} from "../utils/authNotice";
+
+export { stashAuthNotice, consumeAuthNotice, peekAuthNotice, clearAuthNotice } from "../utils/authNotice";
 
 export default function ProtectedRoute({ allowedRoles }) {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState(null);
   const [auth, setAuth] = useState(false);
+  const [authRedirectNotice, setAuthRedirectNotice] = useState(null);
 
   useEffect(() => {
     const check = async () => {
@@ -17,49 +28,61 @@ export default function ProtectedRoute({ allowedRoles }) {
       if (!session?.user) {
         localStorage.removeItem("examnexus_user");
         setAuth(false);
+        setAuthRedirectNotice(null);
         setLoading(false);
         return;
       }
 
-      const { profile, error } = await syncProfileOnLogin(supabase);
+      const access = await fetchAccountAccess(supabase, session.user.id);
 
-      if (profile && !isAccountApproved(profile)) {
+      if (!access.allowed) {
+        const notice = buildPendingAuthNotice(access.profile);
+        stashAuthNotice(notice);
         await supabase.auth.signOut();
         localStorage.removeItem("examnexus_user");
         setAuth(false);
+        setAuthRedirectNotice(notice);
         setLoading(false);
         return;
       }
 
-      if (profile?.role) {
-        setRole(profile.role);
-        setAuth(true);
+      const { profile, error, pendingApproval } = await syncProfileOnLogin(supabase);
+
+      if (pendingApproval || !profile) {
+        const notice = buildPendingAuthNotice(access.profile);
+        stashAuthNotice(notice);
+        await supabase.auth.signOut();
+        localStorage.removeItem("examnexus_user");
+        setAuth(false);
+        setAuthRedirectNotice(notice);
         setLoading(false);
+        if (error) console.error("Profile sync failed:", error);
         return;
       }
 
-      const { data: fallbackProfile } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      setRole(fallbackProfile?.role ?? profile?.role ?? null);
+      setAuthRedirectNotice(null);
+      setRole(profile.role);
       setAuth(true);
-
-      if (error && !fallbackProfile?.role) {
-        console.error("Profile sync failed:", error);
-      }
-
       setLoading(false);
     };
 
     check();
   }, []);
 
-  if (loading) return <div className="text-white p-10">Loading...</div>;
+  if (loading) {
+    return <PageLoadingSkeleton theme={theme} variant="dashboard" />;
+  }
 
-  if (!auth) return <Navigate to="/auth" replace />;
+  if (!auth) {
+    const notice = authRedirectNotice || peekAuthNotice();
+    return (
+      <Navigate
+        to="/auth"
+        replace
+        state={notice ? { authNotice: notice } : undefined}
+      />
+    );
+  }
 
   if (allowedRoles?.length && !allowedRoles.includes(role)) {
     const normalizedRole = String(role || "").toLowerCase();

@@ -37,6 +37,18 @@ const supabase = createClient(
 app.get("/", (req, res) => {
   res.send("🚀 ExamNexus Backend Running");
 });
+
+app.get("/health", (req, res) => {
+  const hasServiceRole = Boolean(getSupabaseAdmin());
+  res.json({
+    ok: true,
+    passwordReset: hasServiceRole,
+    enrollment: hasServiceRole,
+    message: hasServiceRole
+      ? "Service role key loaded"
+      : "Add SUPABASE_SERVICE_ROLE_KEY to backend/.env (Supabase → Project Settings → API → service_role)",
+  });
+});
 // ================= GET ALL EXAMS =================
 app.get("/exams", async (req, res) => {
   try {
@@ -360,10 +372,16 @@ app.use((err, req, res, next) => {
 app.listen(5000, () => {
   console.log("🚀 Backend running on http://localhost:5000");
   if (getSupabaseAdmin()) {
-    console.log("✅ Student enrollment: service role key loaded");
+    console.log("✅ Service role key loaded (password reset + enrollment enabled)");
   } else {
     console.log(
-      "⚠️  Student enrollment: add SUPABASE_SERVICE_ROLE_KEY to backend/.env"
+      "⚠️  SUPABASE_SERVICE_ROLE_KEY is missing or empty in backend/.env"
+    );
+    console.log(
+      "    → Supabase Dashboard → Project Settings → API → copy service_role key"
+    );
+    console.log(
+      "    → Admin password resets and invite enrollment will not work until set"
     );
   }
 });

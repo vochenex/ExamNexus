@@ -240,7 +240,12 @@ export async function fetchAdminExportResults(examId = null) {
 }
 
 export function getAccountStatus(profile) {
-  return profile?.account_status || "approved";
+  const explicit = profile?.account_status;
+  if (explicit) return explicit;
+
+  const role = String(profile?.role || "").toLowerCase();
+  if (role === "admin") return "approved";
+  return "pending";
 }
 
 export function isAccountApproved(profile) {
@@ -249,4 +254,62 @@ export function isAccountApproved(profile) {
 
 export function isAdminUser(user) {
   return String(user?.role || "").toLowerCase() === "admin";
+}
+
+export function canAccessPlatform(profile) {
+  return isAccountApproved(profile) || isAdminUser(profile);
+}
+
+export async function fetchAccountAccess(supabase, userId) {
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "get_my_account_access"
+  );
+
+  if (!rpcError && rpcData && typeof rpcData === "object") {
+    return {
+      allowed: Boolean(rpcData.allowed),
+      profile: {
+        id: userId,
+        role: rpcData.role,
+        account_status: rpcData.account_status,
+      },
+      error: null,
+    };
+  }
+
+  let { data, error } = await supabase
+    .from("users")
+    .select("id, role, account_status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (
+    error &&
+    /account_status|column|schema cache/i.test(String(error.message || ""))
+  ) {
+    ({ data, error } = await supabase
+      .from("users")
+      .select("id, role")
+      .eq("id", userId)
+      .maybeSingle());
+
+    if (data) {
+      data.account_status =
+        String(data.role || "").toLowerCase() === "admin" ? "approved" : "pending";
+    }
+  }
+
+  if (error) {
+    return { allowed: false, profile: null, error };
+  }
+
+  if (!data) {
+    return { allowed: false, profile: null, error: new Error("Profile not found") };
+  }
+
+  return {
+    allowed: canAccessPlatform(data),
+    profile: data,
+    error: null,
+  };
 }

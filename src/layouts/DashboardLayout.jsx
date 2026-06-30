@@ -1,4 +1,5 @@
 import { Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   UserCircle,
@@ -14,6 +15,9 @@ import {
 } from "lucide-react";
 import { useTheme } from "./ThemeContext";
 import { supabase } from "../supabaseClient";
+import { fetchAccountAccess } from "../utils/adminData";
+import { getAuthSession } from "../utils/authUser";
+import { buildPendingAuthNotice, stashAuthNotice } from "../utils/authNotice";
 import { secondaryButton } from "../utils/themeButtons";
 import ProfileAvatar from "../components/ProfileAvatar";
 import NotificationBell from "../components/NotificationBell";
@@ -21,15 +25,41 @@ import ExamNexusLogo from "../components/ExamNexusLogo";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
 import AnimatedPage from "../components/ui/AnimatedPage";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
+import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
 import { motion } from "../utils/motion";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const { isLockdownActive, lockdown } = useAssessmentLockdown();
   const { theme, setTheme } = useTheme();
+  const [accessState, setAccessState] = useState("checking");
 
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
   const isStudent = user.role?.toLowerCase() === "student";
+
+  useEffect(() => {
+    const verifyAccess = async () => {
+      const session = await getAuthSession();
+      if (!session?.user) {
+        setAccessState("denied");
+        return;
+      }
+
+      const access = await fetchAccountAccess(supabase, session.user.id);
+      if (!access.allowed) {
+        const notice = buildPendingAuthNotice(access.profile);
+        stashAuthNotice(notice);
+        await supabase.auth.signOut();
+        localStorage.removeItem("examnexus_user");
+        navigate("/auth", { replace: true, state: { authNotice: notice } });
+        return;
+      }
+
+      setAccessState("allowed");
+    };
+
+    verifyAccess();
+  }, [navigate]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -40,6 +70,14 @@ export default function DashboardLayout() {
   const displayName = user.first_name
     ? `${user.first_name} ${user.last_name || ""}`.trim()
     : user.role || "User";
+
+  if (accessState === "checking") {
+    return <PageLoadingSkeleton theme={theme} variant="dashboard" />;
+  }
+
+  if (accessState !== "allowed") {
+    return null;
+  }
 
   return (
     <div

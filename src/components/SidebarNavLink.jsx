@@ -1,6 +1,16 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useTheme } from "../layouts/ThemeContext";
 import { motion } from "../utils/motion";
+
+function navigateWithTransition(navigate, to) {
+  if (typeof document !== "undefined" && document.startViewTransition) {
+    document.startViewTransition(() => {
+      navigate(to);
+    });
+    return;
+  }
+  navigate(to);
+}
 
 function navLinkClass(theme, isActive) {
   if (isActive) {

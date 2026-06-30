@@ -251,6 +251,11 @@ BEGIN
     RAISE EXCEPTION 'No user found with email %', p_email;
   END IF;
 
+  UPDATE auth.users
+  SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb)
+    || jsonb_build_object('role', 'Admin')
+  WHERE id = profile.id;
+
   RETURN profile;
 END;
 $$;

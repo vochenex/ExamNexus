@@ -1,16 +1,29 @@
 import ExamNexusLogo from "./ExamNexusLogo";
 
-export default function LogoSplashScreen({ theme = "dark", exiting = false }) {
+export default function LogoSplashScreen({
+  theme = "dark",
+  exiting = false,
+  variant = "fullscreen",
+}) {
   const isDark = theme !== "light";
+  const isInline = variant === "inline";
 
   return (
     <div
-      className={`en-splash-screen fixed inset-0 z-[9999] flex flex-col items-center justify-center px-6 ${
+      className={`en-splash-screen flex flex-col items-center justify-center px-6 ${
         exiting ? "en-splash-screen--exit" : ""
+      } ${isInline ? "en-splash-screen--inline" : ""} ${
+        isInline
+          ? "relative min-h-[min(70vh,640px)] w-full py-12"
+          : "fixed inset-0 z-[9999] min-h-screen"
       } ${
         isDark
-          ? "bg-gradient-to-br from-[#021818] via-[#031d1f] to-[#052a28] text-white"
-          : "en-bg-page bg-gradient-to-br from-[#dcefea] via-[#c8e8de] to-[#b8e4d4] text-gray-900"
+          ? isInline
+            ? "text-white"
+            : "bg-gradient-to-br from-[#021818] via-[#031d1f] to-[#052a28] text-white"
+          : isInline
+            ? "text-gray-900"
+            : "en-bg-page bg-gradient-to-br from-[#dcefea] via-[#c8e8de] to-[#b8e4d4] text-gray-900"
       }`}
       role="status"
       aria-live="polite"
@@ -30,8 +43,12 @@ export default function LogoSplashScreen({ theme = "dark", exiting = false }) {
         }`}
       />
 
-      <div className="relative flex flex-col items-center">
-        <div className="relative mb-8 flex h-36 w-36 items-center justify-center">
+      <div className={`relative flex flex-col items-center ${isInline ? "scale-[0.92]" : ""}`}>
+        <div
+          className={`relative flex items-center justify-center ${
+            isInline ? "mb-6 h-28 w-28" : "mb-8 h-36 w-36"
+          }`}
+        >
           <div
             className={`en-splash-ring-glow absolute inset-0 rounded-full ${
               isDark
@@ -56,12 +73,19 @@ export default function LogoSplashScreen({ theme = "dark", exiting = false }) {
                 : "border-emerald-200/90 en-bg-elevated shadow-emerald-500/15"
             }`}
           >
-            <ExamNexusLogo size={88} showGlow idSuffix="splash" animated />
+            <ExamNexusLogo
+              size={isInline ? 72 : 88}
+              showGlow
+              idSuffix={isInline ? "inline" : "splash"}
+              animated
+            />
           </div>
         </div>
 
         <h1
-          className={`en-splash-title text-3xl font-black tracking-tight md:text-4xl ${
+          className={`en-splash-title font-black tracking-tight ${
+            isInline ? "text-2xl md:text-3xl" : "text-3xl md:text-4xl"
+          } ${
             isDark
               ? "bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300 bg-clip-text text-transparent"
               : "bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent"

@@ -1,0 +1,105 @@
+/* Auth card — login: logo left / form right; sign up: form left / logo right */
+
+.en-auth-card {
+  box-sizing: border-box;
+}
+
+.en-auth-panel-brand,
+.en-auth-panel-form {
+  box-sizing: border-box;
+}
+
+/* Mobile: stacked, brand hidden */
+@media (max-width: 767px) {
+  .en-auth-card {
+    height: auto;
+    min-height: 0;
+  }
+
+  .en-auth-panel-brand {
+    display: none !important;
+    transform: none !important;
+  }
+
+  .en-auth-panel-form {
+    position: relative !important;
+    left: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto;
+    display: block !important;
+    transform: none !important;
+    overflow: visible;
+  }
+}
+
+/* Desktop: two halves slide by animating `left` (no transform) */
+@media (min-width: 768px) {
+  .en-auth-card {
+    position: relative;
+    height: min(92vh, 680px);
+    min-height: 560px;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .en-auth-panel-brand,
+  .en-auth-panel-form {
+    position: absolute !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 50% !important;
+    max-width: 50% !important;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transform: translateX(0);
+    transition: transform 0.9s cubic-bezier(0.33, 1, 0.68, 1);
+    will-change: transform;
+  }
+
+  /* Login: logo left, form right */
+  .en-auth-panel-brand {
+    z-index: 1;
+  }
+
+  .en-auth-panel-form {
+    transform: translateX(100%);
+    z-index: 2;
+  }
+
+  /* Sign up — swap sides */
+  .en-auth-card--signup .en-auth-panel-brand {
+    transform: translateX(100%);
+  }
+
+  .en-auth-card--signup .en-auth-panel-form {
+    transform: translateX(0);
+  }
+}
+
+.en-auth-form-inner {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 768px) {
+  .en-auth-form-inner {
+    max-width: 22rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .en-auth-panel-brand,
+  .en-auth-panel-form {
+    transition: none !important;
+    will-change: auto;
+  }
+}

@@ -98,6 +98,13 @@ GRANT EXECUTE ON FUNCTION public.upsert_signup_profile(
   text, text, text, text, text, text, text, text, text, text, text
 ) TO authenticated;
 
+DROP FUNCTION IF EXISTS public.update_user_editable_profile(
+  text, text, text, text, text, text, integer, text
+);
+DROP FUNCTION IF EXISTS public.update_user_editable_profile(
+  text, text, text, text, text, text, text, text
+);
+
 CREATE OR REPLACE FUNCTION public.update_user_editable_profile(
   p_first_name text DEFAULT NULL,
   p_last_name text DEFAULT NULL,
@@ -171,10 +178,6 @@ BEGIN
   RETURN profile;
 END;
 $$;
-
-DROP FUNCTION IF EXISTS public.update_user_editable_profile(
-  text, text, text, text, text, text, integer, text
-);
 
 GRANT EXECUTE ON FUNCTION public.update_user_editable_profile(
   text, text, text, text, text, text, text, text

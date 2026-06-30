@@ -22,7 +22,6 @@ import { secondaryButton } from "../utils/themeButtons";
 import ProfileAvatar from "../components/ProfileAvatar";
 import ExamNexusLogo from "../components/ExamNexusLogo";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
-import AnimatedPage from "../components/ui/AnimatedPage";
 import { motion } from "../utils/motion";
 
 export default function AdminLayout() {
@@ -169,9 +168,7 @@ export default function AdminLayout() {
       </aside>
 
       <main className="relative h-screen flex-1 overflow-y-auto p-8">
-        <AnimatedPage>
-          <Outlet />
-        </AnimatedPage>
+        <Outlet />
       </main>
     </div>
   );

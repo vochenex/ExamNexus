@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Users, Pencil, Trash2, Check, X } from "lucide-react";
+import { Users, Pencil, Trash2, Check } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -168,7 +168,7 @@ export default function AdminAccounts() {
   if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   return (
-    <div className={pageShellClass(theme, "mx-auto max-w-7xl")}>
+    <div className={pageShellClass(theme, "mx-auto max-w-[100rem]")}>
       <PageHeader
         theme={theme}
         icon={Users}
@@ -220,16 +220,16 @@ export default function AdminAccounts() {
 
       <div className={adminTableWrapClass(theme)}>
         <div className="overflow-x-auto">
-          <table className={adminTableClass(theme)}>
+          <table className={`${adminTableClass(theme)} min-w-[72rem]`}>
             <thead>
               <tr>
-                <th className={adminThClass(theme)}>Name</th>
-                <th className={adminThClass(theme)}>Email</th>
-                <th className={adminThClass(theme)}>School ID</th>
-                <th className={adminThClass(theme)}>Role</th>
-                <th className={adminThClass(theme)}>Status</th>
-                <th className={adminThClass(theme)}>Department</th>
-                <th className={adminThClass(theme)}>Actions</th>
+                <th className={`${adminThClass(theme)} min-w-[11rem]`}>Name</th>
+                <th className={`${adminThClass(theme)} min-w-[14rem]`}>Email</th>
+                <th className={`${adminThClass(theme)} min-w-[7rem]`}>School ID</th>
+                <th className={`${adminThClass(theme)} min-w-[5.5rem]`}>Role</th>
+                <th className={`${adminThClass(theme)} min-w-[6.5rem]`}>Status</th>
+                <th className={`${adminThClass(theme)} min-w-[9rem]`}>Department</th>
+                <th className={`${adminThClass(theme)} min-w-[11rem]`}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -247,42 +247,41 @@ export default function AdminAccounts() {
 
                   return (
                     <tr key={user.id}>
-                      <td className={adminTdClass(theme)}>
+                      <td className={`${adminTdClass(theme)} min-w-[11rem] whitespace-nowrap`}>
                         {[user.first_name, user.last_name].filter(Boolean).join(" ") || "—"}
                       </td>
-                      <td className={adminTdClass(theme)}>{user.email}</td>
-                      <td className={adminTdClass(theme)}>{user.school_id}</td>
-                      <td className={adminTdClass(theme)}>{user.role}</td>
-                      <td className={adminTdClass(theme)}>{statusBadge(theme, status)}</td>
-                      <td className={adminTdClass(theme)}>{user.department || "—"}</td>
-                      <td className={adminTdClass(theme)}>
+                      <td className={`${adminTdClass(theme)} min-w-[14rem] break-all`}>
+                        {user.email}
+                      </td>
+                      <td className={`${adminTdClass(theme)} min-w-[7rem] whitespace-nowrap`}>
+                        {user.school_id}
+                      </td>
+                      <td className={`${adminTdClass(theme)} min-w-[5.5rem] whitespace-nowrap`}>
+                        {user.role}
+                      </td>
+                      <td className={`${adminTdClass(theme)} min-w-[6.5rem] whitespace-nowrap`}>
+                        {statusBadge(theme, status)}
+                      </td>
+                      <td className={`${adminTdClass(theme)} min-w-[9rem]`}>
+                        {user.department || "—"}
+                      </td>
+                      <td className={`${adminTdClass(theme)} min-w-[11rem]`}>
                         <div className="flex flex-wrap gap-2">
                           {isPending && !isAdmin && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={reviewingId === user.id}
-                                onClick={() => handleReview(user, "approve")}
-                                className={primaryButtonSm(theme, "text-xs px-2 py-1")}
-                              >
-                                <Check size={14} />
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                disabled={reviewingId === user.id}
-                                onClick={() => handleReview(user, "reject")}
-                                className={dangerButton(theme, "text-xs px-2 py-1")}
-                              >
-                                <X size={14} />
-                                Reject
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              disabled={reviewingId === user.id}
+                              onClick={() => handleReview(user, "approve")}
+                              className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+                            >
+                              <Check size={14} />
+                              Approve
+                            </button>
                           )}
                           <button
                             type="button"
                             onClick={() => setEditing({ ...user })}
-                            className={secondaryButtonSm(theme, "text-xs px-2 py-1")}
+                            className={secondaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
                           >
                             <Pencil size={14} />
                             Edit
@@ -291,7 +290,7 @@ export default function AdminAccounts() {
                             <button
                               type="button"
                               onClick={() => handleDelete(user)}
-                              className={dangerButton(theme, "text-xs px-2 py-1")}
+                              className={dangerButton(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
                             >
                               <Trash2 size={14} />
                               Delete

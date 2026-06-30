@@ -1,6 +1,7 @@
 /** Shared motion class names — keep animations consistent app-wide */
 export const motion = {
   page: "en-page-enter",
+  pageRoute: "en-page-route",
   fadeIn: "en-fade-in",
   fadeInUp: "en-fade-in-up",
   fadeInDown: "en-fade-in-down",

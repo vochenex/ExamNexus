@@ -3,9 +3,12 @@ import { Navigate, Outlet } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { syncProfileOnLogin } from "../utils/authProfile";
 import { getAuthSession } from "../utils/authUser";
-import { isAccountApproved, isAdminUser } from "../utils/adminData";
+import { isAdminUser } from "../utils/adminData";
+import { useTheme } from "../layouts/ThemeContext";
+import { PageLoadingSkeleton } from "./ui/PageLoadingSkeleton";
 
 export default function AdminRouteGuard() {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
   const [redirectRole, setRedirectRole] = useState("student");
@@ -24,7 +27,7 @@ export default function AdminRouteGuard() {
       const { profile } = await syncProfileOnLogin(supabase);
       const role = String(profile?.role || "").toLowerCase();
 
-      if (profile && isAdminUser(profile) && isAccountApproved(profile)) {
+      if (profile && isAdminUser(profile)) {
         setAllowed(true);
         setLoading(false);
         return;
@@ -39,7 +42,7 @@ export default function AdminRouteGuard() {
   }, []);
 
   if (loading) {
-    return <div className="min-h-screen p-10 text-white">Loading admin workspace...</div>;
+    return <PageLoadingSkeleton theme={theme} variant="dashboard" />;
   }
 
   if (!allowed) {

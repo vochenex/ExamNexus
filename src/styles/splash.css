@@ -116,6 +116,20 @@
   animation: en-fade-in 0.35s ease-out both;
 }
 
+.en-splash-screen--inline {
+  animation: en-fade-in 0.35s ease-out both;
+}
+
+.en-splash-screen--inline .en-splash-title,
+.en-splash-screen--inline .en-splash-tagline {
+  animation-duration: 0.45s;
+}
+
+.en-splash-screen--inline .en-splash-progress-track {
+  margin-top: 2rem;
+  width: 10rem;
+}
+
 .en-splash-screen--exit {
   animation: en-splash-overlay-out 0.48s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   pointer-events: none;

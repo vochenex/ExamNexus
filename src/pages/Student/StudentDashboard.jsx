@@ -78,6 +78,16 @@ export default function StudentDashboard() {
     );
   }
 
+  if (!analytics) {
+    return (
+      <div className={`min-h-full p-6 md:p-8 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+        <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
+          No dashboard data available yet.
+        </p>
+      </div>
+    );
+  }
+
   const hasResults = analytics.overallPct != null;
 
   const categorySegments = analytics.categoryBreakdown.map((item) => ({

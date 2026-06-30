@@ -67,6 +67,8 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_school_id text;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -76,11 +78,64 @@ BEGIN
     RAISE EXCEPTION 'Only admins can delete other users';
   END IF;
 
+  SELECT school_id INTO v_school_id FROM public.users WHERE id = p_user_id;
+
+  IF to_regclass('public.exams') IS NOT NULL THEN
+    UPDATE public.exams SET created_by = NULL WHERE created_by = p_user_id;
+  END IF;
+
+  IF to_regclass('public.announcements') IS NOT NULL THEN
+    UPDATE public.announcements SET created_by = NULL WHERE created_by = p_user_id;
+  END IF;
+
+  IF to_regclass('public.admin_announcements') IS NOT NULL THEN
+    UPDATE public.admin_announcements SET created_by = NULL WHERE created_by = p_user_id;
+  END IF;
+
+  IF to_regclass('public.exam_retake_requests') IS NOT NULL THEN
+    UPDATE public.exam_retake_requests SET reviewed_by = NULL WHERE reviewed_by = p_user_id;
+  END IF;
+
+  IF to_regclass('public.password_reset_requests') IS NOT NULL THEN
+    UPDATE public.password_reset_requests SET resolved_by = NULL WHERE resolved_by = p_user_id;
+    UPDATE public.password_reset_requests SET user_id = NULL WHERE user_id = p_user_id;
+  END IF;
+
+  IF v_school_id IS NOT NULL AND to_regclass('public.subjects') IS NOT NULL THEN
+    UPDATE public.subjects SET teacher_school_id = NULL
+    WHERE trim(teacher_school_id) = trim(v_school_id);
+  END IF;
+
   DELETE FROM public.subject_students WHERE student_id = p_user_id;
   DELETE FROM public.exam_results WHERE student_id = p_user_id;
 
   IF to_regclass('public.student_answers') IS NOT NULL THEN
     EXECUTE 'DELETE FROM public.student_answers WHERE student_id = $1'
+      USING p_user_id;
+  END IF;
+
+  IF to_regclass('public.exam_integrity_events') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.exam_integrity_events WHERE student_id = $1'
+      USING p_user_id;
+  END IF;
+
+  IF to_regclass('public.exam_retake_requests') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.exam_retake_requests WHERE student_id = $1'
+      USING p_user_id;
+  END IF;
+
+  IF to_regclass('public.notifications') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.notifications WHERE user_id = $1'
+      USING p_user_id;
+  END IF;
+
+  IF to_regclass('public.announcement_reactions') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.announcement_reactions WHERE user_id = $1'
+      USING p_user_id;
+  END IF;
+
+  IF to_regclass('public.announcement_comments') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.announcement_comments WHERE user_id = $1'
       USING p_user_id;
   END IF;
 
@@ -140,7 +195,12 @@ BEGIN
       THEN meta_school_id
       ELSE users.school_id
     END,
-    role = COALESCE(meta_role, users.role, 'Student'),
+    role = CASE
+      WHEN lower(trim(coalesce(users.role, ''))) = 'admin' THEN users.role
+      WHEN lower(trim(coalesce(users.role, ''))) = 'faculty' THEN users.role
+      WHEN meta_role IS NOT NULL AND trim(meta_role) <> '' THEN meta_role
+      ELSE COALESCE(users.role, 'Student')
+    END,
     gender = COALESCE(meta_gender, users.gender),
     department = COALESCE(meta_department, users.department),
     course = COALESCE(meta_course, users.course),
@@ -250,7 +310,21 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM public.insert_user_profile_from_auth_metadata(NEW);
+  BEGIN
+    PERFORM public.insert_user_profile_from_auth_metadata(NEW);
+  EXCEPTION
+    WHEN unique_violation THEN
+      IF SQLERRM ILIKE '%school_id%' THEN
+        RAISE EXCEPTION
+          'This School ID is already registered. Use a different School ID or log in with your existing account.';
+      ELSIF SQLERRM ILIKE '%email%' THEN
+        RAISE EXCEPTION
+          'This email is already registered. Log in or use a different email.';
+      ELSE
+        RAISE EXCEPTION
+          'An account with these details already exists.';
+      END IF;
+  END;
   RETURN NEW;
 END;
 $$;
@@ -294,17 +368,37 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.ensure_user_profile() TO authenticated;
 
+-- Accept blank or string age values from the app (e.g. "" from forms)
+CREATE OR REPLACE FUNCTION public.safe_text_to_int(p_value text)
+RETURNS integer
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN NULLIF(TRIM(COALESCE(p_value, '')), '') ~ '^\d+$'
+      THEN NULLIF(TRIM(p_value), '')::integer
+    ELSE NULL
+  END;
+$$;
+
 -- ============================================================
 -- RPC: save editable profile fields (bypasses RLS issues)
 -- ============================================================
+DROP FUNCTION IF EXISTS public.update_user_editable_profile(
+  text, text, text, text, text, text, integer, text
+);
+DROP FUNCTION IF EXISTS public.update_user_editable_profile(
+  text, text, text, text, text, text, text, text
+);
+
 CREATE OR REPLACE FUNCTION public.update_user_editable_profile(
-  p_first_name text,
-  p_last_name text,
+  p_first_name text DEFAULT NULL,
+  p_last_name text DEFAULT NULL,
   p_gender text DEFAULT NULL,
   p_department text DEFAULT NULL,
   p_course text DEFAULT NULL,
   p_year_level text DEFAULT NULL,
-  p_age integer DEFAULT NULL,
+  p_age text DEFAULT NULL,
   p_avatar_url text DEFAULT NULL
 )
 RETURNS public.users
@@ -317,6 +411,7 @@ DECLARE
   auth_user auth.users%ROWTYPE;
   v_first_name text;
   v_last_name text;
+  v_age integer := public.safe_text_to_int(p_age);
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -350,7 +445,7 @@ BEGIN
     department = COALESCE(NULLIF(TRIM(p_department), ''), department),
     course = COALESCE(NULLIF(TRIM(p_course), ''), course),
     year_level = COALESCE(NULLIF(TRIM(p_year_level), ''), year_level),
-    age = COALESCE(p_age, age),
+    age = COALESCE(v_age, age),
     avatar_url = CASE
       WHEN NULLIF(TRIM(p_avatar_url), '') LIKE 'http%'
         OR NULLIF(TRIM(p_avatar_url), '') LIKE '//%'
@@ -371,7 +466,7 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.update_user_editable_profile(
-  text, text, text, text, text, text, integer, text
+  text, text, text, text, text, text, text, text
 ) TO authenticated;
 
 -- ============================================================
@@ -461,6 +556,13 @@ GRANT EXECUTE ON FUNCTION public.repair_profile_school_id() TO authenticated;
 -- ============================================================
 -- RPC: upsert full signup profile
 -- ============================================================
+DROP FUNCTION IF EXISTS public.upsert_signup_profile(
+  text, text, text, text, text, text, text, text, text, integer, text
+);
+DROP FUNCTION IF EXISTS public.upsert_signup_profile(
+  text, text, text, text, text, text, text, text, text, text, text
+);
+
 CREATE OR REPLACE FUNCTION public.upsert_signup_profile(
   p_first_name text,
   p_last_name text,
@@ -471,7 +573,7 @@ CREATE OR REPLACE FUNCTION public.upsert_signup_profile(
   p_department text DEFAULT NULL,
   p_course text DEFAULT NULL,
   p_year_level text DEFAULT NULL,
-  p_age integer DEFAULT NULL,
+  p_age text DEFAULT NULL,
   p_avatar_url text DEFAULT '/default-avatar.svg'
 )
 RETURNS public.users
@@ -481,6 +583,7 @@ SET search_path = public
 AS $$
 DECLARE
   profile public.users%ROWTYPE;
+  v_age integer := public.safe_text_to_int(p_age);
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -511,7 +614,7 @@ BEGIN
     NULLIF(TRIM(p_department), ''),
     NULLIF(TRIM(p_course), ''),
     NULLIF(TRIM(p_year_level), ''),
-    p_age,
+    v_age,
     COALESCE(NULLIF(TRIM(p_avatar_url), ''), '/default-avatar.svg')
   )
   ON CONFLICT (id) DO UPDATE SET
@@ -519,7 +622,11 @@ BEGIN
     first_name = COALESCE(EXCLUDED.first_name, public.users.first_name),
     last_name = COALESCE(EXCLUDED.last_name, public.users.last_name),
     school_id = COALESCE(NULLIF(TRIM(EXCLUDED.school_id), ''), public.users.school_id),
-    role = EXCLUDED.role,
+    role = CASE
+      WHEN lower(trim(coalesce(public.users.role, ''))) IN ('admin', 'faculty')
+        THEN public.users.role
+      ELSE EXCLUDED.role
+    END,
     gender = COALESCE(EXCLUDED.gender, public.users.gender),
     department = COALESCE(EXCLUDED.department, public.users.department),
     course = COALESCE(EXCLUDED.course, public.users.course),
@@ -538,6 +645,124 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.upsert_signup_profile(
-  text, text, text, text, text, text, text, text, text, integer, text
+  text, text, text, text, text, text, text, text, text, text, text
 ) TO authenticated;
+
+-- ============================================================
+-- RPC: check email / school ID availability before sign-up
+-- (works for anon users; does not expose other user data)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.check_signup_credentials(
+  p_email text,
+  p_school_id text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_email text := lower(trim(coalesce(p_email, '')));
+  v_school_id text := trim(coalesce(p_school_id, ''));
+  v_email_taken boolean := false;
+  v_school_taken boolean := false;
+BEGIN
+  IF v_email = '' THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'message', 'Email is required.'
+    );
+  END IF;
+
+  IF v_school_id = '' THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'message', 'School ID is required.'
+    );
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE lower(trim(coalesce(email, ''))) = v_email
+  ) INTO v_email_taken;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE trim(coalesce(school_id, '')) = v_school_id
+  ) INTO v_school_taken;
+
+  IF v_email_taken OR v_school_taken THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'email_taken', v_email_taken,
+      'school_id_taken', v_school_taken,
+      'message', CASE
+        WHEN v_email_taken AND v_school_taken THEN
+          'This email and School ID are already registered. Try logging in instead.'
+        WHEN v_email_taken THEN
+          'This email is already registered. Log in or use a different email.'
+        ELSE
+          'This School ID is already registered. Use a different School ID or contact your administrator.'
+      END
+    );
+  END IF;
+
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.check_signup_credentials(text, text) TO anon, authenticated;
+
+-- ============================================================
+-- RPC: reliable account access check for login guards
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.get_my_account_access()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  profile public.users%ROWTYPE;
+  v_has_status boolean;
+  v_status text;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN jsonb_build_object('allowed', false, 'reason', 'not_authenticated');
+  END IF;
+
+  SELECT * INTO profile FROM public.users WHERE id = auth.uid();
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('allowed', false, 'reason', 'no_profile');
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'users'
+      AND column_name = 'account_status'
+  ) INTO v_has_status;
+
+  IF v_has_status THEN
+    v_status := profile.account_status;
+  ELSIF lower(trim(coalesce(profile.role, ''))) = 'admin' THEN
+    v_status := 'approved';
+  ELSE
+    v_status := 'pending';
+  END IF;
+
+  RETURN jsonb_build_object(
+    'allowed',
+      lower(trim(coalesce(profile.role, ''))) = 'admin'
+      OR v_status = 'approved',
+    'role', profile.role,
+    'account_status', v_status
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_my_account_access() TO authenticated;
 

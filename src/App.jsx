@@ -19,7 +19,6 @@ import FacultyAnnouncementsHub from "./pages/Faculty/FacultyAnnouncementsHub";
 import StudentSubjectSocial from "./pages/Student/StudentSubjectSocial";
 import TakeAssessment from "./pages/Student/TakeAssessment";
 import StudentResults from "./pages/Student/StudentResults";
-import AnimatedPage from "./components/ui/AnimatedPage";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminAccounts from "./pages/Admin/AdminAccounts";
 import AdminSubjects from "./pages/Admin/AdminSubjects";
@@ -35,14 +34,7 @@ import ProtectedRoute from "./guards/ProtectedRoute";
 export default function App() {
   return (
     <Routes>
-      <Route
-        path="/auth"
-        element={
-          <AnimatedPage>
-            <ExamNexusAuth />
-          </AnimatedPage>
-        }
-      />
+      <Route path="/auth" element={<ExamNexusAuth />} />
 
       <Route element={<AdminRouteGuard />}>
         <Route element={<AdminLayout />}>

@@ -31,6 +31,11 @@ CREATE POLICY password_reset_requests_deny_all ON public.password_reset_requests
   USING (false)
   WITH CHECK (false);
 
+DROP POLICY IF EXISTS password_reset_requests_admin_select ON public.password_reset_requests;
+CREATE POLICY password_reset_requests_admin_select ON public.password_reset_requests
+  FOR SELECT TO authenticated
+  USING (public.is_admin());
+
 -- ============================================================
 -- Submit request (login page — no auth required)
 -- ============================================================
