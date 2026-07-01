@@ -15,6 +15,8 @@ import AssessmentSettingsPanel from "../../components/AssessmentSettingsPanel";
 import FormatGradingSettings from "../../components/FormatGradingSettings";
 import QuestionFormatPrompt from "../../components/QuestionFormatPrompt";
 import QuestionSectionsPanel from "../../components/QuestionSectionsPanel";
+import AssessmentAiGenerator from "../../components/AssessmentAiGenerator";
+import { mapAiPayloadToBuilderQuestions } from "../../utils/aiQuestionMapper";
 import { getSubjectSections } from "../../utils/sections";
 import { createExam } from "../../utils/supabaseData";
 import { supabase } from "../../supabaseClient";
@@ -46,7 +48,7 @@ export default function CreateAssessment() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
-  const { warning: showWarning, success: showSuccess } = useAppModal();
+  const { warning: showWarning, success: showSuccess, confirm } = useAppModal();
 
   const assessmentType = location.state?.type || "exam";
   const assessmentLabel = getAssessmentCategoryLabel(assessmentType);
@@ -60,6 +62,7 @@ export default function CreateAssessment() {
   const [exam, setExam] = useState(defaultAssessment);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [creationMode, setCreationMode] = useState("manual");
 
   const {
     questionSections,
@@ -86,6 +89,8 @@ export default function CreateAssessment() {
     validateAllQuestions,
     getQuestionsForSave,
     getExamTypeForSave,
+    initializeFromLoadedQuestions,
+    questionHasContent,
   } = useQuestionSections(defaultAssessment.exam_type);
 
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
@@ -129,6 +134,49 @@ export default function CreateAssessment() {
   const onConfirmFormatSection = () => {
     const resolvedType = confirmAddFormatSection();
     setExam((prev) => ({ ...prev, exam_type: resolvedType }));
+  };
+
+  const resolveExamTypeFromMapped = (mappedQuestions) => {
+    const types = [...new Set(mappedQuestions.map((item) => item.type).filter(Boolean))];
+    if (types.length === 0) return defaultAssessment.exam_type;
+    if (types.length === 1) return types[0];
+    return "mixed";
+  };
+
+  const handleAiGenerated = async (payload) => {
+    const mappedQuestions = mapAiPayloadToBuilderQuestions(payload);
+    if (!mappedQuestions.length) {
+      setError("AI did not return usable questions. Adjust your prompt or formats and try again.");
+      return;
+    }
+
+    const hasExisting = questions.some((question) => questionHasContent(question));
+    if (hasExisting) {
+      const shouldReplace = await confirm({
+        title: "Replace current questions?",
+        message:
+          "The questions already on this page will be replaced by the AI-generated set. You can still edit everything before publishing.",
+      });
+      if (!shouldReplace) return;
+    }
+
+    initializeFromLoadedQuestions(
+      mappedQuestions,
+      mappedQuestions[0]?.type || defaultAssessment.exam_type
+    );
+
+    setExam((prev) => ({
+      ...prev,
+      title: prev.title.trim() || payload.suggestedTitle || prev.title,
+      description: prev.description.trim() || payload.suggestedDescription || prev.description,
+      exam_type: resolveExamTypeFromMapped(mappedQuestions),
+    }));
+
+    setCreationMode("manual");
+    setError("");
+    showSuccess(
+      `Generated ${mappedQuestions.length} question${mappedQuestions.length === 1 ? "" : "s"}. Review, adjust settings, then publish.`
+    );
   };
 
   const handlePublish = async () => {
@@ -206,8 +254,40 @@ export default function CreateAssessment() {
           Create {assessmentLabel}
         </h1>
         <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-          Build questions, set a schedule, and publish to selected sections.
+          Build manually, generate from a document or prompt, then review and publish.
         </p>
+
+        <div
+          className={`mt-4 inline-flex flex-wrap gap-2 rounded-xl border p-1 ${
+            theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-100 bg-white"
+          }`}
+        >
+          {[
+            { id: "manual", label: "Manual" },
+            { id: "document", label: "Upload document" },
+            { id: "prompt", label: "AI prompt" },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => {
+                setCreationMode(option.id);
+                clearError();
+              }}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                creationMode === option.id
+                  ? theme === "dark"
+                    ? "bg-emerald-500 text-[#031d1f]"
+                    : "bg-teal-600 text-white"
+                  : theme === "dark"
+                    ? "text-gray-300 hover:bg-white/5"
+                    : "text-gray-700 hover:bg-emerald-50"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         {selectedSubject && (
           <p className={`mt-2 text-sm font-medium ${theme === "dark" ? "text-emerald-300" : "text-teal-800"}`}>
             Subject: {selectedSubject.name}
@@ -277,32 +357,41 @@ export default function CreateAssessment() {
           </div>
 
           <div className={`${assessmentPanelClass(theme)} min-h-[420px] xl:col-span-5`}>
-            <QuestionSectionsPanel
-              questionSections={questionSections}
-              activeSectionId={activeSectionId}
-              questions={questions}
-              onAddQuestionToSection={(sectionId) =>
-                addQuestionToSection(sectionId, setError, clearError)
-              }
-              onUpdateQuestion={(index, field, value) =>
-                updateQuestion(index, field, value, clearError)
-              }
-              onUpdateChoice={(qIndex, cIndex, value) =>
-                updateChoice(qIndex, cIndex, value, clearError)
-              }
-              onUpdateEnumAnswer={(qIndex, aIndex, value) =>
-                updateEnumAnswer(qIndex, aIndex, value, clearError)
-              }
-              onAddEnumAnswer={addEnumAnswer}
-              onRemoveEnumAnswer={removeEnumAnswer}
-              onAddAlternativeAnswer={addAlternativeAnswer}
-              onUpdateAlternativeAnswer={(qIndex, aIndex, value) =>
-                updateAlternativeAnswer(qIndex, aIndex, value, clearError)
-              }
-              onRemoveAlternativeAnswer={removeAlternativeAnswer}
-              onDeleteQuestion={deleteQuestion}
-              onSelectSection={setActiveSectionId}
-            />
+            {creationMode === "manual" ? (
+              <QuestionSectionsPanel
+                questionSections={questionSections}
+                activeSectionId={activeSectionId}
+                questions={questions}
+                onAddQuestionToSection={(sectionId) =>
+                  addQuestionToSection(sectionId, setError, clearError)
+                }
+                onUpdateQuestion={(index, field, value) =>
+                  updateQuestion(index, field, value, clearError)
+                }
+                onUpdateChoice={(qIndex, cIndex, value) =>
+                  updateChoice(qIndex, cIndex, value, clearError)
+                }
+                onUpdateEnumAnswer={(qIndex, aIndex, value) =>
+                  updateEnumAnswer(qIndex, aIndex, value, clearError)
+                }
+                onAddEnumAnswer={addEnumAnswer}
+                onRemoveEnumAnswer={removeEnumAnswer}
+                onAddAlternativeAnswer={addAlternativeAnswer}
+                onUpdateAlternativeAnswer={(qIndex, aIndex, value) =>
+                  updateAlternativeAnswer(qIndex, aIndex, value, clearError)
+                }
+                onRemoveAlternativeAnswer={removeAlternativeAnswer}
+                onDeleteQuestion={deleteQuestion}
+                onSelectSection={setActiveSectionId}
+              />
+            ) : (
+              <AssessmentAiGenerator
+                mode={creationMode}
+                disabled={loading}
+                onGenerated={handleAiGenerated}
+                onError={setError}
+              />
+            )}
           </div>
 
           <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3 xl:sticky xl:top-6`}>

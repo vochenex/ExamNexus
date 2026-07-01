@@ -17,7 +17,9 @@ const { createClient } = require("@supabase/supabase-js");
 const subjectsRoute = require("./routes/subjectsRoute");
 const analyticsRoute = require("./routes/analyticsRoute");
 const passwordResetRoute = require("./routes/passwordResetRoute");
+const assessmentAiRoute = require("./routes/assessmentAiRoute");
 const { getSupabaseAdmin } = require("./lib/supabaseAdmin");
+const { getAiServiceStatus } = require("./lib/aiProvider");
 
 // ================= INIT APP =================
 const app = express();
@@ -38,12 +40,16 @@ app.get("/", (req, res) => {
   res.send("🚀 ExamNexus Backend Running");
 });
 
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
   const hasServiceRole = Boolean(getSupabaseAdmin());
+  const aiStatus = await getAiServiceStatus();
   res.json({
     ok: true,
     passwordReset: hasServiceRole,
     enrollment: hasServiceRole,
+    assessmentAi: aiStatus.configured,
+    aiProvider: aiStatus.provider,
+    aiModel: aiStatus.model,
     message: hasServiceRole
       ? "Service role key loaded"
       : "Add SUPABASE_SERVICE_ROLE_KEY to backend/.env (Supabase → Project Settings → API → service_role)",
@@ -361,6 +367,7 @@ app.delete("/exam/:examId", async (req, res) => {
 app.use("/subjects", subjectsRoute);
 app.use("/analytics", analyticsRoute);
 app.use("/password-reset", passwordResetRoute);
+app.use("/assessment-ai", assessmentAiRoute);
 app.use((err, req, res, next) => {
   console.error("GLOBAL EXPRESS ERROR:", err);
 
@@ -369,7 +376,7 @@ app.use((err, req, res, next) => {
   });
 });
 // ================= START SERVER =================
-app.listen(5000, () => {
+app.listen(5000, async () => {
   console.log("🚀 Backend running on http://localhost:5000");
   if (getSupabaseAdmin()) {
     console.log("✅ Service role key loaded (password reset + enrollment enabled)");
@@ -383,5 +390,18 @@ app.listen(5000, () => {
     console.log(
       "    → Admin password resets and invite enrollment will not work until set"
     );
+  }
+
+  try {
+    const aiStatus = await getAiServiceStatus();
+    if (aiStatus.configured) {
+      console.log(
+        `✅ Assessment AI ready (${aiStatus.provider}: ${aiStatus.model})`
+      );
+    } else {
+      console.log(`⚠️  Assessment AI unavailable — ${aiStatus.error}`);
+    }
+  } catch (err) {
+    console.log(`⚠️  Assessment AI status check failed — ${err.message}`);
   }
 });

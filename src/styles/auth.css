@@ -54,13 +54,22 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     transform: translateX(0);
     transition: transform 0.9s cubic-bezier(0.33, 1, 0.68, 1);
     will-change: transform;
+  }
+
+  .en-auth-panel-brand {
+    justify-content: center;
+  }
+
+  .en-auth-panel-form {
+    justify-content: flex-start;
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
   }
 
   /* Login: logo left, form right */
@@ -73,7 +82,12 @@
     z-index: 2;
   }
 
-  /* Sign up — swap sides */
+  /* Sign up — swap sides; extra height for long signup form */
+  .en-auth-card--signup {
+    height: min(92vh, 920px);
+    min-height: 640px;
+  }
+
   .en-auth-card--signup .en-auth-panel-brand {
     transform: translateX(100%);
   }

@@ -69,7 +69,10 @@ cp backend/.env.example backend/.env
 | `SUPABASE_URL` | `backend/.env` | Same project URL (backend) |
 | `SUPABASE_ANON_KEY` | `backend/.env` | Anon key (backend) |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` | **Server only** — never use `VITE_` prefix |
-| `OPENAI_API_KEY` | `backend/.env` | Optional; AI question generation |
+| `AI_PROVIDER` | `backend/.env` | `ollama` (default) or `openai` |
+| `OLLAMA_BASE_URL` | `backend/.env` | Local Ollama URL (default `http://localhost:11434`) |
+| `OLLAMA_MODEL` | `backend/.env` | Installed Ollama model (e.g. `llama3`) |
+| `OPENAI_API_KEY` | `backend/.env` | Only when `AI_PROVIDER=openai` |
 
 Verify the backend loaded the service role key:
 

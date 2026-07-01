@@ -42,6 +42,7 @@ export default function ExamNexusAuth() {
   const location = useLocation();
   const { theme, setTheme } = useTheme();
   const lastNoticeKeyRef = useRef(null);
+  const formPanelRef = useRef(null);
 const [showPassword, setShowPassword] = useState(false);
 const [successMessage, setSuccessMessage] = useState("");
 const [isLogin, setIsLogin] = useState(true);
@@ -100,6 +101,11 @@ const [loading, setLoading] = useState(false);
       current.email === suggested ? current : { ...current, email: suggested }
     );
   }, [authView, emailManuallyEdited, form.firstName, form.lastName]);
+
+  useEffect(() => {
+    if (authView !== "signup" || !formPanelRef.current) return;
+    formPanelRef.current.scrollTop = 0;
+  }, [authView]);
 
   useEffect(() => {
     const notice = location.state?.authNotice || peekAuthNotice();
@@ -592,6 +598,7 @@ function getAuthInputProps(theme) {
 
         {/* Form Panel */}
         <div
+          ref={formPanelRef}
           className={`en-auth-panel-form p-8 md:p-10 ${
             theme === "dark" ? "bg-[#101827] text-white" : "en-bg-elevated text-gray-900"
           }`}
@@ -701,97 +708,97 @@ function getAuthInputProps(theme) {
               </div>
             ) : (
               <>
-            {!isLogin && (
-              <SignupFormFields
-                form={form}
-                errors={errors}
-                theme={theme}
-                authInputProps={authInputProps}
-                onFieldChange={handleChange}
-                onRoleChange={handleRoleChange}
-              />
-            )}
-
-            {!isLogin && (
-              <p
-                className={`mb-4 mt-5 text-xs font-semibold uppercase tracking-wider ${
-                  theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
-                }`}
-              >
-                Login credentials
-              </p>
-            )}
-
-            <div className={isLogin ? "space-y-4" : "space-y-4"}>
-              <div>
-                <label
-                  className={`mb-1.5 block text-sm font-medium ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  autoComplete="email"
-                  placeholder={CRMCC_EMAIL_PLACEHOLDER}
-                  {...authInputProps}
-                />
-                {errors.email && (
-                  <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  className={`mb-1.5 block text-sm font-medium ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Password
-                </label>
-
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    autoComplete={isLogin ? "current-password" : "new-password"}
-                    placeholder={isLogin ? "Enter your password" : "Create a password"}
-                    {...authInputProps}
-                    className={`${authInputProps.className} pr-12`}
+                {authView === "signup" && (
+                  <SignupFormFields
+                    form={form}
+                    errors={errors}
+                    theme={theme}
+                    authInputProps={authInputProps}
+                    onFieldChange={handleChange}
+                    onRoleChange={handleRoleChange}
                   />
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-emerald-400"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
-                  </button>
-                </div>
-
-                {errors.password && (
-                  <p className="text-red-500 text-xs mt-1">{errors.password}</p>
                 )}
-                {isLogin && authView === "login" && (
-                  <button
-                    type="button"
-                    onClick={switchToForgot}
-                    className={`mt-2 text-xs font-medium underline-offset-2 hover:underline ${
-                      theme === "dark" ? "text-emerald-400" : "text-teal-700"
+
+                {authView === "signup" && (
+                  <p
+                    className={`mb-4 mt-5 text-xs font-semibold uppercase tracking-wider ${
+                      theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
                     }`}
                   >
-                    Forgot password?
-                  </button>
+                    Login credentials
+                  </p>
                 )}
-              </div>
-            </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      className={`mb-1.5 block text-sm font-medium ${
+                        theme === "dark" ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      autoComplete="email"
+                      placeholder={CRMCC_EMAIL_PLACEHOLDER}
+                      {...authInputProps}
+                    />
+                    {errors.email && (
+                      <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      className={`mb-1.5 block text-sm font-medium ${
+                        theme === "dark" ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Password
+                    </label>
+
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={form.password}
+                        onChange={handleChange}
+                        autoComplete={isLogin ? "current-password" : "new-password"}
+                        placeholder={isLogin ? "Enter your password" : "Create a password"}
+                        {...authInputProps}
+                        className={`${authInputProps.className} pr-12`}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-emerald-400"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                      </button>
+                    </div>
+
+                    {errors.password && (
+                      <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+                    )}
+                    {authView === "login" && (
+                      <button
+                        type="button"
+                        onClick={switchToForgot}
+                        className={`mt-2 text-xs font-medium underline-offset-2 hover:underline ${
+                          theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                        }`}
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                </div>
               </>
             )}
 
