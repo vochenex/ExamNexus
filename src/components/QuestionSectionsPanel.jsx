@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Download } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import QuestionBuilderCard from "./QuestionBuilderCard";
 import { getFormatLabel } from "../utils/questionSections";
@@ -21,16 +21,22 @@ export default function QuestionSectionsPanel({
   onUpdateEnumAnswer,
   onAddEnumAnswer,
   onRemoveEnumAnswer,
+  onAddEnumSlotAlternative,
+  onUpdateEnumSlotAlternative,
+  onRemoveEnumSlotAlternative,
   onAddAlternativeAnswer,
   onUpdateAlternativeAnswer,
   onRemoveAlternativeAnswer,
   onDeleteQuestion,
   onSelectSection,
+  onSaveQuestionToBank,
+  onImportFromBank,
 }) {
   const { theme } = useTheme();
   const [expandedSections, setExpandedSections] = useState(() => new Set());
   const [expandedQuestions, setExpandedQuestions] = useState(() => new Set());
   const scrollTargetRef = useRef(null);
+  const previousQuestionCountRef = useRef(0);
 
   useEffect(() => {
     setExpandedSections((prev) => {
@@ -50,6 +56,25 @@ export default function QuestionSectionsPanel({
   useEffect(() => {
     if (questions.length === 0) return;
 
+    if (questions.length > previousQuestionCountRef.current) {
+      const lastQuestion = questions[questions.length - 1];
+      if (lastQuestion?.sectionId) {
+        const sectionIndex = questions.filter(
+          (question) => question.sectionId === lastQuestion.sectionId
+        ).length - 1;
+        const key = `${lastQuestion.sectionId}-${sectionIndex}`;
+
+        setExpandedSections((prev) => new Set(prev).add(lastQuestion.sectionId));
+        setExpandedQuestions((prev) => new Set(prev).add(key));
+      }
+    }
+
+    previousQuestionCountRef.current = questions.length;
+  }, [questions]);
+
+  useEffect(() => {
+    if (questions.length === 0) return;
+
     setExpandedQuestions((prev) => {
       if (prev.size > 0) return prev;
 
@@ -65,10 +90,6 @@ export default function QuestionSectionsPanel({
       return next;
     });
   }, [questions.length, questionSections, questions]);
-
-  useEffect(() => {
-    scrollTargetRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [questions.length]);
 
   const toggleSection = (sectionId) => {
     setExpandedSections((prev) => {
@@ -104,20 +125,52 @@ export default function QuestionSectionsPanel({
     setExpandedQuestions((prev) => new Set(prev).add(newKey));
 
     onAddQuestionToSection(sectionId);
+
+    requestAnimationFrame(() => {
+      scrollTargetRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   };
 
   return (
     <>
-      <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold">Questions ({questions.length})</h2>
-        {questionSections.length > 1 && (
-          <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-            {questionSections.length} format sections
-          </p>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {onImportFromBank && (
+            <button
+              type="button"
+              onClick={onImportFromBank}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                theme === "dark"
+                  ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                  : "en-bg-skeleton text-teal-800 hover:bg-emerald-200"
+              }`}
+            >
+              <Download size={14} />
+              Import from bank
+            </button>
+          )}
+          {questionSections.length > 1 && (
+            <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+              {questionSections.length} format sections
+            </p>
+          )}
+        </div>
       </div>
 
-      {questions.length === 0 && questionSections.length === 1 ? (
+      {questions.length === 0 && questionSections.length === 0 ? (
+        <div
+          className={`rounded-2xl border border-dashed p-8 text-center ${
+            theme === "dark"
+              ? "border-white/10 text-gray-400"
+              : "border-emerald-200 text-gray-500"
+          }`}
+        >
+          <p className="text-sm">
+            Questions will appear here, grouped by format, as each one is generated.
+          </p>
+        </div>
+      ) : questions.length === 0 && questionSections.length === 1 ? (
         <div
           className={`rounded-2xl border border-dashed p-8 text-center ${
             theme === "dark"
@@ -244,7 +297,8 @@ export default function QuestionSectionsPanel({
                       const isLastInSection = localIndex === sectionQuestions.length - 1;
                       const shouldScroll = isLastInSection;
                       const showAlternatives =
-                        section.type === "identification" &&
+                        (section.type === "identification" ||
+                          section.type === "enumeration") &&
                         sectionGrading.accept_alternatives;
 
                       return (
@@ -307,6 +361,24 @@ export default function QuestionSectionsPanel({
                                 onRemoveEnumAnswer={(answerIndex) =>
                                   onRemoveEnumAnswer(globalIndex, answerIndex)
                                 }
+                                onAddEnumSlotAlternative={(answerIndex) =>
+                                  onAddEnumSlotAlternative?.(globalIndex, answerIndex)
+                                }
+                                onUpdateEnumSlotAlternative={(answerIndex, altIndex, value) =>
+                                  onUpdateEnumSlotAlternative?.(
+                                    globalIndex,
+                                    answerIndex,
+                                    altIndex,
+                                    value
+                                  )
+                                }
+                                onRemoveEnumSlotAlternative={(answerIndex, altIndex) =>
+                                  onRemoveEnumSlotAlternative?.(
+                                    globalIndex,
+                                    answerIndex,
+                                    altIndex
+                                  )
+                                }
                                 onAddAlternativeAnswer={() =>
                                   onAddAlternativeAnswer(globalIndex)
                                 }
@@ -317,6 +389,11 @@ export default function QuestionSectionsPanel({
                                   onRemoveAlternativeAnswer(globalIndex, answerIndex)
                                 }
                                 onDelete={() => onDeleteQuestion(globalIndex)}
+                                onSaveToBank={
+                                  onSaveQuestionToBank
+                                    ? () => onSaveQuestionToBank(question)
+                                    : undefined
+                                }
                               />
                             </div>
                           )}

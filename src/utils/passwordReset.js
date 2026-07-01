@@ -2,8 +2,7 @@ import { supabase } from "../supabaseClient";
 import { getAuthSession } from "./authUser";
 import { requireSession } from "./supabaseData";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { API_BASE } from "./apiBase.js";
 
 function isMissingRpcError(error) {
   const message = error?.message || "";

@@ -1,11 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { createClient } = require("@supabase/supabase-js");
+const { createAnonClient } = require("../lib/supabaseClient");
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createAnonClient();
 
 router.get("/:examId", async (req, res) => {
   try {

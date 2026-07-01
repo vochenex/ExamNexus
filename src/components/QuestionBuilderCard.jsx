@@ -1,7 +1,8 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Archive } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { EXAM_TYPE_LABELS } from "../utils/assessmentQuestions";
-import { getQuestionType, normalizeGradingOptions } from "../utils/questionGrading";
+import { choiceLabel, stripChoicePrefix, formatChoiceOptionLabel } from "../utils/choiceLabels";
+import { getQuestionType, normalizeGradingOptions, ensureEnumAlternativesForAnswers } from "../utils/questionGrading";
 import Select from "./ui/Select";
 
 const inputClass = (theme) =>
@@ -55,11 +56,19 @@ export default function QuestionBuilderCard({
   onAddAlternativeAnswer,
   onUpdateAlternativeAnswer,
   onRemoveAlternativeAnswer,
+  onAddEnumSlotAlternative,
+  onUpdateEnumSlotAlternative,
+  onRemoveEnumSlotAlternative,
   onDelete,
+  onSaveToBank,
 }) {
   const { theme } = useTheme();
   const type = getQuestionType(question, examType);
   const grading = normalizeGradingOptions(question.grading);
+  const enumAlternatives = ensureEnumAlternativesForAnswers(
+    grading,
+    question.answers?.length || 0
+  );
 
   return (
     <div
@@ -82,14 +91,31 @@ export default function QuestionBuilderCard({
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded-lg p-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
-          aria-label={`Delete question ${index + 1}`}
-        >
-          <Trash2 size={16} />
-        </button>
+        <div className="flex items-center gap-1">
+          {onSaveToBank && (
+            <button
+              type="button"
+              onClick={onSaveToBank}
+              className={`rounded-lg p-2 transition ${
+                theme === "dark"
+                  ? "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                  : "text-teal-700 hover:bg-emerald-100 hover:text-teal-900"
+              }`}
+              aria-label={`Save question ${index + 1} to bank`}
+              title="Save to question bank"
+            >
+              <Archive size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-lg p-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+            aria-label={`Delete question ${index + 1}`}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -109,13 +135,21 @@ export default function QuestionBuilderCard({
             <label className={labelClass(theme)}>Choices</label>
             <div className="space-y-2">
               {question.choices.map((choice, choiceIndex) => (
-                <input
-                  key={choiceIndex}
-                  className={inputClass(theme)}
-                  placeholder={`Choice ${choiceIndex + 1}`}
-                  value={choice || ""}
-                  onChange={(e) => onUpdateChoice(choiceIndex, e.target.value)}
-                />
+                <div key={choiceIndex} className="flex items-center gap-2">
+                  <span
+                    className={`w-8 shrink-0 text-sm font-semibold ${
+                      theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                    }`}
+                  >
+                    {choiceLabel(choiceIndex)}.
+                  </span>
+                  <input
+                    className={inputClass(theme)}
+                    placeholder={`${choiceLabel(choiceIndex)}. Answer choice`}
+                    value={stripChoicePrefix(choice)}
+                    onChange={(e) => onUpdateChoice(choiceIndex, e.target.value)}
+                  />
+                </div>
               ))}
             </div>
             <div className="mt-3">
@@ -125,10 +159,11 @@ export default function QuestionBuilderCard({
                 onChange={(e) => onUpdate("answer", e.target.value)}
               >
                 <option value="">Select correct choice</option>
-                <option value="A">A — Choice 1</option>
-                <option value="B">B — Choice 2</option>
-                <option value="C">C — Choice 3</option>
-                <option value="D">D — Choice 4</option>
+                {question.choices.map((choice, choiceIndex) => (
+                  <option key={choiceIndex} value={choiceLabel(choiceIndex)}>
+                    {formatChoiceOptionLabel(choice, choiceIndex)}
+                  </option>
+                ))}
               </Select>
             </div>
           </div>
@@ -144,31 +179,92 @@ export default function QuestionBuilderCard({
             >
               Add one field per expected answer.
             </p>
-            <div className="space-y-2">
+            <div className="space-y-4">
               {question.answers.map((answer, answerIndex) => (
-                <div key={answerIndex} className="flex items-center gap-2">
-                  <span
-                    className={`w-8 shrink-0 text-center text-xs font-semibold ${
-                      theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                    }`}
-                  >
-                    {answerIndex + 1}.
-                  </span>
-                  <input
-                    className={inputClass(theme)}
-                    placeholder={`Correct answer ${answerIndex + 1}`}
-                    value={answer || ""}
-                    onChange={(e) => onUpdateEnumAnswer(answerIndex, e.target.value)}
-                  />
-                  {question.answers.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveEnumAnswer(answerIndex)}
-                      className="rounded-lg p-2 text-red-400 hover:bg-red-500/10"
-                      aria-label={`Remove answer ${answerIndex + 1}`}
+                <div
+                  key={answerIndex}
+                  className={`rounded-xl border p-3 ${
+                    theme === "dark"
+                      ? "border-white/10 bg-white/[0.02]"
+                      : "border-emerald-100 en-bg-elevated-soft"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-8 shrink-0 text-center text-xs font-semibold ${
+                        theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                      }`}
                     >
-                      <Trash2 size={14} />
-                    </button>
+                      {answerIndex + 1}.
+                    </span>
+                    <input
+                      className={inputClass(theme)}
+                      placeholder={`Correct answer ${answerIndex + 1}`}
+                      value={answer || ""}
+                      onChange={(e) => onUpdateEnumAnswer(answerIndex, e.target.value)}
+                    />
+                    {question.answers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveEnumAnswer(answerIndex)}
+                        className="rounded-lg p-2 text-red-400 hover:bg-red-500/10"
+                        aria-label={`Remove answer ${answerIndex + 1}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {showAlternatives && (
+                    <div className="mt-3 pl-10">
+                      <p
+                        className={`mb-2 text-xs font-medium ${
+                          theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Alternative spellings for answer {answerIndex + 1}
+                      </p>
+                      <div className="space-y-2">
+                        {(enumAlternatives[answerIndex] || []).map((alternative, altIndex) => (
+                          <div key={altIndex} className="flex items-center gap-2">
+                            <input
+                              className={inputClass(theme)}
+                              placeholder={`Alternative ${altIndex + 1}`}
+                              value={alternative || ""}
+                              onChange={(e) =>
+                                onUpdateEnumSlotAlternative?.(
+                                  answerIndex,
+                                  altIndex,
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onRemoveEnumSlotAlternative?.(answerIndex, altIndex)
+                              }
+                              className="rounded-lg p-2 text-red-400 hover:bg-red-500/10"
+                              aria-label={`Remove alternative ${altIndex + 1}`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onAddEnumSlotAlternative?.(answerIndex)}
+                        className={`mt-2 inline-flex items-center gap-1 text-xs font-medium ${
+                          theme === "dark"
+                            ? "text-emerald-400 hover:text-emerald-300"
+                            : "text-teal-700 hover:text-teal-900"
+                        }`}
+                      >
+                        <Plus size={12} />
+                        Add alternative
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -283,7 +379,7 @@ export function assessmentPanelClass(theme) {
   return `rounded-2xl border p-5 h-fit ${
     theme === "dark"
       ? "bg-white/5 border-white/10"
-      : "en-bg-elevated border-emerald-200 shadow-md"
+      : "en-bg-elevated border-emerald-200/80 en-panel-glow"
   }`;
 }
 

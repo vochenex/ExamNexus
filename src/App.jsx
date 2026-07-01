@@ -16,6 +16,7 @@ import StudentSubjects from "./pages/Student/StudentSubjects";
 import StudentSubjectDetails from "./pages/Student/StudentSubjectDetails";
 import FacultySubjectSocial from "./pages/Faculty/FacultySubjectSocial";
 import FacultyAnnouncementsHub from "./pages/Faculty/FacultyAnnouncementsHub";
+import QuestionBank from "./pages/Faculty/QuestionBank";
 import StudentSubjectSocial from "./pages/Student/StudentSubjectSocial";
 import TakeAssessment from "./pages/Student/TakeAssessment";
 import StudentResults from "./pages/Student/StudentResults";
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/student/subject/:subjectId" element={<StudentSubjectDetails />} />
           <Route path="/student/subject/:subjectId/social" element={<StudentSubjectSocial />} />
           <Route path="/faculty/announcements" element={<FacultyAnnouncementsHub />} />
+          <Route path="/faculty/question-bank" element={<QuestionBank />} />
           <Route path="/faculty/create-assessment" element={<CreateAssessment />} />
           <Route path="/faculty/edit-assessment/:examId" element={<EditAssessment />} />
           <Route path="/faculty/subject/:subjectId" element={<SubjectDetails />} />

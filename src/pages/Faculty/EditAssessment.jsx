@@ -14,12 +14,16 @@ import {
 } from "../../components/QuestionBuilderCard";
 import AssessmentSettingsPanel from "../../components/AssessmentSettingsPanel";
 import FormatGradingSettings from "../../components/FormatGradingSettings";
+import AssessmentPointsPanel from "../../components/AssessmentPointsPanel";
+import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
 import QuestionFormatPrompt from "../../components/QuestionFormatPrompt";
 import QuestionSectionsPanel from "../../components/QuestionSectionsPanel";
+import QuestionBankPicker from "../../components/QuestionBankPicker";
 import { getSubjectSections, normalizeTargetSections } from "../../utils/sections";
 import { deserializeQuestion, serializeQuestionForDb } from "../../utils/assessmentQuestions";
 import { parseDurationValue, DEFAULT_DURATION_VALUE } from "../../utils/assessmentDuration";
 import useQuestionSections from "../../hooks/useQuestionSections";
+import { saveQuestionToBank } from "../../utils/questionBank";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 
 const defaultAssessment = {
@@ -41,7 +45,7 @@ export default function EditAssessment() {
   const navigate = useNavigate();
   const { examId } = useParams();
   const { theme } = useTheme();
-  const { success: showSuccess } = useAppModal();
+  const { success: showSuccess, error: showError } = useAppModal();
 
   const [dateRange, setDateRange] = useState();
   const [startTime, setStartTime] = useState("09:00");
@@ -52,6 +56,7 @@ export default function EditAssessment() {
   const [error, setError] = useState("");
   const [subjectSections, setSubjectSections] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
+  const [bankPickerOpen, setBankPickerOpen] = useState(false);
 
   const {
     questionSections,
@@ -72,6 +77,9 @@ export default function EditAssessment() {
     updateSectionGrading,
     addEnumAnswer,
     removeEnumAnswer,
+    addEnumSlotAlternative,
+    updateEnumSlotAlternative,
+    removeEnumSlotAlternative,
     addAlternativeAnswer,
     updateAlternativeAnswer,
     removeAlternativeAnswer,
@@ -79,6 +87,7 @@ export default function EditAssessment() {
     validateAllQuestions,
     getQuestionsForSave,
     getExamTypeForSave,
+    importBankQuestions,
   } = useQuestionSections(defaultAssessment.exam_type);
 
   const assessmentLabel = "Assessment";
@@ -151,6 +160,22 @@ export default function EditAssessment() {
   };
 
   const clearError = () => setError("");
+
+  const handleSaveQuestionToBank = async (question) => {
+    try {
+      await saveQuestionToBank(question);
+      showSuccess("Question saved to your bank.");
+    } catch (err) {
+      showError(err.message || "Could not save question to bank.");
+    }
+  };
+
+  const handleImportFromBank = (bankQuestions) => {
+    importBankQuestions(bankQuestions);
+    showSuccess(
+      `${bankQuestions.length} question${bankQuestions.length === 1 ? "" : "s"} imported from your bank.`
+    );
+  };
 
   const onFormatChange = (nextType) => {
     clearError();
@@ -321,6 +346,11 @@ export default function EditAssessment() {
               }
               onAddEnumAnswer={addEnumAnswer}
               onRemoveEnumAnswer={removeEnumAnswer}
+              onAddEnumSlotAlternative={addEnumSlotAlternative}
+              onUpdateEnumSlotAlternative={(qIndex, aIndex, altIndex, value) =>
+                updateEnumSlotAlternative(qIndex, aIndex, altIndex, value, clearError)
+              }
+              onRemoveEnumSlotAlternative={removeEnumSlotAlternative}
               onAddAlternativeAnswer={addAlternativeAnswer}
               onUpdateAlternativeAnswer={(qIndex, aIndex, value) =>
                 updateAlternativeAnswer(qIndex, aIndex, value, clearError)
@@ -328,35 +358,52 @@ export default function EditAssessment() {
               onRemoveAlternativeAnswer={removeAlternativeAnswer}
               onDeleteQuestion={deleteQuestion}
               onSelectSection={setActiveSectionId}
+              onSaveQuestionToBank={handleSaveQuestionToBank}
+              onImportFromBank={() => setBankPickerOpen(true)}
             />
           </div>
 
-          <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3 xl:sticky xl:top-6`}>
+          <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3`}>
             <div className="flex items-center gap-2">
               <Settings className="text-emerald-400" size={18} />
               <h2 className="font-semibold">Settings</h2>
             </div>
 
+            {questionSections.length > 0 && (
+              <CollapsiblePanel
+                title="Points per question"
+                subtitle="Default points for each question format"
+                defaultOpen={false}
+              >
+                <AssessmentPointsPanel
+                  sections={questionSections}
+                  onChange={(sectionId, grading) =>
+                    updateSectionGrading(sectionId, grading, clearError)
+                  }
+                />
+              </CollapsiblePanel>
+            )}
+
             {gradingSections.length > 0 && (
-              <div className="space-y-4">
-                <p
-                  className={`text-xs font-semibold uppercase tracking-wide ${
-                    theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
-                  }`}
-                >
-                  Format grading
-                </p>
-                {gradingSections.map((section) => (
-                  <FormatGradingSettings
-                    key={section.id}
-                    sectionType={section.type}
-                    gradingDefaults={section.gradingDefaults}
-                    onChange={(grading) =>
-                      updateSectionGrading(section.id, grading, clearError)
-                    }
-                  />
-                ))}
-              </div>
+              <CollapsiblePanel
+                title="Format grading"
+                subtitle={`${gradingSections.length} format section${gradingSections.length === 1 ? "" : "s"}`}
+                defaultOpen={false}
+              >
+                <div className="space-y-3">
+                  {gradingSections.map((section) => (
+                    <FormatGradingSettings
+                      key={section.id}
+                      sectionType={section.type}
+                      gradingDefaults={section.gradingDefaults}
+                      compact
+                      onChange={(grading) =>
+                        updateSectionGrading(section.id, grading, clearError)
+                      }
+                    />
+                  ))}
+                </div>
+              </CollapsiblePanel>
             )}
 
             <AssessmentSettingsPanel
@@ -377,6 +424,12 @@ export default function EditAssessment() {
         currentType={formatPrompt?.currentType}
         onConfirm={onConfirmFormatSection}
         onCancel={cancelFormatChange}
+      />
+
+      <QuestionBankPicker
+        open={bankPickerOpen}
+        onClose={() => setBankPickerOpen(false)}
+        onImport={handleImportFromBank}
       />
     </div>
   );

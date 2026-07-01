@@ -1,6 +1,30 @@
 import { getAuthSession } from "./authUser";
+import { resolvePromptGenerationSettings } from "./promptPreferences";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { API_BASE } from "./apiBase.js";
+
+const AI_REQUEST_TIMEOUT_MS = 600000;
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        "The request took too long. Check your internet connection and try again."
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function getAuthHeaders(json = true) {
   const session = await getAuthSession();
@@ -20,7 +44,11 @@ async function getAuthHeaders(json = true) {
 }
 
 function formatApiError(payload, fallback) {
-  return payload?.error || fallback || "AI request failed";
+  const message = payload?.error;
+  if (typeof message === "string" && message.trim()) {
+    return message.trim();
+  }
+  return fallback || "AI request failed";
 }
 
 function isBackendUnreachable(error) {
@@ -32,8 +60,125 @@ function isBackendUnreachable(error) {
   );
 }
 
+function emitQuestionReady({ onQuestionGenerated, question, step, total, phase, payload }) {
+  if (!question || !onQuestionGenerated) return;
+
+  onQuestionGenerated({
+    question,
+    index: step,
+    total,
+    phase,
+    suggestedTitle: payload?.suggestedTitle,
+    suggestedDescription: payload?.suggestedDescription,
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function startWaitingProgress({ onProgress, phase, total }) {
+  let percent = 3;
+  const cap = 78;
+  onProgress?.({
+    phase,
+    current: 0,
+    total,
+    percent,
+    status: "waiting",
+  });
+
+  const timer = setInterval(() => {
+    percent = Math.min(cap, percent + 2 + Math.random() * 3);
+    onProgress?.({
+      phase,
+      current: 0,
+      total,
+      percent: Math.round(percent),
+      status: "waiting",
+    });
+  }, 350);
+
+  return () => clearInterval(timer);
+}
+
+async function revealQuestionsIncrementally({
+  questions,
+  onProgress,
+  onQuestionGenerated,
+  phase,
+  payload,
+}) {
+  const total = questions.length;
+  const revealStart = 78;
+
+  for (let step = 0; step < total; step += 1) {
+    const current = step + 1;
+    const percent =
+      total === 0
+        ? 100
+        : Math.round(revealStart + (current / total) * (100 - revealStart));
+
+    onProgress?.({
+      phase,
+      current,
+      total,
+      percent,
+      status: "revealing",
+    });
+
+    emitQuestionReady({
+      onQuestionGenerated,
+      question: questions[step],
+      step,
+      total,
+      phase,
+      payload,
+    });
+
+    if (step < total - 1) {
+      await sleep(55);
+    }
+  }
+
+  onProgress?.({
+    phase,
+    current: total,
+    total,
+    percent: 100,
+    status: "done",
+  });
+}
+
+function mapStatusPayload(payload) {
+  return {
+    configured: Boolean(payload.configured),
+    provider: payload.provider || "gemini",
+    model: payload.model || payload.documentModel || null,
+    promptProvider: payload.promptProvider || "gemini",
+    documentProvider: payload.documentProvider || "gemini",
+    promptModel: payload.promptModel || payload.model || null,
+    documentModel: payload.documentModel || payload.model || null,
+    gemini: payload.gemini || null,
+    error: payload.error || null,
+  };
+}
+
 export async function fetchAssessmentAiStatus() {
   try {
+    const res = await fetch(`${API_BASE}/assessment-ai/public-config`);
+    const payload = await res.json().catch(() => ({}));
+    const status = mapStatusPayload(payload);
+
+    if (!status.configured) {
+      return {
+        ...status,
+        error:
+          status.error ||
+          "AI is not ready. Add GEMINI_API_KEY to backend/.env, then restart the backend.",
+      };
+    }
+
     let session = null;
     try {
       session = await getAuthSession();
@@ -41,50 +186,16 @@ export async function fetchAssessmentAiStatus() {
       session = null;
     }
 
-    if (session?.access_token) {
-      const headers = await getAuthHeaders();
-      const res = await fetch(`${API_BASE}/assessment-ai/status`, { headers });
-      const payload = await res.json().catch(() => ({}));
-
-      if (res.status === 401 || res.status === 403) {
-        return {
-          configured: false,
-          provider: payload.provider || null,
-          model: payload.model || null,
-          error: formatApiError(
-            payload,
-            "Sign in as approved faculty to use AI generation."
-          ),
-        };
-      }
-
-      if (!res.ok) {
-        return {
-          configured: false,
-          provider: payload.provider || null,
-          model: payload.model || null,
-          error: formatApiError(payload, "AI service unavailable"),
-        };
-      }
-
+    if (!session?.access_token) {
       return {
-        configured: Boolean(payload.configured),
-        provider: payload.provider || null,
-        model: payload.model || null,
-        error: null,
+        ...status,
+        error: "Sign in as faculty to generate questions.",
       };
     }
 
-    const res = await fetch(`${API_BASE}/assessment-ai/public-config`);
-    const payload = await res.json().catch(() => ({}));
-
     return {
-      configured: Boolean(payload.configured),
-      provider: payload.provider || null,
-      model: payload.model || null,
-      error: payload.configured
-        ? "Sign in as faculty to generate questions."
-        : payload.error || "AI service unavailable",
+      ...status,
+      error: null,
     };
   } catch (error) {
     return {
@@ -96,157 +207,52 @@ export async function fetchAssessmentAiStatus() {
   }
 }
 
-function isOllamaProvider(provider) {
-  return String(provider || "").toLowerCase() === "ollama";
-}
-
-async function generateOneQuestion({
-  prompt,
-  sourceText,
-  formats,
-  format,
-  difficulty,
-  stepIndex,
-  totalSteps,
-  additionalInstructions,
-}) {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE}/assessment-ai/generate-one`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      prompt,
-      sourceText,
-      formats,
-      format,
-      difficulty,
-      stepIndex,
-      totalSteps,
-      additionalInstructions,
-    }),
-  });
-
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(formatApiError(payload, "Failed to generate question"));
-  }
-
-  return payload;
-}
-
-async function generateWithOllamaSteps({
-  prompt,
-  sourceText,
-  formats,
-  questionCount,
-  difficulty,
-  additionalInstructions,
-  onProgress,
-}) {
-  const total = Math.max(1, Number(questionCount) || 1);
-  const questions = [];
-  let suggestedTitle = "";
-  let suggestedDescription = "";
-  let meta = null;
-
-  for (let step = 0; step < total; step += 1) {
-    onProgress?.({ current: step + 1, total });
-
-    const payload = await generateOneQuestion({
-      prompt,
-      sourceText,
-      formats,
-      difficulty,
-      stepIndex: step,
-      totalSteps: total,
-      additionalInstructions,
-    });
-
-    if (payload.question) {
-      questions.push(payload.question);
-    }
-
-    if (!suggestedTitle && payload.suggestedTitle) {
-      suggestedTitle = payload.suggestedTitle;
-    }
-    if (!suggestedDescription && payload.suggestedDescription) {
-      suggestedDescription = payload.suggestedDescription;
-    }
-    meta = payload.meta || meta;
-  }
-
-  if (!questions.length) {
-    throw new Error("AI did not return any usable questions.");
-  }
-
-  return {
-    success: true,
-    suggestedTitle,
-    suggestedDescription,
-    questions,
-    meta: {
-      requestedCount: total,
-      generatedCount: questions.length,
-      formats,
-      provider: meta?.provider || "ollama",
-      model: meta?.model,
-      batched: true,
-    },
-  };
-}
-
 export async function generateAssessmentFromPrompt({
   prompt,
   formats,
   questionCount,
   difficulty,
-  additionalInstructions,
   onProgress,
+  onQuestionGenerated,
 }) {
-  const status = await fetchAssessmentAiStatus();
-
-  if (isOllamaProvider(status.provider)) {
-    try {
-      return await generateWithOllamaSteps({
-        prompt,
-        formats,
-        questionCount,
-        difficulty,
-        additionalInstructions,
-        onProgress,
-      });
-    } catch (error) {
-      if (isBackendUnreachable(error)) {
-        throw new Error(
-          "Cannot reach the backend. Start it with npm start in the backend folder."
-        );
-      }
-      throw error;
-    }
-  }
+  const trimmed = String(prompt || "").trim();
+  const resolved = resolvePromptGenerationSettings({
+    prompt: trimmed,
+    questionCount,
+    difficulty,
+    formats,
+  });
 
   const headers = await getAuthHeaders();
 
   let res;
+  const stopWaiting = startWaitingProgress({
+    onProgress,
+    phase: "prompt",
+    total: resolved.questionCount,
+  });
+
   try {
-    res = await fetch(`${API_BASE}/assessment-ai/generate-from-prompt`, {
+    res = await fetchWithTimeout(`${API_BASE}/assessment-ai/generate-from-prompt`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        prompt,
-        formats,
-        questionCount,
-        difficulty,
-        additionalInstructions,
+        prompt: trimmed,
+        formats: resolved.formats,
+        questionCount: resolved.questionCount,
+        difficulty: resolved.difficulty,
       }),
     });
   } catch (error) {
+    stopWaiting();
     if (isBackendUnreachable(error)) {
       throw new Error(
         "Cannot reach the backend. Start it with npm start in the backend folder."
       );
     }
     throw error;
+  } finally {
+    stopWaiting();
   }
 
   const payload = await res.json().catch(() => ({}));
@@ -255,61 +261,32 @@ export async function generateAssessmentFromPrompt({
     throw new Error(formatApiError(payload, "Failed to generate questions"));
   }
 
-  return payload;
+  const questions = Array.isArray(payload.questions) ? payload.questions : [];
+  if (!questions.length) {
+    throw new Error("AI did not return any usable questions.");
+  }
+
+  await revealQuestionsIncrementally({
+    questions,
+    onProgress,
+    onQuestionGenerated,
+    phase: "prompt",
+    payload,
+  });
+
+  return {
+    ...payload,
+    resolvedSettings: payload.resolvedSettings || resolved,
+  };
 }
 
 export async function generateAssessmentFromDocument({
   file,
-  formats,
-  questionCount,
-  difficulty,
-  additionalInstructions,
   onProgress,
+  onQuestionGenerated,
 }) {
   if (!file) {
     throw new Error("Choose a PDF or Word (.docx) file to upload.");
-  }
-
-  const status = await fetchAssessmentAiStatus();
-
-  if (isOllamaProvider(status.provider)) {
-    const session = await getAuthSession();
-    if (!session?.access_token) {
-      throw new Error("Your session expired. Please sign in again.");
-    }
-
-    const extractForm = new FormData();
-    extractForm.append("file", file);
-
-    let extractRes;
-    try {
-      extractRes = await fetch(`${API_BASE}/assessment-ai/extract-document`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body: extractForm,
-      });
-    } catch (error) {
-      if (isBackendUnreachable(error)) {
-        throw new Error(
-          "Cannot reach the backend. Start it with npm start in the backend folder."
-        );
-      }
-      throw error;
-    }
-
-    const extracted = await extractRes.json().catch(() => ({}));
-    if (!extractRes.ok) {
-      throw new Error(formatApiError(extracted, "Failed to read document"));
-    }
-
-    return generateWithOllamaSteps({
-      sourceText: extracted.text,
-      formats,
-      questionCount,
-      difficulty,
-      additionalInstructions,
-      onProgress,
-    });
   }
 
   const session = await getAuthSession();
@@ -319,16 +296,15 @@ export async function generateAssessmentFromDocument({
 
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("formats", JSON.stringify(formats || []));
-  formData.append("questionCount", String(questionCount ?? 8));
-  formData.append("difficulty", difficulty || "medium");
-  if (additionalInstructions) {
-    formData.append("additionalInstructions", additionalInstructions);
-  }
 
   let res;
+  const stopWaiting = startWaitingProgress({
+    onProgress,
+    phase: "reading",
+  });
+
   try {
-    res = await fetch(`${API_BASE}/assessment-ai/generate-from-document`, {
+    res = await fetchWithTimeout(`${API_BASE}/assessment-ai/analyze-document`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -336,19 +312,35 @@ export async function generateAssessmentFromDocument({
       body: formData,
     });
   } catch (error) {
+    stopWaiting();
     if (isBackendUnreachable(error)) {
       throw new Error(
         "Cannot reach the backend. Start it with npm start in the backend folder."
       );
     }
     throw error;
+  } finally {
+    stopWaiting();
   }
 
   const payload = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(formatApiError(payload, "Failed to generate from document"));
+    throw new Error(formatApiError(payload, "Failed to analyze document"));
   }
+
+  const questions = Array.isArray(payload.questions) ? payload.questions : [];
+  if (!questions.length) {
+    throw new Error("AI did not return any usable questions from this document.");
+  }
+
+  await revealQuestionsIncrementally({
+    questions,
+    onProgress,
+    onQuestionGenerated,
+    phase: "structuring",
+    payload,
+  });
 
   return payload;
 }

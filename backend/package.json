@@ -24,7 +24,8 @@
     "openai": "^6.39.0",
     "pdf-parse": "^2.4.5",
     "pg": "^8.21.0",
-    "react-router-dom": "^7.15.1"
+    "react-router-dom": "^7.15.1",
+    "undici": "^6.27.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

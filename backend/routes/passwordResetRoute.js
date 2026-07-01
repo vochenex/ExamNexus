@@ -1,21 +1,11 @@
 const express = require("express");
-const { createClient } = require("@supabase/supabase-js");
+const { createUserClient } = require("../lib/supabaseClient");
 const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
 
 const router = express.Router();
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
 function getUserClient(accessToken) {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createUserClient(accessToken);
 }
 
 async function requireAdmin(req, res, next) {

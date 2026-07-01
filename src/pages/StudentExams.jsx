@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE } from "../utils/apiBase.js";
 
 export default function StudentExams() {
   const [exams, setExams] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch("http://localhost:5000/exams")
+    fetch(`${API_BASE}/exams`)
       .then((res) => res.json())
       .then(setExams);
   }, []);

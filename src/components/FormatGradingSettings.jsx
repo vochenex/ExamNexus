@@ -1,28 +1,15 @@
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import {
-  CASE_FORMAT_OPTIONS,
-  normalizeGradingOptions,
-  supportsGradingOptions,
-} from "../utils/questionGrading";
+import { normalizeGradingOptions, supportsGradingOptions } from "../utils/questionGrading";
 import { getFormatLabel } from "../utils/questionSections";
-import Select from "./ui/Select";
 
-const labelClass = (theme) =>
-  `block text-xs font-semibold uppercase tracking-wide mb-2 ${
-    theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
-  }`;
-
-const inputClass = (theme) =>
-  `w-full p-2.5 rounded-xl text-sm transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
-    theme === "dark"
-      ? "bg-white/10 text-white border border-white/10"
-      : "en-bg-elevated text-gray-900 border border-emerald-200"
-  }`;
-
-function ToggleRow({ theme, label, hint, checked, onChange }) {
+function ToggleRow({ theme, label, hint, checked, onChange, disabled = false }) {
   return (
     <label
-      className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer ${
+      className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+      } ${
         theme === "dark"
           ? "border-white/10 bg-white/[0.03]"
           : "border-emerald-100 bg-emerald-50/40"
@@ -31,6 +18,7 @@ function ToggleRow({ theme, label, hint, checked, onChange }) {
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="mt-0.5"
       />
@@ -55,8 +43,10 @@ export default function FormatGradingSettings({
   gradingDefaults,
   onChange,
   compact = false,
+  defaultOpen = false,
 }) {
   const { theme } = useTheme();
+  const [open, setOpen] = useState(defaultOpen || compact);
 
   if (!supportsGradingOptions(sectionType)) {
     return null;
@@ -65,64 +55,19 @@ export default function FormatGradingSettings({
   const grading = normalizeGradingOptions(gradingDefaults);
 
   const patch = (updates) => {
-    onChange({ ...grading, ...updates });
+    onChange(normalizeGradingOptions({ ...grading, ...updates }));
   };
 
-  return (
-    <div
-      className={`space-y-3 ${
-        compact
-          ? ""
-          : `rounded-xl border p-4 ${
-              theme === "dark"
-                ? "border-white/10 bg-white/[0.03]"
-                : "border-emerald-100 bg-emerald-50/30"
-            }`
-      }`}
-    >
-      {!compact && (
-        <div>
-          <p
-            className={`text-xs font-semibold uppercase tracking-wide ${
-              theme === "dark" ? "text-emerald-400" : "text-teal-700"
-            }`}
-          >
-            {getFormatLabel(sectionType)} grading
-          </p>
-          <p className={`mt-1 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-            Applied to all {getFormatLabel(sectionType).toLowerCase()} questions.
-          </p>
-        </div>
-      )}
-
+  const body = (
+    <>
       <ToggleRow
         theme={theme}
         label="Case sensitive"
-        hint="Answers must match capitalization exactly."
+        hint="Answer must match the expected text exactly, including capitalization."
         checked={grading.case_sensitive}
-        onChange={(checked) =>
-          patch({
-            case_sensitive: checked,
-            case_format: checked ? "any" : grading.case_format,
-          })
-        }
+        disabled={grading.accept_alternatives}
+        onChange={(checked) => patch({ case_sensitive: checked })}
       />
-
-      {!grading.case_sensitive && (
-        <div>
-          <label className={labelClass(theme)}>Expected casing</label>
-          <Select
-            value={grading.case_format}
-            onChange={(e) => patch({ case_format: e.target.value })}
-          >
-            {CASE_FORMAT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
 
       <ToggleRow
         theme={theme}
@@ -142,35 +87,89 @@ export default function FormatGradingSettings({
         />
       )}
 
-      {sectionType === "identification" && (
+      {(sectionType === "identification" || sectionType === "enumeration") && (
         <ToggleRow
           theme={theme}
           label="Accept alternative answers"
-          hint="Allow extra accepted answers per question."
+          hint={
+            sectionType === "enumeration"
+              ? "Allow other accepted spellings for listed answers; casing is ignored."
+              : "Allow other accepted spellings; casing is ignored."
+          }
           checked={grading.accept_alternatives}
+          disabled={grading.case_sensitive}
           onChange={(checked) =>
             patch({
               accept_alternatives: checked,
+              alternatives: checked ? grading.alternatives : [],
             })
           }
         />
       )}
 
-      <div>
-        <label className={labelClass(theme)}>Points per question</label>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          className={inputClass(theme)}
-          value={grading.points}
-          onChange={(e) =>
-            patch({
-              points: Math.max(1, Number(e.target.value) || 1),
-            })
-          }
-        />
+    </>
+  );
+
+  if (compact) {
+    return (
+      <div
+        className={`space-y-3 rounded-xl border p-4 ${
+          theme === "dark"
+            ? "border-white/10 bg-white/[0.02]"
+            : "border-emerald-700/15 en-bg-elevated-soft"
+        }`}
+      >
+        <div>
+          <p
+            className={`text-sm font-bold ${
+              theme === "dark" ? "text-emerald-300" : "text-teal-800"
+            }`}
+          >
+            {getFormatLabel(sectionType)}
+          </p>
+          <p
+            className={`mt-0.5 text-xs ${
+              theme === "dark" ? "text-gray-500" : "text-[#5a7a72]"
+            }`}
+          >
+            Grading defaults for all {getFormatLabel(sectionType).toLowerCase()} questions
+          </p>
+        </div>
+        {body}
       </div>
+    );
+  }
+
+  return (
+    <div
+      className={`rounded-xl border ${
+        theme === "dark"
+          ? "border-white/10 bg-white/[0.03]"
+          : "border-emerald-100 bg-emerald-50/30"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${
+          theme === "dark" ? "text-emerald-300" : "text-teal-800"
+        }`}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">
+            {getFormatLabel(sectionType)} grading
+          </span>
+          <span
+            className={`mt-0.5 block text-xs ${
+              theme === "dark" ? "text-gray-500" : "text-gray-500"
+            }`}
+          >
+            Applied to all {getFormatLabel(sectionType).toLowerCase()} questions
+          </span>
+        </span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+      {open && <div className="space-y-3 border-t border-inherit px-4 py-4">{body}</div>}
     </div>
   );
 }

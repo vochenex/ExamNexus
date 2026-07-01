@@ -19,7 +19,7 @@ import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInput
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../utils/apiBase.js";
 
 export default function StudentSubjects() {
   const { theme } = useTheme();

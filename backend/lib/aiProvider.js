@@ -1,331 +1,376 @@
-const { OpenAI } = require("openai");
+const { Agent, fetch: undiciFetch } = require("undici");
 
-const DEFAULT_OLLAMA_BASE = "http://localhost:11434";
-const DEFAULT_OLLAMA_MODEL = "llama3";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const DEFAULT_CHAT_TIMEOUT_MS = 300000;
-const DEFAULT_OLLAMA_CHAT_TIMEOUT_MS = 600000;
+const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;
+const GEMINI_RETRY_DELAYS_MS = [0, 3000, 6000];
 
-function getChatTimeoutMs(provider) {
+function getChatTimeoutMs() {
   const configured = Number(process.env.AI_CHAT_TIMEOUT_MS);
   if (Number.isFinite(configured) && configured > 0) {
     return configured;
   }
-
-  return provider === "ollama"
-    ? DEFAULT_OLLAMA_CHAT_TIMEOUT_MS
-    : DEFAULT_CHAT_TIMEOUT_MS;
+  return DEFAULT_CHAT_TIMEOUT_MS;
 }
 
-function getAiProviderName() {
-  return String(process.env.AI_PROVIDER || "ollama").trim().toLowerCase();
-}
-
-function getOllamaRootUrl() {
-  const configured =
-    process.env.OLLAMA_BASE_URL ||
-    process.env.OLLAMA_HOST ||
-    DEFAULT_OLLAMA_BASE;
-
-  return String(configured)
-    .trim()
-    .replace(/\/v1\/?$/i, "")
-    .replace(/\/$/, "");
-}
-
-function getOllamaOpenAiBaseUrl() {
-  return `${getOllamaRootUrl()}/v1`;
-}
-
-function getConfiguredModel() {
-  const provider = getAiProviderName();
-
-  if (provider === "openai") {
-    return String(process.env.OPENAI_ASSESSMENT_MODEL || "gpt-4o-mini").trim();
+function getDocumentTimeoutMs() {
+  const configured = Number(process.env.AI_DOCUMENT_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured;
   }
-
-  return String(process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL).trim();
+  return DEFAULT_DOCUMENT_TIMEOUT_MS;
 }
 
-function getAiRuntimeConfig() {
-  const provider = getAiProviderName();
+function getGeminiAgent(timeoutMs) {
+  return new Agent({
+    connectTimeout: Math.min(timeoutMs, 120000),
+    headersTimeout: timeoutMs,
+    bodyTimeout: timeoutMs,
+  });
+}
 
-  if (provider === "openai") {
-    const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
-    if (!apiKey) {
-      return null;
-    }
+function getGeminiModel() {
+  return String(
+    process.env.GEMINI_MODEL || process.env.GEMINI_ASSESSMENT_MODEL || DEFAULT_GEMINI_MODEL
+  ).trim();
+}
 
-    return {
-      provider,
-      model: getConfiguredModel(),
-      client: new OpenAI({
-        apiKey,
-        timeout: getChatTimeoutMs(provider),
-      }),
-      supportsJsonMode: true,
-    };
-  }
+function getGeminiApiKey() {
+  return String(
+    process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.GOOGLE_GEMINI_API_KEY ||
+      ""
+  ).trim();
+}
 
-  if (provider !== "ollama") {
+function getGeminiRuntimeConfig() {
+  const apiKey = getGeminiApiKey();
+  if (!validateGeminiApiKey(apiKey)) {
     return null;
   }
 
   return {
-    provider: "ollama",
-    model: getConfiguredModel(),
-    client: new OpenAI({
-      baseURL: getOllamaOpenAiBaseUrl(),
-      apiKey: String(process.env.OLLAMA_API_KEY || "ollama").trim() || "ollama",
-      timeout: getChatTimeoutMs("ollama"),
-    }),
-    supportsJsonMode: String(process.env.OLLAMA_JSON_MODE || "true").toLowerCase() !== "false",
+    provider: "gemini",
+    model: getGeminiModel(),
+    apiKey,
   };
 }
 
-function isConnectionError(error) {
+function isTimeoutError(error) {
   const message = String(error?.message || error || "").toLowerCase();
-  const code = String(error?.code || "").toLowerCase();
+  const code = String(error?.code || error?.cause?.code || "").toLowerCase();
+
+  return (
+    error?.name === "AbortError" ||
+    code === "timeout" ||
+    code === "und_err_headers_timeout" ||
+    code === "und_err_body_timeout" ||
+    message.includes("timeout") ||
+    message.includes("took too long")
+  );
+}
+
+function isConnectionError(error) {
+  if (isTimeoutError(error)) {
+    return false;
+  }
+
+  const message = String(error?.message || error || "").toLowerCase();
+  const code = String(error?.code || error?.cause?.code || "").toLowerCase();
 
   return (
     code === "econnrefused" ||
     code === "enotfound" ||
-    code === "fetch failed" ||
+    code === "econnreset" ||
+    code === "und_err_connect_timeout" ||
+    code === "network_error" ||
     message.includes("econnrefused") ||
-    message.includes("connect") ||
+    message.includes("econnreset") ||
     message.includes("fetch failed") ||
-    message.includes("network")
+    message.includes("cannot connect") ||
+    message.includes("connection refused") ||
+    message.includes("connect timeout")
   );
 }
 
-function formatAiConfigError() {
-  const provider = getAiProviderName();
-
-  if (provider === "openai") {
-    return "AI generation is not configured. Add OPENAI_API_KEY to backend/.env and restart the backend.";
-  }
-
-  return `Ollama is not reachable. Start Ollama, pull a model (e.g. ollama pull ${DEFAULT_OLLAMA_MODEL}), and ensure it is running at ${getOllamaRootUrl()}.`;
+function isTransientGeminiError(error) {
+  return isTimeoutError(error) || isConnectionError(error);
 }
 
-function assertAiConfigured() {
-  const config = getAiRuntimeConfig();
+function formatGeminiNetworkError() {
+  return "Cannot reach Gemini right now. Check your internet connection and try again in a moment.";
+}
+
+function formatGeminiProcessingTimeoutError(isDocument) {
+  if (isDocument) {
+    return "Gemini took too long to analyze this document. Try a shorter file, or wait and try again.";
+  }
+  return "Gemini took too long to respond. Try fewer questions or a shorter prompt.";
+}
+
+function formatGeminiConfigError() {
+  return "Gemini is not configured. Add GEMINI_API_KEY to backend/.env (not the root .env file), then restart the backend from the backend folder.";
+}
+
+function validateGeminiApiKey(apiKey) {
+  const key = String(apiKey || "").trim();
+  if (!key) return false;
+  // Google AI Studio keys usually start with AIza; warn in status if unusual.
+  return key.length >= 20;
+}
+
+function assertGeminiConfigured() {
+  const config = getGeminiRuntimeConfig();
   if (!config) {
-    const error = new Error(formatAiConfigError());
+    const error = new Error(formatGeminiConfigError());
     error.statusCode = 503;
     throw error;
   }
   return config;
 }
 
-async function fetchOllamaTags() {
+async function postJsonWithTimeout(urlString, body, timeoutMs, headers = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const agent = getGeminiAgent(timeoutMs);
 
   try {
-    const res = await fetch(`${getOllamaRootUrl()}/api/tags`, {
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error(`Ollama responded with status ${res.status}`);
-    }
-
-    return res.json();
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function modelIsInstalled(tagsPayload, modelName) {
-  const models = Array.isArray(tagsPayload?.models) ? tagsPayload.models : [];
-  const target = String(modelName || "").trim().toLowerCase();
-  if (!target) return false;
-
-  return models.some((item) => {
-    const name = String(item?.name || "").toLowerCase();
-    return name === target || name.startsWith(`${target}:`);
-  });
-}
-
-async function getAiServiceStatus() {
-  const provider = getAiProviderName();
-  const model = getConfiguredModel();
-  const config = getAiRuntimeConfig();
-
-  if (!config) {
-    return {
-      ok: false,
-      configured: false,
-      provider,
-      model,
-      error: formatAiConfigError(),
-    };
-  }
-
-  if (provider === "openai") {
-    return {
-      ok: true,
-      configured: true,
-      provider,
-      model,
-      error: null,
-    };
-  }
-
-  try {
-    const tags = await fetchOllamaTags();
-    const installedModels = (tags.models || []).map((item) => item.name);
-    const modelReady = modelIsInstalled(tags, model);
-
-    if (!modelReady) {
-      return {
-        ok: false,
-        configured: false,
-        provider,
-        model,
-        installedModels,
-        error: `Model "${model}" is not installed in Ollama. Run: ollama pull ${model}`,
-      };
-    }
-
-    return {
-      ok: true,
-      configured: true,
-      provider,
-      model,
-      installedModels,
-      error: null,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      configured: false,
-      provider,
-      model,
-      error: isConnectionError(error)
-        ? `Cannot connect to Ollama at ${getOllamaRootUrl()}. Make sure the Ollama app is running.`
-        : error.message || "Failed to reach Ollama.",
-    };
-  }
-}
-
-async function requestOllamaNativeChat(config, { messages, temperature, jsonMode }) {
-  const controller = new AbortController();
-  const timeoutMs = getChatTimeoutMs("ollama");
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const body = {
-      model: config.model,
-      messages,
-      stream: false,
-      options: {
-        temperature,
-        num_predict: Number(process.env.OLLAMA_NUM_PREDICT || 1024),
-      },
-    };
-
-    if (jsonMode) {
-      body.format = "json";
-    }
-
-    const res = await fetch(`${getOllamaRootUrl()}/api/chat`, {
+    const response = await undiciFetch(urlString, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
+      dispatcher: agent,
     });
 
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(
-        detail || `Ollama chat request failed with status ${res.status}`
+    const raw = await response.text();
+
+    if (response.status >= 400) {
+      let detail = raw;
+      try {
+        const parsed = JSON.parse(raw);
+        detail =
+          parsed?.error?.message ||
+          parsed?.error ||
+          parsed?.message ||
+          raw;
+      } catch {
+        // keep raw text
+      }
+      const error = new Error(
+        typeof detail === "string" ? detail : "AI request failed"
       );
+      error.statusCode = response.status;
+      throw error;
     }
 
-    const data = await res.json();
-    return String(data?.message?.content || "");
+    try {
+      return JSON.parse(raw);
+    } catch (parseError) {
+      throw parseError;
+    }
   } catch (error) {
     if (error?.name === "AbortError") {
-      const wrapped = new Error(
-        "Ollama took too long to respond. Try fewer questions or a smaller model."
-      );
-      wrapped.statusCode = 504;
-      throw wrapped;
+      throw Object.assign(new Error("AI request timed out."), {
+        statusCode: 504,
+        code: "TIMEOUT",
+      });
     }
-
-    if (isConnectionError(error)) {
-      const wrapped = new Error(formatAiConfigError());
-      wrapped.statusCode = 503;
-      wrapped.cause = error;
-      throw wrapped;
-    }
-
     throw error;
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timer);
+    await agent.close().catch(() => {});
   }
 }
 
-async function createOpenAiChatCompletion(config, { messages, temperature, jsonMode }) {
-  const request = {
-    model: config.model,
-    messages,
-    temperature,
-  };
+function messagesToGeminiPayload(messages) {
+  let systemInstruction = null;
+  const contents = [];
 
-  if (jsonMode && config.supportsJsonMode) {
-    request.response_format = { type: "json_object" };
-  }
+  for (const message of messages) {
+    const text = String(message?.content || "");
+    if (!text) continue;
 
-  try {
-    return await config.client.chat.completions.create(request);
-  } catch (error) {
-    if (isConnectionError(error)) {
-      const wrapped = new Error(formatAiConfigError());
-      wrapped.statusCode = 503;
-      wrapped.cause = error;
-      throw wrapped;
+    if (message.role === "system") {
+      systemInstruction = { parts: [{ text }] };
+      continue;
     }
 
-    throw error;
+    if (message.role === "assistant") {
+      contents.push({ role: "model", parts: [{ text }] });
+      continue;
+    }
+
+    contents.push({ role: "user", parts: [{ text }] });
   }
+
+  if (!contents.length) {
+    contents.push({ role: "user", parts: [{ text: "Respond with valid JSON only." }] });
+  }
+
+  return { systemInstruction, contents };
 }
 
-async function createChatCompletion(config, { messages, temperature, jsonMode }) {
-  if (config.provider === "ollama") {
-    const content = await requestOllamaNativeChat(config, {
-      messages,
+async function requestGeminiChatCompletion(
+  config,
+  { messages, temperature, jsonMode, timeoutMs, isDocument = false }
+) {
+  const effectiveTimeout = timeoutMs || getChatTimeoutMs();
+  const { systemInstruction, contents } = messagesToGeminiPayload(messages);
+
+  const body = {
+    contents,
+    generationConfig: {
       temperature,
-      jsonMode,
-    });
-    return { choices: [{ message: { content } }] };
+      ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+    },
+  };
+
+  if (systemInstruction) {
+    body.systemInstruction = systemInstruction;
   }
 
-  return createOpenAiChatCompletion(config, { messages, temperature, jsonMode });
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    config.model
+  )}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+
+  let lastError = null;
+
+  for (const delayMs of GEMINI_RETRY_DELAYS_MS) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    try {
+      const data = await postJsonWithTimeout(url, body, effectiveTimeout);
+      const text =
+        data?.candidates?.[0]?.content?.parts
+          ?.map((part) => String(part?.text || ""))
+          .join("") || "";
+
+      if (!text.trim()) {
+        const blockReason = data?.promptFeedback?.blockReason;
+        throw new Error(
+          blockReason
+            ? `Gemini blocked the request: ${blockReason}`
+            : "Gemini returned an empty response."
+        );
+      }
+
+      return text;
+    } catch (error) {
+      lastError = error;
+
+      if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+        throw error;
+      }
+
+      if (!isTransientGeminiError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  const error = lastError || new Error("Gemini request failed");
+  if (isConnectionError(error)) {
+    const wrapped = new Error(formatGeminiNetworkError());
+    wrapped.statusCode = 503;
+    wrapped.cause = error;
+    throw wrapped;
+  }
+
+  if (isTimeoutError(error)) {
+    const wrapped = new Error(formatGeminiProcessingTimeoutError(isDocument));
+    wrapped.statusCode = 504;
+    wrapped.cause = error;
+    throw wrapped;
+  }
+
+  throw error;
 }
 
-async function requestChatCompletion({ messages, temperature = 0.4, jsonMode = true }) {
-  const config = assertAiConfigured();
-  const response = await createChatCompletion(config, {
+async function requestChatCompletion({
+  messages,
+  temperature = 0.4,
+  jsonMode = true,
+  timeoutMs,
+  isDocument = false,
+}) {
+  const config = assertGeminiConfigured();
+  const content = await requestGeminiChatCompletion(config, {
     messages,
     temperature,
     jsonMode,
+    timeoutMs,
+    isDocument,
   });
 
   return {
-    content: response.choices?.[0]?.message?.content || "",
+    content,
     provider: config.provider,
     model: config.model,
   };
 }
 
+async function requestPromptChatCompletion(options) {
+  return requestChatCompletion(options);
+}
+
+async function requestDocumentChatCompletion(options) {
+  return requestChatCompletion({
+    ...options,
+    timeoutMs: getDocumentTimeoutMs(),
+    isDocument: true,
+  });
+}
+
+async function getAiServiceStatus() {
+  const rawKey = getGeminiApiKey();
+  const gemini = getGeminiRuntimeConfig();
+  const configured = Boolean(gemini);
+
+  let error = null;
+  if (!configured) {
+    if (!rawKey) {
+      error =
+        "Gemini API key is missing. Add GEMINI_API_KEY to backend/.env (not the project root .env), then restart the backend.";
+    } else if (!rawKey.startsWith("AIza")) {
+      error =
+        'Gemini API key format looks unusual. Create a key at https://aistudio.google.com/apikey — it should start with "AIza".';
+    } else {
+      error = formatGeminiConfigError();
+    }
+  }
+
+  return {
+    ok: configured,
+    configured,
+    provider: "gemini",
+    model: gemini?.model || getGeminiModel(),
+    promptProvider: "gemini",
+    documentProvider: "gemini",
+    promptModel: gemini?.model || getGeminiModel(),
+    documentModel: gemini?.model || getGeminiModel(),
+    gemini: {
+      configured,
+      model: gemini?.model || getGeminiModel(),
+      error: configured ? null : formatGeminiConfigError(),
+    },
+    error: configured ? null : error,
+  };
+}
+
 module.exports = {
-  getAiProviderName,
-  getConfiguredModel,
-  getAiRuntimeConfig,
-  assertAiConfigured,
-  getAiServiceStatus,
+  getGeminiModel,
+  getGeminiRuntimeConfig,
+  assertGeminiConfigured,
   requestChatCompletion,
-  formatAiConfigError,
+  requestPromptChatCompletion,
+  requestDocumentChatCompletion,
+  getAiServiceStatus,
+  formatGeminiConfigError,
 };

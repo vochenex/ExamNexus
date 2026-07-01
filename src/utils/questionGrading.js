@@ -10,6 +10,7 @@ export const DEFAULT_GRADING_OPTIONS = {
   case_format: "any",
   accept_alternatives: false,
   alternatives: [],
+  enum_alternatives: [],
   ignore_order: false,
   trim_whitespace: true,
   points: 1,
@@ -19,8 +20,28 @@ export function createDefaultGradingOptions(overrides = {}) {
   return {
     ...DEFAULT_GRADING_OPTIONS,
     alternatives: [],
+    enum_alternatives: [],
     ...overrides,
   };
+}
+
+export function normalizeEnumAlternatives(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((slot) =>
+    Array.isArray(slot) ? slot.map((item) => String(item || "")) : []
+  );
+}
+
+export function ensureEnumAlternativesForAnswers(grading, answerCount) {
+  const normalized = normalizeGradingOptions(grading);
+  const slots = normalizeEnumAlternatives(normalized.enum_alternatives);
+  const next = [...slots];
+
+  while (next.length < answerCount) {
+    next.push([]);
+  }
+
+  return next.slice(0, answerCount);
 }
 
 export function normalizeGradingOptions(raw) {
@@ -28,9 +49,24 @@ export function normalizeGradingOptions(raw) {
     return createDefaultGradingOptions();
   }
 
+  let case_sensitive = Boolean(raw.case_sensitive);
+  let accept_alternatives = Boolean(raw.accept_alternatives);
+
+  if (case_sensitive && accept_alternatives) {
+    accept_alternatives = false;
+  }
+
   return createDefaultGradingOptions({
     ...raw,
-    alternatives: Array.isArray(raw.alternatives) ? raw.alternatives : [],
+    case_sensitive,
+    accept_alternatives,
+    case_format: "any",
+    alternatives:
+      accept_alternatives && Array.isArray(raw.alternatives) ? raw.alternatives : [],
+    enum_alternatives:
+      accept_alternatives && Array.isArray(raw.enum_alternatives)
+        ? normalizeEnumAlternatives(raw.enum_alternatives)
+        : [],
     points: Number(raw.points) > 0 ? Number(raw.points) : 1,
   });
 }
@@ -65,10 +101,6 @@ export function normalizeAnswerForGrading(value, grading) {
 
   if (options.case_sensitive) {
     return text;
-  }
-
-  if (options.case_format && options.case_format !== "any") {
-    return applyCaseFormat(text, options.case_format);
   }
 
   return text.toLowerCase();
@@ -116,7 +148,8 @@ export function getQuestionValidationMessage(question, examType) {
 
     const emptyChoice = question.choices.findIndex((choice) => !String(choice || "").trim());
     if (emptyChoice !== -1) {
-      return `Fill in choice ${emptyChoice + 1}.`;
+      const letters = ["A", "B", "C", "D"];
+      return `Fill in choice ${letters[emptyChoice] || emptyChoice + 1}.`;
     }
 
     if (!String(question.answer || "").trim()) {
@@ -134,6 +167,15 @@ export function getQuestionValidationMessage(question, examType) {
     const emptyAnswer = question.answers.findIndex((answer) => !String(answer || "").trim());
     if (emptyAnswer !== -1) {
       return `Fill in correct answer ${emptyAnswer + 1}.`;
+    }
+
+    if (
+      normalizeGradingOptions(question.grading).accept_alternatives &&
+      ensureEnumAlternativesForAnswers(question.grading, question.answers?.length || 0).some(
+        (slot) => slot.some((alt) => !String(alt || "").trim())
+      )
+    ) {
+      return "Remove empty enumeration alternatives or turn off alternative matching.";
     }
 
     return null;

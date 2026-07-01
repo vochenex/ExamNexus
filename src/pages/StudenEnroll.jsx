@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_BASE } from "../utils/apiBase.js";
 import { useTheme } from "../layouts/ThemeContext";
 import { useAppModal } from "../contexts/AppModalContext";
 import { primaryButtonFull } from "../utils/themeButtons";
@@ -9,7 +10,7 @@ export default function StudentEnroll() {
   const [code, setCode] = useState("");
 
   const enroll = async () => {
-    await fetch("http://localhost:5000/subjects/enroll", {
+    await fetch(`${API_BASE}/subjects/enroll`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

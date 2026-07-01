@@ -1,18 +1,5 @@
-const { createClient } = require("@supabase/supabase-js");
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-function getUserClient(accessToken) {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
+const { resolveUserIdFromAccessToken } = require("../lib/verifyAccessToken");
 
 function isApprovedFaculty(profile) {
   const role = String(profile?.role || "").toLowerCase();
@@ -27,24 +14,19 @@ async function requireFaculty(req, res, next) {
       .replace(/^Bearer\s+/i, "")
       .trim();
 
-    if (!accessToken) {
-      return res.status(401).json({ error: "Missing authorization token. Please sign in again." });
+    const userId = await resolveUserIdFromAccessToken(accessToken);
+
+    const admin = getSupabaseAdmin();
+    if (!admin) {
+      return res.status(503).json({
+        error: "Server auth is not configured. Add SUPABASE_SERVICE_ROLE_KEY to backend/.env.",
+      });
     }
 
-    const userClient = getUserClient(accessToken);
-    const {
-      data: { user },
-      error: authError,
-    } = await userClient.auth.getUser();
-
-    if (authError || !user) {
-      return res.status(401).json({ error: "Invalid or expired session. Please sign in again." });
-    }
-
-    const { data: profile, error: profileError } = await userClient
+    const { data: profile, error: profileError } = await admin
       .from("users")
       .select("id, role, account_status, avatar_url")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     if (profileError || !profile) {
@@ -61,8 +43,11 @@ async function requireFaculty(req, res, next) {
     req.facultyAccessToken = accessToken;
     next();
   } catch (err) {
-    console.error("requireFaculty error:", err);
-    res.status(500).json({ error: err.message || "Authorization failed" });
+    const status = err.statusCode || 500;
+    if (status >= 500) {
+      console.error("requireFaculty error:", err);
+    }
+    res.status(status).json({ error: err.message || "Authorization failed" });
   }
 }
 

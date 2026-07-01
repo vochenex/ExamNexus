@@ -1,16 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const { OpenAI } = require("openai");
-const { createClient } = require("@supabase/supabase-js");
+const { createAnonClient } = require("../lib/supabaseClient");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createAnonClient();
 
 router.post("/generate-questions", async (req, res) => {
   try {

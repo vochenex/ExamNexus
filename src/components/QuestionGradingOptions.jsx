@@ -2,12 +2,11 @@ import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "../layouts/ThemeContext";
 import {
-  CASE_FORMAT_OPTIONS,
   normalizeGradingOptions,
   supportsGradingOptions,
   getQuestionType,
+  ensureEnumAlternativesForAnswers,
 } from "../utils/questionGrading";
-import Select from "./ui/Select";
 
 const labelClass = (theme) =>
   `block text-xs font-semibold uppercase tracking-wide mb-2 ${
@@ -73,10 +72,7 @@ export default function QuestionGradingOptions({
   const grading = normalizeGradingOptions(question.grading);
 
   const patchGrading = (patch) => {
-    onUpdateGrading({
-      ...grading,
-      ...patch,
-    });
+    onUpdateGrading(normalizeGradingOptions({ ...grading, ...patch }));
   };
 
   const addAlternative = () => {
@@ -121,31 +117,11 @@ export default function QuestionGradingOptions({
           <ToggleRow
             theme={theme}
             label="Case sensitive"
-            hint="Student answer must match capitalization exactly."
+            hint="Student answer must match the expected text exactly, including capitalization."
             checked={grading.case_sensitive}
-            onChange={(checked) =>
-              patchGrading({
-                case_sensitive: checked,
-                case_format: checked ? "any" : grading.case_format,
-              })
-            }
+            disabled={grading.accept_alternatives}
+            onChange={(checked) => patchGrading({ case_sensitive: checked })}
           />
-
-          {!grading.case_sensitive && (
-            <div>
-              <label className={labelClass(theme)}>Expected casing</label>
-              <Select
-                value={grading.case_format}
-                onChange={(e) => patchGrading({ case_format: e.target.value })}
-              >
-                {CASE_FORMAT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
 
           <ToggleRow
             theme={theme}
@@ -165,22 +141,34 @@ export default function QuestionGradingOptions({
             />
           )}
 
-          {type === "identification" && (
+          {(type === "identification" || type === "enumeration") && (
             <>
               <ToggleRow
                 theme={theme}
                 label="Accept alternative answers"
-                hint="Count other valid spellings or phrasings as correct."
+                hint={
+                  type === "enumeration"
+                    ? "Allow other valid spellings per correct answer; casing is ignored."
+                    : "Count other valid spellings as correct; casing is ignored."
+                }
                 checked={grading.accept_alternatives}
+                disabled={grading.case_sensitive}
                 onChange={(checked) =>
                   patchGrading({
                     accept_alternatives: checked,
-                    alternatives: checked ? grading.alternatives : [],
+                    alternatives: checked && type === "identification" ? grading.alternatives : [],
+                    enum_alternatives:
+                      checked && type === "enumeration"
+                        ? ensureEnumAlternativesForAnswers(
+                            grading,
+                            question.answers?.length || 0
+                          )
+                        : [],
                   })
                 }
               />
 
-              {grading.accept_alternatives && (
+              {grading.accept_alternatives && type === "identification" && (
                 <div className="space-y-2">
                   <label className={labelClass(theme)}>Alternative answers</label>
                   {grading.alternatives.length === 0 && (
@@ -223,6 +211,19 @@ export default function QuestionGradingOptions({
                     Add alternative
                   </button>
                 </div>
+              )}
+
+              {grading.accept_alternatives && type === "enumeration" && (
+                <p
+                  className={`rounded-xl border px-3 py-2.5 text-xs ${
+                    theme === "dark"
+                      ? "border-white/10 bg-white/[0.03] text-gray-400"
+                      : "border-emerald-100 bg-emerald-50/50 en-text-muted"
+                  }`}
+                >
+                  Add alternative spellings under each numbered correct answer in the question
+                  card above.
+                </p>
               )}
             </>
           )}

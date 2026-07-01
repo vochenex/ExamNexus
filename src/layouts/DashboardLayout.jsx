@@ -4,9 +4,8 @@ import {
   LayoutDashboard,
   UserCircle,
   LogOut,
-  Moon,
-  Sun,
   Megaphone,
+  Archive,
   ShieldAlert,
   BookOpen,
   ClipboardCheck,
@@ -18,9 +17,9 @@ import { supabase } from "../supabaseClient";
 import { fetchAccountAccess } from "../utils/adminData";
 import { getAuthSession } from "../utils/authUser";
 import { buildPendingAuthNotice, stashAuthNotice } from "../utils/authNotice";
-import { secondaryButton } from "../utils/themeButtons";
 import ProfileAvatar from "../components/ProfileAvatar";
 import NotificationBell from "../components/NotificationBell";
+import ThemeToggle from "../components/ThemeToggle";
 import ExamNexusLogo from "../components/ExamNexusLogo";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
 import AnimatedPage from "../components/ui/AnimatedPage";
@@ -31,7 +30,7 @@ import { motion } from "../utils/motion";
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const { isLockdownActive, lockdown } = useAssessmentLockdown();
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const [accessState, setAccessState] = useState("checking");
 
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
@@ -82,7 +81,7 @@ export default function DashboardLayout() {
   return (
     <div
       className={`flex h-screen ${
-        theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page text-gray-900"
+        theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page en-text-primary"
       }`}
     >
       {!isLockdownActive && (
@@ -90,7 +89,7 @@ export default function DashboardLayout() {
           className={`${motion.slideInLeft} sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r p-4 backdrop-blur-xl ${
             theme === "dark"
               ? "border-[#10B981]/10 bg-[#0b1114]/95"
-              : "en-bg-page border-emerald-300/60"
+              : "en-bg-surface border-emerald-800/15 shadow-[4px_0_32px_rgba(42,92,78,0.12)]"
           } shadow-[0_0_80px_rgba(16,185,129,0.06)]`}
         >
           {/* Brand */}
@@ -135,7 +134,12 @@ export default function DashboardLayout() {
             </SidebarSection>
 
             {!isStudent && (
-              <SidebarSection title="Communication" theme={theme}>
+              <SidebarSection title="Teaching" theme={theme}>
+                <SidebarNavLink
+                  to="/faculty/question-bank"
+                  icon={Archive}
+                  label="Question Bank"
+                />
                 <SidebarNavLink
                   to="/faculty/announcements"
                   icon={Megaphone}
@@ -167,24 +171,6 @@ export default function DashboardLayout() {
 
           {/* Footer */}
           <div className="mt-4 space-y-3">
-            <button
-              type="button"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className={secondaryButton(theme, "w-full text-sm")}
-            >
-              {theme === "dark" ? (
-                <>
-                  <Sun size={18} />
-                  Light Mode
-                </>
-              ) : (
-                <>
-                  <Moon size={18} />
-                  Dark Mode
-                </>
-              )}
-            </button>
-
             <div
               className={`rounded-2xl border p-3 ${
                 theme === "dark"
@@ -233,7 +219,7 @@ export default function DashboardLayout() {
       <main
         className={`relative h-screen flex-1 overflow-y-auto ${
           isLockdownActive ? "p-0" : "p-8"
-        } ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+        } ${theme === "dark" ? "text-white" : "text-[#1a332c]"}`}
       >
         {isLockdownActive && (
           <div
@@ -250,7 +236,10 @@ export default function DashboardLayout() {
         )}
 
         {!isLockdownActive && (
-          <div className={`absolute right-8 top-6 z-40 ${motion.fadeInDown} en-delay-2`}>
+          <div
+            className={`absolute right-8 top-6 z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+          >
+            <ThemeToggle />
             <NotificationBell />
           </div>
         )}

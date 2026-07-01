@@ -31,6 +31,32 @@ export async function fetchAdminDashboardStats() {
   return data || {};
 }
 
+export async function fetchAdminDashboardAnalytics() {
+  await requireSession();
+  const { data, error } = await supabase.rpc("admin_get_dashboard_analytics");
+
+  if (error) {
+    if (isMissingRpcError(error)) {
+      return {
+        teachers_active_today: [],
+        exams_per_day: [],
+        teachers_active_today_total: 0,
+        exams_today: 0,
+        unavailable: true,
+      };
+    }
+    throw error;
+  }
+
+  return {
+    teachers_active_today: normalizeJson(data?.teachers_active_today),
+    exams_per_day: normalizeJson(data?.exams_per_day),
+    teachers_active_today_total: Number(data?.teachers_active_today_total) || 0,
+    exams_today: Number(data?.exams_today) || 0,
+    unavailable: false,
+  };
+}
+
 export async function fetchAdminUsers(role = null, status = null) {
   await requireSession();
 

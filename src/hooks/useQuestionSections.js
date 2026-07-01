@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { createEmptyQuestion, getQuestionValidationMessage } from "../utils/assessmentQuestions";
 import {
   buildSectionsFromQuestions,
@@ -9,7 +9,7 @@ import {
   resolveExamTypeForSave,
   sectionHasContent,
 } from "../utils/questionSections";
-import { normalizeGradingOptions, supportsGradingOptions } from "../utils/questionGrading";
+import { normalizeGradingOptions, supportsGradingOptions, getQuestionType, ensureEnumAlternativesForAnswers } from "../utils/questionGrading";
 
 function syncSectionGradingToQuestions(questions, sectionId, gradingDefaults) {
   const normalized = normalizeGradingOptions(gradingDefaults);
@@ -24,8 +24,15 @@ function syncSectionGradingToQuestions(questions, sectionId, gradingDefaults) {
     return {
       ...question,
       grading: {
+        ...existing,
         ...normalized,
         alternatives: normalized.accept_alternatives ? existing.alternatives : [],
+        enum_alternatives: normalized.accept_alternatives
+          ? ensureEnumAlternativesForAnswers(
+              { ...existing, ...normalized },
+              question.answers?.length || 0
+            )
+          : [],
       },
     };
   });
@@ -47,6 +54,9 @@ export default function useQuestionSections(initialType = "multiple_choice") {
   );
   const [questions, setQuestions] = useState([]);
   const [formatPrompt, setFormatPrompt] = useState(null);
+  const sectionsRef = useRef(questionSections);
+
+  sectionsRef.current = questionSections;
 
   const activeSection = useMemo(
     () =>
@@ -64,6 +74,74 @@ export default function useQuestionSections(initialType = "multiple_choice") {
     setQuestionSections(enrichedSections);
     setActiveSectionId(enrichedSections[0]?.id);
     setQuestions(cloned);
+  }, []);
+
+  const resetForAiGeneration = useCallback(() => {
+    setQuestionSections([]);
+    setQuestions([]);
+    setActiveSectionId(null);
+    setFormatPrompt(null);
+  }, []);
+
+  const appendAiQuestion = useCallback((mappedQuestion) => {
+    const type = getQuestionType(mappedQuestion, "multiple_choice");
+    const question = { ...mappedQuestion, type };
+
+    let sections = sectionsRef.current;
+    let section = sections.find((item) => item.type === type);
+
+    if (!section) {
+      section = createQuestionSection(type);
+      sections = [...sections, section];
+      sectionsRef.current = sections;
+      setQuestionSections(enrichSectionsWithGrading(sections, []));
+      setActiveSectionId((current) => current || section.id);
+    }
+
+    question.sectionId = section.id;
+    setQuestions((prev) => [...prev, question]);
+  }, []);
+
+  const importBankQuestions = useCallback((bankQuestions) => {
+    if (!Array.isArray(bankQuestions) || bankQuestions.length === 0) return;
+
+    let sections = [...sectionsRef.current];
+    const toAdd = [];
+
+    bankQuestions.forEach((incoming) => {
+      const type = getQuestionType(incoming, incoming.type || "multiple_choice");
+      let section = sections.find((item) => item.type === type);
+
+      if (!section) {
+        section = createQuestionSection(type);
+        sections = [...sections, section];
+      }
+
+      const gradingDefaults = section.gradingDefaults || incoming.grading;
+      const blank = createEmptyQuestion(type, section.id, gradingDefaults);
+
+      toAdd.push({
+        ...blank,
+        ...incoming,
+        type,
+        sectionId: section.id,
+        id: undefined,
+        bankId: incoming.bankId,
+      });
+    });
+
+    sectionsRef.current = sections;
+    setQuestionSections((prev) => {
+      const merged = [...prev];
+      sections.forEach((section) => {
+        if (!merged.some((item) => item.id === section.id)) {
+          merged.push(section);
+        }
+      });
+      return enrichSectionsWithGrading(merged, []);
+    });
+    setActiveSectionId((current) => current || sections[0]?.id);
+    setQuestions((prev) => [...prev, ...toAdd]);
   }, []);
 
   const handleFormatChange = (nextType) => {
@@ -196,6 +274,7 @@ export default function useQuestionSections(initialType = "multiple_choice") {
                 grading: {
                   ...normalizeGradingOptions(question.grading),
                   alternatives: [],
+                  enum_alternatives: [],
                 },
               }
             : question
@@ -208,22 +287,105 @@ export default function useQuestionSections(initialType = "multiple_choice") {
 
   const addEnumAnswer = (index) => {
     setQuestions((prev) =>
-      prev.map((question, i) =>
-        i === index ? { ...question, answers: [...question.answers, ""] } : question
-      )
+      prev.map((question, i) => {
+        if (i !== index) return question;
+
+        const grading = normalizeGradingOptions(question.grading);
+        const enum_alternatives = ensureEnumAlternativesForAnswers(
+          grading,
+          question.answers.length + 1
+        );
+
+        return {
+          ...question,
+          answers: [...question.answers, ""],
+          grading: { ...grading, enum_alternatives },
+        };
+      })
     );
   };
 
   const removeEnumAnswer = (qIndex, aIndex) => {
     setQuestions((prev) =>
-      prev.map((question, i) =>
-        i === qIndex
-          ? {
-              ...question,
-              answers: question.answers.filter((_, idx) => idx !== aIndex),
-            }
-          : question
-      )
+      prev.map((question, i) => {
+        if (i !== qIndex) return question;
+
+        const grading = normalizeGradingOptions(question.grading);
+        const enum_alternatives = ensureEnumAlternativesForAnswers(grading, question.answers.length)
+          .filter((_, idx) => idx !== aIndex);
+
+        return {
+          ...question,
+          answers: question.answers.filter((_, idx) => idx !== aIndex),
+          grading: { ...grading, enum_alternatives },
+        };
+      })
+    );
+  };
+
+  const addEnumSlotAlternative = (qIndex, answerIndex) => {
+    setQuestions((prev) =>
+      prev.map((question, i) => {
+        if (i !== qIndex) return question;
+
+        const grading = normalizeGradingOptions(question.grading);
+        const enum_alternatives = ensureEnumAlternativesForAnswers(
+          grading,
+          question.answers.length
+        );
+        const slot = [...(enum_alternatives[answerIndex] || []), ""];
+        enum_alternatives[answerIndex] = slot;
+
+        return {
+          ...question,
+          grading: { ...grading, enum_alternatives },
+        };
+      })
+    );
+  };
+
+  const updateEnumSlotAlternative = (qIndex, answerIndex, altIndex, value, clearError) => {
+    clearError?.();
+    setQuestions((prev) =>
+      prev.map((question, i) => {
+        if (i !== qIndex) return question;
+
+        const grading = normalizeGradingOptions(question.grading);
+        const enum_alternatives = ensureEnumAlternativesForAnswers(
+          grading,
+          question.answers.length
+        );
+        const slot = [...(enum_alternatives[answerIndex] || [])];
+        slot[altIndex] = value;
+        enum_alternatives[answerIndex] = slot;
+
+        return {
+          ...question,
+          grading: { ...grading, enum_alternatives },
+        };
+      })
+    );
+  };
+
+  const removeEnumSlotAlternative = (qIndex, answerIndex, altIndex) => {
+    setQuestions((prev) =>
+      prev.map((question, i) => {
+        if (i !== qIndex) return question;
+
+        const grading = normalizeGradingOptions(question.grading);
+        const enum_alternatives = ensureEnumAlternativesForAnswers(
+          grading,
+          question.answers.length
+        );
+        enum_alternatives[answerIndex] = (enum_alternatives[answerIndex] || []).filter(
+          (_, idx) => idx !== altIndex
+        );
+
+        return {
+          ...question,
+          grading: { ...grading, enum_alternatives },
+        };
+      })
     );
   };
 
@@ -314,6 +476,9 @@ export default function useQuestionSections(initialType = "multiple_choice") {
     gradingSections,
     setActiveSectionId,
     initializeFromLoadedQuestions,
+    resetForAiGeneration,
+    appendAiQuestion,
+    importBankQuestions,
     handleFormatChange,
     confirmAddFormatSection,
     cancelFormatChange,
@@ -326,6 +491,9 @@ export default function useQuestionSections(initialType = "multiple_choice") {
     updateSectionGrading,
     addEnumAnswer,
     removeEnumAnswer,
+    addEnumSlotAlternative,
+    updateEnumSlotAlternative,
+    removeEnumSlotAlternative,
     addAlternativeAnswer,
     updateAlternativeAnswer,
     removeAlternativeAnswer,

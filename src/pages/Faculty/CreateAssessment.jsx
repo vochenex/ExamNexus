@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -13,10 +13,14 @@ import {
 } from "../../components/QuestionBuilderCard";
 import AssessmentSettingsPanel from "../../components/AssessmentSettingsPanel";
 import FormatGradingSettings from "../../components/FormatGradingSettings";
+import AssessmentPointsPanel from "../../components/AssessmentPointsPanel";
+import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
 import QuestionFormatPrompt from "../../components/QuestionFormatPrompt";
 import QuestionSectionsPanel from "../../components/QuestionSectionsPanel";
+import QuestionBankPicker from "../../components/QuestionBankPicker";
 import AssessmentAiGenerator from "../../components/AssessmentAiGenerator";
-import { mapAiPayloadToBuilderQuestions } from "../../utils/aiQuestionMapper";
+import AiGenerationProgress from "../../components/AiGenerationProgress";
+import { mapAiQuestionToBuilder, mapAiPayloadToBuilderQuestions } from "../../utils/aiQuestionMapper";
 import { getSubjectSections } from "../../utils/sections";
 import { createExam } from "../../utils/supabaseData";
 import { supabase } from "../../supabaseClient";
@@ -28,6 +32,7 @@ import {
 import { serializeQuestionForDb } from "../../utils/assessmentQuestions";
 import { getAssessmentCategoryLabel } from "../../utils/assessmentCategories";
 import useQuestionSections from "../../hooks/useQuestionSections";
+import { saveQuestionToBank } from "../../utils/questionBank";
 
 const defaultAssessment = {
   subject_id: "",
@@ -48,7 +53,7 @@ export default function CreateAssessment() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
-  const { warning: showWarning, success: showSuccess, confirm } = useAppModal();
+  const { warning: showWarning, success: showSuccess, error: showError, confirm } = useAppModal();
 
   const assessmentType = location.state?.type || "exam";
   const assessmentLabel = getAssessmentCategoryLabel(assessmentType);
@@ -63,6 +68,10 @@ export default function CreateAssessment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [creationMode, setCreationMode] = useState("manual");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiProgress, setAiProgress] = useState(null);
+  const [bankPickerOpen, setBankPickerOpen] = useState(false);
+  const applyAiExamDetailsRef = useRef(false);
 
   const {
     questionSections,
@@ -82,6 +91,9 @@ export default function CreateAssessment() {
     updateSectionGrading,
     addEnumAnswer,
     removeEnumAnswer,
+    addEnumSlotAlternative,
+    updateEnumSlotAlternative,
+    removeEnumSlotAlternative,
     addAlternativeAnswer,
     updateAlternativeAnswer,
     removeAlternativeAnswer,
@@ -90,6 +102,9 @@ export default function CreateAssessment() {
     getQuestionsForSave,
     getExamTypeForSave,
     initializeFromLoadedQuestions,
+    resetForAiGeneration,
+    appendAiQuestion,
+    importBankQuestions,
     questionHasContent,
   } = useQuestionSections(defaultAssessment.exam_type);
 
@@ -125,6 +140,22 @@ export default function CreateAssessment() {
 
   const clearError = () => setError("");
 
+  const handleSaveQuestionToBank = async (question) => {
+    try {
+      await saveQuestionToBank(question);
+      showSuccess("Question saved to your bank.");
+    } catch (err) {
+      showError(err.message || "Could not save question to bank.");
+    }
+  };
+
+  const handleImportFromBank = (bankQuestions) => {
+    importBankQuestions(bankQuestions);
+    showSuccess(
+      `${bankQuestions.length} question${bankQuestions.length === 1 ? "" : "s"} imported from your bank.`
+    );
+  };
+
   const onFormatChange = (nextType) => {
     clearError();
     const resolvedType = handleFormatChange(nextType);
@@ -143,41 +174,110 @@ export default function CreateAssessment() {
     return "mixed";
   };
 
-  const handleAiGenerated = async (payload) => {
-    const mappedQuestions = mapAiPayloadToBuilderQuestions(payload);
-    if (!mappedQuestions.length) {
-      setError("AI did not return usable questions. Adjust your prompt or formats and try again.");
-      return;
-    }
-
+  const handleAiGenerationStart = async () => {
     const hasExisting = questions.some((question) => questionHasContent(question));
     if (hasExisting) {
       const shouldReplace = await confirm({
         title: "Replace current questions?",
         message:
-          "The questions already on this page will be replaced by the AI-generated set. You can still edit everything before publishing.",
+          "The questions already on this page will be replaced by the AI-generated set. Assessment title and description will refresh from the new AI result. You can still edit everything before publishing.",
       });
-      if (!shouldReplace) return;
+      if (!shouldReplace) return false;
     }
 
-    initializeFromLoadedQuestions(
-      mappedQuestions,
-      mappedQuestions[0]?.type || defaultAssessment.exam_type
-    );
+    applyAiExamDetailsRef.current = true;
+    resetForAiGeneration();
+    setExam((prev) => ({
+      ...prev,
+      title: "",
+      description: "",
+    }));
+    setAiGenerating(true);
+    setAiProgress(null);
+    setError("");
+    return true;
+  };
+
+  const resolveAiExamField = (currentValue, suggestedValue) => {
+    if (applyAiExamDetailsRef.current && suggestedValue) {
+      return suggestedValue;
+    }
+    const trimmed = String(currentValue || "").trim();
+    return trimmed || suggestedValue || currentValue;
+  };
+
+  const handleAiQuestionGenerated = (event) => {
+    const mapped = mapAiQuestionToBuilder(event.question);
+    if (!mapped) return;
+
+    appendAiQuestion(mapped);
+
+    setAiProgress((prev) => ({
+      ...(prev || {}),
+      phase: event.phase || prev?.phase,
+      current: (event.index ?? 0) + 1,
+      total: event.total ?? prev?.total,
+      latestType: mapped.type,
+    }));
+
+    if (event.suggestedTitle || event.suggestedDescription) {
+      setExam((prev) => ({
+        ...prev,
+        title: resolveAiExamField(prev.title, event.suggestedTitle),
+        description: resolveAiExamField(prev.description, event.suggestedDescription),
+      }));
+    }
+  };
+
+  const handleAiGenerationComplete = (payload) => {
+    const mappedQuestions = mapAiPayloadToBuilderQuestions(payload);
+
+    setAiGenerating(false);
+
+    if (!mappedQuestions.length) {
+      setAiProgress(null);
+      applyAiExamDetailsRef.current = false;
+      setError("AI did not return usable questions. Adjust your prompt or file and try again.");
+      return;
+    }
+
+    setAiProgress((prev) => ({
+      ...(prev || {}),
+      status: "done",
+      percent: 100,
+      current: mappedQuestions.length,
+      total: mappedQuestions.length,
+    }));
 
     setExam((prev) => ({
       ...prev,
-      title: prev.title.trim() || payload.suggestedTitle || prev.title,
-      description: prev.description.trim() || payload.suggestedDescription || prev.description,
+      title: resolveAiExamField(prev.title, payload.suggestedTitle),
+      description: resolveAiExamField(prev.description, payload.suggestedDescription),
       exam_type: resolveExamTypeFromMapped(mappedQuestions),
     }));
+    applyAiExamDetailsRef.current = false;
 
-    setCreationMode("manual");
     setError("");
-    showSuccess(
-      `Generated ${mappedQuestions.length} question${mappedQuestions.length === 1 ? "" : "s"}. Review, adjust settings, then publish.`
-    );
   };
+
+  const handleAiError = (message) => {
+    if (!message) {
+      setError("");
+      return;
+    }
+
+    setError(message);
+    setAiGenerating(false);
+    setAiProgress(null);
+    applyAiExamDetailsRef.current = false;
+  };
+
+  const clearAiError = () => setError("");
+
+  const showQuestionPanel =
+    creationMode === "manual" || (!aiGenerating && questions.length > 0);
+
+  const showAiProgress = aiGenerating || aiProgress?.status === "done";
 
   const handlePublish = async () => {
     try {
@@ -259,7 +359,9 @@ export default function CreateAssessment() {
 
         <div
           className={`mt-4 inline-flex flex-wrap gap-2 rounded-xl border p-1 ${
-            theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-100 bg-white"
+            theme === "dark"
+              ? "border-white/10 bg-white/[0.03]"
+              : "border-emerald-700/20 en-bg-elevated en-panel-glow"
           }`}
         >
           {[
@@ -339,11 +441,13 @@ export default function CreateAssessment() {
                 hint="Only students in the selected sections can take this assessment."
               />
 
-              <AssessmentTypeSelect
-                value={activeFormat}
-                onChange={onFormatChange}
-                hint="Switching format with existing questions creates a new section instead of removing them."
-              />
+              {creationMode === "manual" && (
+                <AssessmentTypeSelect
+                  value={activeFormat}
+                  onChange={onFormatChange}
+                  hint="Switching format with existing questions creates a new section instead of removing them."
+                />
+              )}
             </div>
 
             <AssessmentSchedule
@@ -357,69 +461,107 @@ export default function CreateAssessment() {
           </div>
 
           <div className={`${assessmentPanelClass(theme)} min-h-[420px] xl:col-span-5`}>
-            {creationMode === "manual" ? (
+            {creationMode !== "manual" && (
+              <div className={showQuestionPanel ? "mb-6" : ""}>
+                <AssessmentAiGenerator
+                  mode={creationMode}
+                  disabled={loading || aiGenerating}
+                  onGenerationStart={handleAiGenerationStart}
+                  onQuestionGenerated={handleAiQuestionGenerated}
+                  onProgress={setAiProgress}
+                  onGenerated={handleAiGenerationComplete}
+                  onError={handleAiError}
+                  onClearError={clearAiError}
+                />
+                {showAiProgress && (
+                  <div className="mt-6">
+                    <AiGenerationProgress
+                      progress={aiProgress}
+                      questionCount={questions.length}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showQuestionPanel && (
               <QuestionSectionsPanel
-                questionSections={questionSections}
-                activeSectionId={activeSectionId}
-                questions={questions}
-                onAddQuestionToSection={(sectionId) =>
-                  addQuestionToSection(sectionId, setError, clearError)
-                }
-                onUpdateQuestion={(index, field, value) =>
-                  updateQuestion(index, field, value, clearError)
-                }
-                onUpdateChoice={(qIndex, cIndex, value) =>
-                  updateChoice(qIndex, cIndex, value, clearError)
-                }
-                onUpdateEnumAnswer={(qIndex, aIndex, value) =>
-                  updateEnumAnswer(qIndex, aIndex, value, clearError)
-                }
-                onAddEnumAnswer={addEnumAnswer}
-                onRemoveEnumAnswer={removeEnumAnswer}
-                onAddAlternativeAnswer={addAlternativeAnswer}
-                onUpdateAlternativeAnswer={(qIndex, aIndex, value) =>
-                  updateAlternativeAnswer(qIndex, aIndex, value, clearError)
-                }
-                onRemoveAlternativeAnswer={removeAlternativeAnswer}
-                onDeleteQuestion={deleteQuestion}
-                onSelectSection={setActiveSectionId}
-              />
-            ) : (
-              <AssessmentAiGenerator
-                mode={creationMode}
-                disabled={loading}
-                onGenerated={handleAiGenerated}
-                onError={setError}
+                  questionSections={questionSections}
+                  activeSectionId={activeSectionId}
+                  questions={questions}
+                  onAddQuestionToSection={(sectionId) =>
+                    addQuestionToSection(sectionId, setError, clearError)
+                  }
+                  onUpdateQuestion={(index, field, value) =>
+                    updateQuestion(index, field, value, clearError)
+                  }
+                  onUpdateChoice={(qIndex, cIndex, value) =>
+                    updateChoice(qIndex, cIndex, value, clearError)
+                  }
+                  onUpdateEnumAnswer={(qIndex, aIndex, value) =>
+                    updateEnumAnswer(qIndex, aIndex, value, clearError)
+                  }
+                  onAddEnumAnswer={addEnumAnswer}
+                  onRemoveEnumAnswer={removeEnumAnswer}
+                  onAddEnumSlotAlternative={addEnumSlotAlternative}
+                  onUpdateEnumSlotAlternative={(qIndex, aIndex, altIndex, value) =>
+                    updateEnumSlotAlternative(qIndex, aIndex, altIndex, value, clearError)
+                  }
+                  onRemoveEnumSlotAlternative={removeEnumSlotAlternative}
+                  onAddAlternativeAnswer={addAlternativeAnswer}
+                  onUpdateAlternativeAnswer={(qIndex, aIndex, value) =>
+                    updateAlternativeAnswer(qIndex, aIndex, value, clearError)
+                  }
+                  onRemoveAlternativeAnswer={removeAlternativeAnswer}
+                  onDeleteQuestion={deleteQuestion}
+                  onSelectSection={setActiveSectionId}
+                  onSaveQuestionToBank={handleSaveQuestionToBank}
+                  onImportFromBank={() => setBankPickerOpen(true)}
               />
             )}
           </div>
 
-          <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3 xl:sticky xl:top-6`}>
+          <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3`}>
             <div className="flex items-center gap-2">
               <Settings className="text-emerald-400" size={18} />
               <h2 className="font-semibold">Settings</h2>
             </div>
 
+            {questionSections.length > 0 && (
+              <CollapsiblePanel
+                title="Points per question"
+                subtitle="Default points for each question format"
+                defaultOpen={false}
+              >
+                <AssessmentPointsPanel
+                  sections={questionSections}
+                  onChange={(sectionId, grading) =>
+                    updateSectionGrading(sectionId, grading, clearError)
+                  }
+                />
+              </CollapsiblePanel>
+            )}
+
             {gradingSections.length > 0 && (
-              <div className="space-y-4">
-                <p
-                  className={`text-xs font-semibold uppercase tracking-wide ${
-                    theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
-                  }`}
-                >
-                  Format grading
-                </p>
-                {gradingSections.map((section) => (
-                  <FormatGradingSettings
-                    key={section.id}
-                    sectionType={section.type}
-                    gradingDefaults={section.gradingDefaults}
-                    onChange={(grading) =>
-                      updateSectionGrading(section.id, grading, clearError)
-                    }
-                  />
-                ))}
-              </div>
+              <CollapsiblePanel
+                title="Format grading"
+                subtitle={`${gradingSections.length} format section${gradingSections.length === 1 ? "" : "s"}`}
+                defaultOpen={false}
+              >
+                <div className="space-y-3">
+                  {gradingSections.map((section) => (
+                    <FormatGradingSettings
+                      key={section.id}
+                      sectionType={section.type}
+                      gradingDefaults={section.gradingDefaults}
+                      compact
+                      onChange={(grading) =>
+                        updateSectionGrading(section.id, grading, clearError)
+                      }
+                    />
+                  ))}
+                </div>
+              </CollapsiblePanel>
             )}
 
             <AssessmentSettingsPanel
@@ -440,6 +582,12 @@ export default function CreateAssessment() {
         currentType={formatPrompt?.currentType}
         onConfirm={onConfirmFormatSection}
         onCancel={cancelFormatChange}
+      />
+
+      <QuestionBankPicker
+        open={bankPickerOpen}
+        onClose={() => setBankPickerOpen(false)}
+        onImport={handleImportFromBank}
       />
     </div>
   );

@@ -1,30 +1,20 @@
 const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
-const { createClient } = require("@supabase/supabase-js");
+const { createAnonClient, createUserClient } = require("../lib/supabaseClient");
 const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
 
 const generateInviteCode = () =>
   crypto.randomBytes(4).toString("hex");
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createAnonClient();
 
 const getSupabaseForUser = (req) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return supabase;
 
-  return createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY,
-    {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    }
-  );
+  const accessToken = String(authHeader).replace(/^Bearer\s+/i, "").trim();
+  return createUserClient(accessToken);
 };
 
 //

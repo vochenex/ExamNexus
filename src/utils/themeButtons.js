@@ -32,7 +32,7 @@ export function secondaryButton(theme, extra = "") {
     ${
       theme === "dark"
         ? "border border-white/10 bg-white/5 text-gray-200 hover:bg-white/10 hover:border-emerald-500/30"
-        : "border border-emerald-200/80 en-bg-elevated text-gray-700 en-hover hover:border-emerald-400/70 shadow-sm"
+        : "border border-emerald-700/20 en-bg-elevated text-[#2d4a42] en-hover hover:border-emerald-600/40 en-panel-glow"
     }
     ${extra}
   `;

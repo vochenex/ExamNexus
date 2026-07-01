@@ -76,7 +76,7 @@ export function HorizontalBarChart({ items, valueKey = "value", labelKey = "labe
             </div>
             <div
               className={`h-2.5 overflow-hidden rounded-full ${
-                theme === "dark" ? "bg-white/10" : "en-bg-skeleton"
+                theme === "dark" ? "bg-white/10" : "en-skeleton-bone"
               }`}
             >
               <div

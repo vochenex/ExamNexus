@@ -3,6 +3,8 @@ import { useTheme } from "../layouts/ThemeContext";
 import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../hooks/useRealtimeFetch";
 
+import { API_BASE } from "../utils/apiBase.js";
+
 export default function TeacherAnalytics({ examId }) {
   const { theme } = useTheme();
   const [data, setData] = useState([]);
@@ -11,7 +13,7 @@ export default function TeacherAnalytics({ examId }) {
   const load = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const res = await fetch(`http://localhost:5000/analytics/exam/${examId}`);
+      const res = await fetch(`${API_BASE}/analytics/exam/${examId}`);
       const json = await res.json();
       setData(Array.isArray(json) ? json : []);
     } catch (err) {

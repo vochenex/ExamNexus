@@ -49,7 +49,7 @@ export default function AdminLayout() {
         className={`${motion.slideInLeft} sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r p-4 backdrop-blur-xl ${
           theme === "dark"
             ? "border-[#10B981]/10 bg-[#0b1114]/95"
-            : "en-bg-page border-emerald-300/60"
+            : "en-bg-surface border-emerald-800/15 shadow-[4px_0_32px_rgba(42,92,78,0.12)]"
         } shadow-[0_0_80px_rgba(16,185,129,0.06)]`}
       >
         <div

@@ -3,6 +3,8 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import { useTheme } from "../layouts/ThemeContext";
 import { primaryButtonSm } from "../utils/themeButtons";
 
+import { API_BASE } from "../utils/apiBase.js";
+
 export default function Faculty() {
   const { theme } = useTheme();
   const [subjects, setSubjects] = useState([]);
@@ -10,13 +12,13 @@ export default function Faculty() {
   const facultyId = "faculty-1";
 
   useEffect(() => {
-    fetch(`http://localhost:5000/subjects/${facultyId}`)
+    fetch(`${API_BASE}/subjects/${facultyId}`)
       .then((res) => res.json())
       .then(setSubjects);
   }, []);
 
   const addSubject = async () => {
-    const res = await fetch("http://localhost:5000/subjects", {
+    const res = await fetch(`${API_BASE}/subjects`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -88,7 +90,7 @@ function SubjectStudents({ subjectId }) {
   const [students, setStudents] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/subjects/${subjectId}/students`)
+    fetch(`${API_BASE}/subjects/${subjectId}/students`)
       .then((res) => res.json())
       .then(setStudents);
   }, [subjectId]);

@@ -69,10 +69,8 @@ cp backend/.env.example backend/.env
 | `SUPABASE_URL` | `backend/.env` | Same project URL (backend) |
 | `SUPABASE_ANON_KEY` | `backend/.env` | Anon key (backend) |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` | **Server only** — never use `VITE_` prefix |
-| `AI_PROVIDER` | `backend/.env` | `ollama` (default) or `openai` |
-| `OLLAMA_BASE_URL` | `backend/.env` | Local Ollama URL (default `http://localhost:11434`) |
-| `OLLAMA_MODEL` | `backend/.env` | Installed Ollama model (e.g. `llama3`) |
-| `OPENAI_API_KEY` | `backend/.env` | Only when `AI_PROVIDER=openai` |
+| `GEMINI_API_KEY` | `backend/.env` | Google Gemini API key for AI generation (prompts and documents) |
+| `GEMINI_MODEL` | `backend/.env` | Gemini model (default `gemini-2.0-flash`) |
 
 Verify the backend loaded the service role key:
 

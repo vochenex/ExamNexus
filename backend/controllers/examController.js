@@ -1,9 +1,6 @@
-const { createClient } = require("@supabase/supabase-js");
+const { createAnonClient } = require("../lib/supabaseClient");
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createAnonClient();
 
 /* ================= GET EXAMS ================= */
 exports.getExams = async (req, res) => {

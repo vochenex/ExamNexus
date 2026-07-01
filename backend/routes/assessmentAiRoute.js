@@ -7,10 +7,13 @@ const {
   isSupportedUpload,
 } = require("../lib/documentExtractor");
 const {
-  requestAiQuestions,
+  requestAiQuestionsBatched,
+  requestDocumentQuestions,
   requestSingleAiQuestion,
+  getDocumentPlan,
   parseFormats,
   clampQuestionCount,
+  resolvePromptGenerationSettings,
   getAiServiceStatus,
 } = require("../lib/assessmentAiGenerator");
 
@@ -39,9 +42,11 @@ router.get("/status", requireFaculty, async (req, res) => {
     return res.status(503).json({
       ok: false,
       configured: false,
-      provider: status.provider,
-      model: status.model,
-      installedModels: status.installedModels || [],
+      promptProvider: status.promptProvider,
+      documentProvider: status.documentProvider,
+      promptModel: status.promptModel,
+      documentModel: status.documentModel,
+      gemini: status.gemini,
       error: status.error,
     });
   }
@@ -49,18 +54,25 @@ router.get("/status", requireFaculty, async (req, res) => {
   res.json({
     ok: true,
     configured: true,
-    provider: status.provider,
-    model: status.model,
-    installedModels: status.installedModels || [],
+    promptProvider: status.promptProvider,
+    documentProvider: status.documentProvider,
+    promptModel: status.promptModel,
+    documentModel: status.documentModel,
+    gemini: status.gemini,
   });
 });
 
 router.get("/public-config", async (req, res) => {
   const status = await getAiServiceStatus();
   res.json({
+    configured: status.configured,
     provider: status.provider,
     model: status.model,
-    configured: status.configured,
+    promptProvider: status.promptProvider,
+    documentProvider: status.documentProvider,
+    promptModel: status.promptModel,
+    documentModel: status.documentModel,
+    gemini: status.gemini,
     error: status.error || null,
   });
 });
@@ -138,6 +150,7 @@ router.post("/generate-one", requireFaculty, async (req, res) => {
       difficulty: String(difficulty || "medium"),
       stepIndex: Number(stepIndex) || 0,
       totalSteps: clampQuestionCount(totalSteps || 1),
+      mode: topicPrompt ? "prompt" : "document",
     });
 
     res.json({
@@ -172,20 +185,85 @@ router.post("/generate-from-prompt", requireFaculty, async (req, res) => {
       return res.status(400).json({ error: "Describe what you want the AI to generate." });
     }
 
-    const result = await requestAiQuestions({
-      topicPrompt,
-      additionalInstructions,
-      formats: parseFormats(formats),
-      questionCount: clampQuestionCount(questionCount),
-      difficulty: String(difficulty || "medium"),
-      mode: "prompt",
+    const resolved = resolvePromptGenerationSettings({
+      prompt: topicPrompt,
+      questionCount,
+      difficulty,
+      formats,
     });
 
-    res.json({ success: true, ...result });
+    const result = await requestAiQuestionsBatched({
+      topicPrompt,
+      additionalInstructions,
+      formats: resolved.formats,
+      questionCount: resolved.questionCount,
+      difficulty: resolved.difficulty,
+    });
+
+    res.json({
+      success: true,
+      ...result,
+      resolvedSettings: resolved,
+    });
   } catch (err) {
     handleRouteError(res, err);
   }
 });
+
+router.post("/document-plan", requireFaculty, async (req, res) => {
+  try {
+    const { sourceText } = req.body || {};
+    const plan = getDocumentPlan(sourceText);
+    res.json({ success: true, ...plan });
+  } catch (err) {
+    handleRouteError(res, err);
+  }
+});
+
+router.post(
+  "/analyze-document",
+  requireFaculty,
+  (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err?.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
+      }
+      if (err) {
+        return res.status(400).json({ error: err.message || "File upload failed." });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    const file = req.file;
+
+    try {
+      if (!file) {
+        return res.status(400).json({ error: "Upload a PDF or Word (.docx) file." });
+      }
+
+      if (!isSupportedUpload(file)) {
+        return res.status(400).json({
+          error: "Unsupported file type. Use PDF or Word (.docx) only.",
+        });
+      }
+
+      const sourceText = await extractDocumentText(file);
+
+      const result = await requestDocumentQuestions({ sourceText });
+
+      res.json({
+        success: true,
+        extractedChars: sourceText.length,
+        ...result,
+      });
+    } catch (err) {
+      handleRouteError(res, err);
+    } finally {
+      cleanupUploadedFile(file);
+    }
+  }
+);
 
 router.post(
   "/generate-from-document",
@@ -216,21 +294,8 @@ router.post(
       }
 
       const sourceText = await extractDocumentText(file);
-      const {
-        formats,
-        questionCount,
-        difficulty,
-        additionalInstructions,
-      } = req.body || {};
 
-      const result = await requestAiQuestions({
-        sourceText,
-        additionalInstructions,
-        formats: parseFormats(formats),
-        questionCount: clampQuestionCount(questionCount),
-        difficulty: String(difficulty || "medium"),
-        mode: "document",
-      });
+      const result = await requestDocumentQuestions({ sourceText });
 
       res.json({
         success: true,

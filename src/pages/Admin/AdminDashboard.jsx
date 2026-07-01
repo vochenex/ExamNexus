@@ -10,42 +10,130 @@ import {
   Download,
   LogIn,
   KeyRound,
+  BarChart3,
 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { pageShellClass, panelClass, staggerGridClass } from "../../utils/themeInputs";
 import PageHeader from "../../components/ui/PageHeader";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
-import { fetchAdminDashboardStats } from "../../utils/adminData";
+import { fetchAdminDashboardAnalytics, fetchAdminDashboardStats } from "../../utils/adminData";
 import { primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
+import { AdminStatBadge, AdminVerticalBarChart } from "../../components/admin/AdminBarChart";
 
-function StatCard({ label, value, theme }) {
+const ADMIN_TOOLS = [
+  {
+    to: "/admin/accounts",
+    icon: Users,
+    label: "Manage accounts",
+    hint: "Approve registrations, roles, and profiles",
+    getValue: (stats) => stats?.pending_requests ?? 0,
+    valueLabel: "pending",
+    alertWhenPositive: true,
+    getDetail: (stats) =>
+      `${stats?.users ?? 0} users · ${stats?.students ?? 0} students · ${stats?.faculty ?? 0} faculty`,
+  },
+  {
+    to: "/admin/password-resets",
+    icon: KeyRound,
+    label: "Password resets",
+    hint: "Review forgot-password requests",
+    getValue: (stats) => stats?.pending_password_resets ?? 0,
+    valueLabel: "pending",
+    alertWhenPositive: true,
+  },
+  {
+    to: "/admin/subjects",
+    icon: BookOpen,
+    label: "Manage subjects",
+    hint: "Create subjects and assign faculty",
+    getValue: (stats) => stats?.subjects ?? 0,
+    valueLabel: "subjects",
+  },
+  {
+    to: "/admin/announcements",
+    icon: Megaphone,
+    label: "Announcements",
+    hint: "Broadcast to teachers or students",
+    showBadge: false,
+  },
+  {
+    to: "/admin/catalog",
+    icon: Shield,
+    label: "Departments & courses",
+    hint: "Academic catalog setup",
+    showBadge: false,
+  },
+  {
+    to: "/admin/assessments",
+    icon: ClipboardList,
+    label: "Assessments",
+    hint: "View all exams, quizzes, and activities",
+    getValue: (stats) => stats?.assessments ?? 0,
+    valueLabel: "total",
+  },
+  {
+    to: "/admin/exam-logs",
+    icon: ShieldAlert,
+    label: "Exam logs",
+    hint: "Integrity and proctoring events",
+    getValue: (stats) => stats?.integrity_events ?? 0,
+    valueLabel: "events",
+  },
+  {
+    to: "/admin/exports",
+    icon: Download,
+    label: "Export data",
+    hint: "Download assessments and results",
+    getValue: (stats) => stats?.results ?? 0,
+    valueLabel: "results",
+  },
+];
+
+function AdminToolCard({ tool, stats, theme, onOpen }) {
+  const Icon = tool.icon;
+  const value = tool.getValue ? tool.getValue(stats) : 0;
+  const showBadge = tool.showBadge !== false;
+  const isAlert = tool.alertWhenPositive && Number(value) > 0;
+
   return (
-    <div className={panelClass(theme)}>
-      <p className={`text-xs font-semibold uppercase tracking-wide ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-        {label}
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`${panelClass(theme, "text-left transition hover:-translate-y-0.5")}`}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+            theme === "dark" ? "bg-emerald-500/10 text-emerald-400" : "en-bg-skeleton text-teal-700"
+          }`}
+        >
+          <Icon size={20} />
+        </div>
+        {showBadge && (
+          <AdminStatBadge value={value} label={tool.valueLabel} alert={isAlert} />
+        )}
+      </div>
+      <h3 className="font-semibold">{tool.label}</h3>
+      <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+        {tool.hint}
       </p>
-      <p className="mt-2 text-3xl font-bold">{value ?? "—"}</p>
-    </div>
+      {tool.getDetail && (
+        <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+          {tool.getDetail(stats)}
+        </p>
+      )}
+      <span className={`mt-3 inline-flex ${primaryButtonSm(theme, "text-xs")}`}>Open</span>
+    </button>
   );
 }
-
-const QUICK_LINKS = [
-  { to: "/admin/accounts", icon: Users, label: "Manage accounts", hint: "Users, roles, profiles" },
-  { to: "/admin/password-resets", icon: KeyRound, label: "Password resets", hint: "Review forgot-password requests" },
-  { to: "/admin/subjects", icon: BookOpen, label: "Manage subjects", hint: "Create subjects & assign faculty" },
-  { to: "/admin/announcements", icon: Megaphone, label: "Announcements", hint: "Broadcast to teachers or students" },
-  { to: "/admin/catalog", icon: Shield, label: "Departments & courses", hint: "Academic catalog setup" },
-  { to: "/admin/assessments", icon: ClipboardList, label: "Assessments", hint: "View all exams & quizzes" },
-  { to: "/admin/exam-logs", icon: ShieldAlert, label: "Exam logs", hint: "Integrity & proctoring events" },
-  { to: "/admin/exports", icon: Download, label: "Export data", hint: "Download assessments & results" },
-];
 
 export default function AdminDashboard() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -53,11 +141,22 @@ export default function AdminDashboard() {
     try {
       if (!silent) setLoading(true);
       setLoadError("");
-      const data = await fetchAdminDashboardStats();
-      setStats(data);
+      const [statsData, analyticsData] = await Promise.all([
+        fetchAdminDashboardStats(),
+        fetchAdminDashboardAnalytics(),
+      ]);
+      setStats(statsData);
+      setAnalytics(analyticsData);
     } catch (err) {
       console.error(err);
       setStats({});
+      setAnalytics({
+        teachers_active_today: [],
+        exams_per_day: [],
+        teachers_active_today_total: 0,
+        exams_today: 0,
+        unavailable: true,
+      });
       setLoadError(formatAdminError(err));
     } finally {
       if (!silent) setLoading(false);
@@ -91,41 +190,88 @@ export default function AdminDashboard() {
         <AdminPageError theme={theme} message={loadError} onRetry={() => load()} />
       )}
 
-      <div className={staggerGridClass("mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4")}>
-        <StatCard theme={theme} label="Pending requests" value={stats?.pending_requests} />
-        <StatCard theme={theme} label="Password resets" value={stats?.pending_password_resets} />
-        <StatCard theme={theme} label="Total users" value={stats?.users} />
-        <StatCard theme={theme} label="Students" value={stats?.students} />
-        <StatCard theme={theme} label="Faculty" value={stats?.faculty} />
-        <StatCard theme={theme} label="Subjects" value={stats?.subjects} />
-        <StatCard theme={theme} label="Assessments" value={stats?.assessments} />
-        <StatCard theme={theme} label="Results submitted" value={stats?.results} />
-        <StatCard theme={theme} label="Exam log events" value={stats?.integrity_events} />
-      </div>
-
       <h2 className={`mb-4 text-lg font-bold ${theme === "dark" ? "text-emerald-400" : "text-teal-800"}`}>
         Admin tools
       </h2>
       <div className={staggerGridClass("grid gap-4 md:grid-cols-2 xl:grid-cols-3")}>
-        {QUICK_LINKS.map(({ to, icon: Icon, label, hint }) => (
-          <button
-            key={to}
-            type="button"
-            onClick={() => navigate(to)}
-            className={`${panelClass(theme, "text-left transition hover:-translate-y-0.5")}`}
-          >
-            <div
-              className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${
-                theme === "dark" ? "bg-emerald-500/10 text-emerald-400" : "en-bg-skeleton text-teal-700"
-              }`}
-            >
-              <Icon size={20} />
-            </div>
-            <h3 className="font-semibold">{label}</h3>
-            <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{hint}</p>
-            <span className={`mt-3 inline-flex ${primaryButtonSm(theme, "text-xs")}`}>Open</span>
-          </button>
+        {ADMIN_TOOLS.map((tool) => (
+          <AdminToolCard
+            key={tool.to}
+            tool={tool}
+            stats={stats}
+            theme={theme}
+            onOpen={() => navigate(tool.to)}
+          />
         ))}
+      </div>
+
+      <div className="mt-10">
+        <div className="mb-4 flex items-center gap-2">
+          <BarChart3
+            size={20}
+            className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
+          />
+          <h2 className={`text-lg font-bold ${theme === "dark" ? "text-emerald-400" : "text-teal-800"}`}>
+            Analytics
+          </h2>
+        </div>
+
+        {analytics?.unavailable && (
+          <div
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+              theme === "dark"
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+          >
+            Chart analytics are not set up yet. Run{" "}
+            <code className="text-xs">database/admin_dashboard_analytics.sql</code> in Supabase to
+            enable graphs.
+          </div>
+        )}
+
+        <div className={staggerGridClass("grid gap-4 xl:grid-cols-2")}>
+          <div className={panelClass(theme)}>
+            <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">Teachers conducting exams today</h3>
+                <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                  Faculty with at least one scheduled assessment active today
+                </p>
+              </div>
+              <AdminStatBadge
+                value={analytics?.teachers_active_today_total ?? 0}
+                label="teachers"
+              />
+            </div>
+            <div className="mt-6">
+              <AdminVerticalBarChart
+                items={analytics?.teachers_active_today || []}
+                emptyMessage="No teachers have examinations scheduled for today."
+              />
+            </div>
+          </div>
+
+          <div className={panelClass(theme)}>
+            <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">Examinations per day</h3>
+                <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                  Assessments scheduled to start each day (last 14 days)
+                </p>
+              </div>
+              <AdminStatBadge value={analytics?.exams_today ?? 0} label="today" />
+            </div>
+            <div className="mt-6 overflow-x-auto">
+              <div className="min-w-[520px]">
+                <AdminVerticalBarChart
+                  items={analytics?.exams_per_day || []}
+                  emptyMessage="No examinations recorded in the last 14 days."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

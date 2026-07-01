@@ -6,6 +6,7 @@ import {
   isQuestionComplete,
   answersMatch,
   getAcceptedIdentificationAnswers,
+  ensureEnumAlternativesForAnswers,
 } from "./questionGrading";
 
 export {
@@ -102,12 +103,32 @@ export function deserializeQuestion(dbRow, examType) {
         Boolean
       );
 
+    const answers = fromJson.length ? fromJson : [""];
+    let grading = normalizeGradingOptions(dbRow.grading_options);
+
+    if (
+      grading.accept_alternatives &&
+      grading.enum_alternatives.length === 0 &&
+      grading.alternatives.length > 0
+    ) {
+      grading = {
+        ...grading,
+        enum_alternatives: answers.map(() => [...grading.alternatives]),
+        alternatives: [],
+      };
+    }
+
+    grading = {
+      ...grading,
+      enum_alternatives: ensureEnumAlternativesForAnswers(grading, answers.length),
+    };
+
     return {
       id: dbRow.id,
       question: dbRow.question || "",
       type,
       choices: [],
-      answers: fromJson.length ? fromJson : [""],
+      answers,
       answer: "",
       grading,
     };
@@ -232,7 +253,15 @@ export function formatQuestionCorrectAnswers(question, examType) {
   }
 
   if (type === "enumeration") {
-    return getExpectedEnumerationAnswers(question).filter(Boolean);
+    const answers = getExpectedEnumerationAnswers(question).filter(Boolean);
+    const grading = normalizeGradingOptions(question.grading_options);
+    const slotAlternatives =
+      grading.accept_alternatives && grading.enum_alternatives?.length
+        ? grading.enum_alternatives.flatMap((slot) =>
+            (slot || []).map((item) => String(item || "").trim()).filter(Boolean)
+          )
+        : [];
+    return [...new Set([...answers, ...slotAlternatives])];
   }
 
   if (type === "true_false") {
@@ -260,6 +289,30 @@ export function formatQuestionCorrectAnswers(question, examType) {
   return fallback ? [fallback] : [];
 }
 
+function enumAnswerMatches(studentAnswer, expectedAnswer, question, slotIndex, grading) {
+  const options = normalizeGradingOptions(grading);
+  const primary = String(expectedAnswer ?? "").trim();
+  const expectedCount =
+    question.answers?.length || getExpectedEnumerationAnswers(question).length;
+
+  if (answersMatch(studentAnswer, primary, options)) {
+    return true;
+  }
+
+  if (!options.accept_alternatives) {
+    return false;
+  }
+
+  const slots = ensureEnumAlternativesForAnswers(options, expectedCount);
+  const slotAlternatives = slots[slotIndex] || [];
+
+  return slotAlternatives.some(
+    (alternative) =>
+      String(alternative || "").trim() &&
+      answersMatch(studentAnswer, alternative, options)
+  );
+}
+
 function gradeEnumerationAnswer(question, rawAnswer) {
   const expected = getExpectedEnumerationAnswers(question);
   const grading = normalizeGradingOptions(question.grading || question.grading_options);
@@ -274,10 +327,16 @@ function gradeEnumerationAnswer(question, rawAnswer) {
   }
 
   if (grading.ignore_order) {
-    const remaining = [...expected];
+    const remaining = expected.map((answer, index) => ({ answer, index }));
     return studentAnswers.every((studentAnswer) => {
-      const matchIndex = remaining.findIndex((expectedAnswer) =>
-        answersMatch(studentAnswer, expectedAnswer, grading)
+      const matchIndex = remaining.findIndex((item) =>
+        enumAnswerMatches(
+          studentAnswer,
+          item.answer,
+          question,
+          item.index,
+          grading
+        )
       );
       if (matchIndex === -1) return false;
       remaining.splice(matchIndex, 1);
@@ -286,7 +345,7 @@ function gradeEnumerationAnswer(question, rawAnswer) {
   }
 
   return expected.every((answer, index) =>
-    answersMatch(studentAnswers[index], answer, grading)
+    enumAnswerMatches(studentAnswers[index], answer, question, index, grading)
   );
 }
 

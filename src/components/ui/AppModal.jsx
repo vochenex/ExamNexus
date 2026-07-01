@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
 import { motion } from "../../utils/motion";
+import ModalPortal from "./ModalPortal";
 
 import AnimatedSuccessCheck from "./AnimatedSuccessCheck";
 
@@ -138,10 +139,11 @@ export default function AppModal({
   const isConfirm = mode === "confirm";
 
   return (
-    <div
-      className={`fixed inset-0 z-[200] flex items-center justify-center p-4 ${motion.overlay}`}
-      role="presentation"
-    >
+    <ModalPortal>
+      <div
+        className={`fixed inset-0 z-[200] flex items-center justify-center p-4 ${motion.overlay}`}
+        role="presentation"
+      >
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm en-fade-in"
         onClick={!loading && showClose && !isSuccessAlert ? onCancel : undefined}
@@ -235,5 +237,6 @@ export default function AppModal({
         )}
       </div>
     </div>
+    </ModalPortal>
   );
 }

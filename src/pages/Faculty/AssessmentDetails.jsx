@@ -3,9 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
-import { secondaryButtonSm } from "../../utils/themeButtons";
-import { Pencil, Trash2 } from "lucide-react";
+import { Archive, Pencil, Trash2 } from "lucide-react";
 import AssessmentQuestionsReview from "../../components/AssessmentQuestionsReview";
+import QuestionBankSaveModal from "../../components/QuestionBankSaveModal";
 import ExamAnalyticsPanel from "../../components/ExamAnalyticsPanel";
 import ExamSubmissionAlertsPanel from "../../components/ExamSubmissionAlertsPanel";
 import ExamRetakeRequestsPanel from "../../components/ExamRetakeRequestsPanel";
@@ -61,7 +61,7 @@ export default function AssessmentDetails() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
-  const { error: showError } = useAppModal();
+  const { error: showError, success: showSuccess, confirm } = useAppModal();
 
   const [exam, setExam] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -69,8 +69,8 @@ export default function AssessmentDetails() {
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [bankSaveOpen, setBankSaveOpen] = useState(false);
 
   const reloadAnalytics = useCallback(
     async (questionList, examRecord, { silent = false } = {}) => {
@@ -117,10 +117,17 @@ export default function AssessmentDetails() {
   usePolling(load, [examId]);
 
   const handleDelete = async () => {
+    const ok = await confirm({
+      title: "Delete Assessment",
+      message: `Are you sure you want to delete "${exam.title}"?\n\nThis action cannot be undone.`,
+      tone: "danger",
+      confirmLabel: "Delete Assessment",
+    });
+    if (!ok) return;
+
     try {
       setDeleting(true);
       await deleteExam(examId);
-      setShowDeleteModal(false);
       navigate(-1);
     } catch (err) {
       console.error(err);
@@ -144,6 +151,9 @@ export default function AssessmentDetails() {
   }
 
   const status = getAssessmentStatus(exam);
+
+  const actionButtonBase =
+    "group inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0";
 
   return (
     <div className={pageShellWithBellClass(theme)}>
@@ -194,31 +204,65 @@ export default function AssessmentDetails() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
               onClick={() => navigate(`/faculty/edit-assessment/${examId}`)}
-              className={`inline-flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:-translate-y-0.5 ${
+              className={`${actionButtonBase} ${
                 theme === "dark"
-                  ? "border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/15 hover:border-cyan-400/40"
-                  : "border border-cyan-300 bg-cyan-50 text-cyan-800 shadow-sm hover:bg-cyan-100"
+                  ? "border border-cyan-400/35 bg-gradient-to-br from-cyan-500/20 to-teal-500/10 text-cyan-200 shadow-[0_8px_24px_rgba(34,211,238,0.12)] hover:border-cyan-300/50 hover:shadow-[0_10px_28px_rgba(34,211,238,0.18)]"
+                  : "border border-cyan-600/25 bg-gradient-to-br from-cyan-100 to-teal-50 text-cyan-900 en-panel-glow hover:border-cyan-500/40"
               }`}
             >
-              <Pencil size={17} strokeWidth={2.25} />
-              Edit
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+                  theme === "dark" ? "bg-cyan-500/20" : "bg-white/70"
+                }`}
+              >
+                <Pencil size={16} strokeWidth={2.25} />
+              </span>
+              Edit assessment
             </button>
 
             <button
               type="button"
-              onClick={() => setShowDeleteModal(true)}
-              className={`inline-flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:-translate-y-0.5 ${
+              onClick={() => setBankSaveOpen(true)}
+              disabled={questions.length === 0}
+              className={`${actionButtonBase} ${
                 theme === "dark"
-                  ? "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15"
-                  : "border border-red-300 bg-red-50 text-red-700 shadow-sm hover:bg-red-100"
+                  ? "border border-emerald-400/35 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-200 shadow-[0_8px_24px_rgba(16,185,129,0.12)] hover:border-emerald-300/50 hover:shadow-[0_10px_28px_rgba(16,185,129,0.18)]"
+                  : "border border-emerald-600/25 bg-gradient-to-br from-emerald-100 to-teal-50 text-teal-900 en-panel-glow hover:border-emerald-500/40"
+              }`}
+              title="Save questions to question bank"
+            >
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+                  theme === "dark" ? "bg-emerald-500/20" : "bg-white/70"
+                }`}
+              >
+                <Archive size={16} strokeWidth={2.25} />
+              </span>
+              Save to bank
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className={`${actionButtonBase} ${
+                theme === "dark"
+                  ? "border border-red-400/35 bg-gradient-to-br from-red-500/20 to-rose-500/10 text-red-200 shadow-[0_8px_24px_rgba(239,68,68,0.1)] hover:border-red-300/50 hover:shadow-[0_10px_28px_rgba(239,68,68,0.16)]"
+                  : "border border-red-400/40 bg-gradient-to-br from-red-50 to-rose-100/80 text-red-800 en-panel-glow hover:border-red-500/45"
               }`}
             >
-              <Trash2 size={17} strokeWidth={2.25} />
-              Delete
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+                  theme === "dark" ? "bg-red-500/20" : "bg-white/70"
+                }`}
+              >
+                <Trash2 size={16} strokeWidth={2.25} />
+              </span>
+              {deleting ? "Deleting…" : "Delete"}
             </button>
           </div>
         </div>
@@ -264,55 +308,17 @@ export default function AssessmentDetails() {
         <ExamSubmissionAlertsPanel examId={examId} />
       </div>
 
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setShowDeleteModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-md rounded-2xl border p-6 ${
-              theme === "dark"
-                ? "border-red-500/30 bg-slate-900"
-                : "border-red-300/80 en-bg-elevated shadow-xl"
-            }`}
-          >
-            <h2
-              className={`mb-3 text-xl font-bold ${
-                theme === "dark" ? "text-red-400" : "text-red-600"
-              }`}
-            >
-              Delete Assessment
-            </h2>
-            <p className={`mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-              Are you sure you want to delete:
-            </p>
-            <p className={`mb-4 font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-              {exam.title}
-            </p>
-            <p className={`mb-6 text-sm ${theme === "dark" ? "text-red-300" : "text-red-600"}`}>
-              This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                className={secondaryButtonSm(theme)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="rounded-xl bg-red-600 px-4 py-2 font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-              >
-                {deleting ? "Deleting..." : "Delete Assessment"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuestionBankSaveModal
+        open={bankSaveOpen}
+        onClose={() => setBankSaveOpen(false)}
+        questions={questions}
+        examType={exam.exam_type}
+        onSaved={(count) =>
+          showSuccess(
+            `${count} question${count === 1 ? "" : "s"} saved to your question bank.`
+          )
+        }
+      />
     </div>
   );
 }

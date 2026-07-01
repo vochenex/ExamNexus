@@ -1,9 +1,10 @@
 const {
-  assertAiConfigured,
-  requestChatCompletion,
+  assertGeminiConfigured,
+  requestPromptChatCompletion,
+  requestDocumentChatCompletion,
   getAiServiceStatus,
-  getAiProviderName,
 } = require("./aiProvider");
+const { planDocumentSteps } = require("./documentBlocks");
 
 const VALID_TYPES = new Set([
   "multiple_choice",
@@ -13,6 +14,8 @@ const VALID_TYPES = new Set([
   "essay",
 ]);
 
+const ALL_FORMATS = [...VALID_TYPES];
+
 const TYPE_LABELS = {
   multiple_choice: "Multiple Choice",
   enumeration: "Enumeration",
@@ -21,7 +24,7 @@ const TYPE_LABELS = {
   essay: "Essay",
 };
 
-const MAX_QUESTIONS = 40;
+const MAX_QUESTIONS = 150;
 const MIN_QUESTIONS = 1;
 const DEFAULT_QUESTIONS = 8;
 const MAX_SOURCE_CHARS = 14000;
@@ -31,6 +34,74 @@ function clampQuestionCount(value) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return DEFAULT_QUESTIONS;
   return Math.min(MAX_QUESTIONS, Math.max(MIN_QUESTIONS, parsed));
+}
+
+function parsePromptPreferences(prompt) {
+  const text = String(prompt || "");
+  const lower = text.toLowerCase();
+
+  let questionCount = null;
+  const countPatterns = [
+    /(\d+)\s*(?:questions?|items?|problems?|qs?)\b/i,
+    /(?:create|make|generate|write)\s+(\d+)\b/i,
+    /(\d+)\s*[- ]?(?:item|question)\b/i,
+  ];
+
+  for (const pattern of countPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const parsed = Number.parseInt(match[1], 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        questionCount = Math.min(MAX_QUESTIONS, parsed);
+        break;
+      }
+    }
+  }
+
+  let difficulty = null;
+  if (/\b(hard|difficult|advanced|challenging)\b/i.test(lower)) {
+    difficulty = "hard";
+  } else if (/\b(easy|basic|simple|beginner)\b/i.test(lower)) {
+    difficulty = "easy";
+  } else if (/\b(medium|moderate|intermediate)\b/i.test(lower)) {
+    difficulty = "medium";
+  }
+
+  const formatKeywords = [
+    { value: "multiple_choice", patterns: [/multiple\s*choice/i, /\bmcq\b/i] },
+    { value: "enumeration", patterns: [/enumeration/i, /\benumerate\b/i] },
+    { value: "identification", patterns: [/identification/i, /\bidentify\b/i] },
+    { value: "true_false", patterns: [/true\s*or\s*false/i, /\btrue\/false\b/i] },
+    { value: "essay", patterns: [/essay/i, /\bshort\s+answer\b/i] },
+  ];
+
+  const formats = [];
+  for (const { value, patterns } of formatKeywords) {
+    if (patterns.some((pattern) => pattern.test(text))) {
+      formats.push(value);
+    }
+  }
+
+  return { questionCount, difficulty, formats };
+}
+
+function resolvePromptGenerationSettings({
+  prompt,
+  questionCount,
+  difficulty,
+  formats,
+}) {
+  const parsed = parsePromptPreferences(prompt);
+
+  return {
+    questionCount: clampQuestionCount(
+      parsed.questionCount ?? questionCount ?? DEFAULT_QUESTIONS
+    ),
+    difficulty: parsed.difficulty || difficulty || "medium",
+    formats: parseFormats(
+      Array.isArray(formats) && formats.length > 0 ? formats : parsed.formats
+    ),
+  };
 }
 
 function parseFormats(raw) {
@@ -302,7 +373,7 @@ async function parseAiResponse(content, allowedFormats) {
   try {
     return normalizeAiPayload(tryParseJson(content), allowedFormats);
   } catch (firstError) {
-    const repair = await requestChatCompletion({
+    const repair = await requestPromptChatCompletion({
       temperature: 0,
       jsonMode: true,
       messages: [
@@ -333,8 +404,9 @@ async function requestSingleAiQuestion({
   difficulty = "medium",
   stepIndex = 0,
   totalSteps = 1,
+  mode = "prompt",
 }) {
-  assertAiConfigured();
+  assertGeminiConfigured();
 
   const allowedFormats = parseFormats([format]);
   const targetFormat = pickFormatForStep(allowedFormats, 0);
@@ -347,7 +419,7 @@ async function requestSingleAiQuestion({
     totalSteps,
   });
 
-  const response = await requestChatCompletion({
+  const response = await requestPromptChatCompletion({
     temperature: 0.3,
     jsonMode: true,
     messages: [
@@ -361,7 +433,7 @@ async function requestSingleAiQuestion({
 
   if (!question) {
     if (process.env.DEBUG_AI === "1") {
-      console.error("Ollama raw response:", response.content);
+      console.error("AI raw response:", response.content);
       console.error("Normalized payload:", JSON.stringify(payload, null, 2));
     }
     const error = new Error("AI could not produce a valid question. Try again.");
@@ -391,7 +463,7 @@ async function requestAiQuestionsBatched({
   const questions = [];
   let suggestedTitle = "";
   let suggestedDescription = "";
-  let provider = getAiProviderName();
+  let provider = "gemini";
   let model = "";
 
   for (let step = 0; step < count; step += 1) {
@@ -404,6 +476,7 @@ async function requestAiQuestionsBatched({
       difficulty,
       stepIndex: step,
       totalSteps: count,
+      mode: topicPrompt ? "prompt" : "document",
     });
 
     questions.push(result.question);
@@ -487,6 +560,200 @@ function buildUserPrompt({ sourceText, topicPrompt, additionalInstructions }) {
   return parts.join("\n\n");
 }
 
+function buildDocumentAnalysisSystemPrompt() {
+  return `You are an expert at reading teacher documents and converting them into structured exam questions for ExamNexus.
+
+Your job:
+1. Read the uploaded document carefully (exam papers, worksheets, handouts, study guides).
+2. If the document ALREADY contains numbered or labeled questions, convert EACH one into a structured question. Keep the original wording when possible.
+3. Detect the correct question type from layout:
+   - A/B/C/D or multiple choices → multiple_choice (4 choices, answer as A, B, C, or D)
+   - True/False statements → true_false
+   - Fill-in-the-blank or identification lines → identification
+   - Enumerate, list, or ordered answer sets → enumeration
+   - Long answer, explain, or essay prompts → essay
+4. If the document is ONLY study material with NO existing questions, create a suitable quiz from the content. Infer an appropriate number of questions from the material (typically 5-15 for short docs, more for longer docs, never exceed 150).
+5. Infer overall difficulty from vocabulary, grade level, and complexity.
+
+Rules:
+- Return ONLY valid JSON. No markdown fences or commentary.
+- Include every question found or reasonably derived from the source.
+- multiple_choice: exactly 4 non-empty choices; answer must be A, B, C, or D.
+- enumeration: provide an "answers" array with every required item in order.
+- identification: provide a single correct "answer" string.
+- true_false: answer must be "true" or "false".
+- essay: no answer field required.
+
+JSON shape:
+{
+  "suggestedTitle": "short title from document topic",
+  "suggestedDescription": "one sentence summary",
+  "analysis": {
+    "sourceType": "existing_exam or study_material",
+    "questionCount": 0,
+    "inferredDifficulty": "easy, medium, or hard"
+  },
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "question": "text",
+      "choices": ["A text", "B text", "C text", "D text"],
+      "answer": "A"
+    }
+  ]
+}`;
+}
+
+async function requestDocumentQuestions({
+  sourceText = "",
+  questionCount,
+  difficulty,
+}) {
+  assertGeminiConfigured();
+
+  const resolvedSource = String(sourceText || "").trim();
+  if (!resolvedSource) {
+    const error = new Error("The document did not contain readable text.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const guidance = [];
+  if (questionCount != null && String(questionCount).trim() !== "") {
+    guidance.push(
+      `Target approximately ${clampQuestionCount(questionCount)} questions unless the document clearly contains fewer.`
+    );
+  }
+  if (difficulty) {
+    guidance.push(`Target difficulty level: ${String(difficulty).trim()}.`);
+  }
+
+  const userPrompt = buildUserPrompt({
+    sourceText: resolvedSource,
+    additionalInstructions: guidance.join("\n"),
+  });
+  const response = await requestDocumentChatCompletion({
+    temperature: 0.2,
+    jsonMode: true,
+    messages: [
+      { role: "system", content: buildDocumentAnalysisSystemPrompt() },
+      { role: "user", content: userPrompt },
+    ],
+  });
+
+  const normalized = await parseAiResponse(response.content, ALL_FORMATS);
+
+  if (!normalized.questions.length) {
+    const error = new Error(
+      "AI could not extract or build questions from this document. Try a clearer PDF or Word file."
+    );
+    error.statusCode = 422;
+    throw error;
+  }
+
+  return {
+    ...normalized,
+    meta: {
+      generatedCount: normalized.questions.length,
+      formats: [...new Set(normalized.questions.map((item) => item.type))],
+      provider: response.provider,
+      model: response.model,
+      mode: "document_analysis",
+    },
+  };
+}
+
+async function requestDocumentQuestionsStepwise({
+  sourceText,
+  additionalInstructions = "",
+  onProgress,
+}) {
+  const plan = planDocumentSteps(sourceText);
+  const steps = plan.steps;
+  const questions = [];
+  let suggestedTitle = "";
+  let suggestedDescription = "";
+  let provider = "gemini";
+  let model = "";
+
+  for (let step = 0; step < steps.length; step += 1) {
+    onProgress?.({
+      current: step + 1,
+      total: steps.length,
+      phase: plan.mode,
+    });
+
+    const stepConfig = steps[step];
+    const format =
+      stepConfig.format || pickFormatForStep(ALL_FORMATS, step);
+
+    const result = await requestSingleAiQuestion({
+      sourceText: stepConfig.sourceText,
+      additionalInstructions,
+      format,
+      difficulty: "medium",
+      stepIndex: step,
+      totalSteps: steps.length,
+      mode: "document",
+    });
+
+    questions.push(result.question);
+    provider = result.provider || provider;
+    model = result.model || model;
+
+    if (!suggestedTitle && result.suggestedTitle) {
+      suggestedTitle = result.suggestedTitle;
+    }
+    if (!suggestedDescription && result.suggestedDescription) {
+      suggestedDescription = result.suggestedDescription;
+    }
+  }
+
+  if (!questions.length) {
+    const error = new Error(
+      "AI could not extract or build questions from this document. Try a clearer PDF or Word file."
+    );
+    error.statusCode = 422;
+    throw error;
+  }
+
+  return {
+    suggestedTitle,
+    suggestedDescription,
+    questions,
+    meta: {
+      generatedCount: questions.length,
+      formats: [...new Set(questions.map((item) => item.type))],
+      provider,
+      model,
+      mode: "document_stepwise",
+      planMode: plan.mode,
+      stepCount: steps.length,
+    },
+  };
+}
+
+function getDocumentPlan(sourceText) {
+  const resolvedSource = String(sourceText || "").trim();
+  if (!resolvedSource) {
+    const error = new Error("The document did not contain readable text.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const plan = planDocumentSteps(resolvedSource);
+  return {
+    mode: plan.mode,
+    stepCount: plan.steps.length,
+    steps: plan.steps.map((step, index) => ({
+      index,
+      format: step.format,
+      sourceText: step.sourceText,
+      preview: String(step.sourceText || "").slice(0, 160),
+    })),
+  };
+}
+
 async function requestAiQuestions({
   sourceText = "",
   topicPrompt = "",
@@ -496,7 +763,7 @@ async function requestAiQuestions({
   difficulty = "medium",
   mode = "document",
 }) {
-  assertAiConfigured();
+  assertGeminiConfigured();
 
   const allowedFormats = parseFormats(formats);
   const count = clampQuestionCount(questionCount);
@@ -508,20 +775,6 @@ async function requestAiQuestions({
     throw error;
   }
 
-  const useBatchedOllama =
-    getAiProviderName() === "ollama" && count > 1;
-
-  if (useBatchedOllama) {
-    return requestAiQuestionsBatched({
-      sourceText,
-      topicPrompt,
-      additionalInstructions,
-      formats: allowedFormats,
-      questionCount: count,
-      difficulty,
-    });
-  }
-
   const systemPrompt = buildSystemPrompt({
     formats: allowedFormats,
     questionCount: count,
@@ -529,7 +782,7 @@ async function requestAiQuestions({
     mode,
   });
 
-  const response = await requestChatCompletion({
+  const response = await requestPromptChatCompletion({
     temperature: 0.4,
     jsonMode: true,
     messages: [
@@ -563,10 +816,17 @@ async function requestAiQuestions({
 
 module.exports = {
   VALID_TYPES,
+  ALL_FORMATS,
   clampQuestionCount,
   parseFormats,
+  parsePromptPreferences,
+  resolvePromptGenerationSettings,
   requestAiQuestions,
+  requestAiQuestionsBatched,
+  requestDocumentQuestions,
+  requestDocumentQuestionsStepwise,
+  getDocumentPlan,
   requestSingleAiQuestion,
-  assertAiConfigured,
+  assertGeminiConfigured,
   getAiServiceStatus,
 };

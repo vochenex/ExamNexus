@@ -1,17 +1,31 @@
-require("dotenv").config();
+require("dotenv").config({
+  path: require("path").join(__dirname, ".env"),
+  override: true,
+});
 process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION:");
-  console.error(err);
+  console.error("UNCAUGHT EXCEPTION:", err?.message || err);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("UNHANDLED REJECTION:");
-  console.error(reason);
+process.on("unhandledRejection", (reason) => {
+  const code = reason?.cause?.code || reason?.code;
+  if (
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    code === "SUPABASE_FETCH_TIMEOUT" ||
+    String(reason?.message || "").includes("fetch failed")
+  ) {
+    console.warn(
+      "⚠️  Supabase network timeout (backend still running). Check your internet connection."
+    );
+    return;
+  }
+  console.error("UNHANDLED REJECTION:", reason?.message || reason);
 });
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
-const { createClient } = require("@supabase/supabase-js");
+const fs = require("fs");
+const path = require("path");
+const { createAnonClient } = require("./lib/supabaseClient");
 
 // Routes
 const subjectsRoute = require("./routes/subjectsRoute");
@@ -27,13 +41,11 @@ const app = express();
 // ================= MIDDLEWARE =================
 app.use(cors({ origin: "*" }));
 app.use(express.json());
+fs.mkdirSync(path.join(__dirname, "uploads"), { recursive: true });
 const upload = multer({ dest: "uploads/" });
 
 // ================= SUPABASE =================
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createAnonClient();
 
 // ================= HEALTH CHECK =================
 app.get("/", (req, res) => {
@@ -48,8 +60,10 @@ app.get("/health", async (req, res) => {
     passwordReset: hasServiceRole,
     enrollment: hasServiceRole,
     assessmentAi: aiStatus.configured,
-    aiProvider: aiStatus.provider,
-    aiModel: aiStatus.model,
+    promptProvider: aiStatus.promptProvider,
+    documentProvider: aiStatus.documentProvider,
+    promptModel: aiStatus.promptModel,
+    documentModel: aiStatus.documentModel,
     message: hasServiceRole
       ? "Service role key loaded"
       : "Add SUPABASE_SERVICE_ROLE_KEY to backend/.env (Supabase → Project Settings → API → service_role)",
@@ -376,52 +390,109 @@ app.use((err, req, res, next) => {
   });
 });
 // ================= START SERVER =================
-const PORT = Number(process.env.PORT) || 5000;
+const PREFERRED_PORT = Number(process.env.PORT) || 5000;
+const MAX_PORT_TRIES = 10;
 
-const server = app.listen(PORT);
+function syncFrontendApiUrl(port) {
+  if (port === 5000) return;
 
-server.on("listening", async () => {
-  console.log(`🚀 Backend running on http://localhost:${PORT}`);
-  console.log("   Keep this terminal open while using the app.");
-  if (getSupabaseAdmin()) {
-    console.log("✅ Service role key loaded (password reset + enrollment enabled)");
-  } else {
-    console.log(
-      "⚠️  SUPABASE_SERVICE_ROLE_KEY is missing or empty in backend/.env"
-    );
-    console.log(
-      "    → Supabase Dashboard → Project Settings → API → copy service_role key"
-    );
-    console.log(
-      "    → Admin password resets and invite enrollment will not work until set"
-    );
-  }
+  const apiUrl = `http://localhost:${port}`;
+  const envPath = path.join(__dirname, "..", ".env");
+  let content = "";
 
   try {
-    const aiStatus = await getAiServiceStatus();
-    if (aiStatus.configured) {
-      console.log(
-        `✅ Assessment AI ready (${aiStatus.provider}: ${aiStatus.model})`
+    content = fs.readFileSync(envPath, "utf8");
+  } catch {
+    content = "";
+  }
+
+  const line = `VITE_API_BASE_URL=${apiUrl}`;
+  if (/^VITE_API_BASE_URL=/m.test(content)) {
+    content = content.replace(/^VITE_API_BASE_URL=.*$/m, line);
+  } else {
+    content = `${content.trimEnd()}${content ? "\n" : ""}${line}\n`;
+  }
+
+  fs.writeFileSync(envPath, content);
+  console.log(`   Updated root .env → ${line}`);
+  console.log("   Vite will restart automatically to use the new backend URL.");
+}
+
+function listenOnAvailablePort(port, attempt = 0) {
+  const server = app.listen(port);
+
+  server.on("listening", async () => {
+    const actualPort = server.address().port;
+
+    if (actualPort !== PREFERRED_PORT) {
+      console.warn(
+        `⚠️  Port ${PREFERRED_PORT} was busy — using http://localhost:${actualPort} instead.`
       );
-    } else {
-      console.log(`⚠️  Assessment AI unavailable — ${aiStatus.error}`);
+      syncFrontendApiUrl(actualPort);
     }
-  } catch (err) {
-    console.log(`⚠️  Assessment AI status check failed — ${err.message}`);
-  }
-});
 
-server.on("error", (err) => {
-  if (err.code === "EADDRINUSE") {
-    console.error(
-      `\n❌ Port ${PORT} is already in use. Another backend is probably still running.`
-    );
-    console.error("   Stop it with Ctrl+C in that terminal, or run:");
-    console.error(`   Get-NetTCPConnection -LocalPort ${PORT} | Select OwningProcess`);
-    console.error("   Stop-Process -Id <PID> -Force\n");
+    console.log(`🚀 Backend running on http://localhost:${actualPort}`);
+    console.log("   Keep this terminal open while using the app.");
+
+    if (getSupabaseAdmin()) {
+      console.log("✅ Service role key loaded (password reset + enrollment enabled)");
+    } else {
+      console.log(
+        "⚠️  SUPABASE_SERVICE_ROLE_KEY is missing or empty in backend/.env"
+      );
+      console.log(
+        "    → Supabase Dashboard → Project Settings → API → copy service_role key"
+      );
+      console.log(
+        "    → Admin password resets and invite enrollment will not work until set"
+      );
+    }
+
+    try {
+      const aiStatus = await getAiServiceStatus();
+      if (aiStatus.configured) {
+        console.log(`✅ Assessment AI ready (Gemini: ${aiStatus.model})`);
+      } else {
+        console.log(`⚠️  Assessment AI unavailable — ${aiStatus.error}`);
+      }
+    } catch (err) {
+      console.log(`⚠️  Assessment AI status check failed — ${err.message}`);
+    }
+
+    if (!String(process.env.SUPABASE_JWT_SECRET || "").trim()) {
+      console.log(
+        "⚠️  SUPABASE_JWT_SECRET is not set — faculty auth may fail when Supabase is slow."
+      );
+      console.log(
+        "    → Supabase Dashboard → Project Settings → API → JWT Secret → add to backend/.env"
+      );
+    }
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE" && attempt + 1 < MAX_PORT_TRIES) {
+      console.warn(`Port ${port} is in use, trying ${port + 1}...`);
+      listenOnAvailablePort(port + 1, attempt + 1);
+      return;
+    }
+
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `\n❌ No free port found between ${PREFERRED_PORT} and ${port}.`
+      );
+      console.error("   To free port 5000 in PowerShell, run this exact command:");
+      console.error(
+        "   Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }"
+      );
+      process.exit(1);
+      return;
+    }
+
+    console.error("Server failed to start:", err);
     process.exit(1);
-  }
+  });
 
-  console.error("Server failed to start:", err);
-  process.exit(1);
-});
+  return server;
+}
+
+listenOnAvailablePort(PREFERRED_PORT);

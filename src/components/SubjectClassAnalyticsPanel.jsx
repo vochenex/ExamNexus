@@ -15,8 +15,8 @@ export default function SubjectClassAnalyticsPanel({ analytics, loading }) {
     return (
       <div className={panelClass}>
         <div className="animate-pulse space-y-4">
-          <div className={`h-6 w-32 rounded-lg ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
-          <div className={`h-24 rounded-xl ${theme === "dark" ? "bg-white/5" : "en-bg-skeleton"}`} />
+          <div className={`h-6 w-32 rounded-lg ${theme === "dark" ? "bg-white/10" : "en-skeleton-bone"}`} />
+          <div className={`h-24 rounded-xl ${theme === "dark" ? "bg-white/5" : "en-skeleton-bone"}`} />
         </div>
       </div>
     );
