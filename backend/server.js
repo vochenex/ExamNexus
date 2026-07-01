@@ -376,8 +376,11 @@ app.use((err, req, res, next) => {
   });
 });
 // ================= START SERVER =================
-app.listen(5000, async () => {
-  console.log("🚀 Backend running on http://localhost:5000");
+const PORT = Number(process.env.PORT) || 5000;
+
+const server = app.listen(PORT, async () => {
+  console.log(`🚀 Backend running on http://localhost:${PORT}`);
+  console.log("   Keep this terminal open while using the app.");
   if (getSupabaseAdmin()) {
     console.log("✅ Service role key loaded (password reset + enrollment enabled)");
   } else {
@@ -404,4 +407,18 @@ app.listen(5000, async () => {
   } catch (err) {
     console.log(`⚠️  Assessment AI status check failed — ${err.message}`);
   }
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `\n❌ Port ${PORT} is already in use. Another backend is probably still running.`
+    );
+    console.error("   Stop it with Ctrl+C in that terminal, or close the old process.");
+    console.error(`   Then run: cd backend && npm start\n`);
+    process.exit(1);
+  }
+
+  console.error("Server failed to start:", err);
+  process.exit(1);
 });

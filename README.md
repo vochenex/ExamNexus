@@ -110,14 +110,20 @@ npm run dev
 
 Open the URL shown by Vite (typically `http://localhost:5173`).
 
-**Terminal 2 — backend:**
+**Terminal 2 — backend** (from project root or `backend/`):
+
+```bash
+npm run backend
+```
+
+Or:
 
 ```bash
 cd backend
 npm start
 ```
 
-The API listens on `http://localhost:5000`.
+Keep this terminal open while using the app.
 
 ## Usage
 
