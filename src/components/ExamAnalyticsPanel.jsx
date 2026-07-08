@@ -379,6 +379,7 @@ export default function ExamAnalyticsPanel({
 }) {
   const { theme } = useTheme();
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [averageMode, setAverageMode] = useState("include_retakes");
 
   const difficultyGroups = useMemo(
     () => analytics?.questionDifficultyGroups || [],
@@ -403,6 +404,66 @@ export default function ExamAnalyticsPanel({
       (analytics?.questionDifficulty || []).some((item) => item.responseCount > 0),
     [analytics]
   );
+
+  const classAverageOptions = useMemo(() => {
+    const currentRows = (analytics?.studentPerformance || [])
+      .filter((student) => student.scorePct != null && Number(student.total) > 0)
+      .map((student) => ({
+        studentId: student.studentId,
+        score: Number(student.score) || 0,
+        total: Number(student.total) || 0,
+      }));
+
+    const retakeByStudent = new Map(
+      (analytics?.retakeRequests || [])
+        .filter((row) => row?.student_id)
+        .map((row) => [row.student_id, row])
+    );
+
+    const includeRetakesRows = currentRows;
+    const originalOnlyRows = currentRows.map((row) => {
+      const retake = retakeByStudent.get(row.studentId);
+      if (
+        retake &&
+        retake.original_score != null &&
+        retake.original_total != null &&
+        (retake.retake_score != null || retake.status === "fulfilled")
+      ) {
+        return {
+          studentId: row.studentId,
+          score: Number(retake.original_score) || 0,
+          total: Number(retake.original_total) || 0,
+        };
+      }
+      return row;
+    });
+
+    const computeAverage = (rows) => {
+      if (!rows.length) return null;
+      return (
+        Math.round(
+          (rows.reduce((sum, row) => sum + (row.total > 0 ? (row.score / row.total) * 100 : 0), 0) /
+            rows.length) *
+            10
+        ) / 10
+      );
+    };
+
+    return {
+      include_retakes: {
+        value: computeAverage(includeRetakesRows),
+        submissionCount: includeRetakesRows.length,
+        label: "Including retakes",
+      },
+      original_only: {
+        value: computeAverage(originalOnlyRows),
+        submissionCount: originalOnlyRows.length,
+        label: "Original scores only",
+      },
+    };
+  }, [analytics]);
+
+  const displayedAverage = classAverageOptions[averageMode] || classAverageOptions.include_retakes;
 
   const refreshAnalytics = async () => {
     await onScoresUpdated?.({ silent: true });
@@ -447,18 +508,48 @@ export default function ExamAnalyticsPanel({
     <>
       <div className="space-y-6">
         <div className={panelClass(theme)}>
-          <h3 className={`font-semibold ${theme === "dark" ? "text-white" : "text-teal-700"}`}>
-            Class average
-          </h3>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className={`font-semibold ${theme === "dark" ? "text-white" : "text-teal-700"}`}>
+                Class average
+              </h3>
+              <p className={`mt-1 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                Switch between overall averages using current retake results or only original scores.
+              </p>
+            </div>
+            <div className="inline-flex rounded-xl border p-1 text-xs font-medium">
+              {[
+                { key: "include_retakes", label: "Include retakes" },
+                { key: "original_only", label: "Original only" },
+              ].map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setAverageMode(option.key)}
+                  className={`rounded-lg px-3 py-1.5 transition ${
+                    averageMode === option.key
+                      ? theme === "dark"
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-emerald-50 text-emerald-800"
+                      : theme === "dark"
+                        ? "text-gray-400 hover:bg-white/5"
+                        : "text-gray-600 hover:bg-emerald-50/60"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {analytics.submissionCount > 0 ? (
             <>
-              {analytics.classAverage != null ? (
+              {displayedAverage?.value != null ? (
                 <p
                   className={`mt-2 text-4xl font-bold ${
                     theme === "dark" ? "text-emerald-400" : "text-teal-700"
                   }`}
                 >
-                  {analytics.classAverage}%
+                  {displayedAverage.value}%
                 </p>
               ) : (
                 <p className={`mt-2 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
@@ -466,8 +557,8 @@ export default function ExamAnalyticsPanel({
                 </p>
               )}
               <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                Based on {analytics.submissionCount} submission
-                {analytics.submissionCount === 1 ? "" : "s"}
+                {displayedAverage?.label} · Based on {displayedAverage?.submissionCount ?? analytics.submissionCount} submission
+                {(displayedAverage?.submissionCount ?? analytics.submissionCount) === 1 ? "" : "s"}
               </p>
             </>
           ) : (

@@ -8,7 +8,6 @@ import {
   ShieldAlert,
   Megaphone,
   Download,
-  LogIn,
   KeyRound,
   BarChart3,
 } from "lucide-react";
@@ -18,7 +17,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { fetchAdminDashboardAnalytics, fetchAdminDashboardStats } from "../../utils/adminData";
-import { primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
+import { primaryButtonSm } from "../../utils/themeButtons";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { AdminStatBadge, AdminVerticalBarChart } from "../../components/admin/AdminBarChart";
 
@@ -176,14 +175,6 @@ export default function AdminDashboard() {
         icon={Shield}
         title="Admin Dashboard"
         subtitle="Manage accounts, subjects, announcements, and system-wide academic data."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => navigate("/auth")} className={secondaryButtonSm(theme)}>
-              <LogIn size={16} />
-              Auth page
-            </button>
-          </div>
-        }
       />
 
       {loadError && (

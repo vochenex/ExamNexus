@@ -7,10 +7,15 @@ import {
   INTEGRITY_EVENT_TYPES,
   isAltTabAttempt,
   isRestrictedShortcut,
+  isStrikeWorthyEvent,
+  loadIntegrityStrikes,
+  MAX_INTEGRITY_STRIKES,
+  saveIntegrityStrikes,
 } from "../utils/examIntegrity";
 import { logExamIntegrityEvent } from "../utils/supabaseData";
 
 const LOG_DEBOUNCE_MS = 5000;
+const STRIKE_DEBOUNCE_MS = 1500;
 const STARTUP_GRACE_MS = 3500;
 const RETURN_GRACE_MS = 2500;
 const EXTERNAL_APP_CHECK_MS = 700;
@@ -21,9 +26,13 @@ export default function useAssessmentIntegrity({
   isRetakeAttempt = false,
   onAlert,
   onFocusViolation,
+  onStrikeChange,
+  onAutoSubmit,
   suppressAlerts = false,
 }) {
   const lastLoggedRef = useRef({});
+  const lastStrikeAtRef = useRef(0);
+  const autoSubmitTriggeredRef = useRef(false);
   const leftPageRef = useRef(false);
   const graceUntilRef = useRef(0);
   const externalAppTimerRef = useRef(null);
@@ -42,8 +51,9 @@ export default function useAssessmentIntegrity({
   }, [isInGracePeriod]);
 
   const recordEvent = useCallback(
-    async (eventType, description, metadata = {}) => {
-      if (shouldIgnoreEvent()) {
+    async (eventType, description, metadata = {}, options = {}) => {
+      const { silentAlert = false, ignoreGrace = false } = options;
+      if (!ignoreGrace && shouldIgnoreEvent()) {
         return;
       }
 
@@ -55,7 +65,9 @@ export default function useAssessmentIntegrity({
       lastLoggedRef.current[eventType] = now;
 
       const message = description || getIntegrityEventMessage(eventType);
-      onAlert?.(message);
+      if (!silentAlert) {
+        onAlert?.(message);
+      }
 
       try {
         await logExamIntegrityEvent({
@@ -74,6 +86,38 @@ export default function useAssessmentIntegrity({
     [examId, isRetakeAttempt, onAlert, shouldIgnoreEvent]
   );
 
+  const recordStrike = useCallback(
+    (eventType, options = {}) => {
+      const { ignoreGrace = false } = options;
+      if (!isStrikeWorthyEvent(eventType) || (!ignoreGrace && shouldIgnoreEvent())) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastStrikeAtRef.current < STRIKE_DEBOUNCE_MS) {
+        return;
+      }
+      lastStrikeAtRef.current = now;
+
+      const next = Math.min(MAX_INTEGRITY_STRIKES, loadIntegrityStrikes(examId) + 1);
+      saveIntegrityStrikes(examId, next);
+
+      const remaining = Math.max(0, MAX_INTEGRITY_STRIKES - next);
+      onStrikeChange?.({
+        strikes: next,
+        remaining,
+        maxStrikes: MAX_INTEGRITY_STRIKES,
+        eventType,
+      });
+
+      if (next >= MAX_INTEGRITY_STRIKES && !autoSubmitTriggeredRef.current) {
+        autoSubmitTriggeredRef.current = true;
+        onAutoSubmit?.(eventType);
+      }
+    },
+    [examId, onAutoSubmit, onStrikeChange, shouldIgnoreEvent]
+  );
+
   const flagFocusViolation = useCallback(
     (eventType, metadata = {}) => {
       if (shouldIgnoreEvent()) {
@@ -82,15 +126,19 @@ export default function useAssessmentIntegrity({
 
       leftPageRef.current = true;
       onFocusViolation?.(true);
-      recordEvent(eventType, undefined, metadata);
+      recordStrike(eventType);
+      recordEvent(eventType, undefined, metadata, {
+        silentAlert: isStrikeWorthyEvent(eventType),
+      });
     },
-    [onFocusViolation, recordEvent, shouldIgnoreEvent]
+    [onFocusViolation, recordEvent, recordStrike, shouldIgnoreEvent]
   );
 
   useEffect(() => {
     if (!active || !examId) return;
 
     leftPageRef.current = false;
+    autoSubmitTriggeredRef.current = false;
     extendGracePeriod(STARTUP_GRACE_MS);
     enterAssessmentFullscreen();
 
@@ -106,9 +154,15 @@ export default function useAssessmentIntegrity({
 
     const handleStorage = (event) => {
       if (event.key === tabLockKey && event.newValue && event.newValue !== tabId) {
+        // Multiple assessment tabs should always be recorded, even during grace.
+        leftPageRef.current = true;
+        onFocusViolation?.(true);
+        recordStrike(INTEGRITY_EVENT_TYPES.MULTIPLE_TABS, { ignoreGrace: true });
         recordEvent(
           INTEGRITY_EVENT_TYPES.MULTIPLE_TABS,
-          getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.MULTIPLE_TABS)
+          undefined,
+          {},
+          { silentAlert: true, ignoreGrace: true }
         );
       }
     };
@@ -152,11 +206,23 @@ export default function useAssessmentIntegrity({
     };
 
     const handleFullscreenChange = () => {
-      extendGracePeriod(RETURN_GRACE_MS);
+      const exited = !document.fullscreenElement;
 
-      if (!document.fullscreenElement && !shouldIgnoreEvent()) {
-        flagFocusViolation(INTEGRITY_EVENT_TYPES.FULLSCREEN_EXIT);
+      if (exited) {
+        // Exiting fullscreen (via Escape or other means) should always be recorded.
+        leftPageRef.current = true;
+        onFocusViolation?.(true);
+        recordStrike(INTEGRITY_EVENT_TYPES.FULLSCREEN_EXIT, { ignoreGrace: true });
+        recordEvent(
+          INTEGRITY_EVENT_TYPES.FULLSCREEN_EXIT,
+          undefined,
+          {},
+          { silentAlert: true, ignoreGrace: true }
+        );
       }
+
+      // After handling the event, give a short grace window to avoid double-logging.
+      extendGracePeriod(RETURN_GRACE_MS);
     };
 
     const handleCopy = (event) => {

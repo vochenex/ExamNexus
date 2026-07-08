@@ -13,6 +13,7 @@ import {
 } from "../utils/assessmentStatus";
 import { motion } from "../utils/motion";
 import { useAppModal } from "../contexts/AppModalContext";
+import { isNativeApp, openOnWebsite } from "../utils/platform";
 import { requestExamRetake } from "../utils/supabaseData";
 import { formatTargetSectionsLabel } from "../utils/sections";
 import {
@@ -55,7 +56,7 @@ export default function StudentAssessmentCard({
 }) {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const { error } = useAppModal();
+  const { error, confirm } = useAppModal();
   const [requesting, setRequesting] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
@@ -69,6 +70,31 @@ export default function StudentAssessmentCard({
   const categoryStyles = getAssessmentCategoryStyles(category, theme);
   const canViewResults = canStudentViewResultsFromCard(assessment);
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+
+  const handleTakeAssessment = async () => {
+    const path = `/student/take-assessment/${assessment.id}`;
+
+    // Assessments cannot be taken inside the mobile app — integrity lockdown
+    // (fullscreen, tab detection) only works in a real browser. Send students
+    // to the website instead.
+    if (isNativeApp()) {
+      const proceed = await confirm({
+        title: "Take this assessment on the website",
+        message:
+          "For a secure, monitored exam, assessments are taken on the ExamNexus website. We'll open it now in your browser — sign in with the same account to continue.",
+        tone: "info",
+        confirmLabel: "Open website",
+        cancelLabel: "Not now",
+      });
+
+      if (proceed) {
+        await openOnWebsite(path);
+      }
+      return;
+    }
+
+    navigate(path);
+  };
 
   const handleRequestRetake = async () => {
     try {
@@ -155,7 +181,7 @@ export default function StudentAssessmentCard({
           {canTake && (
             <button
               type="button"
-              onClick={() => navigate(`/student/take-assessment/${assessment.id}`)}
+              onClick={handleTakeAssessment}
               className={primaryButtonSm(
                 theme,
                 "text-xs px-3 py-1.5 rounded-lg"

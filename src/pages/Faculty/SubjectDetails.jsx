@@ -22,6 +22,7 @@ import FacultyAvatarRequiredBanner from "../../components/FacultyAvatarRequiredB
 import ClassmateCard from "../../components/ClassmateCard";
 import SectionTabs from "../../components/SectionTabs";
 import SubjectFacultyCard from "../../components/SubjectFacultyCard";
+import ModalPortal from "../../components/ui/ModalPortal";
 import {
   buildSectionCounts,
   formatSubjectSectionsLabel,
@@ -467,10 +468,21 @@ export default function SubjectDetails() {
 
       </div>
       {showAssessmentModal && (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+  <ModalPortal>
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
     <div
+      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      onClick={() => setShowAssessmentModal(false)}
+      aria-hidden="true"
+    />
+    <div
+  role="dialog"
+  aria-modal="true"
+  onClick={(event) => event.stopPropagation()}
   className={`
+  relative z-10
   w-[900px]
+  max-w-[calc(100vw-2rem)]
 
   rounded-3xl
   p-8
@@ -683,6 +695,7 @@ export default function SubjectDetails() {
 
     </div>
   </div>
+  </ModalPortal>
 )}
       <EditSubjectModal
         subject={subject}

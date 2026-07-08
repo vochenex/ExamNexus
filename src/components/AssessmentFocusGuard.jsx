@@ -1,13 +1,22 @@
 import { ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { primaryButton } from "../utils/themeButtons";
+import { MAX_INTEGRITY_STRIKES } from "../utils/examIntegrity";
+import ModalPortal from "./ui/ModalPortal";
 
-export default function AssessmentFocusGuard({ open, onContinue }) {
+export default function AssessmentFocusGuard({
+  open,
+  onContinue,
+  integrityStrikes = 0,
+  maxStrikes = MAX_INTEGRITY_STRIKES,
+}) {
   const { theme } = useTheme();
+  const remaining = Math.max(0, maxStrikes - integrityStrikes);
 
   if (!open) return null;
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
       <div
         role="alertdialog"
@@ -38,6 +47,24 @@ export default function AssessmentFocusGuard({ open, onContinue }) {
           been recorded and sent to your teacher.
         </p>
 
+        <p
+          className={`mt-3 rounded-xl border px-3 py-2 text-xs font-medium ${
+            remaining <= 1
+              ? theme === "dark"
+                ? "border-red-500/30 bg-red-500/10 text-red-200"
+                : "border-red-300 bg-red-50 text-red-800"
+              : theme === "dark"
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                : "border-amber-300 bg-amber-50 text-amber-900"
+          }`}
+        >
+          Violation {integrityStrikes} of {maxStrikes}. You have{" "}
+          <strong>
+            {remaining} alert{remaining === 1 ? "" : "s"} left
+          </strong>{" "}
+          before your assessment is submitted automatically.
+        </p>
+
         <p className={`mt-3 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
           Close other apps and windows, stay on this tab, and return to fullscreen to continue.
         </p>
@@ -51,5 +78,6 @@ export default function AssessmentFocusGuard({ open, onContinue }) {
         </button>
       </div>
     </div>
+    </ModalPortal>
   );
 }

@@ -75,10 +75,16 @@ function QuestionReviewCard({ question, number, examType, theme }) {
   );
 }
 
-export default function AssessmentQuestionsReview({ questions, examType }) {
+export default function AssessmentQuestionsReview({
+  questions,
+  examType,
+  defaultExpanded = true,
+}) {
   const { theme } = useTheme();
   const groups = groupQuestionsForNavigation(questions, examType);
-  const [expanded, setExpanded] = useState(() => new Set(groups.map((group) => group.type)));
+  const [expanded, setExpanded] = useState(() =>
+    defaultExpanded ? new Set(groups.map((group) => group.type)) : new Set()
+  );
 
   const toggleGroup = (type) => {
     setExpanded((prev) => {

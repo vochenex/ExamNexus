@@ -56,10 +56,22 @@
     flex-direction: column;
     overflow-x: hidden;
     overflow-y: auto;
+    /* Reserve space for the scrollbar so the centered form doesn't shift
+       sideways when the scrollbar appears/disappears (e.g. as an error banner
+       is cleared on the first keystroke). */
+    scrollbar-gutter: stable;
+    /* Hide scrollbar visuals (layout stability comes from scrollbar-gutter). */
+    scrollbar-width: none; /* Firefox */
     -webkit-overflow-scrolling: touch;
     transform: translateX(0);
     transition: transform 0.9s cubic-bezier(0.33, 1, 0.68, 1);
     will-change: transform;
+  }
+
+  .en-auth-panel-brand::-webkit-scrollbar,
+  .en-auth-panel-form::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 
   .en-auth-panel-brand {
@@ -84,8 +96,9 @@
 
   /* Sign up — swap sides; extra height for long signup form */
   .en-auth-card--signup {
-    height: min(92vh, 920px);
-    min-height: 640px;
+    /* Keep signup the same height as login; the panel itself is scrollable. */
+    height: min(92vh, 680px);
+    min-height: 560px;
   }
 
   .en-auth-card--signup .en-auth-panel-brand {

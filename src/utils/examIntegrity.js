@@ -1,3 +1,5 @@
+export const MAX_INTEGRITY_STRIKES = 3;
+
 export const INTEGRITY_EVENT_TYPES = {
   TAB_HIDDEN: "tab_hidden",
   WINDOW_BLUR: "window_blur",
@@ -11,11 +13,12 @@ export const INTEGRITY_EVENT_TYPES = {
   NAVIGATION_ATTEMPT: "navigation_attempt",
   DEVTOOLS_SHORTCUT: "devtools_shortcut",
   MULTIPLE_TABS: "multiple_tabs",
+  AUTO_SUBMIT: "auto_submit",
 };
 
 export const INTEGRITY_EVENT_MESSAGES = {
   [INTEGRITY_EVENT_TYPES.TAB_HIDDEN]:
-    "You switched away from the assessment tab. This incident has been recorded and sent to your teacher.",
+    "You switched away from the assessment tab. This counts as an integrity violation and has been recorded.",
   [INTEGRITY_EVENT_TYPES.WINDOW_BLUR]:
     "The assessment window lost focus. This incident has been recorded and sent to your teacher.",
   [INTEGRITY_EVENT_TYPES.EXTERNAL_APP_OVERLAY]:
@@ -37,8 +40,48 @@ export const INTEGRITY_EVENT_MESSAGES = {
   [INTEGRITY_EVENT_TYPES.DEVTOOLS_SHORTCUT]:
     "Keyboard shortcuts are disabled during the assessment. This incident has been recorded.",
   [INTEGRITY_EVENT_TYPES.MULTIPLE_TABS]:
-    "Only one assessment tab is allowed. Close other tabs immediately. This incident has been recorded.",
+    "Only one assessment tab is allowed. Opening another tab counts as an integrity violation and has been recorded.",
+  [INTEGRITY_EVENT_TYPES.AUTO_SUBMIT]:
+    "Assessment auto-submitted after reaching the maximum number of integrity violations.",
 };
+
+export const STRIKE_WORTHY_EVENT_TYPES = new Set([
+  INTEGRITY_EVENT_TYPES.TAB_HIDDEN,
+  INTEGRITY_EVENT_TYPES.MULTIPLE_TABS,
+  INTEGRITY_EVENT_TYPES.ALT_TAB_ATTEMPT,
+  INTEGRITY_EVENT_TYPES.EXTERNAL_APP_OVERLAY,
+  INTEGRITY_EVENT_TYPES.FULLSCREEN_EXIT,
+]);
+
+export function isStrikeWorthyEvent(eventType) {
+  return STRIKE_WORTHY_EVENT_TYPES.has(eventType);
+}
+
+export function getIntegrityStrikesKey(examId) {
+  return `examnexus_integrity_strikes_${examId}`;
+}
+
+export function loadIntegrityStrikes(examId) {
+  try {
+    const raw = sessionStorage.getItem(getIntegrityStrikesKey(examId));
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.min(MAX_INTEGRITY_STRIKES, parsed));
+  } catch {
+    return 0;
+  }
+}
+
+export function saveIntegrityStrikes(examId, strikes) {
+  sessionStorage.setItem(
+    getIntegrityStrikesKey(examId),
+    String(Math.max(0, Math.min(MAX_INTEGRITY_STRIKES, strikes)))
+  );
+}
+
+export function getIntegrityStrikesRemaining(examId) {
+  return Math.max(0, MAX_INTEGRITY_STRIKES - loadIntegrityStrikes(examId));
+}
 
 export function getIntegrityEventMessage(eventType) {
   return (
@@ -77,6 +120,7 @@ export function loadExamSession(examId) {
 export function clearExamSession(examId) {
   sessionStorage.removeItem(getExamSessionKey(examId));
   sessionStorage.removeItem(getExamTabLockKey(examId));
+  sessionStorage.removeItem(getIntegrityStrikesKey(examId));
 }
 
 export function computeRemainingSeconds(startedAtIso, totalSeconds) {

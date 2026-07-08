@@ -16,12 +16,12 @@ function navLinkClass(theme, isActive) {
   if (isActive) {
     return theme === "dark"
       ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.12)]"
-      : "bg-emerald-500 text-white border border-emerald-500 shadow-md shadow-emerald-500/25";
+      : "bg-teal-600 text-white border border-teal-600 shadow-md shadow-teal-600/20";
   }
 
   return theme === "dark"
     ? "text-gray-300 border border-transparent hover:bg-white/10 hover:text-emerald-300 hover:border-white/10"
-    : "text-gray-700 border border-transparent en-hover hover:text-teal-800 hover:border-emerald-200/60";
+    : "text-gray-700 border border-transparent en-hover hover:text-teal-800 hover:border-slate-200/80";
 }
 
 function iconWrapClass(theme, isActive) {
@@ -33,7 +33,7 @@ function iconWrapClass(theme, isActive) {
 
   return theme === "dark"
     ? "bg-white/10 text-emerald-400 group-hover:bg-emerald-500/15 group-hover:text-emerald-300"
-    : "bg-emerald-500/10 text-teal-700 group-hover:bg-emerald-500/15 group-hover:text-teal-800";
+    : "bg-slate-100 text-slate-600 group-hover:bg-teal-50 group-hover:text-teal-700";
 }
 
 export default function SidebarNavLink({ to, icon: Icon, label, end = false }) {
@@ -73,7 +73,7 @@ export function SidebarSection({ title, theme, children }) {
       {title && (
         <p
           className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${
-            theme === "dark" ? "text-gray-500" : "text-teal-700/70"
+            theme === "dark" ? "text-gray-500" : "text-slate-500"
           }`}
         >
           {title}

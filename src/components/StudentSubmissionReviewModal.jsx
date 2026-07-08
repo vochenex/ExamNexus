@@ -11,6 +11,8 @@ import {
   computeSubmissionTotals,
   formatReviewAnswerDisplay,
 } from "../utils/facultyGrading";
+import { useModalDismiss } from "../hooks/useModalDismiss";
+import ModalPortal from "./ui/ModalPortal";
 
 function clampEssayScoreInput(raw, maxPoints) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -62,6 +64,7 @@ export default function StudentSubmissionReviewModal({
   onSaved,
 }) {
   const { theme } = useTheme();
+  useModalDismiss(onClose, { enabled: open, closeOnEscape: false });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -104,7 +107,11 @@ export default function StudentSubmissionReviewModal({
       })
       .catch((err) => setError(err.message || "Failed to load submission."))
       .finally(() => setLoading(false));
-  }, [open, examId, studentId, questions, examType]);
+    // `questions`/`examType` are read to seed essay scores but must NOT trigger a
+    // refetch: their parent rebuilds a new array reference on every realtime poll,
+    // which previously caused the modal to flicker/reload every few seconds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, examId, studentId]);
 
   const reviewItems = useMemo(
     () => buildSubmissionReviewItems(questions, answers, examType),
@@ -200,14 +207,20 @@ export default function StudentSubmissionReviewModal({
 
   const overlay = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      role="presentation"
     >
       <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border ${
+        className={`relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border ${
           theme === "dark"
-            ? "border-white/10 bg-slate-900"
+            ? "border-white/10 bg-[#0a120f]"
             : "border-emerald-200/80 en-bg-elevated shadow-xl"
         }`}
       >
@@ -434,5 +447,5 @@ export default function StudentSubmissionReviewModal({
     </div>
   );
 
-  return overlay;
+  return <ModalPortal>{overlay}</ModalPortal>;
 }

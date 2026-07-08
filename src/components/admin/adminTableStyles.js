@@ -14,13 +14,13 @@ export function adminThClass(theme) {
   return `px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${
     theme === "dark"
       ? "bg-white/[0.04] text-gray-400"
-      : "en-bg-muted text-teal-800/80"
+      : "en-bg-muted text-slate-600"
   }`;
 }
 
 export function adminTdClass(theme) {
   return `px-4 py-3 align-top border-t ${
-    theme === "dark" ? "border-white/10" : "border-emerald-100"
+    theme === "dark" ? "border-white/10" : "border-slate-100"
   }`;
 }
 

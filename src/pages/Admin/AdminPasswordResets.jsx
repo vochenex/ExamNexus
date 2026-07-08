@@ -4,6 +4,7 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
 import Select from "../../components/ui/Select";
+import ModalPortal from "../../components/ui/ModalPortal";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
@@ -250,8 +251,19 @@ export default function AdminPasswordResets() {
       </div>
 
       {resetTarget && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className={`${panelClass(theme)} w-full max-w-md`}>
+        <ModalPortal>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4" role="presentation">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => !submitting && setResetTarget(null)}
+            aria-hidden="true"
+          />
+          <div
+            className={`${panelClass(theme)} relative z-10 w-full max-w-md`}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
             <h2 className="text-lg font-bold">Set new password</h2>
             <p className={`mt-2 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
               Create a temporary password for <strong>{resetTarget.email}</strong>. Share it with the user securely.
@@ -293,6 +305,7 @@ export default function AdminPasswordResets() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

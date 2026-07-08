@@ -1,15 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
-import { Archive, Pencil, Trash2 } from "lucide-react";
+import {
+  Archive,
+  BarChart3,
+  ClipboardList,
+  Pencil,
+  RotateCcw,
+  Shield,
+  Trash2,
+} from "lucide-react";
 import AssessmentQuestionsReview from "../../components/AssessmentQuestionsReview";
 import QuestionBankSaveModal from "../../components/QuestionBankSaveModal";
 import ExamAnalyticsPanel from "../../components/ExamAnalyticsPanel";
 import ExamSubmissionAlertsPanel from "../../components/ExamSubmissionAlertsPanel";
+import ExamAutoSubmittedPanel from "../../components/ExamAutoSubmittedPanel";
 import ExamRetakeRequestsPanel from "../../components/ExamRetakeRequestsPanel";
-import ExamNexusBrand from "../../components/ExamNexusBrand";
 import { pageShellWithBellClass } from "../../utils/themeInputs";
 import {
   deleteExam,
@@ -20,11 +28,27 @@ import { getAssessmentStatus } from "../../utils/assessmentStatus";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 
+const TABS = [
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "integrity", label: "Integrity", icon: Shield },
+  { id: "retakes", label: "Retakes", icon: RotateCcw },
+  { id: "questions", label: "Questions", icon: ClipboardList },
+];
+
 const formatDate = (date) => {
   if (!date) return "Not set";
   return new Date(date).toLocaleString("en-PH", {
     dateStyle: "medium",
     timeStyle: "short",
+  });
+};
+
+const formatShortDate = (date) => {
+  if (!date) return "—";
+  return new Date(date).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 };
 
@@ -51,11 +75,25 @@ const StatusBadge = ({ status, theme }) => {
   };
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${styles[status]}`}>
+    <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles[status]}`}>
       {labels[status]}
     </span>
   );
 };
+
+function MetaChip({ children, theme }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs ${
+        theme === "dark"
+          ? "border-white/10 bg-white/[0.04] text-gray-300"
+          : "border-emerald-100 bg-emerald-50/80 text-gray-700"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
 
 export default function AssessmentDetails() {
   const { examId } = useParams();
@@ -71,6 +109,7 @@ export default function AssessmentDetails() {
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [bankSaveOpen, setBankSaveOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("analytics");
 
   const reloadAnalytics = useCallback(
     async (questionList, examRecord, { silent = false } = {}) => {
@@ -151,77 +190,74 @@ export default function AssessmentDetails() {
   }
 
   const status = getAssessmentStatus(exam);
+  const submissionCount = analytics?.submissionCount;
 
   const actionButtonBase =
-    "group inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0";
+    "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0";
+
+  const panelBorder =
+    theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200/80 en-bg-elevated";
 
   return (
     <div className={pageShellWithBellClass(theme)}>
       <BackButton />
 
-      <ExamNexusBrand
-        variant="compact"
-        idSuffix="assessment-details"
-        className="mb-6 opacity-90"
-        showTagline={false}
-      />
-
-      <div className="mb-8">
+      <div
+        className={`mb-5 rounded-2xl border p-4 sm:p-5 ${panelBorder} ${
+          theme === "dark" ? "" : "shadow-sm"
+        }`}
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1
-              className={`text-3xl font-bold ${
-                theme === "dark" ? "text-teal-400" : "text-teal-700"
-              }`}
-            >
-              {exam.title}
-            </h1>
-            <div className="mt-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1
+                className={`text-xl font-bold sm:text-2xl ${
+                  theme === "dark" ? "text-teal-400" : "text-teal-700"
+                }`}
+              >
+                {exam.title}
+              </h1>
               <StatusBadge status={status} theme={theme} />
             </div>
-            <div
-              className={`mt-5 space-y-1 text-sm ${
-                theme === "dark" ? "text-gray-400" : "text-gray-700"
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <MetaChip theme={theme}>
+                From {formatShortDate(exam.start_datetime)}
+              </MetaChip>
+              <MetaChip theme={theme}>
+                Until {formatShortDate(exam.end_datetime)}
+              </MetaChip>
+              <MetaChip theme={theme}>
+                {questions.length} question{questions.length === 1 ? "" : "s"}
+              </MetaChip>
+              {submissionCount != null && (
+                <MetaChip theme={theme}>
+                  {submissionCount} submission{submissionCount === 1 ? "" : "s"}
+                </MetaChip>
+              )}
+            </div>
+
+            <p
+              className={`mt-2 hidden text-xs sm:block ${
+                theme === "dark" ? "text-gray-500" : "text-gray-500"
               }`}
             >
-              <p>
-                Available from:{" "}
-                <span className={theme === "dark" ? "text-teal-400" : "text-teal-700"}>
-                  {formatDate(exam.start_datetime)}
-                </span>
-              </p>
-              <p>
-                Available until:{" "}
-                <span className={theme === "dark" ? "text-teal-400" : "text-teal-700"}>
-                  {formatDate(exam.end_datetime)}
-                </span>
-              </p>
-              <p>
-                {questions.length} question{questions.length === 1 ? "" : "s"}
-                {analytics?.submissionCount != null &&
-                  ` · ${analytics.submissionCount} submission${analytics.submissionCount === 1 ? "" : "s"}`}
-              </p>
-            </div>
+              {formatDate(exam.start_datetime)} → {formatDate(exam.end_datetime)}
+            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => navigate(`/faculty/edit-assessment/${examId}`)}
               className={`${actionButtonBase} ${
                 theme === "dark"
-                  ? "border border-cyan-400/35 bg-gradient-to-br from-cyan-500/20 to-teal-500/10 text-cyan-200 shadow-[0_8px_24px_rgba(34,211,238,0.12)] hover:border-cyan-300/50 hover:shadow-[0_10px_28px_rgba(34,211,238,0.18)]"
-                  : "border border-cyan-600/25 bg-gradient-to-br from-cyan-100 to-teal-50 text-cyan-900 en-panel-glow hover:border-cyan-500/40"
+                  ? "border border-cyan-400/35 bg-cyan-500/15 text-cyan-200"
+                  : "border border-cyan-600/25 bg-cyan-50 text-cyan-900"
               }`}
             >
-              <span
-                className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                  theme === "dark" ? "bg-cyan-500/20" : "bg-white/70"
-                }`}
-              >
-                <Pencil size={16} strokeWidth={2.25} />
-              </span>
-              Edit assessment
+              <Pencil size={14} />
+              Edit
             </button>
 
             <button
@@ -230,19 +266,13 @@ export default function AssessmentDetails() {
               disabled={questions.length === 0}
               className={`${actionButtonBase} ${
                 theme === "dark"
-                  ? "border border-emerald-400/35 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-200 shadow-[0_8px_24px_rgba(16,185,129,0.12)] hover:border-emerald-300/50 hover:shadow-[0_10px_28px_rgba(16,185,129,0.18)]"
-                  : "border border-emerald-600/25 bg-gradient-to-br from-emerald-100 to-teal-50 text-teal-900 en-panel-glow hover:border-emerald-500/40"
+                  ? "border border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
+                  : "border border-emerald-600/25 bg-emerald-50 text-teal-900"
               }`}
               title="Save questions to question bank"
             >
-              <span
-                className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                  theme === "dark" ? "bg-emerald-500/20" : "bg-white/70"
-                }`}
-              >
-                <Archive size={16} strokeWidth={2.25} />
-              </span>
-              Save to bank
+              <Archive size={14} />
+              Bank
             </button>
 
             <button
@@ -251,61 +281,78 @@ export default function AssessmentDetails() {
               disabled={deleting}
               className={`${actionButtonBase} ${
                 theme === "dark"
-                  ? "border border-red-400/35 bg-gradient-to-br from-red-500/20 to-rose-500/10 text-red-200 shadow-[0_8px_24px_rgba(239,68,68,0.1)] hover:border-red-300/50 hover:shadow-[0_10px_28px_rgba(239,68,68,0.16)]"
-                  : "border border-red-400/40 bg-gradient-to-br from-red-50 to-rose-100/80 text-red-800 en-panel-glow hover:border-red-500/45"
+                  ? "border border-red-400/35 bg-red-500/15 text-red-200"
+                  : "border border-red-400/40 bg-red-50 text-red-800"
               }`}
             >
-              <span
-                className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                  theme === "dark" ? "bg-red-500/20" : "bg-white/70"
-                }`}
-              >
-                <Trash2 size={16} strokeWidth={2.25} />
-              </span>
-              {deleting ? "Deleting…" : "Delete"}
+              <Trash2 size={14} />
+              {deleting ? "…" : "Delete"}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="mb-10">
-        <h2
-          className={`mb-4 text-xl font-semibold ${
-            theme === "dark" ? "text-white" : "text-teal-700"
-          }`}
-        >
-          Questions
-        </h2>
-        <AssessmentQuestionsReview questions={questions} examType={exam.exam_type} />
+      <div className="mb-4 flex flex-wrap gap-2">
+        {TABS.map(({ id, label, icon: Icon }) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                isActive
+                  ? theme === "dark"
+                    ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/25"
+                    : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md"
+                  : theme === "dark"
+                    ? "border border-white/10 bg-white/5 text-gray-300 hover:border-emerald-500/30"
+                    : "en-bg-elevated border border-emerald-200 text-gray-700 hover:border-emerald-400"
+              }`}
+            >
+              <Icon size={15} />
+              {label}
+              {id === "questions" && (
+                <span className="opacity-80">({questions.length})</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mb-10">
-        <h2
-          className={`mb-4 text-xl font-semibold ${
-            theme === "dark" ? "text-white" : "text-teal-700"
-          }`}
-        >
-          Analytics
-        </h2>
-        <ExamAnalyticsPanel
-          analytics={analytics}
-          loading={analyticsLoading}
-          examId={examId}
-          questions={questions}
-          examType={exam.exam_type}
-          onScoresUpdated={(options) => reloadAnalytics(undefined, undefined, options)}
-        />
-      </div>
+      <div className={`rounded-2xl border p-4 sm:p-5 ${panelBorder}`}>
+        {activeTab === "analytics" && (
+          <ExamAnalyticsPanel
+            analytics={analytics}
+            loading={analyticsLoading}
+            examId={examId}
+            questions={questions}
+            examType={exam.exam_type}
+            onScoresUpdated={(options) => reloadAnalytics(undefined, undefined, options)}
+          />
+        )}
 
-      <div className="mb-10">
-        <ExamRetakeRequestsPanel
-          examId={examId}
-          onUpdated={() => reloadAnalytics(undefined, undefined, { silent: true })}
-        />
-      </div>
+        {activeTab === "integrity" && (
+          <div className="space-y-4">
+            <ExamAutoSubmittedPanel examId={examId} />
+            <ExamSubmissionAlertsPanel examId={examId} />
+          </div>
+        )}
 
-      <div className="mb-10">
-        <ExamSubmissionAlertsPanel examId={examId} />
+        {activeTab === "retakes" && (
+          <ExamRetakeRequestsPanel
+            examId={examId}
+            onUpdated={() => reloadAnalytics(undefined, undefined, { silent: true })}
+          />
+        )}
+
+        {activeTab === "questions" && (
+          <AssessmentQuestionsReview
+            questions={questions}
+            examType={exam.exam_type}
+            defaultExpanded={false}
+          />
+        )}
       </div>
 
       <QuestionBankSaveModal

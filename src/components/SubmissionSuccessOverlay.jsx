@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "../layouts/ThemeContext";
 import { motion } from "../utils/motion";
+import ModalPortal from "./ui/ModalPortal";
 
 export default function SubmissionSuccessOverlay({ open, message, onComplete }) {
   const { theme } = useTheme();
@@ -26,6 +27,7 @@ export default function SubmissionSuccessOverlay({ open, message, onComplete }) 
   if (!open) return null;
 
   return (
+    <ModalPortal>
     <div
       className={`${motion.overlay} fixed inset-0 z-[130] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md`}
       role="status"
@@ -87,5 +89,6 @@ export default function SubmissionSuccessOverlay({ open, message, onComplete }) 
         ) : null}
       </div>
     </div>
+    </ModalPortal>
   );
 }

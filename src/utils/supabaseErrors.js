@@ -42,6 +42,23 @@ export function formatSupabaseError(error, options = {}) {
   const combined = collectErrorText(error);
   const lower = combined.toLowerCase();
 
+  if (
+    error.name === "AuthRetryableFetchError" ||
+    error.name === "TypeError" ||
+    includesAny(lower, [
+      "failed to fetch",
+      "networkerror",
+      "network request failed",
+      "load failed",
+      "err_name_not_resolved",
+      "err_internet_disconnected",
+      "err_connection",
+      "fetch failed",
+    ])
+  ) {
+    return "Can't reach the server. Check your internet connection and try again. If you're on both Wi-Fi and a wired/other network at once, disconnect one of them, then retry.";
+  }
+
   if (/database error saving new user/i.test(message)) {
     if (context === "signup") {
       return "Could not create your account. Your School ID or email is likely already registered — use a different School ID, log in with your existing account, or contact your administrator.";

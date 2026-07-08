@@ -1,6 +1,8 @@
 import { useTheme } from "../../layouts/ThemeContext";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
 import { motion } from "../../utils/motion";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
+import ModalPortal from "./ModalPortal";
 
 export default function ActionDialog({
   open,
@@ -15,6 +17,10 @@ export default function ActionDialog({
   tone = "default",
 }) {
   const { theme } = useTheme();
+
+  useModalDismiss(showCancel && !loading ? onCancel : undefined, {
+    enabled: open && showCancel && !loading,
+  });
 
   if (!open) return null;
 
@@ -32,6 +38,7 @@ export default function ActionDialog({
           : "border-emerald-200/80 en-bg-elevated";
 
   return (
+    <ModalPortal>
     <div className={`fixed inset-0 z-[120] flex items-center justify-center p-4 ${motion.overlay}`}>
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm en-fade-in"
@@ -99,5 +106,6 @@ export default function ActionDialog({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

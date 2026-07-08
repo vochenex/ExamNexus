@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Archive, Check, X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import ModalPortal from "./ui/ModalPortal";
+import ModalShell from "./ui/ModalShell";
 import { primaryButton, secondaryButton } from "../utils/themeButtons";
 import { deserializeQuestion } from "../utils/assessmentQuestions";
 import { getQuestionBankTypeLabel, saveQuestionToBank } from "../utils/questionBank";
@@ -90,10 +90,12 @@ export default function QuestionBankSaveModal({
   if (!open) return null;
 
   return (
-    <ModalPortal>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <ModalShell open={open} onClose={handleClose} overlayClassName="bg-black/60 backdrop-blur-sm">
         <div
-          className={`flex max-h-[min(88vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl shadow-2xl ${
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
+          className={`relative z-10 flex max-h-[min(88vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl shadow-2xl ${
             theme === "dark"
               ? "border border-white/10 bg-[#031d1f]"
               : "en-bg-surface border border-emerald-700/20 en-panel-glow"
@@ -235,7 +237,6 @@ export default function QuestionBankSaveModal({
             </div>
           </div>
         </div>
-      </div>
-    </ModalPortal>
+    </ModalShell>
   );
 }

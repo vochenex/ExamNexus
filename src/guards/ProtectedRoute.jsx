@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { syncProfileOnLogin } from "../utils/authProfile";
 import { fetchAccountAccess } from "../utils/adminData";
-import { getAuthSession } from "../utils/authUser";
+import { getAuthSession, getCachedExamNexusUser, hasLikelyAuthSession } from "../utils/authUser";
 import { useTheme } from "../layouts/ThemeContext";
 import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
 import {
@@ -16,13 +16,23 @@ export { stashAuthNotice, consumeAuthNotice, peekAuthNotice, clearAuthNotice } f
 
 export default function ProtectedRoute({ allowedRoles }) {
   const { theme } = useTheme();
-  const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState(null);
-  const [auth, setAuth] = useState(false);
+  const cachedProfile = getCachedExamNexusUser();
+  const likelySession = hasLikelyAuthSession();
+  const [loading, setLoading] = useState(!cachedProfile && likelySession);
+  const [role, setRole] = useState(cachedProfile?.role || null);
+  const [auth, setAuth] = useState(Boolean(cachedProfile));
   const [authRedirectNotice, setAuthRedirectNotice] = useState(null);
 
   useEffect(() => {
     const check = async () => {
+      if (!hasLikelyAuthSession()) {
+        localStorage.removeItem("examnexus_user");
+        setAuth(false);
+        setAuthRedirectNotice(null);
+        setLoading(false);
+        return;
+      }
+
       const session = await getAuthSession();
 
       if (!session?.user) {

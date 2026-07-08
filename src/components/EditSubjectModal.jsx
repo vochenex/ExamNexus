@@ -5,6 +5,7 @@ import { primaryButton, secondaryButton } from "../utils/themeButtons";
 import { YearLevelSelect } from "./YearLevelBadge";
 import SectionCountSelect from "./SectionCountSelect";
 import { updateSubject } from "../utils/supabaseData";
+import { useModalDismiss } from "../hooks/useModalDismiss";
 import {
   DEFAULT_SECTION_COUNT,
   getMaxEnrolledSectionIndex,
@@ -12,6 +13,7 @@ import {
   normalizeSectionCount,
 } from "../utils/sections";
 import { DEFAULT_YEAR_LEVEL, normalizeYearLevel } from "../utils/yearLevels";
+import ModalPortal from "./ui/ModalPortal";
 
 export default function EditSubjectModal({
   subject,
@@ -28,6 +30,8 @@ export default function EditSubjectModal({
   const [error, setError] = useState("");
 
   const minSectionCount = getMaxEnrolledSectionIndex(classmates);
+
+  useModalDismiss(onClose, { enabled: open });
 
   useEffect(() => {
     if (!open || !subject) return;
@@ -76,9 +80,18 @@ export default function EditSubjectModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
       <div
-        className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl ${
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+        className={`relative z-10 w-full max-w-lg rounded-3xl p-6 shadow-2xl ${
           theme === "dark"
             ? "bg-[#031d1f] border border-white/10"
             : "en-bg-surface border border-emerald-300"
@@ -180,6 +193,7 @@ export default function EditSubjectModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 

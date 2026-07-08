@@ -4,6 +4,7 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
 import Select from "../../components/ui/Select";
+import ModalPortal from "../../components/ui/ModalPortal";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
@@ -308,8 +309,19 @@ export default function AdminAccounts() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className={`${panelClass(theme)} w-full max-w-lg`}>
+        <ModalPortal>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4" role="presentation">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => !saving && setEditing(null)}
+            aria-hidden="true"
+          />
+          <div
+            className={`${panelClass(theme)} relative z-10 w-full max-w-lg`}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
             <h2 className="text-lg font-bold">Edit account</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <input
@@ -381,6 +393,7 @@ export default function AdminAccounts() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
 import { motion } from "../../utils/motion";
 import ModalPortal from "./ModalPortal";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 import AnimatedSuccessCheck from "./AnimatedSuccessCheck";
 
@@ -123,6 +124,10 @@ export default function AppModal({
   const config = TONE_CONFIG[tone] || TONE_CONFIG.info;
   const Icon = config.icon;
   const isSuccessAlert = tone === "success" && mode === "alert";
+
+  useModalDismiss(!loading && showClose && !isSuccessAlert ? onCancel : undefined, {
+    enabled: open && !loading && showClose && !isSuccessAlert,
+  });
 
   useEffect(() => {
     if (!open || !isSuccessAlert || loading) return undefined;

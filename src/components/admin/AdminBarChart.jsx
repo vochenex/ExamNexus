@@ -9,7 +9,7 @@ function badgeClass(theme, alert = false) {
 
   return theme === "dark"
     ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/25"
-    : "en-bg-skeleton text-teal-800 ring-1 ring-emerald-200";
+    : "en-bg-skeleton text-slate-700 ring-1 ring-slate-200/80";
 }
 
 export function AdminStatBadge({ value, label, alert = false }) {

@@ -80,7 +80,7 @@ export function PageLoadingSkeleton({ theme = "dark", variant = "cards", classNa
     return (
       <div
         className={`min-h-screen p-6 ${
-          theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page text-[#1a332c]"
+          theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page en-text-primary"
         }`}
       >
         <div className="mx-auto max-w-5xl space-y-6">

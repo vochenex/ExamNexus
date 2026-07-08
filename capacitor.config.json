@@ -1,0 +1,22 @@
+{
+  "appId": "com.examnexus.app",
+  "appName": "ExamNexus",
+  "webDir": "dist",
+  "backgroundColor": "#031d1f",
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "DARK",
+      "backgroundColor": "#031d1f"
+    },
+    "Keyboard": {
+      "resize": "native"
+    }
+  },
+  "ios": {
+    "contentInset": "always"
+  },
+  "android": {
+    "backgroundColor": "#031d1f"
+  }
+}

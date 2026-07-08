@@ -1,10 +1,9 @@
 import { Outlet, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import {
   LayoutDashboard,
   UserCircle,
   LogOut,
-  Moon,
-  Sun,
   Users,
   BookOpen,
   Megaphone,
@@ -18,16 +17,24 @@ import {
 } from "lucide-react";
 import { useTheme } from "./ThemeContext";
 import { supabase } from "../supabaseClient";
-import { secondaryButton } from "../utils/themeButtons";
 import ProfileAvatar from "../components/ProfileAvatar";
 import ExamNexusLogo from "../components/ExamNexusLogo";
+import ThemeToggle from "../components/ThemeToggle";
+import InstallIconButton from "../components/pwa/InstallIconButton";
+import NotificationBell from "../components/NotificationBell";
+import RequiredSchoolIdGate from "../components/RequiredSchoolIdGate";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
+import MobileTabBar from "../components/mobile/MobileTabBar";
+import useMobileNav from "../hooks/useMobileNav";
 import { motion } from "../utils/motion";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
-  const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+  const { theme } = useTheme();
+  const mobileNav = useMobileNav();
+  const [user, setUser] = useState(() =>
+    JSON.parse(localStorage.getItem("examnexus_user") || "{}")
+  );
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -42,21 +49,22 @@ export default function AdminLayout() {
   return (
     <div
       className={`flex h-screen ${
-        theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page text-gray-900"
+        theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page en-text-primary"
       }`}
     >
+      {!mobileNav && (
       <aside
         className={`${motion.slideInLeft} sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r p-4 backdrop-blur-xl ${
           theme === "dark"
             ? "border-[#10B981]/10 bg-[#0b1114]/95"
-            : "en-bg-surface border-emerald-800/15 shadow-[4px_0_32px_rgba(42,92,78,0.12)]"
+            : "en-bg-surface border-slate-200/80 shadow-[4px_0_32px_rgba(15,23,42,0.08)]"
         } shadow-[0_0_80px_rgba(16,185,129,0.06)]`}
       >
         <div
           className={`rounded-2xl border px-3 py-3 ${
             theme === "dark"
               ? "border-white/10 bg-white/[0.03]"
-              : "border-emerald-200/70 en-bg-surface"
+              : "border-slate-200/80 en-bg-surface"
           }`}
         >
           <div className="flex items-center gap-3">
@@ -67,7 +75,7 @@ export default function AdminLayout() {
               </h1>
               <p
                 className={`truncate text-[11px] ${
-                  theme === "dark" ? "text-gray-500" : "text-teal-700/80"
+                  theme === "dark" ? "text-gray-500" : "text-slate-500"
                 }`}
               >
                 Administration
@@ -105,29 +113,11 @@ export default function AdminLayout() {
         </nav>
 
         <div className="mt-4 space-y-3">
-          <button
-            type="button"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className={secondaryButton(theme, "w-full text-sm")}
-          >
-            {theme === "dark" ? (
-              <>
-                <Sun size={18} />
-                Light Mode
-              </>
-            ) : (
-              <>
-                <Moon size={18} />
-                Dark Mode
-              </>
-            )}
-          </button>
-
           <div
             className={`rounded-2xl border p-3 ${
               theme === "dark"
                 ? "border-white/10 bg-white/[0.03]"
-                : "border-emerald-200/70 en-bg-surface"
+                : "border-slate-200/80 en-bg-surface"
             }`}
           >
             <div className="mb-3 flex items-center gap-3">
@@ -135,7 +125,7 @@ export default function AdminLayout() {
               <div className="min-w-0 flex-1">
                 <p
                   className={`truncate text-sm font-semibold ${
-                    theme === "dark" ? "text-emerald-400" : "text-teal-800"
+                    theme === "dark" ? "text-emerald-400" : "text-gray-900"
                   }`}
                 >
                   {displayName}
@@ -166,10 +156,32 @@ export default function AdminLayout() {
           </div>
         </div>
       </aside>
+      )}
 
-      <main className="relative h-screen flex-1 overflow-y-auto p-8">
+      <main
+        className={`relative h-screen flex-1 overflow-y-auto ${
+          mobileNav ? "p-4 sm:p-6 en-has-tabbar" : "p-8"
+        } ${theme === "dark" ? "text-white" : "en-text-primary"}`}
+      >
+        <div
+          className={`absolute ${mobileNav ? "right-4 top-4" : "right-8 top-6"} z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+        >
+          <InstallIconButton />
+          <ThemeToggle />
+          <NotificationBell />
+        </div>
         <Outlet />
+        <RequiredSchoolIdGate theme={theme} onResolved={setUser} />
       </main>
+
+      {mobileNav && (
+        <MobileTabBar
+          role="admin"
+          user={user}
+          displayName={displayName}
+          onLogout={handleLogout}
+        />
+      )}
     </div>
   );
 }

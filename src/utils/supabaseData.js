@@ -4,6 +4,7 @@ import {
   normalizeTargetSections,
   isVisibleToSection,
   normalizeSectionCount,
+  getSubjectSections,
 } from "./sections";
 import {
   normalizeAssessmentCategory,
@@ -31,6 +32,7 @@ import {
   buildExamFacultyAnalytics,
   buildSubmissionAlertRankings,
 } from "./examAnalytics";
+import { INTEGRITY_EVENT_TYPES } from "./examIntegrity";
 import {
   computeSubmissionTotals,
   getQuestionMaxPoints,
@@ -1020,6 +1022,7 @@ export async function submitStudentExam({
   answersByQuestionId,
   answersByIndex,
   timeSpentByQuestionId = {},
+  autoSubmitted = false,
 }) {
   const session = await requireSession();
   const studentId = session.user.id;
@@ -1076,14 +1079,26 @@ export async function submitStudentExam({
     throw new Error("You have already submitted this assessment.");
   }
 
-  const { error: resultError } = await supabase.from("exam_results").insert([
-    {
-      exam_id: examId,
-      student_id: studentId,
-      score,
-      total: total || questions.length,
-    },
-  ]);
+  const resultRow = {
+    exam_id: examId,
+    student_id: studentId,
+    score,
+    total: total || questions.length,
+  };
+
+  if (autoSubmitted) {
+    resultRow.auto_submitted = true;
+  }
+
+  let { error: resultError } = await supabase.from("exam_results").insert([resultRow]);
+
+  if (
+    resultError?.message?.includes("auto_submitted") ||
+    resultError?.message?.includes("does not exist")
+  ) {
+    const { auto_submitted: _removed, ...fallbackRow } = resultRow;
+    ({ error: resultError } = await supabase.from("exam_results").insert([fallbackRow]));
+  }
 
   if (resultError) throw resultError;
 
@@ -1104,6 +1119,23 @@ export async function submitStudentExam({
   }
 
   if (answersError) throw answersError;
+
+  if (autoSubmitted) {
+    const { error: integrityError } = await supabase.from("exam_integrity_events").insert([
+      {
+        exam_id: examId,
+        student_id: studentId,
+        event_type: INTEGRITY_EVENT_TYPES.AUTO_SUBMIT,
+        description:
+          "Assessment auto-submitted after reaching the maximum number of integrity violations.",
+        metadata: { auto_submitted: true },
+      },
+    ]);
+
+    if (integrityError && !integrityError.message?.includes("exam_integrity_events")) {
+      console.warn("auto_submit integrity log:", integrityError.message);
+    }
+  }
 
   await supabase.rpc("mark_retake_fulfilled", { p_exam_id: examId }).then(({ error }) => {
     if (error && !error.message?.includes("mark_retake_fulfilled")) {
@@ -1254,12 +1286,19 @@ export async function fetchExamFacultyAnalytics(examId, questions = [], examType
   await requireSession();
 
   const payload = await loadExamFacultyAnalyticsPayload(examId);
+  let retakeRequests = [];
+  try {
+    retakeRequests = await fetchExamRetakeRequests(examId);
+  } catch {
+    retakeRequests = [];
+  }
 
   return buildExamFacultyAnalytics(
     payload.results,
     payload.studentAnswers,
     questions,
-    examType
+    examType,
+    retakeRequests
   );
 }
 
@@ -1269,6 +1308,95 @@ export async function fetchExamSubmissionAlerts(examId) {
   const payload = await loadExamFacultyAnalyticsPayload(examId);
 
   return buildSubmissionAlertRankings(payload.results, payload.integrityEvents);
+}
+
+function mapAutoSubmittedStudentRow(row) {
+  const user = row.users || {};
+  const name =
+    `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
+    user.school_id ||
+    "Student";
+  const score = Number(row.score) || 0;
+  const total = Number(row.total) || 0;
+
+  return {
+    studentId: row.student_id,
+    name,
+    schoolId: user.school_id || "",
+    score,
+    total,
+    scorePct: total > 0 ? Math.round((score / total) * 1000) / 10 : 0,
+    submittedAt: row.created_at || null,
+  };
+}
+
+export async function fetchExamAutoSubmittedStudents(examId) {
+  await requireSession();
+
+  const resultSelect = `
+    id,
+    score,
+    total,
+    created_at,
+    auto_submitted,
+    student_id,
+    users:student_id (
+      id,
+      first_name,
+      last_name,
+      school_id
+    )
+  `;
+
+  const resultSelectWithoutAuto = `
+    id,
+    score,
+    total,
+    created_at,
+    student_id,
+    users:student_id (
+      id,
+      first_name,
+      last_name,
+      school_id
+    )
+  `;
+
+  let { data, error } = await supabase
+    .from("exam_results")
+    .select(resultSelect)
+    .eq("exam_id", examId)
+    .eq("auto_submitted", true)
+    .order("created_at", { ascending: false });
+
+  if (error?.message?.includes("auto_submitted")) {
+    const events = await fetchExamIntegrityEvents(examId);
+    const autoStudentIds = [
+      ...new Set(
+        events
+          .filter((event) => event.event_type === INTEGRITY_EVENT_TYPES.AUTO_SUBMIT)
+          .map((event) => event.student_id)
+          .filter(Boolean)
+      ),
+    ];
+
+    if (autoStudentIds.length === 0) {
+      return [];
+    }
+
+    const { data: fallbackRows, error: fallbackError } = await supabase
+      .from("exam_results")
+      .select(resultSelectWithoutAuto)
+      .eq("exam_id", examId)
+      .in("student_id", autoStudentIds)
+      .order("created_at", { ascending: false });
+
+    if (fallbackError) throw fallbackError;
+    return (fallbackRows || []).map(mapAutoSubmittedStudentRow);
+  }
+
+  if (error) throw error;
+  return (data || []).map(mapAutoSubmittedStudentRow);
 }
 
 export async function fetchStudentSubmissionReview(examId, studentId) {
@@ -1788,6 +1916,194 @@ export async function getFacultyDashboardStats(teacherSchoolId) {
     totalSubjects: subjects.length,
     totalAssessments,
     totalStudents,
+  };
+}
+
+export async function fetchFacultyDashboardAnalytics(teacherSchoolId) {
+  if (!teacherSchoolId) {
+    return {
+      totalSubmissions: 0,
+      submissionsByDate: [],
+      submissionsBySection: [],
+      assessmentActivity: [],
+    };
+  }
+
+  const subjects = await fetchTeacherSubjects(teacherSchoolId);
+  const subjectIds = subjects.map((subject) => subject.id);
+  const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
+
+  if (!subjectIds.length) {
+    return {
+      totalSubmissions: 0,
+      submissionsByDate: [],
+      submissionsBySection: [],
+      assessmentActivity: [],
+    };
+  }
+
+  const { data: exams, error: examsError } = await supabase
+    .from("exams")
+    .select("id, title, subject_id, start_datetime, target_sections")
+    .in("subject_id", subjectIds)
+    .order("start_datetime", { ascending: false })
+    .limit(40);
+
+  if (examsError) throw examsError;
+
+  const examList = exams || [];
+  const examIds = examList.map((exam) => exam.id);
+
+  const { data: enrollments, error: enrollError } = await supabase
+    .from("subject_students")
+    .select("subject_id, student_id, section")
+    .in("subject_id", subjectIds);
+
+  if (enrollError) throw enrollError;
+
+  let results = [];
+  if (examIds.length > 0) {
+    const { data: resultRows, error: resultsError } = await supabase
+      .from("exam_results")
+      .select("exam_id, student_id, created_at")
+      .in("exam_id", examIds);
+
+    if (resultsError) throw resultsError;
+    results = resultRows || [];
+  }
+
+  const sectionByEnrollment = new Map();
+  for (const row of enrollments || []) {
+    sectionByEnrollment.set(
+      `${row.subject_id}:${row.student_id}`,
+      String(row.section || "A").toUpperCase()
+    );
+  }
+
+  const dateCounts = {};
+  const today = new Date();
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const day = new Date(today);
+    day.setDate(today.getDate() - offset);
+    dateCounts[day.toISOString().slice(0, 10)] = 0;
+  }
+
+  const sectionCounts = {};
+  const submissionsPerExam = {};
+  const sectionSet = new Set();
+  const submissions = [];
+
+  for (const row of results) {
+    const exam = examList.find((item) => item.id === row.exam_id);
+    if (!exam) continue;
+
+    submissionsPerExam[row.exam_id] = (submissionsPerExam[row.exam_id] || 0) + 1;
+
+    const section =
+      sectionByEnrollment.get(`${exam.subject_id}:${row.student_id}`) || "—";
+    sectionCounts[section] = (sectionCounts[section] || 0) + 1;
+    if (section !== "—") sectionSet.add(section);
+
+    const submittedAt = row.created_at ? new Date(row.created_at) : new Date();
+    const dateKey = submittedAt.toISOString().slice(0, 10);
+    if (Object.prototype.hasOwnProperty.call(dateCounts, dateKey)) {
+      dateCounts[dateKey] += 1;
+    }
+
+    const subject = subjectById.get(exam.subject_id);
+    submissions.push({
+      examId: row.exam_id,
+      subjectId: exam.subject_id,
+      yearLevel: subject?.year_level ?? null,
+      section,
+      dateKey,
+    });
+  }
+
+  for (const enrollment of enrollments || []) {
+    const section = String(enrollment.section || "A").toUpperCase();
+    sectionSet.add(section);
+  }
+
+  const submissionsByDate = Object.entries(dateCounts).map(([date, value]) => ({
+    key: date,
+    label: new Date(`${date}T12:00:00`).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+    }),
+    value,
+  }));
+
+  const submissionsBySection = Object.entries(sectionCounts)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([label, value]) => ({
+      key: label,
+      label: label === "—" ? "Unknown" : `Sec ${label}`,
+      value,
+    }));
+
+  const enrolledPerExam = {};
+  const enrolledBySectionPerExam = {};
+  for (const exam of examList) {
+    const subject = subjectById.get(exam.subject_id);
+    const allowedSections = getSubjectSections(subject);
+    let count = 0;
+    const bySection = {};
+
+    for (const enrollment of enrollments || []) {
+      if (enrollment.subject_id !== exam.subject_id) continue;
+      const section = String(enrollment.section || "A").toUpperCase();
+      if (isVisibleToSection(exam.target_sections, section, allowedSections)) {
+        count += 1;
+        bySection[section] = (bySection[section] || 0) + 1;
+      }
+    }
+
+    enrolledPerExam[exam.id] = count;
+    enrolledBySectionPerExam[exam.id] = bySection;
+  }
+
+  const assessmentsAll = examList.map((exam) => {
+    const title = exam.title || "Assessment";
+    const shortTitle = title.length > 20 ? `${title.slice(0, 18)}…` : title;
+
+    return {
+      key: exam.id,
+      examId: exam.id,
+      label: shortTitle,
+      fullTitle: title,
+      subjectId: exam.subject_id,
+      subjectName: subjectById.get(exam.subject_id)?.name || "Subject",
+      yearLevel: subjectById.get(exam.subject_id)?.year_level ?? null,
+      submitted: submissionsPerExam[exam.id] || 0,
+      enrolled: enrolledPerExam[exam.id] || 0,
+      enrolledBySection: enrolledBySectionPerExam[exam.id] || {},
+      date: exam.start_datetime,
+      value: submissionsPerExam[exam.id] || 0,
+    };
+  });
+
+  const assessmentActivity = assessmentsAll.slice(0, 8);
+
+  const subjectMeta = subjects.map((subject) => ({
+    id: subject.id,
+    name: subject.name,
+    yearLevel: subject.year_level ?? null,
+  }));
+
+  const sections = Array.from(sectionSet).sort((left, right) =>
+    left.localeCompare(right)
+  );
+
+  return {
+    totalSubmissions: results.length,
+    submissionsByDate,
+    submissionsBySection,
+    assessmentActivity,
+    assessments: assessmentsAll,
+    subjects: subjectMeta,
+    sections,
+    submissions,
   };
 }
 

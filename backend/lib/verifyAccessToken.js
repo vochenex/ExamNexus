@@ -30,7 +30,13 @@ function verifyUserIdFromJwt(accessToken) {
     const payload = jwt.verify(accessToken, secret, { algorithms: ["HS256"] });
     const userId = String(payload?.sub || "").trim();
     return userId || null;
-  } catch {
+  } catch (error) {
+    if (error?.name === "TokenExpiredError") {
+      const expired = new Error("Invalid or expired session. Please sign in again.");
+      expired.statusCode = 401;
+      expired.cause = error;
+      throw expired;
+    }
     return null;
   }
 }
@@ -93,9 +99,15 @@ async function resolveUserIdFromAccessToken(accessToken) {
     throw error;
   }
 
-  const localUserId = verifyUserIdFromJwt(token);
-  if (localUserId) {
-    return localUserId;
+  try {
+    const localUserId = verifyUserIdFromJwt(token);
+    if (localUserId) {
+      return localUserId;
+    }
+  } catch (error) {
+    if (error?.statusCode === 401) {
+      throw error;
+    }
   }
 
   return resolveUserIdFromSupabaseApi(token);

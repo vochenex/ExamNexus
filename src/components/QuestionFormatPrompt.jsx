@@ -1,6 +1,8 @@
 import { useTheme } from "../layouts/ThemeContext";
 import { primaryButton, secondaryButton } from "../utils/themeButtons";
 import { getFormatLabel } from "../utils/questionSections";
+import { useModalDismiss } from "../hooks/useModalDismiss";
+import ModalPortal from "./ui/ModalPortal";
 
 export default function QuestionFormatPrompt({
   open,
@@ -10,13 +12,23 @@ export default function QuestionFormatPrompt({
   onCancel,
 }) {
   const { theme } = useTheme();
+  useModalDismiss(onCancel, { enabled: open });
 
   if (!open || !nextType) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
       <div
-        className={`w-full max-w-md rounded-3xl p-6 shadow-2xl ${
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+        className={`relative z-10 w-full max-w-md rounded-3xl p-6 shadow-2xl ${
           theme === "dark"
             ? "bg-[#031d1f] border border-white/10"
             : "en-bg-surface border border-emerald-300"
@@ -45,5 +57,6 @@ export default function QuestionFormatPrompt({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

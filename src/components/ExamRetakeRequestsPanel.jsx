@@ -356,10 +356,52 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
                       {row.section ? ` · ${formatSectionLabel(row.section)}` : ""}
                     </p>
 
-                    {row.last_score != null && row.last_total != null && (
-                      <p className={`mt-1 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                        Last score: {row.last_score} / {row.last_total}
-                      </p>
+                    {(row.original_score != null || row.retake_score != null || (row.last_score != null && row.last_total != null)) && (
+                      <div className="mt-1 space-y-0.5 text-xs">
+                        {row.original_score != null && row.original_total != null && (
+                          <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
+                            <span className="inline-flex items-center gap-2">
+                              <span>Original attempt:</span>
+                              {(row.status === "fulfilled" ||
+                                (row.retake_score != null && row.retake_total != null)) && (
+                                <span
+                                  className={`inline-flex items-center justify-center rounded-full border px-1.5 py-0.5 ${
+                                    theme === "dark"
+                                      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                                      : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                  }`}
+                                  title="This student took a retake"
+                                >
+                                  <RotateCcw size={12} />
+                                </span>
+                              )}
+                            </span>{" "}
+                            <span className="font-semibold">
+                              {row.original_score} / {row.original_total}
+                            </span>
+                          </p>
+                        )}
+                        {row.retake_score != null && row.retake_total != null && (
+                          <p className={theme === "dark" ? "text-emerald-300" : "text-emerald-700"}>
+                            Retake attempt:{" "}
+                            <span className="font-semibold">
+                              {row.retake_score} / {row.retake_total}
+                            </span>
+                          </p>
+                        )}
+                        {/* Fallback for older rows/backends that only expose a single last_score */}
+                        {row.original_score == null &&
+                          row.retake_score == null &&
+                          row.last_score != null &&
+                          row.last_total != null && (
+                            <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
+                              Last score:{" "}
+                              <span className="font-semibold">
+                                {row.last_score} / {row.last_total}
+                              </span>
+                            </p>
+                          )}
+                      </div>
                     )}
 
                     {row.student_message && (

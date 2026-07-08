@@ -15,25 +15,33 @@ import {
 import { useTheme } from "./ThemeContext";
 import { supabase } from "../supabaseClient";
 import { fetchAccountAccess } from "../utils/adminData";
-import { getAuthSession } from "../utils/authUser";
+import { getAuthSession, getCachedExamNexusUser } from "../utils/authUser";
 import { buildPendingAuthNotice, stashAuthNotice } from "../utils/authNotice";
 import ProfileAvatar from "../components/ProfileAvatar";
 import NotificationBell from "../components/NotificationBell";
 import ThemeToggle from "../components/ThemeToggle";
+import InstallIconButton from "../components/pwa/InstallIconButton";
 import ExamNexusLogo from "../components/ExamNexusLogo";
+import RequiredSchoolIdGate from "../components/RequiredSchoolIdGate";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
 import AnimatedPage from "../components/ui/AnimatedPage";
+import MobileTabBar from "../components/mobile/MobileTabBar";
+import useMobileNav from "../hooks/useMobileNav";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
-import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
 import { motion } from "../utils/motion";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const { isLockdownActive, lockdown } = useAssessmentLockdown();
   const { theme } = useTheme();
-  const [accessState, setAccessState] = useState("checking");
+  const mobileNav = useMobileNav();
+  const cachedUser = getCachedExamNexusUser();
+  const [accessState, setAccessState] = useState(cachedUser ? "allowed" : "checking");
+  const [sessionUser, setSessionUser] = useState(
+    () => cachedUser || JSON.parse(localStorage.getItem("examnexus_user") || "{}")
+  );
 
-  const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+  const user = sessionUser;
   const isStudent = user.role?.toLowerCase() === "student";
 
   useEffect(() => {
@@ -54,6 +62,17 @@ export default function DashboardLayout() {
         return;
       }
 
+      if (access.profile) {
+        // access.profile only carries { id, role, account_status }. Merge it
+        // into the richer cached profile so fields like avatar_url, first_name,
+        // and last_name are preserved for the sidebar.
+        setSessionUser((prev) => {
+          const merged = { ...prev, ...access.profile };
+          localStorage.setItem("examnexus_user", JSON.stringify(merged));
+          return merged;
+        });
+      }
+
       setAccessState("allowed");
     };
 
@@ -71,7 +90,7 @@ export default function DashboardLayout() {
     : user.role || "User";
 
   if (accessState === "checking") {
-    return <PageLoadingSkeleton theme={theme} variant="dashboard" />;
+    return null;
   }
 
   if (accessState !== "allowed") {
@@ -84,12 +103,12 @@ export default function DashboardLayout() {
         theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page en-text-primary"
       }`}
     >
-      {!isLockdownActive && (
+      {!isLockdownActive && !mobileNav && (
         <aside
           className={`${motion.slideInLeft} sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r p-4 backdrop-blur-xl ${
             theme === "dark"
               ? "border-[#10B981]/10 bg-[#0b1114]/95"
-              : "en-bg-surface border-emerald-800/15 shadow-[4px_0_32px_rgba(42,92,78,0.12)]"
+              : "en-bg-surface border-slate-200/80 shadow-[4px_0_32px_rgba(15,23,42,0.08)]"
           } shadow-[0_0_80px_rgba(16,185,129,0.06)]`}
         >
           {/* Brand */}
@@ -97,7 +116,7 @@ export default function DashboardLayout() {
             className={`rounded-2xl border px-3 py-3 ${
               theme === "dark"
                 ? "border-white/10 bg-white/[0.03]"
-                : "border-emerald-200/70 en-bg-surface"
+                : "border-slate-200/80 en-bg-surface"
             }`}
           >
             <div className="flex items-center gap-3">
@@ -108,7 +127,7 @@ export default function DashboardLayout() {
                 </h1>
                 <p
                   className={`truncate text-[11px] ${
-                    theme === "dark" ? "text-gray-500" : "text-teal-700/80"
+                    theme === "dark" ? "text-gray-500" : "text-slate-500"
                   }`}
                 >
                   Intelligent Assessment
@@ -175,7 +194,7 @@ export default function DashboardLayout() {
               className={`rounded-2xl border p-3 ${
                 theme === "dark"
                   ? "border-white/10 bg-white/[0.03]"
-                  : "border-emerald-200/70 en-bg-surface"
+                  : "border-slate-200/80 en-bg-surface"
               }`}
             >
               <div className="mb-3 flex items-center gap-3">
@@ -183,7 +202,7 @@ export default function DashboardLayout() {
                 <div className="min-w-0 flex-1">
                   <p
                     className={`truncate text-sm font-semibold capitalize ${
-                      theme === "dark" ? "text-emerald-400" : "text-teal-800"
+                      theme === "dark" ? "text-emerald-400" : "text-gray-900"
                     }`}
                   >
                     {displayName}
@@ -218,8 +237,10 @@ export default function DashboardLayout() {
 
       <main
         className={`relative h-screen flex-1 overflow-y-auto ${
-          isLockdownActive ? "p-0" : "p-8"
-        } ${theme === "dark" ? "text-white" : "text-[#1a332c]"}`}
+          isLockdownActive ? "p-0" : mobileNav ? "p-4 sm:p-6" : "p-8"
+        } ${mobileNav && !isLockdownActive ? "en-has-tabbar" : ""} ${
+          theme === "dark" ? "text-white" : "en-text-primary"
+        }`}
       >
         {isLockdownActive && (
           <div
@@ -237,8 +258,9 @@ export default function DashboardLayout() {
 
         {!isLockdownActive && (
           <div
-            className={`absolute right-8 top-6 z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+            className={`absolute ${mobileNav ? "right-4 top-4" : "right-8 top-6"} z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
           >
+            <InstallIconButton />
             <ThemeToggle />
             <NotificationBell />
           </div>
@@ -246,7 +268,17 @@ export default function DashboardLayout() {
         <AnimatedPage>
           <Outlet />
         </AnimatedPage>
+        <RequiredSchoolIdGate theme={theme} onResolved={setSessionUser} />
       </main>
+
+      {mobileNav && !isLockdownActive && (
+        <MobileTabBar
+          role={user.role}
+          user={user}
+          displayName={displayName}
+          onLogout={handleLogout}
+        />
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import ActionDialog from "../../components/ui/ActionDialog";
 import SubmissionSuccessOverlay from "../../components/SubmissionSuccessOverlay";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import AssessmentFocusGuard from "../../components/AssessmentFocusGuard";
+import AssessmentExamInstructionsBar from "../../components/AssessmentExamInstructionsBar";
 import IntegrityAlertToast from "../../components/IntegrityAlertToast";
 import useAssessmentIntegrity from "../../hooks/useAssessmentIntegrity";
 import useQuestionTimeTracking from "../../hooks/useQuestionTimeTracking";
@@ -42,12 +43,15 @@ import {
   getAssessmentDurationSeconds,
 } from "../../utils/assessmentDuration";
 import { resolveStudentId } from "../../utils/authUser";
+import { isNativeApp, openOnWebsite } from "../../utils/platform";
 import {
   clearExamSession,
   computeRemainingSeconds,
   enterAssessmentFullscreen,
   exitAssessmentFullscreen,
   loadExamSession,
+  loadIntegrityStrikes,
+  MAX_INTEGRITY_STRIKES,
   saveExamSession,
 } from "../../utils/examIntegrity";
 
@@ -55,13 +59,47 @@ function formatDurationLabel(examData) {
   return formatAssessmentDurationLabel(examData);
 }
 
+/**
+ * Assessments can never be taken inside the native mobile app — the integrity
+ * lockdown (fullscreen, tab-switch detection) only works in a real browser.
+ * If a student reaches this route in the app (notification, deep link), we
+ * redirect to the website and never mount the heavy exam experience.
+ */
 export default function TakeAssessment() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { theme } = useTheme();
+
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    openOnWebsite(`/student/take-assessment/${id}`);
+    navigate("/student/assessments", { replace: true });
+  }, [id, navigate]);
+
+  if (isNativeApp()) {
+    return (
+      <div
+        className={`flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}
+      >
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
+        <p className="text-sm font-medium">Opening the assessment on the website…</p>
+      </div>
+    );
+  }
+
+  return <TakeAssessmentExperience />;
+}
+
+function TakeAssessmentExperience() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { startLockdown, endLockdown } = useAssessmentLockdown();
 
   const [exam, setExam] = useState(null);
+  const [studentId, setStudentId] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -78,12 +116,17 @@ export default function TakeAssessment() {
   const [focusBlocked, setFocusBlocked] = useState(false);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const [resultDialog, setResultDialog] = useState(null);
+  const [integrityStrikes, setIntegrityStrikes] = useState(0);
   const [submitBlocked, setSubmitBlocked] = useState(false);
   const [isRetakeAttempt, setIsRetakeAttempt] = useState(false);
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
   const alertTimerRef = useRef(null);
+  const submitExamRef = useRef(null);
+  const autoSubmittingRef = useRef(false);
 
   const isActive = phase === "active";
-  const interactionLocked = submitting || confirmSubmitOpen || Boolean(resultDialog);
+  const interactionLocked =
+    submitting || confirmSubmitOpen || Boolean(resultDialog) || autoSubmitting;
 
   const {
     flushCurrentQuestionTime,
@@ -105,12 +148,42 @@ export default function TakeAssessment() {
     }, 9000);
   }, []);
 
+  const handleStrikeChange = useCallback(
+    ({ strikes, remaining, maxStrikes }) => {
+      setIntegrityStrikes(strikes);
+      showIntegrityAlert(
+        `Integrity violation recorded (${strikes}/${maxStrikes}). ${remaining} alert${remaining === 1 ? "" : "s"} left before auto-submit.`
+      );
+    },
+    [showIntegrityAlert]
+  );
+
+  const handleAutoSubmit = useCallback(() => {
+    if (autoSubmittingRef.current) return;
+    autoSubmittingRef.current = true;
+    setAutoSubmitting(true);
+    setFocusBlocked(false);
+    showIntegrityAlert(
+      "Maximum integrity violations reached. Your assessment is being submitted automatically."
+    );
+    submitExamRef.current?.({ reason: "integrity" });
+  }, [showIntegrityAlert]);
+
+  useEffect(() => {
+    if (!isActive || !id || autoSubmittingRef.current) return;
+    if (loadIntegrityStrikes(id) >= MAX_INTEGRITY_STRIKES) {
+      handleAutoSubmit();
+    }
+  }, [handleAutoSubmit, id, isActive]);
+
   const { clearFocusViolation } = useAssessmentIntegrity({
     examId: id,
     active: isActive,
     isRetakeAttempt,
     onAlert: showIntegrityAlert,
     onFocusViolation: setFocusBlocked,
+    onStrikeChange: handleStrikeChange,
+    onAutoSubmit: handleAutoSubmit,
     suppressAlerts: interactionLocked,
   });
 
@@ -119,6 +192,9 @@ export default function TakeAssessment() {
       try {
         setError("");
         setSubmitBlocked(false);
+
+        const currentStudentId = await resolveStudentId();
+        setStudentId(currentStudentId || null);
 
         const retakeStatus = await getStudentRetakeStatus(id);
         const isApprovedRetake = retakeStatus === "approved";
@@ -157,7 +233,15 @@ export default function TakeAssessment() {
         const uniqueQuestions = dedupeExamQuestions(questionData || []);
         const durationSeconds = getAssessmentDurationSeconds(examData);
 
-        const saved = isApprovedRetake ? null : loadExamSession(id);
+        let saved = isApprovedRetake ? null : loadExamSession(id);
+
+        // If a different student previously used this browser for this exam,
+        // discard that session so answers/lockdown state are never reused
+        // across accounts.
+        if (saved?.studentId && currentStudentId && saved.studentId !== currentStudentId) {
+          clearExamSession(id);
+          saved = null;
+        }
         let orderedQuestions = uniqueQuestions;
         let resumeSession = null;
 
@@ -191,6 +275,7 @@ export default function TakeAssessment() {
           setTimeLeft(remaining);
           setTotalSeconds(activeTotalSeconds);
           replaceTimes(session.questionTimes || {});
+          setIntegrityStrikes(loadIntegrityStrikes(id));
           setPhase("active");
           setShowLockdownModal(false);
           startLockdown(id, examData.title);
@@ -220,13 +305,24 @@ export default function TakeAssessment() {
       commenced: true,
       startedAt: existing?.startedAt || new Date().toISOString(),
       totalSeconds: existing?.totalSeconds || totalSeconds,
+      studentId,
       answers,
       currentQuestion,
       flaggedIndices: [...flaggedIndices],
       questionOrder: existing?.questionOrder || questions.map((question) => question.id),
       questionTimes: getTimesSnapshot(),
     });
-  }, [answers, currentQuestion, flaggedIndices, getTimesSnapshot, id, isActive, questions, totalSeconds]);
+  }, [
+    answers,
+    currentQuestion,
+    flaggedIndices,
+    getTimesSnapshot,
+    id,
+    isActive,
+    questions,
+    studentId,
+    totalSeconds,
+  ]);
 
   useEffect(
     () => () => {
@@ -323,7 +419,8 @@ export default function TakeAssessment() {
     }
   }, [isActive, exam, questions, navGroups, answers, currentQuestion]);
 
-  const submitExam = useCallback(async () => {
+  const submitExam = useCallback(async (options = {}) => {
+    const { reason } = options;
     if (submitting || submitBlocked) return;
 
     try {
@@ -336,6 +433,7 @@ export default function TakeAssessment() {
         questions,
         answersByQuestionId: answers,
         timeSpentByQuestionId: getTimesSnapshot(),
+        autoSubmitted: reason === "integrity",
       });
 
       clearExamSession(id);
@@ -344,12 +442,28 @@ export default function TakeAssessment() {
       const hasEssayQuestions = questions.some(
         (question) => getQuestionFormatType(question, exam.exam_type) === "essay"
       );
+      const autoSubmitted = reason === "integrity";
+
+      let message;
+      if (autoSubmitted) {
+        message = `Your answers were submitted automatically after ${MAX_INTEGRITY_STRIKES} integrity violations (leaving the tab or opening extra tabs).`;
+        if (hasEssayQuestions) {
+          message += " Essay responses are pending teacher review.";
+        } else {
+          message += ` Your score: ${result.score} / ${result.total}.`;
+        }
+      } else if (hasEssayQuestions) {
+        message =
+          "Your answers were submitted. Essay responses are pending teacher review.";
+      } else {
+        message = `Your score: ${result.score} / ${result.total}`;
+      }
 
       setResultDialog({
-        tone: "success",
-        message: hasEssayQuestions
-          ? "Your answers were submitted. Essay responses are pending teacher review."
-          : `Your score: ${result.score} / ${result.total}`,
+        tone: autoSubmitted ? "danger" : "success",
+        title: autoSubmitted ? "Assessment auto-submitted" : undefined,
+        message,
+        exitLockdown: autoSubmitted,
       });
     } catch (err) {
       const alreadySubmitted = /already submitted/i.test(err.message || "");
@@ -379,6 +493,8 @@ export default function TakeAssessment() {
     submitBlocked,
     submitting,
   ]);
+
+  submitExamRef.current = submitExam;
 
   const handleResultDialogClose = useCallback(async () => {
     const dialog = resultDialog;
@@ -445,9 +561,9 @@ export default function TakeAssessment() {
     let orderedQuestions = questions;
 
     if (exam?.shuffle_questions) {
-      const studentId = await resolveStudentId();
-      if (studentId) {
-        orderedQuestions = shuffleQuestionsForStudent(questions, id, studentId);
+      const currentStudentId = studentId || (await resolveStudentId());
+      if (currentStudentId) {
+        orderedQuestions = shuffleQuestionsForStudent(questions, id, currentStudentId);
         setQuestions(orderedQuestions);
       }
     }
@@ -455,10 +571,14 @@ export default function TakeAssessment() {
     clearExamSession(id);
 
     const startedAt = new Date().toISOString();
+    setIntegrityStrikes(0);
+    autoSubmittingRef.current = false;
+    setAutoSubmitting(false);
     saveExamSession(id, {
       commenced: true,
       startedAt,
       totalSeconds,
+      studentId,
       answers,
       currentQuestion: 0,
       flaggedIndices: [],
@@ -541,7 +661,7 @@ export default function TakeAssessment() {
   };
 
   const shellClass = `min-h-screen ${
-    isActive ? "p-4 md:p-6" : "p-6 md:p-8"
+    isActive ? "px-4 pt-6 pb-8 md:px-8 md:pt-8 md:pb-10" : "p-6 md:p-8"
   } ${
     theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page text-gray-900"
   }`;
@@ -624,6 +744,8 @@ export default function TakeAssessment() {
           examTitle={exam.title}
           durationLabel={formatDurationLabel(exam)}
           questionCount={questions.length}
+          instructions={exam.instructions}
+          maxStrikes={MAX_INTEGRITY_STRIKES}
           onConfirm={commenceExam}
           onCancel={handleCancelLockdown}
         />
@@ -643,7 +765,9 @@ export default function TakeAssessment() {
   return (
     <div className={shellClass}>
       <AssessmentFocusGuard
-        open={isActive && focusBlocked}
+        open={isActive && focusBlocked && !autoSubmitting}
+        integrityStrikes={integrityStrikes}
+        maxStrikes={MAX_INTEGRITY_STRIKES}
         onContinue={() => clearFocusViolation()}
       />
 
@@ -653,6 +777,12 @@ export default function TakeAssessment() {
       />
 
       <div className="mx-auto max-w-6xl">
+        <AssessmentExamInstructionsBar
+          instructions={exam.instructions}
+          integrityStrikes={integrityStrikes}
+          maxStrikes={MAX_INTEGRITY_STRIKES}
+        />
+
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p

@@ -1,6 +1,7 @@
 import { GraduationCap, UserRound } from "lucide-react";
 import Select from "../ui/Select";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
+import { getSchoolIdHelpText, getSchoolIdRule } from "../../utils/schoolIdRules";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
 
 function SectionTitle({ children, theme }) {
@@ -65,6 +66,7 @@ export default function SignupFormFields({
 }) {
   const isStudent = form.role === "Student";
   const courses = getCoursesForDepartment(form.department);
+  const schoolIdRule = getSchoolIdRule(form.role);
 
   return (
     <div className="space-y-5">
@@ -195,10 +197,19 @@ export default function SignupFormFields({
               name="schoolId"
               value={form.schoolId}
               onChange={onFieldChange}
-              placeholder="2024-12345"
+              placeholder={schoolIdRule.example}
               autoComplete="off"
+              inputMode="numeric"
+              maxLength={schoolIdRule.max}
               {...authInputProps}
             />
+            <p
+              className={`mt-1 text-xs ${
+                theme === "dark" ? "text-gray-500" : "text-gray-500"
+              }`}
+            >
+              {getSchoolIdHelpText(form.role)}
+            </p>
             <FieldError message={errors.schoolId} />
           </div>
 

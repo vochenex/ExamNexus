@@ -2,6 +2,8 @@ import { X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { secondaryButtonSm } from "../utils/themeButtons";
 import { formatIntegrityEventLabel } from "../utils/examIntegrity";
+import { useModalDismiss } from "../hooks/useModalDismiss";
+import ModalPortal from "./ui/ModalPortal";
 
 export default function StudentIntegrityAlertsModal({
   open,
@@ -11,19 +13,28 @@ export default function StudentIntegrityAlertsModal({
   loading = false,
 }) {
   const { theme } = useTheme();
+  useModalDismiss(onClose, { enabled: open });
 
   if (!open) return null;
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      role="presentation"
     >
       <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border ${
+        className={`relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border ${
           theme === "dark"
-            ? "border-white/10 bg-slate-900"
+            ? "border-white/10 bg-[#0a120f]"
             : "border-amber-200/80 en-bg-elevated shadow-xl"
         }`}
       >
@@ -126,5 +137,6 @@ export default function StudentIntegrityAlertsModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

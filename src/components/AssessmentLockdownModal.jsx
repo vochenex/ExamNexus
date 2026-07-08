@@ -1,27 +1,39 @@
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { primaryButton, secondaryButton } from "../utils/themeButtons";
+import { MAX_INTEGRITY_STRIKES } from "../utils/examIntegrity";
+import { useModalDismiss } from "../hooks/useModalDismiss";
+import ModalPortal from "./ui/ModalPortal";
 
 export default function AssessmentLockdownModal({
   open,
   examTitle,
   durationLabel,
   questionCount,
+  instructions,
+  maxStrikes = MAX_INTEGRITY_STRIKES,
   onConfirm,
   onCancel,
 }) {
   const { theme } = useTheme();
+  useModalDismiss(onCancel, { enabled: open });
 
   if (!open) return null;
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="lockdown-modal-title"
+        onClick={(event) => event.stopPropagation()}
         className={`relative z-10 w-full max-w-lg rounded-2xl border p-6 shadow-2xl ${
           theme === "dark"
             ? "border-amber-500/30 bg-[#0a1f1f] text-white"
@@ -71,6 +83,12 @@ export default function AssessmentLockdownModal({
               <strong>prohibited</strong>.
             </li>
             <li>
+              Switching tabs or opening another assessment tab counts as an integrity{" "}
+              <strong>violation</strong>. You may receive up to{" "}
+              <strong>{maxStrikes} alerts</strong> before your exam is{" "}
+              <strong>submitted automatically</strong>, even if you have not finished.
+            </li>
+            <li>
               The assessment runs in <strong>fullscreen</strong> and blocks access if you leave
               the window until you submit.
             </li>
@@ -79,6 +97,20 @@ export default function AssessmentLockdownModal({
               <strong>recorded and sent to your teacher</strong>, and you will be alerted.
             </li>
           </ul>
+          {instructions?.trim() && (
+            <div
+              className={`mt-4 rounded-xl border p-3 ${
+                theme === "dark"
+                  ? "border-white/10 bg-black/20"
+                  : "border-amber-200/80 bg-white/70"
+              }`}
+            >
+              <p className="mb-1 font-semibold">Instructions</p>
+              <p className="whitespace-pre-wrap text-xs leading-relaxed opacity-90">
+                {instructions}
+              </p>
+            </div>
+          )}
         </div>
 
         <div
@@ -118,5 +150,6 @@ export default function AssessmentLockdownModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

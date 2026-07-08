@@ -2,19 +2,29 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { syncProfileOnLogin } from "../utils/authProfile";
-import { getAuthSession } from "../utils/authUser";
+import { getAuthSession, getCachedExamNexusUser, hasLikelyAuthSession } from "../utils/authUser";
 import { isAdminUser } from "../utils/adminData";
 import { useTheme } from "../layouts/ThemeContext";
 import { PageLoadingSkeleton } from "./ui/PageLoadingSkeleton";
 
 export default function AdminRouteGuard() {
   const { theme } = useTheme();
-  const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(false);
+  const cachedProfile = getCachedExamNexusUser();
+  const cachedAdmin = Boolean(cachedProfile && isAdminUser(cachedProfile));
+  const likelySession = hasLikelyAuthSession();
+  const [loading, setLoading] = useState(!cachedAdmin && likelySession);
+  const [allowed, setAllowed] = useState(cachedAdmin);
   const [redirectRole, setRedirectRole] = useState("student");
 
   useEffect(() => {
     const check = async () => {
+      if (!hasLikelyAuthSession()) {
+        localStorage.removeItem("examnexus_user");
+        setAllowed(false);
+        setLoading(false);
+        return;
+      }
+
       const session = await getAuthSession();
 
       if (!session?.user) {

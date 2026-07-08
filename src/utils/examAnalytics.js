@@ -47,7 +47,8 @@ export function buildExamFacultyAnalytics(
   results = [],
   studentAnswers = [],
   questions = [],
-  examType = "multiple_choice"
+  examType = "multiple_choice",
+  retakeRequests = []
 ) {
   const submissions = (results || []).filter((row) => row.student_id);
   const gradedResults = submissions.filter((row) => Number(row.total) > 0);
@@ -139,6 +140,7 @@ export function buildExamFacultyAnalytics(
     questionTimeGroups: groupQuestionTimeByFormat(questionTimeAnalytics),
     overallAvgQuestionTimeSeconds: getOverallAverageQuestionTime(questionTimeAnalytics),
     studentPerformance,
+    retakeRequests,
   };
 }
 

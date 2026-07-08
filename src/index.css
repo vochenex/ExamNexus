@@ -1,60 +1,70 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Light mode — white → emerald linear wash, crisp surfaces, readable text */
+/* Light mode — "Emerald Glass (light)": mint/emerald tinted neutrals that
+   relate to the dark theme, with the same emerald accent family. */
 html.light {
-  --en-bg-page-from: #ffffff;
-  --en-bg-page-mid: #f0fdf4;
-  --en-bg-page-to: #bbf7d0;
+  --en-bg-page-from: #eaf6f0;
+  --en-bg-page-mid: #d9efe6;
+  --en-bg-page-to: #c2e2d5;
   --en-bg-surface: #ffffff;
-  --en-bg-surface-tint: #f7fef9;
+  --en-bg-surface-tint: #f2fbf7;
   --en-bg-elevated: #ffffff;
-  --en-bg-muted: #ecfdf5;
+  --en-bg-muted: #eaf5f0;
   --en-bg-input: #ffffff;
-  --en-bg-hover: #d1fae5;
-  --en-emerald-deep: #047857;
+  --en-bg-hover: rgba(16, 185, 129, 0.1);
+  --en-accent: #0d9488;
+  --en-accent-deep: #0f766e;
+  --en-accent-soft: #ccfbf1;
+  --en-emerald-deep: #0f766e;
   --en-emerald-mid: #10b981;
-  --en-emerald-soft: #a7f3d0;
-  --en-skeleton-from: #a7f3d0;
-  --en-skeleton-mid: #6ee7b7;
-  --en-skeleton-to: #34d399;
-  --en-border: rgba(5, 150, 105, 0.18);
-  --en-border-strong: rgba(4, 120, 87, 0.28);
-  --en-text-primary: #064e3b;
-  --en-text-secondary: #047857;
-  --en-text-muted: #3f7563;
-  --en-text-on-emerald: #ecfdf5;
-  --en-shadow-soft: 0 4px 24px rgba(4, 120, 87, 0.08);
-  --en-shadow-panel: 0 12px 40px rgba(4, 120, 87, 0.1);
+  --en-emerald-soft: #ccfbf1;
+  --en-skeleton-from: #f0fdfa;
+  --en-skeleton-mid: #ecfdf5;
+  --en-skeleton-to: #d1fae5;
+  --en-border: rgba(16, 185, 129, 0.16);
+  --en-border-strong: rgba(16, 185, 129, 0.28);
+  --en-text-primary: #06231b;
+  --en-text-secondary: #234b41;
+  --en-text-muted: #5a7d72;
+  --en-text-on-emerald: #f0fdfa;
+  --en-shadow-soft: 0 4px 24px rgba(6, 35, 27, 0.07);
+  --en-shadow-panel: 0 12px 40px rgba(6, 35, 27, 0.1);
 }
 
 html.light body {
-  background: linear-gradient(
-    128deg,
-    var(--en-bg-page-from) 0%,
-    var(--en-bg-page-mid) 42%,
-    #dcfce7 72%,
-    var(--en-bg-page-to) 100%
-  );
+  background:
+    radial-gradient(circle at 15% 12%, rgba(16, 185, 129, 0.16), transparent 32%),
+    radial-gradient(circle at 85% 18%, rgba(20, 184, 166, 0.13), transparent 36%),
+    radial-gradient(circle at 50% 92%, rgba(34, 197, 94, 0.1), transparent 42%),
+    linear-gradient(
+      168deg,
+      var(--en-bg-page-from) 0%,
+      var(--en-bg-page-mid) 38%,
+      #cfe7dc 72%,
+      var(--en-bg-page-to) 100%
+    );
   background-attachment: fixed;
   color: var(--en-text-primary);
 }
 
 html.light .en-bg-page {
-  background: linear-gradient(
-    128deg,
-    #ffffff 0%,
-    #f0fdf4 38%,
-    #d1fae5 78%,
-    #a7f3d0 100%
-  );
+  background:
+    radial-gradient(circle at 15% 12%, rgba(16, 185, 129, 0.14), transparent 32%),
+    radial-gradient(circle at 85% 18%, rgba(20, 184, 166, 0.11), transparent 36%),
+    radial-gradient(circle at 50% 92%, rgba(34, 197, 94, 0.09), transparent 42%),
+    linear-gradient(
+      168deg,
+      #eaf6f0 0%,
+      #d9efe6 38%,
+      #cfe7dc 78%,
+      #c2e2d5 100%
+    );
 }
 
 html.light .en-bg-surface {
-  background: linear-gradient(145deg, var(--en-bg-surface) 0%, var(--en-bg-surface-tint) 100%);
+  background: linear-gradient(148deg, var(--en-bg-surface) 0%, var(--en-bg-surface-tint) 55%, #f3f4f6 100%);
   box-shadow: var(--en-shadow-soft);
 }
 
@@ -65,12 +75,12 @@ html.light .en-bg-elevated {
 }
 
 html.light .en-bg-muted {
-  background: linear-gradient(160deg, #ecfdf5 0%, #d1fae5 100%);
+  background: linear-gradient(160deg, #f2fbf7 0%, #e6f3ee 100%);
 }
 
 html.light .en-bg-input {
   background: var(--en-bg-input);
-  box-shadow: inset 0 1px 2px rgba(4, 120, 87, 0.06);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 html.light .en-bg-skeleton {
@@ -92,7 +102,7 @@ html.light .en-skeleton-bone {
   );
   background-size: 220% 100%;
   animation: en-skeleton-shimmer 1.85s ease-in-out infinite;
-  border: 1px solid var(--en-border-strong);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 @keyframes en-skeleton-shimmer {
@@ -109,11 +119,11 @@ html.light .en-hover:hover {
 }
 
 html.light .en-bg-surface-soft {
-  background: linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
 }
 
 html.light .en-bg-elevated-soft {
-  background: linear-gradient(145deg, #ffffff 0%, #ecfdf5 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f3f4f6 100%);
 }
 
 html.light .en-panel-glow {
@@ -138,6 +148,16 @@ body {
   background-color: #0a0f0c;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent the whole page from shifting horizontally when scrollbars appear/disappear
+     (this was visible when typing into auth inputs and after navigating pages). */
+  scrollbar-gutter: stable;
+  /* Hide scrollbar visuals while keeping layout stability. */
+  scrollbar-width: none; /* Firefox */
+}
+
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 html:not(.light) .examnexus-auth-input:-webkit-autofill,
@@ -178,8 +198,58 @@ html:not(.light) .en-select option:hover {
 
 html.light .en-select option:checked,
 html.light .en-select option:hover {
-  background-color: #d1fae5;
+  background-color: #ecfdf5;
   color: var(--en-text-primary);
+}
+
+/* Light mode — remap legacy emerald utility classes to slate/teal palette */
+html.light [class*="border-emerald"] {
+  --tw-border-opacity: 1;
+}
+
+html.light .border-emerald-100,
+html.light .border-emerald-200,
+html.light .border-emerald-200\/70,
+html.light .border-emerald-200\/80,
+html.light .border-emerald-200\/90,
+html.light .border-emerald-300,
+html.light .border-emerald-300\/80,
+html.light .border-emerald-400,
+html.light .border-emerald-400\/40,
+html.light .border-emerald-500,
+html.light .border-emerald-700\/20 {
+  border-color: rgba(16, 185, 129, 0.22) !important;
+}
+
+html.light .bg-emerald-50,
+html.light .bg-emerald-50\/60 {
+  background-color: #f0fdfa !important;
+}
+
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/15 {
+  background-color: rgba(13, 148, 136, 0.08) !important;
+}
+
+html.light .text-emerald-700,
+html.light .text-emerald-800 {
+  color: #0f766e !important;
+}
+
+html.light .ring-emerald-200,
+html.light .ring-emerald-300 {
+  --tw-ring-color: rgba(13, 148, 136, 0.25) !important;
+}
+
+html.light .hover\:border-emerald-300:hover,
+html.light .hover\:border-emerald-400:hover,
+html.light .hover\:border-emerald-500:hover,
+html.light .hover\:border-emerald-600\/40:hover {
+  border-color: rgba(13, 148, 136, 0.35) !important;
+}
+
+html.light .hover\:bg-emerald-200:hover {
+  background-color: #ecfdf5 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -233,4 +303,1082 @@ html.light .en-select option:hover {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* ==========================================================================
+   Mobile bottom tab bar + more sheet (native app + small screens)
+   ========================================================================== */
+
+:root {
+  --en-tabbar-height: 4.25rem;
+  --en-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Reserve space so content is never hidden behind the floating bar. */
+.en-has-tabbar {
+  padding-bottom: calc(var(--en-tabbar-height) + var(--en-safe-bottom) + 1.25rem) !important;
+}
+
+/* Body-level scroll pages (homepage, auth) need bottom clearance too. */
+body.en-body-has-tabbar .en-home-shell,
+body.en-body-has-tabbar .en-auth-shell {
+  padding-bottom: calc(var(--en-tabbar-height) + var(--en-safe-bottom) + 1.25rem);
+}
+
+.en-tabbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(0.6rem + var(--en-safe-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(30rem, calc(100vw - 1.5rem));
+  border-radius: 1.35rem;
+  padding: 0.4rem;
+  animation: en-tabbar-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+}
+
+@keyframes en-tabbar-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.en-tabbar--dark {
+  background: rgba(10, 20, 19, 0.82);
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+}
+
+.en-tabbar--light {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 12px 40px rgba(15, 23, 42, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+
+.en-tabbar-inner {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.15rem;
+}
+
+.en-tabbar-item {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.1rem;
+  border-radius: 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.18s ease;
+}
+
+.en-tabbar-item:active {
+  transform: scale(0.92);
+}
+
+.en-tabbar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 1.85rem;
+  border-radius: 0.85rem;
+  color: #94a3b8;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+html.light .en-tabbar-icon {
+  color: #64748b;
+}
+
+.en-tabbar-icon--active-dark {
+  color: #6ee7b7;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(6, 182, 212, 0.2));
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.28);
+}
+
+.en-tabbar-icon--active-light {
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d9488, #0891b2);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.35);
+}
+
+.en-tabbar-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #94a3b8;
+  transition: color 0.2s ease;
+}
+
+html.light .en-tabbar-label {
+  color: #64748b;
+}
+
+.en-tabbar-label--active {
+  color: #0f766e;
+}
+
+html:not(.light) .en-tabbar-label--active {
+  color: #6ee7b7;
+}
+
+/* Bottom sheet ("More") */
+.en-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.en-sheet-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 12, 11, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: en-fade-in 0.25s ease both;
+}
+
+@keyframes en-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.en-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(30rem, calc(100vw - 1rem));
+  margin-bottom: calc(0.6rem + var(--en-safe-bottom));
+  border-radius: 1.6rem;
+  padding: 0.75rem 1.1rem calc(1.1rem + var(--en-safe-bottom));
+  animation: en-sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes en-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.en-sheet--dark {
+  background: rgba(11, 17, 20, 0.98);
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
+}
+
+.en-sheet--light {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 -12px 48px rgba(15, 23, 42, 0.18);
+}
+
+.en-sheet-handle {
+  width: 2.5rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.2;
+  margin: 0.15rem auto 0.75rem;
+}
+
+.en-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.85rem;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.en-sheet-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--en-text-primary);
+}
+
+html:not(.light) .en-sheet-name {
+  color: #6ee7b7;
+}
+
+.en-sheet-role {
+  font-size: 0.72rem;
+  text-transform: capitalize;
+  color: var(--en-text-muted);
+}
+
+html:not(.light) .en-sheet-role {
+  color: #94a3b8;
+}
+
+.en-sheet-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.75rem;
+  color: var(--en-text-muted);
+  background: rgba(148, 163, 184, 0.12);
+  border: none;
+  cursor: pointer;
+}
+
+.en-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.en-sheet-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.9rem 0.4rem;
+  border-radius: 1rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--en-text-secondary);
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid transparent;
+  transition:
+    transform 0.16s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+html:not(.light) .en-sheet-tile {
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.en-sheet-tile:active {
+  transform: scale(0.94);
+}
+
+.en-sheet-tile--active {
+  color: #0f766e;
+  background: rgba(13, 148, 136, 0.12);
+  border-color: rgba(13, 148, 136, 0.4);
+}
+
+html:not(.light) .en-sheet-tile--active {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.en-sheet-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.9rem;
+  padding: 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+html:not(.light) .en-sheet-logout {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.en-sheet-logout:active {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   PWA install prompt (floating pill + iOS Add-to-Home-Screen sheet)
+   ========================================================================== */
+
+.en-install-fab {
+  position: fixed;
+  right: clamp(0.75rem, 3vw, 1.5rem);
+  bottom: calc(var(--en-tabbar-height, 4.25rem) + var(--en-safe-bottom, 0px) + 1.25rem);
+  z-index: 65;
+  max-width: calc(100vw - 1.5rem);
+  animation: en-tabbar-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (min-width: 1024px) {
+  .en-install-fab {
+    bottom: clamp(1rem, 3vw, 2rem);
+  }
+}
+
+.en-install-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.7rem 0.6rem 0.85rem;
+  border-radius: 1.1rem;
+  border: 1px solid;
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+}
+
+.en-install-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.8rem;
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #0891b2);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.35);
+}
+
+.en-install-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.en-install-sub {
+  font-size: 0.68rem;
+  opacity: 0.7;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.en-install-cta {
+  flex-shrink: 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #0891b2);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.en-install-cta:hover {
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.4);
+}
+
+.en-install-cta:active {
+  transform: scale(0.95);
+}
+
+.en-install-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.6rem;
+  color: currentColor;
+  opacity: 0.55;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.en-install-close:hover {
+  opacity: 1;
+}
+
+.en-install-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.en-install-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 12, 11, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: en-fade-in 0.25s ease both;
+}
+
+.en-install-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(28rem, calc(100vw - 1rem));
+  margin-bottom: calc(0.6rem + var(--en-safe-bottom, 0px));
+  border-radius: 1.6rem;
+  padding: 0.75rem 1.4rem calc(1.4rem + var(--en-safe-bottom, 0px));
+  animation: en-sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-install-sheet--dark {
+  background: rgba(11, 17, 20, 0.98);
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  color: #e2e8f0;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
+}
+
+.en-install-sheet--light {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #1f2937;
+  box-shadow: 0 -12px 48px rgba(15, 23, 42, 0.18);
+}
+
+.en-install-sheet-handle {
+  width: 2.5rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.2;
+  margin: 0.15rem auto 1rem;
+}
+
+.en-install-sheet-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.en-install-sheet-text {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  text-align: center;
+  opacity: 0.75;
+}
+
+.en-install-steps {
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.en-install-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.en-install-step-icon,
+.en-install-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
+  border-radius: 0.65rem;
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.12);
+  font-weight: 800;
+}
+
+html:not(.light) .en-install-step-icon,
+html:not(.light) .en-install-step-num {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.en-install-sheet-done {
+  width: 100%;
+  margin-top: 1.4rem;
+  padding: 0.8rem;
+  border-radius: 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #0891b2);
+  border: none;
+  cursor: pointer;
+}
+
+.en-install-sheet-done:active {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   New-version update prompt (PWA)
+   ========================================================================== */
+
+.en-update-root {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .en-update-root {
+    align-items: center;
+  }
+}
+
+.en-update-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 12, 11, 0.6);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.en-update-card {
+  position: relative;
+  width: 100%;
+  max-width: 24rem;
+  padding: 1.6rem 1.4rem 1.4rem;
+  border-radius: 1.4rem;
+  text-align: center;
+  animation: enUpdateIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes enUpdateIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.en-update-card--dark {
+  background: linear-gradient(160deg, #0d1f1a 0%, #0a1512 100%);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(16, 185, 129, 0.08);
+  color: #ecfdf5;
+}
+
+.en-update-card--light {
+  background: #ffffff;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  box-shadow: 0 24px 60px rgba(6, 35, 27, 0.18);
+  color: #06231b;
+}
+
+.en-update-dismiss {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.en-update-dismiss:hover {
+  opacity: 1;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.en-update-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  margin-bottom: 0.9rem;
+  border-radius: 1rem;
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #14b8a6);
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.35);
+}
+
+.en-update-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.en-update-text {
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  opacity: 0.8;
+}
+
+.en-update-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.3rem;
+}
+
+.en-update-later,
+.en-update-cta {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.15s ease, background 0.15s ease;
+}
+
+.en-update-later {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: transparent;
+  color: currentColor;
+}
+
+.en-update-later:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.en-update-cta {
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #0d9488);
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.3);
+}
+
+.en-update-cta:hover {
+  filter: brightness(1.05);
+}
+
+.en-update-cta:active,
+.en-update-later:active {
+  transform: scale(0.98);
+}
+
+.en-update-cta:disabled,
+.en-update-later:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.en-update-spin {
+  animation: enSpin 0.9s linear infinite;
+}
+
+@keyframes enSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Header install icon button + hover tooltip */
+.en-install-tip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.en-install-icon-btn {
+  cursor: pointer;
+}
+
+.en-install-tip {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: max-content;
+  max-width: 15rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.7rem;
+  background: #0a120f;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.en-install-tip strong {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ecfdf5;
+  line-height: 1.1;
+}
+
+.en-install-tip span {
+  font-size: 0.68rem;
+  color: #86efac;
+  line-height: 1.15;
+}
+
+.en-install-tip::before {
+  content: "";
+  position: absolute;
+  top: -0.32rem;
+  right: 1rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: #0a120f;
+  border-left: 1px solid rgba(16, 185, 129, 0.3);
+  border-top: 1px solid rgba(16, 185, 129, 0.3);
+  transform: rotate(45deg);
+}
+
+.en-install-tip-wrap:hover .en-install-tip,
+.en-install-tip-wrap:focus-within .en-install-tip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+  .en-install-tip {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   DARK THEME — "Emerald Glass" palette (user-provided)
+   Applied globally to dark mode. Poppins retained; gradient is static.
+   Palette: bg #050807 + emerald/teal/green glows, cards #13231d,
+   accents #10b981 / #14b8a6 / #34d399, mint text.
+   ========================================================================== */
+
+html:not(.light) {
+  --en-bg-page-from: #040606;
+  --en-bg-page-mid: #08110d;
+  --en-bg-page-to: #0d1714;
+  --en-bg-surface: #0a120f;
+  --en-bg-surface-tint: #0d1714;
+  --en-bg-elevated: #13231d;
+  --en-bg-muted: #0f1c17;
+  --en-bg-input: #14231d;
+  --en-bg-hover: rgba(16, 185, 129, 0.1);
+  --en-accent: #10b981;
+  --en-accent-deep: #14b8a6;
+  --en-accent-soft: rgba(16, 185, 129, 0.15);
+  --en-emerald-deep: #14b8a6;
+  --en-emerald-mid: #10b981;
+  --en-emerald-soft: rgba(16, 185, 129, 0.15);
+  --en-border: rgba(16, 185, 129, 0.12);
+  --en-border-strong: rgba(16, 185, 129, 0.24);
+  --en-text-primary: #ecfdf5;
+  --en-text-secondary: #bbf7d0;
+  --en-text-muted: #86efac;
+  --en-text-on-emerald: #04110c;
+  --en-shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --en-shadow-panel: 0 25px 45px rgba(0, 0, 0, 0.55), 0 0 40px rgba(16, 185, 129, 0.08);
+}
+
+/* Page background — provided radial glows + diagonal gradient, kept static. */
+html:not(.light) body,
+html:not(.light) .en-bg-page {
+  background:
+    radial-gradient(circle at 15% 12%, rgba(16, 185, 129, 0.22), transparent 34%),
+    radial-gradient(circle at 85% 18%, rgba(20, 184, 166, 0.18), transparent 38%),
+    radial-gradient(circle at 50% 95%, rgba(34, 197, 94, 0.16), transparent 46%),
+    radial-gradient(ellipse 95% 70% at 50% 42%, rgba(13, 148, 136, 0.09), transparent 72%),
+    linear-gradient(135deg, #04100c 0%, #071510 45%, #0a1a15 100%);
+  background-attachment: fixed;
+  color: var(--en-text-primary);
+}
+
+/* Variable-driven surfaces adopt the new palette. */
+html:not(.light) .en-bg-surface {
+  background: var(--en-bg-surface);
+  box-shadow: var(--en-shadow-soft);
+  border-color: var(--en-border);
+}
+
+html:not(.light) .en-bg-elevated,
+html:not(.light) .en-bg-elevated-soft {
+  background: var(--en-bg-elevated);
+  border-color: var(--en-border);
+}
+
+html:not(.light) .en-bg-surface-soft {
+  background: var(--en-bg-surface);
+}
+
+html:not(.light) .en-bg-muted {
+  background: var(--en-bg-muted);
+}
+
+html:not(.light) .en-bg-input {
+  background: var(--en-bg-input);
+}
+
+html:not(.light) .en-hover:hover {
+  background-color: var(--en-bg-hover);
+}
+
+html:not(.light) .en-text-primary {
+  color: var(--en-text-primary);
+}
+
+html:not(.light) .en-text-secondary {
+  color: var(--en-text-secondary);
+}
+
+html:not(.light) .en-text-muted {
+  color: var(--en-text-muted);
+}
+
+/* --- Remap shared hardcoded dark surfaces so the whole app follows suit --- */
+
+/* Near-black shells / page frames / sidebars. */
+html:not(.light) .bg-\[\#031d1f\],
+html:not(.light) .bg-\[\#0a0f0c\],
+html:not(.light) .bg-\[\#021818\],
+html:not(.light) .bg-\[\#052a28\] {
+  background-color: #050807 !important;
+}
+
+/* Full-page app shells get the emerald gradient (not a flat black), while
+   modals/cards that reuse the same hex stay a solid surface above. */
+html:not(.light) .h-screen.bg-\[\#031d1f\],
+html:not(.light) .min-h-screen.bg-\[\#031d1f\] {
+  background:
+    radial-gradient(circle at 16% 12%, rgba(16, 185, 129, 0.22), transparent 34%),
+    radial-gradient(circle at 84% 16%, rgba(20, 184, 166, 0.18), transparent 38%),
+    radial-gradient(circle at 50% 96%, rgba(34, 197, 94, 0.16), transparent 46%),
+    radial-gradient(ellipse 95% 70% at 50% 42%, rgba(13, 148, 136, 0.09), transparent 72%),
+    linear-gradient(135deg, #04100c 0%, #071510 45%, #0a1a15 100%) !important;
+  background-attachment: fixed !important;
+}
+
+html:not(.light) .bg-\[\#0b1114\],
+html:not(.light) .bg-\[\#0b1114\]\/95,
+html:not(.light) .bg-\[\#0b1114\]\/90,
+html:not(.light) .bg-\[\#0a1018\],
+html:not(.light) .bg-\[\#071210\] {
+  background-color: #0a120f !important;
+}
+
+html:not(.light) .bg-\[\#0f1a18\] {
+  background-color: #0f1c17 !important;
+}
+
+/* Glassy card / panel surfaces (white-alpha fills). */
+html:not(.light) .bg-white\/\[0\.02\],
+html:not(.light) .bg-white\/\[0\.03\],
+html:not(.light) .bg-white\/\[0\.04\],
+html:not(.light) .bg-white\/\[0\.05\],
+html:not(.light) .bg-white\/5 {
+  background-color: #13231d !important;
+}
+
+html:not(.light) .bg-white\/\[0\.06\],
+html:not(.light) .bg-white\/\[0\.08\],
+html:not(.light) .bg-white\/10 {
+  background-color: #183128 !important;
+}
+
+/* Hover elevation for glassy surfaces. */
+html:not(.light) .hover\:bg-white\/5:hover,
+html:not(.light) .hover\:bg-white\/10:hover,
+html:not(.light) .hover\:bg-white\/\[0\.06\]:hover,
+html:not(.light) .hover\:bg-white\/\[0\.08\]:hover {
+  background-color: #183128 !important;
+}
+
+/* Borders → subtle emerald hairlines. */
+html:not(.light) .border-white\/5,
+html:not(.light) .border-white\/10,
+html:not(.light) .border-white\/\[0\.08\],
+html:not(.light) .border-white\/15 {
+  border-color: rgba(16, 185, 129, 0.12) !important;
+}
+
+html:not(.light) .hover\:border-white\/10:hover,
+html:not(.light) .hover\:border-white\/20:hover {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+/* Inputs pick up the provided field color + mint placeholder. */
+html:not(.light) input,
+html:not(.light) textarea,
+html:not(.light) select {
+  color-scheme: dark;
+}
+
+html:not(.light) input::placeholder,
+html:not(.light) textarea::placeholder {
+  color: #86efac;
+  opacity: 0.75;
+}
+
+html:not(.light) .examnexus-auth-input:-webkit-autofill,
+html:not(.light) .examnexus-auth-input:-webkit-autofill:hover,
+html:not(.light) .examnexus-auth-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #14231d inset !important;
+  box-shadow: 0 0 0 1000px #14231d inset !important;
+}
+
+/* Select dropdown options. */
+html:not(.light) .en-select option {
+  background-color: #0a120f;
+  color: #ecfdf5;
+}
+
+html:not(.light) .en-select option:checked,
+html:not(.light) .en-select option:hover {
+  background-color: #183128;
+  color: #ecfdf5;
+}
+
+/* ==========================================================================
+   Public pages keep the ORIGINAL near-black theme.
+   The emerald palette above is only for logged-in areas. The homepage, login,
+   and sign-up pages live inside .en-home-shell / .en-auth-shell, so here we
+   restore the original dark utility values within those shells, overriding the
+   global dark remaps (these selectors are more specific + come last, so win).
+   ========================================================================== */
+
+/* Page background (the shell element itself) → deep near-black (not the teal
+   #031d1f, and not the emerald gradient used for logged-in areas). */
+html:not(.light) .en-home-shell.bg-\[\#031d1f\],
+html:not(.light) .en-auth-shell.bg-\[\#031d1f\],
+html:not(.light) .en-home-shell.min-h-screen.bg-\[\#031d1f\] {
+  background: #050807 !important;
+}
+
+/* Near-black surfaces inside the public shells. */
+html:not(.light) .en-home-shell .bg-\[\#031d1f\],
+html:not(.light) .en-auth-shell .bg-\[\#031d1f\] {
+  background-color: #050807 !important;
+}
+
+html:not(.light) .en-home-shell .bg-\[\#0a0f0c\],
+html:not(.light) .en-auth-shell .bg-\[\#0a0f0c\] {
+  background-color: #0a0f0c !important;
+}
+
+html:not(.light) .en-home-shell .bg-\[\#0b1114\],
+html:not(.light) .en-home-shell .bg-\[\#0b1114\]\/95,
+html:not(.light) .en-home-shell .bg-\[\#0b1114\]\/90,
+html:not(.light) .en-auth-shell .bg-\[\#0b1114\],
+html:not(.light) .en-auth-shell .bg-\[\#0b1114\]\/95,
+html:not(.light) .en-auth-shell .bg-\[\#0b1114\]\/90 {
+  background-color: #0b1114 !important;
+}
+
+html:not(.light) .en-home-shell .bg-\[\#0f1a18\],
+html:not(.light) .en-auth-shell .bg-\[\#0f1a18\] {
+  background-color: #0f1a18 !important;
+}
+
+/* Translucent white surfaces inside the public shells. */
+html:not(.light) .en-home-shell .bg-white\/\[0\.02\],
+html:not(.light) .en-home-shell .bg-white\/\[0\.03\],
+html:not(.light) .en-home-shell .bg-white\/\[0\.04\],
+html:not(.light) .en-home-shell .bg-white\/\[0\.05\],
+html:not(.light) .en-home-shell .bg-white\/5,
+html:not(.light) .en-auth-shell .bg-white\/\[0\.02\],
+html:not(.light) .en-auth-shell .bg-white\/\[0\.03\],
+html:not(.light) .en-auth-shell .bg-white\/\[0\.04\],
+html:not(.light) .en-auth-shell .bg-white\/\[0\.05\],
+html:not(.light) .en-auth-shell .bg-white\/5 {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+html:not(.light) .en-home-shell .bg-white\/\[0\.06\],
+html:not(.light) .en-home-shell .bg-white\/\[0\.08\],
+html:not(.light) .en-home-shell .bg-white\/10,
+html:not(.light) .en-auth-shell .bg-white\/\[0\.06\],
+html:not(.light) .en-auth-shell .bg-white\/\[0\.08\],
+html:not(.light) .en-auth-shell .bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html:not(.light) .en-home-shell .hover\:bg-white\/5:hover,
+html:not(.light) .en-home-shell .hover\:bg-white\/10:hover,
+html:not(.light) .en-home-shell .hover\:bg-white\/\[0\.06\]:hover,
+html:not(.light) .en-home-shell .hover\:bg-white\/\[0\.08\]:hover,
+html:not(.light) .en-auth-shell .hover\:bg-white\/5:hover,
+html:not(.light) .en-auth-shell .hover\:bg-white\/10:hover,
+html:not(.light) .en-auth-shell .hover\:bg-white\/\[0\.06\]:hover,
+html:not(.light) .en-auth-shell .hover\:bg-white\/\[0\.08\]:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Borders inside the public shells → original white hairlines. */
+html:not(.light) .en-home-shell .border-white\/5,
+html:not(.light) .en-auth-shell .border-white\/5 {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+html:not(.light) .en-home-shell .border-white\/10,
+html:not(.light) .en-home-shell .border-white\/\[0\.08\],
+html:not(.light) .en-auth-shell .border-white\/10,
+html:not(.light) .en-auth-shell .border-white\/\[0\.08\] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.light) .en-home-shell .border-white\/15,
+html:not(.light) .en-auth-shell .border-white\/15 {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+html:not(.light) .en-home-shell .hover\:border-white\/10:hover,
+html:not(.light) .en-home-shell .hover\:border-white\/20:hover,
+html:not(.light) .en-auth-shell .hover\:border-white\/10:hover,
+html:not(.light) .en-auth-shell .hover\:border-white\/20:hover {
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }

@@ -26,8 +26,9 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOU
   }
 }
 
-async function getAuthHeaders(json = true) {
-  const session = await getAuthSession();
+async function getAuthHeaders(json = true, { forceRefresh = false } = {}) {
+  let session = await getAuthSession({ forceRefresh });
+
   if (!session?.access_token) {
     throw new Error("Your session expired. Please sign in again.");
   }
@@ -41,6 +42,34 @@ async function getAuthHeaders(json = true) {
   }
 
   return headers;
+}
+
+async function fetchAuthedWithRetry(url, options = {}, timeoutMs = AI_REQUEST_TIMEOUT_MS) {
+  let res = await fetchWithTimeout(url, options, timeoutMs);
+
+  if (res.status !== 401) {
+    return res;
+  }
+
+  const refreshedHeaders = await getAuthHeaders(!(options.body instanceof FormData), {
+    forceRefresh: true,
+  });
+
+  const retryOptions = {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...refreshedHeaders,
+    },
+  };
+
+  res = await fetchWithTimeout(url, retryOptions, timeoutMs);
+
+  if (res.status === 401) {
+    throw new Error("Your session expired. Please sign out and sign in again.");
+  }
+
+  return res;
 }
 
 function formatApiError(payload, fallback) {
@@ -223,7 +252,7 @@ export async function generateAssessmentFromPrompt({
     formats,
   });
 
-  const headers = await getAuthHeaders();
+  const headers = await getAuthHeaders(true, { forceRefresh: true });
 
   let res;
   const stopWaiting = startWaitingProgress({
@@ -233,7 +262,7 @@ export async function generateAssessmentFromPrompt({
   });
 
   try {
-    res = await fetchWithTimeout(`${API_BASE}/assessment-ai/generate-from-prompt`, {
+    res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/generate-from-prompt`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -289,7 +318,7 @@ export async function generateAssessmentFromDocument({
     throw new Error("Choose a PDF or Word (.docx) file to upload.");
   }
 
-  const session = await getAuthSession();
+  const session = await getAuthSession({ forceRefresh: true });
   if (!session?.access_token) {
     throw new Error("Your session expired. Please sign in again.");
   }
@@ -304,7 +333,7 @@ export async function generateAssessmentFromDocument({
   });
 
   try {
-    res = await fetchWithTimeout(`${API_BASE}/assessment-ai/analyze-document`, {
+    res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/analyze-document`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${session.access_token}`,

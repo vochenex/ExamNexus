@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  Moon,
-  Sun,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -27,6 +25,11 @@ import {
 import { checkSignupCredentials } from "../utils/authSignup";
 import { formatSupabaseError } from "../utils/supabaseErrors";
 import {
+  normalizeSchoolId,
+  validateSchoolIdAnyRole,
+  validateSchoolIdForRole,
+} from "../utils/schoolIdRules";
+import {
   buildPendingAuthNotice,
   clearAuthNotice,
   peekAuthNotice,
@@ -35,12 +38,14 @@ import {
 import SignupFormFields from "./auth/SignupFormFields";
 import PendingApprovalModal from "./auth/PendingApprovalModal";
 import ExamNexusBrand from "./ExamNexusBrand";
+import HomeSiteHeader from "./home/HomeSiteHeader";
 import LogoSplashScreen from "./LogoSplashScreen";
+import "../styles/home.css";
 
 export default function ExamNexusAuth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const lastNoticeKeyRef = useRef(null);
   const formPanelRef = useRef(null);
 const [showPassword, setShowPassword] = useState(false);
@@ -77,7 +82,10 @@ const [loading, setLoading] = useState(false);
     }
 
     setForm((current) => {
-      const next = { ...current, [name]: value };
+      const next = {
+        ...current,
+        [name]: name === "schoolId" ? normalizeSchoolId(value) : value,
+      };
 
       if (name === "department") {
         next.course = "";
@@ -180,7 +188,8 @@ function getAuthInputProps(theme) {
     }
 
     if (authView === "forgot") {
-      if (!form.schoolId) errs.schoolId = "School ID is required";
+      const schoolIdCheck = validateSchoolIdAnyRole(form.schoolId);
+      if (!schoolIdCheck.valid) errs.schoolId = schoolIdCheck.message;
       setErrors(errs);
       return Object.keys(errs).length === 0;
     }
@@ -189,7 +198,8 @@ function getAuthInputProps(theme) {
     if (authView === "signup") {
       if (!form.firstName) errs.firstName = "First name is required";
       if (!form.lastName) errs.lastName = "Last name is required";
-      if (!form.schoolId) errs.schoolId = "School ID is required";
+      const schoolIdCheck = validateSchoolIdForRole(form.schoolId, form.role);
+      if (!schoolIdCheck.valid) errs.schoolId = schoolIdCheck.message;
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -323,8 +333,11 @@ function getAuthInputProps(theme) {
         JSON.stringify(profile)
       );
 
-      setLoading(false);
-      navigateForRole(navigate, profile.role);
+      // Keep the branded loader visible through the route change + lazy
+      // dashboard load. Clearing `loading` here would re-reveal the login form
+      // for a beat before navigation commits — which looked like the page
+      // "bouncing back to login and then auto-logging in after a delay".
+      navigateForRole(navigate, profile.role, { replace: true });
       return;
     }
 
@@ -443,21 +456,10 @@ function getAuthInputProps(theme) {
 
   return (
     <div
-  className={`
-    min-h-screen
-    flex
-    items-center
-    justify-center
-    relative
-    overflow-hidden
-
-    ${
-      theme === "dark"
-        ? "bg-[#031d1f]"
-        : "en-bg-page"
-    }
-  `}
->
+      className={`en-auth-shell ${
+        theme === "dark" ? "bg-[#031d1f]" : "en-auth-shell-bg en-home-shell"
+      }`}
+    >
   <PendingApprovalModal
     notice={authNotice}
     onClose={() => {
@@ -466,16 +468,19 @@ function getAuthInputProps(theme) {
     }}
   />
   {loading && <LogoSplashScreen theme={theme} />}
+
+  <HomeSiteHeader />
+
+  <div className="en-auth-body en-page-enter">
   {/* Background Orb 1 */}
 <div
   className="
+    pointer-events-none
     absolute
     top-0
     left-0
-
     w-[500px]
     h-[500px]
-
     bg-emerald-400/20
     blur-[150px]
     rounded-full
@@ -485,13 +490,12 @@ function getAuthInputProps(theme) {
 {/* Background Orb 2 */}
 <div
   className="
+    pointer-events-none
     absolute
     bottom-0
     right-0
-
     w-[500px]
     h-[500px]
-
     bg-cyan-400/20
     blur-[150px]
     rounded-full
@@ -500,41 +504,28 @@ function getAuthInputProps(theme) {
 
 {/* Grid Overlay */}
 <div
-  className="
-    absolute
-    inset-0
-
-    opacity-[0.03]
-
-    bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)]
-
-    bg-[size:40px_40px]
-  "
+  className={`pointer-events-none absolute inset-0 bg-[size:40px_40px] ${
+    theme === "dark"
+      ? "opacity-[0.03] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)]"
+      : "en-home-grid-overlay opacity-[0.07]"
+  }`}
 />
       <div
   className={`
     en-auth-card
     relative
-
     w-full
     max-w-5xl
-
     rounded-[32px]
-
     overflow-hidden
-
     backdrop-blur-2xl
-
     border
-
     ${swapPanels ? "en-auth-card--signup" : ""}
-
     ${
       theme === "dark"
         ? "bg-[#0b1114]/90 border-white/10"
-        : "en-bg-elevated-soft border-white"
+        : "border-slate-200/80 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.12)]"
     }
-
     shadow-[0_0_80px_rgba(16,185,129,0.15)]
   `}
 >
@@ -544,54 +535,28 @@ function getAuthInputProps(theme) {
           className={`en-auth-panel-brand hidden md:flex flex-col items-center p-10 ${
             theme === "dark"
               ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
-              : "bg-gradient-to-br from-[#edfbf6] via-[#dff5ec] to-[#cceee3]"
+              : "bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#134e4a]"
           }`}
         >
           <div
             className={`pointer-events-none absolute inset-0 ${
               theme === "dark"
                 ? "bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.12),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,0.08),transparent_40%)]"
-                : "bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.85),transparent_50%),radial-gradient(circle_at_75%_85%,rgba(167,243,208,0.45),transparent_45%)]"
+                : "bg-[radial-gradient(circle_at_25%_20%,rgba(13,148,136,0.18),transparent_50%),radial-gradient(circle_at_75%_85%,rgba(15,23,42,0.35),transparent_45%)]"
             }`}
           />
           <div
-            className={`pointer-events-none absolute inset-0 opacity-[0.035] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:32px_32px] ${
-              theme === "light" ? "opacity-[0.06]" : ""
-            }`}
+            className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:32px_32px]"
           />
 
           <div className="relative z-10 flex w-full flex-col items-center">
-            <div className="mb-6 max-w-sm">
+            <div className="max-w-sm">
               <ExamNexusBrand
                 variant="hero"
                 idSuffix="auth"
                 showTagline
-                panelTone={theme === "dark" ? "dark" : "light"}
+                panelTone="dark"
               />
-            </div>
-
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl border transition-all duration-300 ${
-                  theme === "dark"
-                    ? "border-white/15 bg-white/10 text-emerald-50 hover:bg-white/15"
-                    : "border-emerald-300/70 bg-white/70 text-teal-900 shadow-sm hover:bg-white"
-                }`}
-              >
-                {theme === "dark" ? (
-                  <>
-                    <Sun size={18} />
-                    Light Mode
-                  </>
-                ) : (
-                  <>
-                    <Moon size={18} />
-                    Dark Mode
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>
@@ -600,29 +565,21 @@ function getAuthInputProps(theme) {
         <div
           ref={formPanelRef}
           className={`en-auth-panel-form p-8 md:p-10 ${
-            theme === "dark" ? "bg-[#101827] text-white" : "en-bg-elevated text-gray-900"
+            theme === "dark" ? "bg-[#101827] text-white" : "bg-white text-slate-900"
           }`}
         >
           <div className="en-auth-form-inner">
   <div className="mb-6 flex flex-col items-center gap-4 md:hidden">
-    <ExamNexusBrand variant="panel" idSuffix="auth-mobile" />
-    <button
-      type="button"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm ${
-        theme === "dark"
-          ? "border-white/10 bg-white/5 text-gray-300"
-          : "border-emerald-200 en-bg-muted text-teal-800"
-      }`}
-    >
-      {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-      {theme === "dark" ? "Light mode" : "Dark mode"}
-    </button>
+    <ExamNexusBrand
+      variant="panel"
+      idSuffix="auth-mobile"
+      panelTone={theme === "light" ? "light" : "dark"}
+    />
   </div>
 
   <h2
     className={`text-2xl font-bold ${
-      theme === "dark" ? "text-emerald-400" : "text-teal-700"
+      theme === "dark" ? "text-emerald-400" : "text-slate-900"
     }`}
   >
     {authView === "forgot"
@@ -908,6 +865,7 @@ function getAuthInputProps(theme) {
           </div>
         </div>
       </div>
+  </div>
     </div>
   );
 }

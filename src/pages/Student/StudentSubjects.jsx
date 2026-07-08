@@ -14,6 +14,7 @@ import {
 import FacultyProfileChip from "../../components/FacultyProfileChip";
 import YearLevelBadge from "../../components/YearLevelBadge";
 import ActionDialog from "../../components/ui/ActionDialog";
+import ModalPortal from "../../components/ui/ModalPortal";
 import { getSectionsForCount, formatSectionLabel } from "../../utils/sections";
 import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
@@ -476,9 +477,18 @@ export default function StudentSubjects() {
       </div>
 
       {showEnrollModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <ModalPortal>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
           <div
-            className={`w-full max-w-md rounded-3xl p-8 shadow-2xl ${
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={closeModal}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+            className={`relative z-10 w-full max-w-md rounded-3xl p-8 shadow-2xl ${
               theme === "dark"
                 ? "bg-[#0b1114] border border-emerald-500/20 shadow-[0_0_60px_rgba(16,185,129,0.12)]"
                 : "en-bg-elevated border border-emerald-200"
@@ -567,6 +577,7 @@ export default function StudentSubjects() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       <ActionDialog

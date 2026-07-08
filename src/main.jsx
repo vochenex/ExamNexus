@@ -10,10 +10,18 @@ import AppBootstrap from "./components/AppBootstrap.jsx";
 import { ThemeProvider } from "./layouts/ThemeContext";
 import { AssessmentLockdownProvider } from "./contexts/AssessmentLockdownContext";
 import { AppModalProvider } from "./contexts/AppModalContext";
+import { clearStaleAccountCacheOnLoad } from "./utils/sessionReset";
+import { initNativeApp } from "./utils/nativeApp";
+import { registerServiceWorker } from "./utils/pwa";
 import "@fontsource/poppins/400.css";
 import "@fontsource/poppins/500.css";
 import "@fontsource/poppins/600.css";
 import "@fontsource/poppins/700.css";
+
+clearStaleAccountCacheOnLoad();
+initNativeApp();
+registerServiceWorker();
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ThemeProvider>

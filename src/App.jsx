@@ -1,81 +1,87 @@
-import { Routes, Route, Navigate } from "react-router-dom";
-import StudentDashboard from "./pages/Student/StudentDashboard";
-import ExamNexusAuth from "./components/ExamNexusAuth";
-import DashboardLayout from "./layouts/DashboardLayout";
-import AdminLayout from "./layouts/AdminLayout";
-import AdminRouteGuard from "./components/AdminRouteGuard";
-import Profile from "./pages/Profile";
-import FacultyDashboard from "./pages/Faculty/FacultyDashboard";
-import CreateAssessment from "./pages/Faculty/CreateAssessment";
-import SubjectDetails from "./pages/Faculty/SubjectDetails";
-import AssessmentDetails from "./pages/Faculty/AssessmentDetails";
-import EditAssessment from "./pages/Faculty/EditAssessment";
-import StudentAssessments from "./pages/Student/StudentAssessments";
-import StudentResultsList from "./pages/Student/StudentResultsList";
-import StudentSubjects from "./pages/Student/StudentSubjects";
-import StudentSubjectDetails from "./pages/Student/StudentSubjectDetails";
-import FacultySubjectSocial from "./pages/Faculty/FacultySubjectSocial";
-import FacultyAnnouncementsHub from "./pages/Faculty/FacultyAnnouncementsHub";
-import QuestionBank from "./pages/Faculty/QuestionBank";
-import StudentSubjectSocial from "./pages/Student/StudentSubjectSocial";
-import TakeAssessment from "./pages/Student/TakeAssessment";
-import StudentResults from "./pages/Student/StudentResults";
-import AdminDashboard from "./pages/Admin/AdminDashboard";
-import AdminAccounts from "./pages/Admin/AdminAccounts";
-import AdminSubjects from "./pages/Admin/AdminSubjects";
-import AdminAssignedSubjects from "./pages/Admin/AdminAssignedSubjects";
-import AdminCatalog from "./pages/Admin/AdminCatalog";
-import AdminAnnouncements from "./pages/Admin/AdminAnnouncements";
-import AdminAssessments from "./pages/Admin/AdminAssessments";
-import AdminExamLogs from "./pages/Admin/AdminExamLogs";
-import AdminExports from "./pages/Admin/AdminExports";
-import AdminPasswordResets from "./pages/Admin/AdminPasswordResets";
+import { lazy, Suspense } from "react";
+import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./guards/ProtectedRoute";
+import AdminRouteGuard from "./components/AdminRouteGuard";
+import RouteFallback from "./components/RouteFallback";
+
+const HomePage = lazy(() => import("./pages/HomePage"));
+const ExamNexusAuth = lazy(() => import("./components/ExamNexusAuth"));
+const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
+const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
+const Profile = lazy(() => import("./pages/Profile"));
+const StudentDashboard = lazy(() => import("./pages/Student/StudentDashboard"));
+const FacultyDashboard = lazy(() => import("./pages/Faculty/FacultyDashboard"));
+const CreateAssessment = lazy(() => import("./pages/Faculty/CreateAssessment"));
+const SubjectDetails = lazy(() => import("./pages/Faculty/SubjectDetails"));
+const AssessmentDetails = lazy(() => import("./pages/Faculty/AssessmentDetails"));
+const EditAssessment = lazy(() => import("./pages/Faculty/EditAssessment"));
+const StudentAssessments = lazy(() => import("./pages/Student/StudentAssessments"));
+const StudentResultsList = lazy(() => import("./pages/Student/StudentResultsList"));
+const StudentSubjects = lazy(() => import("./pages/Student/StudentSubjects"));
+const StudentSubjectDetails = lazy(() => import("./pages/Student/StudentSubjectDetails"));
+const FacultySubjectSocial = lazy(() => import("./pages/Faculty/FacultySubjectSocial"));
+const FacultyAnnouncementsHub = lazy(() => import("./pages/Faculty/FacultyAnnouncementsHub"));
+const QuestionBank = lazy(() => import("./pages/Faculty/QuestionBank"));
+const StudentSubjectSocial = lazy(() => import("./pages/Student/StudentSubjectSocial"));
+const TakeAssessment = lazy(() => import("./pages/Student/TakeAssessment"));
+const StudentResults = lazy(() => import("./pages/Student/StudentResults"));
+const AdminDashboard = lazy(() => import("./pages/Admin/AdminDashboard"));
+const AdminAccounts = lazy(() => import("./pages/Admin/AdminAccounts"));
+const AdminSubjects = lazy(() => import("./pages/Admin/AdminSubjects"));
+const AdminAssignedSubjects = lazy(() => import("./pages/Admin/AdminAssignedSubjects"));
+const AdminCatalog = lazy(() => import("./pages/Admin/AdminCatalog"));
+const AdminAnnouncements = lazy(() => import("./pages/Admin/AdminAnnouncements"));
+const AdminAssessments = lazy(() => import("./pages/Admin/AdminAssessments"));
+const AdminExamLogs = lazy(() => import("./pages/Admin/AdminExamLogs"));
+const AdminExports = lazy(() => import("./pages/Admin/AdminExports"));
+const AdminPasswordResets = lazy(() => import("./pages/Admin/AdminPasswordResets"));
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/auth" element={<ExamNexusAuth />} />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/auth" element={<ExamNexusAuth />} />
 
-      <Route element={<AdminRouteGuard />}>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/profile" element={<Profile />} />
-          <Route path="/admin/accounts" element={<AdminAccounts />} />
-          <Route path="/admin/password-resets" element={<AdminPasswordResets />} />
-          <Route path="/admin/subjects" element={<AdminSubjects />} />
-          <Route path="/admin/assigned-subjects" element={<AdminAssignedSubjects />} />
-          <Route path="/admin/catalog" element={<AdminCatalog />} />
-          <Route path="/admin/announcements" element={<AdminAnnouncements />} />
-          <Route path="/admin/assessments" element={<AdminAssessments />} />
-          <Route path="/admin/exam-logs" element={<AdminExamLogs />} />
-          <Route path="/admin/exports" element={<AdminExports />} />
+        <Route element={<AdminRouteGuard />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/profile" element={<Profile />} />
+            <Route path="/admin/accounts" element={<AdminAccounts />} />
+            <Route path="/admin/password-resets" element={<AdminPasswordResets />} />
+            <Route path="/admin/subjects" element={<AdminSubjects />} />
+            <Route path="/admin/assigned-subjects" element={<AdminAssignedSubjects />} />
+            <Route path="/admin/catalog" element={<AdminCatalog />} />
+            <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+            <Route path="/admin/assessments" element={<AdminAssessments />} />
+            <Route path="/admin/exam-logs" element={<AdminExamLogs />} />
+            <Route path="/admin/exports" element={<AdminExports />} />
+          </Route>
         </Route>
-      </Route>
 
-      <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/" element={<Navigate to="/auth" replace />} />
-          <Route path="/faculty/profile" element={<Profile />} />
-          <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
-          <Route path="/student/dashboard" element={<StudentDashboard />} />
-          <Route path="/student/profile" element={<Profile />} />
-          <Route path="/student/assessments" element={<StudentAssessments />} />
-          <Route path="/student/results" element={<StudentResultsList />} />
-          <Route path="/student/results/:examId/:studentId" element={<StudentResults />} />
-          <Route path="/student/take-assessment/:id" element={<TakeAssessment />} />
-          <Route path="/student/subjects" element={<StudentSubjects />} />
-          <Route path="/student/subject/:subjectId" element={<StudentSubjectDetails />} />
-          <Route path="/student/subject/:subjectId/social" element={<StudentSubjectSocial />} />
-          <Route path="/faculty/announcements" element={<FacultyAnnouncementsHub />} />
-          <Route path="/faculty/question-bank" element={<QuestionBank />} />
-          <Route path="/faculty/create-assessment" element={<CreateAssessment />} />
-          <Route path="/faculty/edit-assessment/:examId" element={<EditAssessment />} />
-          <Route path="/faculty/subject/:subjectId" element={<SubjectDetails />} />
-          <Route path="/faculty/subject/:subjectId/social" element={<FacultySubjectSocial />} />
-          <Route path="/faculty/assessment/:examId" element={<AssessmentDetails />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<DashboardLayout />}>
+            <Route path="/faculty/profile" element={<Profile />} />
+            <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
+            <Route path="/student/dashboard" element={<StudentDashboard />} />
+            <Route path="/student/profile" element={<Profile />} />
+            <Route path="/student/assessments" element={<StudentAssessments />} />
+            <Route path="/student/results" element={<StudentResultsList />} />
+            <Route path="/student/results/:examId/:studentId" element={<StudentResults />} />
+            <Route path="/student/take-assessment/:id" element={<TakeAssessment />} />
+            <Route path="/student/subjects" element={<StudentSubjects />} />
+            <Route path="/student/subject/:subjectId" element={<StudentSubjectDetails />} />
+            <Route path="/student/subject/:subjectId/social" element={<StudentSubjectSocial />} />
+            <Route path="/faculty/announcements" element={<FacultyAnnouncementsHub />} />
+            <Route path="/faculty/question-bank" element={<QuestionBank />} />
+            <Route path="/faculty/create-assessment" element={<CreateAssessment />} />
+            <Route path="/faculty/edit-assessment/:examId" element={<EditAssessment />} />
+            <Route path="/faculty/subject/:subjectId" element={<SubjectDetails />} />
+            <Route path="/faculty/subject/:subjectId/social" element={<FacultySubjectSocial />} />
+            <Route path="/faculty/assessment/:examId" element={<AssessmentDetails />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }

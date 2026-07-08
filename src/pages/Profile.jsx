@@ -16,6 +16,7 @@ import {
   GraduationCap,
   UserRound,
   Compass,
+  LogOut,
 } from "lucide-react";
 import { cardClass, inputClass } from "../utils/themeInputs";
 import Select from "../components/ui/Select";
@@ -41,6 +42,7 @@ import { YEAR_LEVELS, normalizeYearLevel, getYearLevelLabel } from "../utils/yea
 import ProfileAvatar from "../components/ProfileAvatar";
 import AvatarLightbox from "../components/AvatarLightbox";
 import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
+import useMobileNav from "../hooks/useMobileNav";
 
 function inputStyle(theme) {
   return inputClass(theme);
@@ -138,8 +140,9 @@ function QuickLink({ icon: Icon, label, onClick, theme }) {
 
 export default function Profile() {
   const { theme } = useTheme();
-  const { error: showError } = useAppModal();
+  const { error: showError, confirm: showConfirm } = useAppModal();
   const navigate = useNavigate();
+  const mobileNav = useMobileNav();
   const [editing, setEditing] = useState(false);
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
   const [profile, setProfile] = useState({
@@ -338,6 +341,25 @@ export default function Profile() {
     }
   };
 
+  const handleLogout = async () => {
+    const confirmed = await showConfirm({
+      title: "Log out",
+      message: "Are you sure you want to log out of your account?",
+      confirmLabel: "Log out",
+      cancelLabel: "Cancel",
+      tone: "warning",
+    });
+    if (!confirmed) return;
+
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore sign-out network errors; still clear the local session below.
+    }
+    localStorage.removeItem("examnexus_user");
+    navigate("/auth", { replace: true });
+  };
+
   const handleSave = async (updatedProfile) => {
     try {
       setSaveStatus("saving");
@@ -508,30 +530,48 @@ export default function Profile() {
           </p>
         </div>
 
-        {!editing ? (
-          <button
-            type="button"
-            onClick={() => {
-              setEditProfile(profile);
-              setEditing(true);
-            }}
-            className={`flex shrink-0 items-center gap-2 ${primaryButton(theme)}`}
-          >
-            <Pencil size={16} />
-            Edit Profile
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setEditProfile(profile);
-              setEditing(false);
-            }}
-            className={dangerButton(theme)}
-          >
-            Cancel Editing
-          </button>
-        )}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {!editing ? (
+            <button
+              type="button"
+              onClick={() => {
+                setEditProfile(profile);
+                setEditing(true);
+              }}
+              className={`flex items-center gap-2 ${primaryButton(theme)}`}
+            >
+              <Pencil size={16} />
+              Edit Profile
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setEditProfile(profile);
+                setEditing(false);
+              }}
+              className={dangerButton(theme)}
+            >
+              Cancel Editing
+            </button>
+          )}
+
+          {mobileNav && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out"
+              className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                theme === "dark"
+                  ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                  : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+              }`}
+            >
+              <LogOut size={16} />
+              Log out
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">

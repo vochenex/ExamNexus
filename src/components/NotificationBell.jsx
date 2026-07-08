@@ -14,6 +14,7 @@ import { fetchUserNotifications } from "../utils/supabaseData";
 import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
 import { formatTargetSectionsLabel } from "../utils/sections";
 import { getNotificationDestination } from "../utils/notificationRoutes";
+import { isNativeApp, openOnWebsite } from "../utils/platform";
 import {
   dismissNotificationItems,
   filterVisibleNotifications,
@@ -124,13 +125,19 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
-  const handleItemClick = (item) => {
+  const handleItemClick = async (item) => {
     setOpen(false);
     setShowClearConfirm(false);
     const { path } = getNotificationDestination(item, {
       isStudent,
       userId: user.id,
     });
+
+    if (isNativeApp() && path.includes("/take-assessment/")) {
+      await openOnWebsite(path);
+      return;
+    }
+
     navigate(path);
   };
 

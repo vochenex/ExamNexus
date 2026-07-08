@@ -4,6 +4,41 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const DEFAULT_CHAT_TIMEOUT_MS = 300000;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;
 const GEMINI_RETRY_DELAYS_MS = [0, 3000, 6000];
+const GEMINI_QUOTA_MAX_ATTEMPTS = 10;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isQuotaError(error) {
+  const status = Number(error?.statusCode);
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    status === 429 ||
+    message.includes("quota exceeded") ||
+    message.includes("rate limit") ||
+    message.includes("rate-limit") ||
+    message.includes("resource_exhausted") ||
+    message.includes("too many requests")
+  );
+}
+
+function parseQuotaRetryMs(error) {
+  const message = String(error?.message || "");
+  const match = message.match(/retry in ([\d.]+)s/i);
+  if (match) {
+    const seconds = Number.parseFloat(match[1]);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(120000, Math.ceil(seconds * 1000) + 1000);
+    }
+  }
+  return 62000;
+}
+
+function formatGeminiQuotaError(retryMs) {
+  const seconds = Math.max(1, Math.ceil(retryMs / 1000));
+  return `Gemini free-tier limit reached (20 requests/min). Wait about ${seconds} seconds and try again, or generate fewer questions at once.`;
+}
 
 function getChatTimeoutMs() {
   const configured = Number(process.env.AI_CHAT_TIMEOUT_MS);
@@ -240,9 +275,13 @@ async function requestGeminiChatCompletion(
 
   let lastError = null;
 
-  for (const delayMs of GEMINI_RETRY_DELAYS_MS) {
-    if (delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+  for (let attempt = 0; attempt < GEMINI_QUOTA_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 0 && !isQuotaError(lastError)) {
+      const delayMs =
+        GEMINI_RETRY_DELAYS_MS[Math.min(attempt, GEMINI_RETRY_DELAYS_MS.length - 1)] || 0;
+      if (delayMs > 0) {
+        await sleep(delayMs);
+      }
     }
 
     try {
@@ -264,6 +303,18 @@ async function requestGeminiChatCompletion(
       return text;
     } catch (error) {
       lastError = error;
+
+      if (isQuotaError(error)) {
+        const waitMs = parseQuotaRetryMs(error);
+        if (attempt < GEMINI_QUOTA_MAX_ATTEMPTS - 1) {
+          await sleep(waitMs);
+          continue;
+        }
+        const wrapped = new Error(formatGeminiQuotaError(waitMs));
+        wrapped.statusCode = 429;
+        wrapped.cause = error;
+        throw wrapped;
+      }
 
       if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
         throw error;

@@ -9,6 +9,12 @@ CREATE TABLE IF NOT EXISTS public.exam_retake_requests (
     CHECK (status IN ('pending', 'approved', 'denied', 'fulfilled')),
   student_message text,
   faculty_note text,
+  -- Snapshot scores so faculty can compare original vs retake even though
+  -- exam_results is cleared to allow the retake submission.
+  original_score integer,
+  original_total integer,
+  retake_score integer,
+  retake_total integer,
   reviewed_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
   reviewed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -184,6 +190,10 @@ BEGIN
         r.status,
         r.student_message,
         r.faculty_note,
+        r.original_score,
+        r.original_total,
+        r.retake_score,
+        r.retake_total,
         r.reviewed_by,
         r.reviewed_at,
         r.created_at,
@@ -232,6 +242,8 @@ DECLARE
   v_action text := lower(trim(p_action));
   v_id uuid;
   v_student_id uuid;
+  v_prev_score integer;
+  v_prev_total integer;
   v_processed integer := 0;
   v_skipped integer := 0;
 BEGIN
@@ -266,6 +278,13 @@ BEGIN
     END IF;
 
     IF v_action = 'approve' THEN
+      -- Snapshot the student's current score before clearing results/answers.
+      SELECT er.score, er.total
+      INTO v_prev_score, v_prev_total
+      FROM public.exam_results er
+      WHERE er.exam_id = p_exam_id AND er.student_id = v_student_id
+      LIMIT 1;
+
       DELETE FROM public.student_answers
       WHERE exam_id = p_exam_id AND student_id = v_student_id;
 
@@ -275,6 +294,11 @@ BEGIN
       UPDATE public.exam_retake_requests
       SET status = 'approved',
           faculty_note = NULLIF(trim(p_note), ''),
+          original_score = COALESCE(original_score, v_prev_score),
+          original_total = COALESCE(original_total, v_prev_total),
+          -- Clear any previous retake snapshot when approving a new retake.
+          retake_score = NULL,
+          retake_total = NULL,
           reviewed_by = v_reviewer,
           reviewed_at = now(),
           updated_at = now()
@@ -323,9 +347,22 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_score integer;
+  v_total integer;
 BEGIN
+  -- Snapshot the score from the retake submission (exam_results row just inserted).
+  SELECT er.score, er.total
+  INTO v_score, v_total
+  FROM public.exam_results er
+  WHERE er.exam_id = p_exam_id
+    AND er.student_id = auth.uid()
+  LIMIT 1;
+
   UPDATE public.exam_retake_requests
   SET status = 'fulfilled',
+      retake_score = COALESCE(retake_score, v_score),
+      retake_total = COALESCE(retake_total, v_total),
       updated_at = now()
   WHERE exam_id = p_exam_id
     AND student_id = auth.uid()

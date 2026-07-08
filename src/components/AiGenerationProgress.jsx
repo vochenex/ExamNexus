@@ -66,8 +66,8 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
     ? `${questionCount} question${questionCount === 1 ? "" : "s"} ready to review below`
     : status === "waiting"
       ? total
-        ? `Working toward ${total} question${total === 1 ? "" : "s"}…`
-        : "This may take a minute…"
+        ? `Working toward ${total} question${total === 1 ? "" : "s"}… (paced for Gemini free-tier limits)`
+        : "Pacing requests for Gemini free-tier limits…"
       : current && total
         ? `Question ${current} of ${total}${latestType ? ` · ${formatLabel(latestType)}` : ""}`
         : null;

@@ -29,6 +29,32 @@ const MIN_QUESTIONS = 1;
 const DEFAULT_QUESTIONS = 8;
 const MAX_SOURCE_CHARS = 14000;
 const MAX_PROMPT_CHARS = 4000;
+const DEFAULT_BATCH_DELAY_MS = 4000;
+const DEFAULT_CHUNK_SIZE = 5;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getBatchDelayMs() {
+  const configured = Number(process.env.GEMINI_BATCH_DELAY_MS);
+  if (Number.isFinite(configured) && configured >= 0) {
+    return configured;
+  }
+  return DEFAULT_BATCH_DELAY_MS;
+}
+
+function getChunkSize() {
+  const configured = Number.parseInt(process.env.GEMINI_CHUNK_SIZE, 10);
+  if (Number.isFinite(configured) && configured >= 1) {
+    return Math.min(10, configured);
+  }
+  return DEFAULT_CHUNK_SIZE;
+}
+
+function questionDedupeKey(question) {
+  return String(question?.question || "").trim().toLowerCase();
+}
 
 function clampQuestionCount(value) {
   const parsed = Number.parseInt(value, 10);
@@ -460,48 +486,133 @@ async function requestAiQuestionsBatched({
 }) {
   const allowedFormats = parseFormats(formats);
   const count = clampQuestionCount(questionCount);
+  const delayMs = getBatchDelayMs();
+  const chunkSize = getChunkSize();
+  const mode = topicPrompt ? "prompt" : "document";
+
   const questions = [];
+  const seen = new Set();
   let suggestedTitle = "";
   let suggestedDescription = "";
   let provider = "gemini";
   let model = "";
 
-  for (let step = 0; step < count; step += 1) {
-    const format = pickFormatForStep(allowedFormats, step);
-    const result = await requestSingleAiQuestion({
+  const absorbQuestions = (items) => {
+    for (const item of items) {
+      const key = questionDedupeKey(item);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      questions.push(item);
+      if (questions.length >= count) break;
+    }
+  };
+
+  let chunkRound = 0;
+  const maxChunkRounds = Math.ceil(count / chunkSize) + 3;
+
+  while (questions.length < count && chunkRound < maxChunkRounds) {
+    if (chunkRound > 0) {
+      await sleep(delayMs);
+    }
+    chunkRound += 1;
+
+    const need = Math.min(chunkSize, count - questions.length);
+    const continuation =
+      questions.length > 0
+        ? `\n\nAlready created ${questions.length} of ${count} questions. Add ${need} NEW distinct questions without repeating topics or wording.`
+        : "";
+
+    const result = await requestAiQuestions({
       sourceText,
-      topicPrompt,
+      topicPrompt: topicPrompt + continuation,
       additionalInstructions,
-      format,
+      formats: allowedFormats,
+      questionCount: need,
       difficulty,
-      stepIndex: step,
-      totalSteps: count,
-      mode: topicPrompt ? "prompt" : "document",
+      mode,
     });
 
-    questions.push(result.question);
-    provider = result.provider || provider;
-    model = result.model || model;
-
+    provider = result.meta?.provider || provider;
+    model = result.meta?.model || model;
     if (!suggestedTitle && result.suggestedTitle) {
       suggestedTitle = result.suggestedTitle;
     }
     if (!suggestedDescription && result.suggestedDescription) {
       suggestedDescription = result.suggestedDescription;
     }
+
+    const before = questions.length;
+    absorbQuestions(result.questions);
+    if (questions.length === before) {
+      break;
+    }
+  }
+
+  let singleStep = 0;
+  const maxSingleSteps = count - questions.length + 5;
+
+  while (questions.length < count && singleStep < maxSingleSteps) {
+    await sleep(delayMs);
+    singleStep += 1;
+
+    const step = questions.length;
+    const format = pickFormatForStep(allowedFormats, step);
+    const recent = questions
+      .slice(-5)
+      .map((item) => item.question)
+      .filter(Boolean)
+      .join(" | ");
+
+    const result = await requestSingleAiQuestion({
+      sourceText,
+      topicPrompt,
+      additionalInstructions: recent
+        ? `${additionalInstructions}\nAvoid duplicating: ${recent}`
+        : additionalInstructions,
+      format,
+      difficulty,
+      stepIndex: step,
+      totalSteps: count,
+      mode,
+    });
+
+    provider = result.provider || provider;
+    model = result.model || model;
+    if (!suggestedTitle && result.suggestedTitle) {
+      suggestedTitle = result.suggestedTitle;
+    }
+    if (!suggestedDescription && result.suggestedDescription) {
+      suggestedDescription = result.suggestedDescription;
+    }
+
+    const key = questionDedupeKey(result.question);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      questions.push(result.question);
+    }
+  }
+
+  if (!questions.length) {
+    const error = new Error(
+      "AI could not produce valid questions. Try fewer questions or wait a minute and retry."
+    );
+    error.statusCode = 422;
+    throw error;
   }
 
   return {
     suggestedTitle,
     suggestedDescription,
-    questions,
+    questions: questions.slice(0, count),
     meta: {
       requestedCount: count,
-      generatedCount: questions.length,
+      generatedCount: Math.min(questions.length, count),
       formats: allowedFormats,
       provider,
       model,
       batched: true,
+      chunkSize,
+      batchDelayMs: delayMs,
     },
   };
 }

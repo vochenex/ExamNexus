@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
+import ModalPortal from "./ui/ModalPortal";
 
 export default function AvatarLightbox({ src, alt = "Profile photo", open, onClose }) {
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function AvatarLightbox({ src, alt = "Profile photo", open, onClo
   if (!open || !src) return null;
 
   return (
+    <ModalPortal>
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
       onClick={onClose}
@@ -44,5 +46,6 @@ export default function AvatarLightbox({ src, alt = "Profile photo", open, onClo
         onClick={(event) => event.stopPropagation()}
       />
     </div>
+    </ModalPortal>
   );
 }

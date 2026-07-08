@@ -4,6 +4,7 @@ import { supabase } from "../../supabaseClient";
 import {
   createSubject,
   deleteSubjectById,
+  fetchFacultyDashboardAnalytics,
   fetchTeacherSubjects,
   updateSubject,
 } from "../../utils/supabaseData";
@@ -17,9 +18,7 @@ import FacultyProfileChip from "../../components/FacultyProfileChip";
 import CopyInviteCodeButton from "../../components/CopyInviteCodeButton";
 import YearLevelBadge, {
   YearLevelFilter,
-  YearLevelSelect,
 } from "../../components/YearLevelBadge";
-import SectionCountSelect from "../../components/SectionCountSelect";
 import {
   DEFAULT_YEAR_LEVEL,
   filterSubjectsByYearLevel,
@@ -37,12 +36,11 @@ import {
   Trash2,
   BookOpen,
   Users,
-  Plus,
   LayoutDashboard,
+  FileCheck,
 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import {
-  primaryButton,
   primaryButtonSm,
   secondaryButton,
   secondaryButtonSm,
@@ -51,10 +49,14 @@ import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { staggerGridClass } from "../../utils/themeInputs";
+import FacultyDashboardAnalyticsPanel from "../../components/FacultyDashboardAnalyticsPanel";
+import FacultyCreateSubjectPanel from "../../components/FacultyCreateSubjectPanel";
+import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
+import ModalPortal from "../../components/ui/ModalPortal";
 
 function panelClass(theme) {
   return theme === "dark"
-    ? "bg-white/[0.04] border border-white/10"
+    ? "bg-gradient-to-br from-[#173a2e] via-[#123027] to-[#0d211b] border border-emerald-500/20"
     : "en-bg-surface border border-emerald-300 shadow-sm";
 }
 
@@ -97,6 +99,7 @@ export default function FacultyDashboard() {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const navigate = useNavigate();
   const [deletingSubject, setDeletingSubject] = useState(false);
+  const [dashAnalytics, setDashAnalytics] = useState(null);
   const [editingSubjectId, setEditingSubjectId] = useState(null);
   const [editingSubjectName, setEditingSubjectName] = useState("");
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
@@ -117,6 +120,13 @@ export default function FacultyDashboard() {
       const freshSubjects = await fetchTeacherSubjects(teacherId);
       setSubjects(freshSubjects);
       localStorage.setItem("examnexus_subjects", JSON.stringify(freshSubjects));
+
+      try {
+        const analytics = await fetchFacultyDashboardAnalytics(teacherId);
+        setDashAnalytics(analytics);
+      } catch (analyticsErr) {
+        console.error("Dashboard analytics:", analyticsErr);
+      }
     } catch (err) {
       console.error("Error fetching subjects:", err);
       setSubjects([]);
@@ -269,10 +279,11 @@ export default function FacultyDashboard() {
 
   return (
     <div
-      className={`min-h-screen p-6 ${
+      className={`min-h-screen p-4 sm:p-6 ${
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
+      <div className="mx-auto w-full max-w-7xl">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -313,7 +324,7 @@ export default function FacultyDashboard() {
       )}
 
       {subjects.length > 0 && (
-        <div className={staggerGridClass("mb-6 grid gap-3 sm:grid-cols-3")}>
+        <div className={staggerGridClass("mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4")}>
           <StatPill icon={BookOpen} label="Subjects" value={subjects.length} theme={theme} />
           <StatPill icon={Users} label="Class sections" value={totalSections} theme={theme} />
           <StatPill
@@ -322,104 +333,45 @@ export default function FacultyDashboard() {
             value={Object.keys(yearLevelCounts).length - 1}
             theme={theme}
           />
+          <StatPill
+            icon={FileCheck}
+            label="Total submissions"
+            value={dashAnalytics?.totalSubmissions ?? "—"}
+            theme={theme}
+          />
         </div>
       )}
 
-      <div className={`mb-6 overflow-hidden rounded-2xl ${panelClass(theme)}`}>
-        <div
-          className={`border-b px-5 py-4 ${
-            theme === "dark" ? "border-white/10 bg-white/[0.02]" : "border-emerald-100 bg-emerald-50/40"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                theme === "dark" ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-100 text-teal-700"
-              }`}
-            >
-              <Plus size={20} />
-            </div>
-            <div>
-              <h2 className={`font-semibold ${theme === "dark" ? "text-white" : "text-teal-800"}`}>
-                Create subject
-              </h2>
-              <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                Add a course, choose year level and sections, then share the invite code.
-              </p>
-            </div>
-          </div>
+      <div className="mb-6">
+        <FacultyCreateSubjectPanel
+          name={name}
+          onNameChange={setName}
+          yearLevel={newSubjectYearLevel}
+          onYearLevelChange={setNewSubjectYearLevel}
+          sectionCount={newSubjectSectionCount}
+          onSectionCountChange={setNewSubjectSectionCount}
+          onSubmit={addSubject}
+          creating={creatingSubject}
+          disabled={!facultyCanManage}
+          defaultOpen={subjects.length === 0}
+        />
+      </div>
+
+      <div className="mb-6">
+        <div className="mb-3 flex items-center gap-2">
+          <LayoutDashboard
+            size={16}
+            className={theme === "dark" ? "text-emerald-400" : "text-teal-600"}
+          />
+          <h2 className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-teal-800"}`}>
+            Submission insights
+          </h2>
         </div>
-
-        <div className="space-y-5 p-5">
-          <div>
-            <label
-              htmlFor="faculty-subject-name"
-              className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${
-                theme === "dark" ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              Subject name
-            </label>
-            <input
-              id="faculty-subject-name"
-              className={`w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 ${
-                theme === "dark"
-                  ? "border-white/10 bg-black/30 text-white placeholder:text-gray-500"
-                  : "border-emerald-300/80 en-bg-elevated text-gray-900 placeholder:text-gray-400"
-              }`}
-              placeholder="e.g. Programming 1"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addSubject()}
-              disabled={!facultyCanManage}
-            />
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div>
-              <p
-                className={`mb-2 text-xs font-semibold uppercase tracking-wide ${
-                  theme === "dark" ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
-                Year level
-              </p>
-              <YearLevelSelect
-                value={newSubjectYearLevel}
-                onChange={setNewSubjectYearLevel}
-                disabled={!facultyCanManage}
-              />
-            </div>
-            <SectionCountSelect
-              value={newSubjectSectionCount}
-              onChange={setNewSubjectSectionCount}
-              disabled={!facultyCanManage}
-            />
-          </div>
-
-          <div
-            className={`flex justify-end border-t pt-4 ${
-              theme === "dark" ? "border-white/10" : "border-emerald-100"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={addSubject}
-              disabled={!facultyCanManage || creatingSubject || !name.trim()}
-              className={primaryButton(
-                theme,
-                "rounded-xl px-6 py-3 disabled:cursor-not-allowed disabled:opacity-50"
-              )}
-            >
-              <Plus size={18} />
-              {creatingSubject ? "Creating..." : "Create subject"}
-            </button>
-          </div>
-        </div>
+        <FacultyDashboardAnalyticsPanel teacherSchoolId={teacherId} />
       </div>
 
       {subjects.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-4">
           <YearLevelFilter
             value={yearFilter}
             onChange={setYearFilter}
@@ -428,28 +380,34 @@ export default function FacultyDashboard() {
         </div>
       )}
 
-      {subjects.length === 0 ? (
-        <div
-          className={`rounded-2xl border border-dashed px-6 py-12 text-center ${
-            theme === "dark"
-              ? "border-white/15 bg-white/[0.02] text-gray-400"
-              : "border-emerald-300/80 en-bg-elevated/50 text-gray-600"
-          }`}
-        >
-          <BookOpen size={32} className="mx-auto mb-3 opacity-60" />
-          <p className="font-medium">No subjects yet</p>
-          <p className="mt-1 text-sm">Create your first subject above to get an invitation code.</p>
-        </div>
-      ) : filteredSubjects.length === 0 ? (
-        <p className={theme === "dark" ? "text-gray-400" : "text-gray-700"}>
-          No subjects match this year level filter.
-        </p>
-      ) : (
-        <div className={staggerGridClass("grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3")}>
+      <CollapsiblePanel
+        title={`Your subjects (${filteredSubjects.length})`}
+        subtitle="Invite codes, assessments, and subject pages"
+        defaultOpen
+        className={`mb-6 ${panelClass(theme)}`}
+      >
+        {subjects.length === 0 ? (
+          <div
+            className={`rounded-xl border border-dashed px-4 py-8 text-center ${
+              theme === "dark"
+                ? "border-white/15 bg-white/[0.02] text-gray-400"
+                : "border-emerald-300/80 text-gray-600"
+            }`}
+          >
+            <BookOpen size={28} className="mx-auto mb-2 opacity-60" />
+            <p className="font-medium text-sm">No subjects yet</p>
+            <p className="mt-1 text-xs">Use the panel on the right to create your first subject.</p>
+          </div>
+        ) : filteredSubjects.length === 0 ? (
+          <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-700"}`}>
+            No subjects match this year level filter.
+          </p>
+        ) : (
+          <div className={staggerGridClass("grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3")}>
           {filteredSubjects.map((subject) => (
             <article
               key={subject.id}
-              className={`group relative rounded-2xl p-5 pr-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+              className={`group relative rounded-xl p-4 pr-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg ${
                 theme === "dark"
                   ? "bg-white/[0.04] border border-white/10 hover:border-emerald-500/25"
                   : "en-bg-elevated border border-emerald-200 shadow-md hover:border-teal-300"
@@ -513,7 +471,7 @@ export default function FacultyDashboard() {
               </div>
 
               <div
-                className={`mb-4 rounded-xl border px-3 py-2.5 ${
+                className={`mb-3 rounded-lg border px-2.5 py-2 ${
                   theme === "dark"
                     ? "border-white/10 bg-black/20"
                     : "border-emerald-100 bg-emerald-50/60"
@@ -524,17 +482,14 @@ export default function FacultyDashboard() {
                     theme === "dark" ? "text-gray-500" : "text-gray-500"
                   }`}
                 >
-                  Invitation code
+                  Invite code
                 </p>
                 <p
-                  className={`mt-1 font-mono text-sm font-semibold tracking-wide ${
+                  className={`mt-0.5 font-mono text-xs font-semibold tracking-wide ${
                     theme === "dark" ? "text-emerald-300" : "text-teal-700"
                   }`}
                 >
                   {subject.invite_code}
-                </p>
-                <p className={`mt-1 text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                  Hover the card edge to copy
                 </p>
               </div>
 
@@ -560,15 +515,26 @@ export default function FacultyDashboard() {
               </div>
             </article>
           ))}
-        </div>
-      )}
+          </div>
+        )}
+      </CollapsiblePanel>
+      </div>
 
       {showAssessmentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <ModalPortal>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
           <div
-            className={`w-full max-w-3xl rounded-3xl p-8 ${
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowAssessmentModal(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+            className={`relative z-10 w-full max-w-3xl rounded-3xl p-8 ${
               theme === "dark"
-                ? "bg-[#031d1f] border border-white/10"
+                ? "bg-[#0a120f] border border-white/10"
                 : "en-bg-surface border border-emerald-300"
             } shadow-2xl`}
           >
@@ -620,6 +586,7 @@ export default function FacultyDashboard() {
             </button>
           </div>
         </div>
+        </ModalPortal>
       )}
 
     </div>

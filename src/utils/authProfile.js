@@ -1,5 +1,6 @@
 import { DEFAULT_AVATAR_PATH } from "./avatar";
 import { getAuthSession } from "./authUser";
+import { normalizeSchoolId } from "./schoolIdRules";
 import { normalizeYearLevelForStorage } from "./yearLevels";
 
 import { formatSupabaseError } from "./supabaseErrors";
@@ -13,7 +14,7 @@ export function buildUserProfileRow(userId, form) {
     first_name: String(form.firstName || "").trim(),
     last_name: String(form.lastName || "").trim(),
     email: String(form.email || "").trim(),
-    school_id: String(form.schoolId || "").trim(),
+    school_id: normalizeSchoolId(form.schoolId),
     role: form.role || "Student",
     gender: emptyToNull(form.gender),
     department: emptyToNull(form.department),
@@ -37,7 +38,7 @@ export function buildSignupMetadata(form) {
   const metadata = {
     first_name: String(form.firstName || "").trim(),
     last_name: String(form.lastName || "").trim(),
-    school_id: String(form.schoolId || "").trim(),
+    school_id: normalizeSchoolId(form.schoolId),
     role: form.role || "Student",
     gender: emptyToNull(form.gender),
     department: emptyToNull(form.department),
@@ -254,14 +255,14 @@ async function repairSchoolIdFromMetadata(supabase, authUser, profile) {
   return mergeProfileWithAuthMetadata(persisted, authUser);
 }
 
-export function navigateForRole(navigate, role) {
+export function navigateForRole(navigate, role, options = {}) {
   const normalized = String(role || "").toLowerCase();
   if (normalized === "faculty") {
-    navigate("/faculty/dashboard");
+    navigate("/faculty/dashboard", options);
   } else if (normalized === "admin") {
-    navigate("/admin/dashboard");
+    navigate("/admin/dashboard", options);
   } else {
-    navigate("/student/dashboard");
+    navigate("/student/dashboard", options);
   }
 }
 
