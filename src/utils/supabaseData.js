@@ -28,6 +28,7 @@ import { buildSubjectClassAnalytics } from "./subjectClassAnalytics";
 import { normalizeYearLevelForStorage } from "./yearLevels";
 import { durationFieldsForDb } from "./assessmentDuration";
 import { dedupeExamQuestions } from "./assessmentTake";
+import { API_BASE } from "./apiBase.js";
 import {
   buildExamFacultyAnalytics,
   buildSubmissionAlertRankings,
@@ -2262,6 +2263,7 @@ export async function createAnnouncement({
   body,
   targetSections,
   createdBy,
+  skipPush = false,
 }) {
   await requireSession();
 
@@ -2284,6 +2286,16 @@ export async function createAnnouncement({
     .single();
 
   if (error) throw error;
+
+  if (!skipPush) {
+    await dispatchAnnouncementPush({
+      subjectIds: [subjectId],
+      title,
+      body,
+      targetSections,
+    });
+  }
+
   return data;
 }
 
@@ -2379,6 +2391,41 @@ export async function postAnnouncementComment(announcementId, body) {
   return data;
 }
 
+async function dispatchAnnouncementPush({
+  subjectIds = [],
+  title,
+  body,
+  targetSections,
+}) {
+  try {
+    const session = await requireSession();
+    const token = session?.access_token;
+    if (!token || !subjectIds.length) return;
+
+    const sections = normalizeTargetSections(targetSections);
+    await Promise.allSettled(
+      subjectIds.map((subjectId) =>
+        fetch(`${API_BASE}/push/announce`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            subjectId,
+            title,
+            body,
+            targetSections: sections,
+            path: `/student/subject/${subjectId}/social`,
+          }),
+        })
+      )
+    );
+  } catch (err) {
+    console.warn("Announcement push dispatch skipped:", err?.message || err);
+  }
+}
+
 export async function createFacultyAnnouncements({
   subjectIds,
   title,
@@ -2397,7 +2444,17 @@ export async function createFacultyAnnouncements({
   const { data, error } = await supabase.rpc("create_faculty_announcements", payload);
 
   if (!error && data) {
-    return normalizeJsonList(data).length;
+    const rows = normalizeJsonList(data);
+    const createdSubjectIds = [
+      ...new Set(rows.map((row) => row.subject_id).filter(Boolean)),
+    ];
+    await dispatchAnnouncementPush({
+      subjectIds: createdSubjectIds.length ? createdSubjectIds : subjectIds || [],
+      title,
+      body,
+      targetSections,
+    });
+    return rows.length;
   }
 
   if (error?.message?.includes("Could not find the function")) {
@@ -2415,9 +2472,17 @@ export async function createFacultyAnnouncements({
         body,
         targetSections,
         createdBy: user.id,
+        skipPush: true,
       });
       created += 1;
     }
+
+    await dispatchAnnouncementPush({
+      subjectIds: ids,
+      title,
+      body,
+      targetSections,
+    });
 
     return created;
   }

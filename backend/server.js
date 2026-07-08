@@ -32,8 +32,10 @@ const subjectsRoute = require("./routes/subjectsRoute");
 const analyticsRoute = require("./routes/analyticsRoute");
 const passwordResetRoute = require("./routes/passwordResetRoute");
 const assessmentAiRoute = require("./routes/assessmentAiRoute");
+const pushRoute = require("./routes/pushRoute");
 const { getSupabaseAdmin } = require("./lib/supabaseAdmin");
 const { getAiServiceStatus } = require("./lib/aiProvider");
+const { getFcmServerKey } = require("./lib/pushSender");
 
 // ================= INIT APP =================
 const app = express();
@@ -60,6 +62,7 @@ app.get("/health", async (req, res) => {
     passwordReset: hasServiceRole,
     enrollment: hasServiceRole,
     assessmentAi: aiStatus.configured,
+    pushNotifications: Boolean(getFcmServerKey()),
     promptProvider: aiStatus.promptProvider,
     documentProvider: aiStatus.documentProvider,
     promptModel: aiStatus.promptModel,
@@ -382,6 +385,7 @@ app.use("/subjects", subjectsRoute);
 app.use("/analytics", analyticsRoute);
 app.use("/password-reset", passwordResetRoute);
 app.use("/assessment-ai", assessmentAiRoute);
+app.use("/push", pushRoute);
 app.use((err, req, res, next) => {
   console.error("GLOBAL EXPRESS ERROR:", err);
 

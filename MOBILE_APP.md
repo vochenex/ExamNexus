@@ -2,104 +2,127 @@
 
 There are two ways to ship ExamNexus as an app, both from the **same React code**:
 
-1. **PWA (installable web app) — recommended, no app store, no emulators.**
-   Users just open the site and tap **Install** (Android/desktop) or **Add to
-   Home Screen** (iOS). It launches fullscreen with its own icon like a native app.
-2. **Capacitor native app** — a real `.apk`/`.ipa` for the app stores (needs
-   Android Studio / Xcode). See the Capacitor sections below.
+1. **PWA (installable web app) — recommended starter.** Users open the site and tap **Install** / **Add to Home Screen**.
+2. **Capacitor native app** — real `.apk` / `.ipa` with push notifications (needs Android Studio / Xcode).
 
-## PWA install (the "downloadable" version)
+## What's different on mobile
 
-Nothing to build separately — the PWA ships with your normal `npm run build`
-and works once the site is served over **HTTPS** (localhost also works for testing).
+| Area | Computer / laptop website | Mobile app + phones/tablets/iPads |
+|------|---------------------------|----------------------------------|
+| Navigation | Top header / left sidebar | **Bottom tab bar** + "More" sheet |
+| Taking an assessment | Allowed (fullscreen lockdown) | **Blocked everywhere** — desktop/laptop only |
+| Announcements / notifications | In-app bell | In-app bell **+ native push** to the phone |
+| Everything else | ✅ | ✅ identical |
 
-How users install it:
-- **Android (Chrome):** an **Install ExamNexus** prompt appears; or menu → *Install app*.
-- **Desktop (Chrome/Edge):** install icon in the address bar, or the in-app pill.
-- **iPhone/iPad (Safari):** **Share → Add to Home Screen** (the app shows a guide).
+### Desktop-only assessments (important)
 
-PWA files:
-| File | Purpose |
-|------|---------|
-| `public/manifest.webmanifest` | App name, icons, colors, standalone display |
-| `public/sw.js` | Service worker — makes it installable + offline-resilient |
-| `public/icons/*` | App icons (192, 512, maskable, apple-touch) |
-| `src/utils/pwa.js` | Registers the service worker (prod web only) |
-| `src/hooks/useInstallPrompt.js` | Shared PWA install state (captures the install event) |
-| `src/components/pwa/InstallIconButton.jsx` | Header install icon (beside theme toggle) + tooltip |
-| `src/components/pwa/IosInstallSheet.jsx` | iOS "Add to Home Screen" instructions sheet |
-| `public/icons/logo.svg` | Website logo (same as `ExamNexusLogo.jsx`) — source for all icons |
-| `scripts/gen-pwa-icons.mjs` | Regenerate icons: `node scripts/gen-pwa-icons.mjs` |
+Students **cannot** take assessments on:
 
-Notes:
-- The service worker never caches Supabase/API calls, so live data and logins
-  always hit the network.
-- After deploying changes, bump `CACHE_VERSION` in `public/sw.js` to refresh clients.
+- the ExamNexus **mobile app**
+- a **phone browser**
+- a **tablet / iPad** (any orientation)
+
+Opening the website on those devices still shows a block screen. Assessments require a **computer or laptop** browser (`viewport ≥ 1024px` and not a mobile/tablet UA), so integrity lockdown can run properly.
+
+---
+
+## PWA install
+
+See the PWA section below; ship with normal `npm run build` over HTTPS.
 
 ---
 
 ## Capacitor native app
 
-The native app is the **same React app** wrapped with [Capacitor](https://capacitorjs.com/).
-It reuses 100% of the website's code, theme, and features — no separate codebase.
+Same React app wrapped with [Capacitor](https://capacitorjs.com/).
 
-## What's different in the app vs. the website
-
-| Area | Website | Mobile app |
-|------|---------|------------|
-| Navigation | Top header (home) / left sidebar (dashboards) | **Bottom tab bar** with a "More" sheet |
-| Taking an assessment | In-app, with fullscreen integrity lockdown | **Not allowed** — tapping "Take Assessment" opens the exam on the website in the system browser |
-| Everything else (auth, dashboards, subjects, results, analytics, admin, faculty tools) | ✅ | ✅ identical |
-
-Assessments are website-only on purpose: the exam integrity features (fullscreen
-lockdown, tab-switch detection) require a real browser and can't be enforced inside a
-webview.
-
-## One-time setup
+### One-time setup
 
 ```bash
-npm install                 # installs Capacitor + all deps
-npm run build               # produces dist/
-npm run cap:add:android     # creates the native android/ project (needs Android Studio)
-npm run cap:add:ios         # creates the native ios/ project (needs Xcode, macOS only)
+npm install
+npm run build
+npm run cap:add:android    # needs Android Studio + JDK 17
+npm run cap:add:ios        # macOS + Xcode + CocoaPods only
 ```
 
-Requirements:
-- **Android:** Android Studio + JDK 17
-- **iOS:** macOS + Xcode + CocoaPods
-
-## Daily workflow
+### Daily workflow
 
 ```bash
-npm run cap:android    # build web, sync, open Android Studio → Run on device/emulator
-npm run cap:ios        # build web, sync, open Xcode → Run on simulator/device
-npm run cap:sync       # just rebuild web + copy into native projects
+npm run cap:android    # build web, sync, open Android Studio
+npm run cap:ios        # build web, sync, open Xcode
+npm run cap:sync       # rebuild web + copy into native projects
 ```
 
-## Configuration
+### Configuration
 
-- **Website URL for the assessment redirect:** set `VITE_WEBSITE_URL` in `.env`
-  (defaults to `https://examnexus.app`). See `src/config/appConfig.js`.
-- **App identity:** `capacitor.config.json` (`appId`: `com.examnexus.app`, `appName`: `ExamNexus`).
-- **Supabase:** the app talks to the same Supabase backend as the website via the same
-  `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`.
+| Setting | Where |
+|---------|--------|
+| `VITE_WEBSITE_URL` | root `.env` — public website URL |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | root `.env` — same as web |
+| `VITE_API_BASE_URL` | root `.env` — backend used for push dispatch |
+| `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` |
+| `FCM_SERVER_KEY` | `backend/.env` — Firebase Cloud Messaging key for push delivery |
+| `appId` / `appName` | `capacitor.config.json` (`com.examnexus.app`) |
 
-## Key implementation files
+### Push notifications (students)
+
+When a faculty announcement is posted, the app:
+
+1. Saves each native device token into Supabase `push_devices` (run `database/push_notification_devices.sql`).
+2. Calls backend `POST /push/announce` after create.
+3. Backend looks up enrolled students for that subject/section and sends an FCM push.
+
+**Setup checklist**
+
+1. Run `database/push_notification_devices.sql` in Supabase SQL Editor.
+2. Create a Firebase project, enable Cloud Messaging, add Android (`com.examnexus.app`) and/or iOS apps.
+3. Put the FCM server key in `backend/.env` as `FCM_SERVER_KEY=...`.
+4. For Android: add `google-services.json` under `android/app/` after `cap add android`.
+5. For iOS: enable Push capability in Xcode, upload APNs key to Firebase, sync pods.
+6. Rebuild/sync: `npm run cap:sync`.
+
+Without `FCM_SERVER_KEY`, tokens still register but sends are skipped (logged).
+
+### Key files
 
 | File | Purpose |
 |------|---------|
-| `capacitor.config.json` | Native app config (id, name, status bar) |
-| `src/utils/platform.js` | `isNativeApp()`, `openOnWebsite()` |
-| `src/utils/nativeApp.js` | Native init (status bar, Android back button) |
-| `src/config/appConfig.js` | `WEBSITE_URL` + `websiteUrl(path)` |
-| `src/hooks/useMobileNav.js` | True in the app + on small screens |
-| `src/components/mobile/MobileTabBar.jsx` | Dashboard/admin bottom tab bar + More sheet |
-| `src/components/mobile/mobileNav.js` | Per-role tab items |
-| `src/components/home/HomeBottomBar.jsx` | Homepage bottom bar |
+| `capacitor.config.json` | Native id/name + push plugin options |
+| `src/utils/platform.js` | `isNativeApp()`, `canTakeAssessmentOnThisDevice()` |
+| `src/utils/nativeApp.js` | Status bar, back button, push init |
+| `src/utils/pushNotifications.js` | Capacitor PushNotifications + token upsert |
+| `database/push_notification_devices.sql` | `push_devices` table + RPCs |
+| `backend/routes/pushRoute.js` | `/push/announce`, `/push/notify-users` |
+| `backend/lib/pushSender.js` | FCM send helpers |
+| `src/components/mobile/MobileTabBar.jsx` | Bottom tab bar |
+| `src/hooks/useMobileNav.js` | When bottom nav replaces the sidebar |
 
-## How the "Take Assessment" redirect works
+### How assessment blocking works
 
-- `StudentAssessmentCard` — in the app, the button shows a confirm dialog, then opens
-  `<WEBSITE_URL>/student/take-assessment/<id>` in the system browser.
-- `TakeAssessment` page — if reached any other way (notification, deep link) in the app,
-  it redirects to the website and never mounts the exam experience.
+- `StudentAssessmentCard` — warns and blocks on non-desktop devices (including the app).
+- `TakeAssessment` — hard gate; never mounts the exam UI on phone/tablet/iPad/native.
+- `NotificationBell` — assessment links on those devices go to `/student/assessments` with a warning instead of opening the exam.
+
+---
+
+## PWA install (the downloadable web app)
+
+Nothing separate to build — ships with `npm run build` over **HTTPS**.
+
+How users install:
+- **Android (Chrome):** Install prompt / menu → *Install app*
+- **Desktop (Chrome/Edge):** address-bar install icon or in-app download icon
+- **iPhone/iPad (Safari):** Share → Add to Home Screen
+
+| File | Purpose |
+|------|---------|
+| `public/manifest.webmanifest` | App name, icons, standalone display |
+| `public/sw.js` | Service worker |
+| `public/icons/*` | App icons |
+| `src/utils/pwa.js` | Registers the service worker (prod web only) |
+| `src/hooks/useInstallPrompt.js` | Shared install state |
+| `src/components/pwa/InstallIconButton.jsx` | Header install icon |
+
+Notes:
+- The service worker never caches Supabase/API calls.
+- After deploy, bump `CACHE_VERSION` / build stamp in `sw.js` so clients refresh.

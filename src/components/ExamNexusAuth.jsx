@@ -333,6 +333,11 @@ function getAuthInputProps(theme) {
         JSON.stringify(profile)
       );
 
+      // Re-bind this device's push token to the signed-in student/faculty account.
+      import("../utils/pushNotifications")
+        .then(({ syncPushTokenForCurrentUser }) => syncPushTokenForCurrentUser())
+        .catch(() => {});
+
       // Keep the branded loader visible through the route change + lazy
       // dashboard load. Clearing `loading` here would re-reveal the login form
       // for a beat before navigation commits — which looked like the page

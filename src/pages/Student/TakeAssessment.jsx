@@ -43,7 +43,7 @@ import {
   getAssessmentDurationSeconds,
 } from "../../utils/assessmentDuration";
 import { resolveStudentId } from "../../utils/authUser";
-import { isNativeApp, openOnWebsite } from "../../utils/platform";
+import { canTakeAssessmentOnThisDevice } from "../../utils/platform";
 import {
   clearExamSession,
   computeRemainingSeconds,
@@ -60,31 +60,75 @@ function formatDurationLabel(examData) {
 }
 
 /**
- * Assessments can never be taken inside the native mobile app — the integrity
- * lockdown (fullscreen, tab-switch detection) only works in a real browser.
- * If a student reaches this route in the app (notification, deep link), we
- * redirect to the website and never mount the heavy exam experience.
+ * Assessments may only be taken on a computer / laptop browser.
+ * Phones, tablets, iPads, and the native mobile app are blocked even if
+ * the student opens the website on those devices.
  */
 export default function TakeAssessment() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const blocked = !canTakeAssessmentOnThisDevice();
 
   useEffect(() => {
-    if (!isNativeApp()) return;
-    openOnWebsite(`/student/take-assessment/${id}`);
-    navigate("/student/assessments", { replace: true });
-  }, [id, navigate]);
+    if (!blocked) return undefined;
 
-  if (isNativeApp()) {
+    const onResize = () => {
+      // Keep page blocked if the viewport stays below desktop size.
+      if (!canTakeAssessmentOnThisDevice()) return;
+      // Soft refresh once a genuine desktop width is available.
+      window.location.reload();
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [blocked]);
+
+  if (blocked) {
     return (
       <div
-        className={`flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center ${
-          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        className={`flex min-h-[70vh] flex-col items-center justify-center gap-4 p-8 text-center ${
+          theme === "dark" ? "bg-[#031d1f] text-gray-200" : "en-bg-page text-gray-800"
         }`}
       >
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
-        <p className="text-sm font-medium">Opening the assessment on the website…</p>
+        <div
+          className={`max-w-md rounded-2xl border px-6 py-8 ${
+            theme === "dark"
+              ? "border-amber-500/25 bg-amber-500/5"
+              : "border-amber-200 bg-amber-50"
+          }`}
+        >
+          <p
+            className={`text-xs font-semibold uppercase tracking-wide ${
+              theme === "dark" ? "text-amber-300" : "text-amber-800"
+            }`}
+          >
+            Desktop required
+          </p>
+          <h1
+            className={`mt-2 text-2xl font-bold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
+            Assessments can only be taken on a computer or laptop
+          </h1>
+          <p
+            className={`mt-3 text-sm leading-relaxed ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
+            Phones, tablets, iPads, and the ExamNexus mobile app do not support the
+            secure exam lockdown (fullscreen + integrity checks). Please open
+            ExamNexus on a desktop or laptop browser to continue.
+          </p>
+          <button
+            type="button"
+            className={`mt-6 ${secondaryButton(theme)}`}
+            onClick={() => navigate("/student/assessments", { replace: true })}
+          >
+            Back to assessments
+          </button>
+        </div>
       </div>
     );
   }

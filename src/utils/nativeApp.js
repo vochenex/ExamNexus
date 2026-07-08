@@ -1,8 +1,10 @@
 import { isNativeApp, getPlatform } from "./platform";
+import { initPushNotifications } from "./pushNotifications";
 
 /**
  * One-time native (Capacitor) setup: status bar styling, Android hardware
- * back-button handling, and keyboard behavior. No-ops on the web build.
+ * back-button handling, keyboard behavior, and push notification registration.
+ * No-ops on the web build.
  */
 export async function initNativeApp() {
   if (!isNativeApp()) return;
@@ -32,4 +34,11 @@ export async function initNativeApp() {
   } catch (err) {
     console.warn("App back-button init skipped:", err);
   }
+
+  // Register for push after a short delay so auth/session can settle.
+  setTimeout(() => {
+    initPushNotifications().catch((err) => {
+      console.warn("Push init deferred error:", err);
+    });
+  }, 1500);
 }

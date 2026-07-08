@@ -14,7 +14,8 @@ import { fetchUserNotifications } from "../utils/supabaseData";
 import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
 import { formatTargetSectionsLabel } from "../utils/sections";
 import { getNotificationDestination } from "../utils/notificationRoutes";
-import { isNativeApp, openOnWebsite } from "../utils/platform";
+import { canTakeAssessmentOnThisDevice } from "../utils/platform";
+import { useAppModal } from "../contexts/AppModalContext";
 import {
   dismissNotificationItems,
   filterVisibleNotifications,
@@ -82,6 +83,7 @@ function kindIcon(item) {
 export default function NotificationBell() {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const { warning } = useAppModal();
   const panelRef = useRef(null);
 
   const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
@@ -133,8 +135,12 @@ export default function NotificationBell() {
       userId: user.id,
     });
 
-    if (isNativeApp() && path.includes("/take-assessment/")) {
-      await openOnWebsite(path);
+    if (path.includes("/take-assessment/") && !canTakeAssessmentOnThisDevice()) {
+      await warning(
+        "Assessments can only be taken on a computer or laptop browser. Phones, tablets, iPads, and the ExamNexus mobile app cannot start an exam.",
+        "Desktop or laptop required"
+      );
+      navigate("/student/assessments");
       return;
     }
 
