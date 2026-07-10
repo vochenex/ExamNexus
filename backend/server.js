@@ -19,9 +19,13 @@ process.on("unhandledRejection", (reason) => {
 
 const fs = require("fs");
 const path = require("path");
+// Vercel Express detection requires a direct express import in the entry file.
+const express = require("express");
 const { createApp } = require("./createApp");
 const { getSupabaseAdmin } = require("./lib/supabaseAdmin");
 const { getAiServiceStatus } = require("./lib/aiProvider");
+
+void express;
 
 const app = createApp();
 
