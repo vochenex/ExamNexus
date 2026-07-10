@@ -4,11 +4,14 @@
 const path = require("path");
 const fs = require("fs");
 
-// Load backend/.env for local runs. On Vercel, env vars come from the dashboard.
-require("dotenv").config({
-  path: path.join(__dirname, ".env"),
-  override: true,
-});
+// Load backend/.env for local runs only. On Vercel, env vars come from the dashboard
+// and must not be overridden by a missing/empty file.
+if (!process.env.VERCEL) {
+  require("dotenv").config({
+    path: path.join(__dirname, ".env"),
+    override: true,
+  });
+}
 
 const express = require("express");
 const cors = require("cors");
@@ -31,11 +34,14 @@ function ensureUploadsDir() {
   }
 }
 
+function getSupabase() {
+  return createAnonClient();
+}
+
 function createApp() {
   ensureUploadsDir();
 
   const app = express();
-  const supabase = createAnonClient();
 
   app.use(cors({ origin: "*" }));
   app.use(express.json({ limit: "2mb" }));
@@ -58,27 +64,51 @@ function createApp() {
   });
 
   app.get("/health", async (req, res) => {
-    const hasServiceRole = Boolean(getSupabaseAdmin());
-    const aiStatus = await getAiServiceStatus();
-    res.json({
-      ok: true,
-      passwordReset: hasServiceRole,
-      enrollment: hasServiceRole,
-      assessmentAi: aiStatus.configured,
-      pushNotifications: isPushConfigured(),
-      pushApi: getPushApiMode(),
-      promptProvider: aiStatus.promptProvider,
-      documentProvider: aiStatus.documentProvider,
-      promptModel: aiStatus.promptModel,
-      documentModel: aiStatus.documentModel,
-      message: hasServiceRole
-        ? "Service role key loaded"
-        : "Add SUPABASE_SERVICE_ROLE_KEY (Supabase → Project Settings → API → service_role)",
-    });
+    try {
+      const hasServiceRole = Boolean(getSupabaseAdmin());
+      let aiStatus = {
+        configured: false,
+        error: "AI status unavailable",
+      };
+      try {
+        aiStatus = await getAiServiceStatus();
+      } catch (err) {
+        aiStatus = { configured: false, error: err.message };
+      }
+
+      const hasSupabase = Boolean(
+        process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+      );
+      const hasAnon = Boolean(
+        process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+      );
+
+      res.json({
+        ok: hasSupabase && hasAnon,
+        passwordReset: hasServiceRole,
+        enrollment: hasServiceRole,
+        assessmentAi: aiStatus.configured,
+        pushNotifications: isPushConfigured(),
+        pushApi: getPushApiMode(),
+        promptProvider: aiStatus.promptProvider,
+        documentProvider: aiStatus.documentProvider,
+        promptModel: aiStatus.promptModel,
+        documentModel: aiStatus.documentModel,
+        supabaseConfigured: hasSupabase && hasAnon,
+        message: !hasSupabase || !hasAnon
+          ? "Add SUPABASE_URL and SUPABASE_ANON_KEY in Vercel Environment Variables"
+          : hasServiceRole
+            ? "Service role key loaded"
+            : "Add SUPABASE_SERVICE_ROLE_KEY (Supabase → Project Settings → API → service_role)",
+      });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
   });
 
   app.get("/exams", async (req, res) => {
     try {
+      const supabase = getSupabase();
       const { data, error } = await supabase.from("exams").select("*");
       if (error) throw error;
       res.json(data);
@@ -90,6 +120,7 @@ function createApp() {
 
   app.post("/manual-exam", async (req, res) => {
     try {
+      const supabase = getSupabase();
       const {
         subject_id,
         title,
@@ -163,6 +194,7 @@ function createApp() {
 
   app.get("/exam/:examId", async (req, res) => {
     try {
+      const supabase = getSupabase();
       const { examId } = req.params;
 
       const { data: exam, error: examError } = await supabase
@@ -215,21 +247,27 @@ function createApp() {
   });
 
   app.get("/test-insert", async (req, res) => {
-    const { data, error } = await supabase
-      .from("subjects")
-      .insert([
-        {
-          name: "TEST SUBJECT",
-          teacher_school_id: "202302440",
-        },
-      ])
-      .select();
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from("subjects")
+        .insert([
+          {
+            name: "TEST SUBJECT",
+            teacher_school_id: "202302440",
+          },
+        ])
+        .select();
 
-    res.json({ data, error });
+      res.json({ data, error });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.put("/exam/:examId", async (req, res) => {
     try {
+      const supabase = getSupabase();
       const { examId } = req.params;
       const { exam, questions } = req.body;
 
@@ -308,6 +346,7 @@ function createApp() {
 
   app.delete("/exam/:examId", async (req, res) => {
     try {
+      const supabase = getSupabase();
       const { examId } = req.params;
 
       const { error: questionError } = await supabase

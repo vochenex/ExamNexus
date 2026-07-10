@@ -76,10 +76,12 @@ function mergeOptions(base, extra = {}) {
 }
 
 function createAnonClient(extraOptions = {}) {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) {
-    throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set in backend/.env");
+    throw new Error(
+      "SUPABASE_URL and SUPABASE_ANON_KEY must be set (Vercel Environment Variables or backend/.env)"
+    );
   }
   return createClient(url, key, mergeOptions(BASE_SERVER_OPTIONS, extraOptions));
 }
@@ -101,7 +103,7 @@ function createUserClient(accessToken, extraOptions = {}) {
 }
 
 function createServiceClient() {
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const serviceRoleKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 
