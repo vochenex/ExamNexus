@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 const mammoth = require("mammoth");
-const { PDFParse } = require("pdf-parse");
 
 const MAX_EXTRACT_CHARS = 50000;
 const MIN_EXTRACT_CHARS = 40;
@@ -24,6 +23,8 @@ function isSupportedUpload(file) {
 }
 
 async function extractPdfText(buffer) {
+  // Lazy-load so Vercel cold start does not require optional @napi-rs/canvas.
+  const { PDFParse } = require("pdf-parse");
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();

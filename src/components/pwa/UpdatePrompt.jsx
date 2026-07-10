@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, Sparkles, X } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
+import ExamNexusLogo from "../ExamNexusLogo";
 import {
   applyServiceWorkerUpdate,
   subscribeServiceWorkerUpdate,
@@ -43,7 +44,7 @@ export default function UpdatePrompt() {
         </button>
 
         <span className="en-update-badge">
-          <Sparkles size={22} strokeWidth={2.2} />
+          <ExamNexusLogo size={40} showGlow={false} idSuffix="update-prompt" />
         </span>
 
         <h3 className="en-update-title">A new version is available</h3>

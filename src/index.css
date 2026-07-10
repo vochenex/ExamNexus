@@ -1100,9 +1100,8 @@ html:not(.light) .en-install-step-num {
   height: 3.4rem;
   margin-bottom: 0.9rem;
   border-radius: 1rem;
-  color: #fff;
-  background: linear-gradient(135deg, #10b981, #14b8a6);
-  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.35);
+  background: transparent;
+  box-shadow: none;
 }
 
 .en-update-title {

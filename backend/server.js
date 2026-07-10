@@ -21,11 +21,23 @@ const fs = require("fs");
 const path = require("path");
 // Vercel Express detection requires a direct express import in the entry file.
 const express = require("express");
-const { createApp } = require("./createApp");
+const createAppModule = require("./createApp");
 const { getSupabaseAdmin } = require("./lib/supabaseAdmin");
 const { getAiServiceStatus } = require("./lib/aiProvider");
 
 void express;
+
+const createApp =
+  typeof createAppModule === "function"
+    ? createAppModule
+    : createAppModule?.createApp ||
+      createAppModule?.default?.createApp ||
+      createAppModule?.default;
+
+if (typeof createApp !== "function") {
+  console.error("createApp export shape:", createAppModule);
+  throw new Error("createApp export is not a function");
+}
 
 const app = createApp();
 
