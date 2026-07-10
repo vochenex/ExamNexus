@@ -1,9 +1,12 @@
 const { createAnonClient } = require("../lib/supabaseClient");
 
-const supabase = createAnonClient();
+function getSupabase() {
+  return createAnonClient();
+}
 
 /* ================= GET EXAMS ================= */
 exports.getExams = async (req, res) => {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from("exams")
     .select("*");
@@ -20,6 +23,7 @@ exports.getExams = async (req, res) => {
 /* ================= GENERATE QUESTIONS ================= */
 exports.generateQuestions = async (req, res) => {
   try {
+    const supabase = getSupabase();
     const {
       text,
       title,

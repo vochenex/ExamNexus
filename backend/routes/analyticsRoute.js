@@ -2,10 +2,9 @@ const express = require("express");
 const router = express.Router();
 const { createAnonClient } = require("../lib/supabaseClient");
 
-const supabase = createAnonClient();
-
 router.get("/:examId", async (req, res) => {
   try {
+    const supabase = createAnonClient();
     const { examId } = req.params;
 
     const { data, error } = await supabase

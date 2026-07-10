@@ -7,11 +7,13 @@ const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
 const generateInviteCode = () =>
   crypto.randomBytes(4).toString("hex");
 
-const supabase = createAnonClient();
+function getAnon() {
+  return createAnonClient();
+}
 
 const getSupabaseForUser = (req) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader) return supabase;
+  if (!authHeader) return getAnon();
 
   const accessToken = String(authHeader).replace(/^Bearer\s+/i, "").trim();
   return createUserClient(accessToken);
@@ -29,7 +31,7 @@ console.log({
   teacher_school_id,
 });
 
-    const { data, error } = await supabase
+    const { data, error } = await getAnon()
       .from("subjects")
       .insert([
         {
@@ -60,7 +62,7 @@ router.get("/teacher/:teacherId", async (req, res) => {
   try {
     const { teacherId } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await getAnon()
       .from("subjects")
       .select("*")
       .eq("teacher_school_id", teacherId);
@@ -85,7 +87,7 @@ router.get("/:subjectId", async (req, res) => {
   try {
     const { subjectId } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await getAnon()
       .from("subjects")
       .select("*")
       .eq("id", subjectId)
@@ -144,7 +146,7 @@ const joinSubject = async (req, res) => {
       return res.status(403).json({ error: "Invalid student session." });
     }
 
-    const { data: subject, error: subError } = await supabase
+    const { data: subject, error: subError } = await getAnon()
       .from("subjects")
       .select("id, name, invite_code, teacher_school_id")
       .eq("invite_code", normalizedCode)
@@ -227,7 +229,7 @@ router.get("/:subjectId/assessments", async (req, res) => {
   try {
     const { subjectId } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await getAnon()
       .from("exams")
       .select("*")
       .eq("subject_id", subjectId)
@@ -248,7 +250,7 @@ router.get("/:subjectId/students", async (req, res) => {
   try {
     const { subjectId } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await getAnon()
       .from("subject_students")
       .select("student_id")
       .eq("subject_id", subjectId);
@@ -267,7 +269,7 @@ router.delete("/:subjectId", async (req, res) => {
   try {
     const { subjectId } = req.params;
 
-    const { error } = await supabase
+    const { error } = await getAnon()
       .from("subjects")
       .delete()
       .eq("id", subjectId);

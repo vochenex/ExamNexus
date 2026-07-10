@@ -136,8 +136,8 @@ function listenOnAvailablePort(port, attempt = 0) {
   return server;
 }
 
-// On Vercel the serverless entry (`api/index.js`) exports the app — do not listen.
-if (!process.env.VERCEL) {
+// Only listen when run directly (`npm start`). Vercel requires this module and must not bind a port.
+if (require.main === module) {
   listenOnAvailablePort(PREFERRED_PORT);
 }
 
