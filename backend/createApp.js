@@ -40,6 +40,19 @@ function createApp() {
   app.use(cors({ origin: "*" }));
   app.use(express.json({ limit: "2mb" }));
 
+  // Vercel Services may forward /api/... to this Express app with the prefix intact.
+  app.use((req, _res, next) => {
+    const url = req.url || "/";
+    if (url === "/api") {
+      req.url = "/";
+    } else if (url.startsWith("/api?")) {
+      req.url = `/${url.slice(4)}`;
+    } else if (url.startsWith("/api/")) {
+      req.url = url.slice(4) || "/";
+    }
+    next();
+  });
+
   app.get("/", (req, res) => {
     res.send("🚀 ExamNexus Backend Running");
   });
