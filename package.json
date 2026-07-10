@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/check-import-casing.mjs && vite build",
     "lint": "eslint .",
+    "check:imports": "node scripts/check-import-casing.mjs",
     "preview": "vite preview",
     "start:backend": "npm start --prefix backend",
     "backend": "npm start --prefix backend",

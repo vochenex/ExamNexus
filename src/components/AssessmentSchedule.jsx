@@ -1,7 +1,7 @@
 
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import "../layouts/calendar.css";
+import "../layouts/Calendar.css";
 import { Clock2 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 
