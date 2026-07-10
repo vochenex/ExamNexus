@@ -6,6 +6,8 @@ import { useAppModal } from "../../contexts/AppModalContext";
 import {
   Archive,
   BarChart3,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   Pencil,
   RotateCcw,
@@ -18,7 +20,7 @@ import ExamAnalyticsPanel from "../../components/ExamAnalyticsPanel";
 import ExamSubmissionAlertsPanel from "../../components/ExamSubmissionAlertsPanel";
 import ExamAutoSubmittedPanel from "../../components/ExamAutoSubmittedPanel";
 import ExamRetakeRequestsPanel from "../../components/ExamRetakeRequestsPanel";
-import { pageShellWithBellClass } from "../../utils/themeInputs";
+import { pageShellWithBellClass, panelClass } from "../../utils/themeInputs";
 import {
   deleteExam,
   fetchExamFacultyAnalytics,
@@ -110,6 +112,7 @@ export default function AssessmentDetails() {
   const [deleting, setDeleting] = useState(false);
   const [bankSaveOpen, setBankSaveOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("analytics");
+  const [headerOpen, setHeaderOpen] = useState(true);
 
   const reloadAnalytics = useCallback(
     async (questionList, examRecord, { silent = false } = {}) => {
@@ -195,101 +198,129 @@ export default function AssessmentDetails() {
   const actionButtonBase =
     "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0";
 
-  const panelBorder =
-    theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200/80 en-bg-elevated";
-
   return (
     <div className={pageShellWithBellClass(theme)}>
       <BackButton />
 
-      <div
-        className={`mb-5 rounded-2xl border p-4 sm:p-5 ${panelBorder} ${
-          theme === "dark" ? "" : "shadow-sm"
-        }`}
-      >
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1
-                className={`text-xl font-bold sm:text-2xl ${
+      <div className={`${panelClass(theme)} mb-5 !p-0 overflow-hidden`}>
+        <button
+          type="button"
+          onClick={() => setHeaderOpen((value) => !value)}
+          className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3.5 text-left sm:px-5"
+        >
+          <span className="min-w-0 flex-1 overflow-hidden">
+            <span className="flex flex-wrap items-center gap-2">
+              <span
+                className={`truncate text-lg font-bold sm:text-xl ${
                   theme === "dark" ? "text-teal-400" : "text-teal-700"
                 }`}
               >
                 {exam.title}
-              </h1>
+              </span>
               <StatusBadge status={status} theme={theme} />
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <MetaChip theme={theme}>
-                From {formatShortDate(exam.start_datetime)}
-              </MetaChip>
-              <MetaChip theme={theme}>
-                Until {formatShortDate(exam.end_datetime)}
-              </MetaChip>
-              <MetaChip theme={theme}>
+            </span>
+            {!headerOpen && (
+              <span
+                className={`mt-1 block truncate text-xs ${
+                  theme === "dark" ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {questions.length} question{questions.length === 1 ? "" : "s"}
-              </MetaChip>
-              {submissionCount != null && (
-                <MetaChip theme={theme}>
-                  {submissionCount} submission{submissionCount === 1 ? "" : "s"}
-                </MetaChip>
-              )}
+                {submissionCount != null
+                  ? ` · ${submissionCount} submission${submissionCount === 1 ? "" : "s"}`
+                  : ""}
+                {" · "}
+                Tap to expand details
+              </span>
+            )}
+          </span>
+          {headerOpen ? (
+            <ChevronUp size={18} className="shrink-0 opacity-70" />
+          ) : (
+            <ChevronDown size={18} className="shrink-0 opacity-70" />
+          )}
+        </button>
+
+        {headerOpen && (
+          <div
+            className={`space-y-4 border-t px-4 py-4 sm:px-5 ${
+              theme === "dark" ? "border-white/10" : "border-emerald-100"
+            }`}
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap gap-2">
+                  <MetaChip theme={theme}>
+                    From {formatShortDate(exam.start_datetime)}
+                  </MetaChip>
+                  <MetaChip theme={theme}>
+                    Until {formatShortDate(exam.end_datetime)}
+                  </MetaChip>
+                  <MetaChip theme={theme}>
+                    {questions.length} question{questions.length === 1 ? "" : "s"}
+                  </MetaChip>
+                  {submissionCount != null && (
+                    <MetaChip theme={theme}>
+                      {submissionCount} submission{submissionCount === 1 ? "" : "s"}
+                    </MetaChip>
+                  )}
+                </div>
+
+                <p
+                  className={`mt-2 hidden text-xs sm:block ${
+                    theme === "dark" ? "text-gray-500" : "text-gray-500"
+                  }`}
+                >
+                  {formatDate(exam.start_datetime)} → {formatDate(exam.end_datetime)}
+                </p>
+              </div>
+
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/faculty/edit-assessment/${examId}`)}
+                  className={`${actionButtonBase} ${
+                    theme === "dark"
+                      ? "border border-cyan-400/35 bg-cyan-500/15 text-cyan-200"
+                      : "border border-cyan-600/25 bg-cyan-50 text-cyan-900"
+                  }`}
+                >
+                  <Pencil size={14} />
+                  Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBankSaveOpen(true)}
+                  disabled={questions.length === 0}
+                  className={`${actionButtonBase} ${
+                    theme === "dark"
+                      ? "border border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
+                      : "border border-emerald-600/25 bg-emerald-50 text-teal-900"
+                  }`}
+                  title="Save questions to question bank"
+                >
+                  <Archive size={14} />
+                  Bank
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className={`${actionButtonBase} ${
+                    theme === "dark"
+                      ? "border border-red-400/35 bg-red-500/15 text-red-200"
+                      : "border border-red-400/40 bg-red-50 text-red-800"
+                  }`}
+                >
+                  <Trash2 size={14} />
+                  {deleting ? "…" : "Delete"}
+                </button>
+              </div>
             </div>
-
-            <p
-              className={`mt-2 hidden text-xs sm:block ${
-                theme === "dark" ? "text-gray-500" : "text-gray-500"
-              }`}
-            >
-              {formatDate(exam.start_datetime)} → {formatDate(exam.end_datetime)}
-            </p>
           </div>
-
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(`/faculty/edit-assessment/${examId}`)}
-              className={`${actionButtonBase} ${
-                theme === "dark"
-                  ? "border border-cyan-400/35 bg-cyan-500/15 text-cyan-200"
-                  : "border border-cyan-600/25 bg-cyan-50 text-cyan-900"
-              }`}
-            >
-              <Pencil size={14} />
-              Edit
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setBankSaveOpen(true)}
-              disabled={questions.length === 0}
-              className={`${actionButtonBase} ${
-                theme === "dark"
-                  ? "border border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
-                  : "border border-emerald-600/25 bg-emerald-50 text-teal-900"
-              }`}
-              title="Save questions to question bank"
-            >
-              <Archive size={14} />
-              Bank
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className={`${actionButtonBase} ${
-                theme === "dark"
-                  ? "border border-red-400/35 bg-red-500/15 text-red-200"
-                  : "border border-red-400/40 bg-red-50 text-red-800"
-              }`}
-            >
-              <Trash2 size={14} />
-              {deleting ? "…" : "Delete"}
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -320,7 +351,7 @@ export default function AssessmentDetails() {
         })}
       </div>
 
-      <div className={`rounded-2xl border p-4 sm:p-5 ${panelBorder}`}>
+      <div className={panelClass(theme)}>
         {activeTab === "analytics" && (
           <ExamAnalyticsPanel
             analytics={analytics}

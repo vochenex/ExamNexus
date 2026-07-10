@@ -490,7 +490,7 @@ export default function Profile() {
 
   return (
     <div
-      className={`min-h-screen p-6 ${
+      className={`min-h-screen w-full max-w-full min-w-0 overflow-x-hidden p-4 sm:p-6 ${
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
@@ -574,15 +574,15 @@ export default function Profile() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className={`${cardClass(theme)} p-6 sm:p-7`}>
-          <div className="mb-8 flex flex-col gap-6 border-b pb-8 sm:flex-row sm:items-center sm:justify-between border-inherit">
-            <div className="flex items-center gap-5">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-6 overflow-x-hidden xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className={`${cardClass(theme)} min-w-0 max-w-full overflow-hidden p-5 sm:p-7`}>
+          <div className="mb-8 flex min-w-0 flex-col gap-6 overflow-hidden border-b pb-8 sm:flex-row sm:items-center sm:justify-between border-inherit">
+            <div className="flex min-w-0 items-center gap-4 sm:gap-5">
               <ProfileAvatar
                 src={editProfile.avatar_url}
                 alt={`${editProfile.first_name} ${editProfile.last_name}`}
                 size="lg"
-                className="shadow-lg ring-4 ring-emerald-500/10"
+                className="shrink-0 shadow-lg ring-4 ring-emerald-500/10"
                 clickable={hasCustomProfilePhoto(editProfile.avatar_url)}
                 onClick={() => setAvatarPreviewOpen(true)}
               />
@@ -594,9 +594,9 @@ export default function Profile() {
                 onClose={() => setAvatarPreviewOpen(false)}
               />
 
-              <div className="min-w-0">
+              <div className="min-w-0 overflow-hidden">
                 <h2
-                  className={`text-xl font-bold sm:text-2xl ${
+                  className={`truncate text-xl font-bold sm:text-2xl ${
                     theme === "dark" ? "text-white" : "text-slate-900"
                   }`}
                 >
@@ -606,7 +606,7 @@ export default function Profile() {
                   {profile.email}
                 </p>
                 {displaySchoolId && (
-                  <p className={`mt-1 text-xs font-medium ${theme === "dark" ? "text-emerald-400/80" : "text-teal-700"}`}>
+                  <p className={`mt-1 truncate text-xs font-medium ${theme === "dark" ? "text-emerald-400/80" : "text-teal-700"}`}>
                     ID · {displaySchoolId}
                   </p>
                 )}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Archive, Search, Trash2 } from "lucide-react";
 import BackButton from "../../components/BackButton";
 import PageHeader from "../../components/ui/PageHeader";
+import Select from "../../components/ui/Select";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
@@ -160,14 +161,10 @@ export default function QuestionBank() {
               }`}
             />
           </div>
-          <select
+          <Select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className={`rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
-              theme === "dark"
-                ? "border border-white/10 bg-white/10 text-white"
-                : "border border-emerald-200 en-bg-elevated text-gray-900"
-            }`}
+            className="!py-2.5"
           >
             <option value="all">All formats</option>
             {Object.entries(EXAM_TYPE_LABELS)
@@ -177,7 +174,7 @@ export default function QuestionBank() {
                   {label}
                 </option>
               ))}
-          </select>
+          </Select>
           <button type="button" onClick={load} className={secondaryButton(theme)}>
             Refresh
           </button>
@@ -206,7 +203,7 @@ export default function QuestionBank() {
             </p>
           </div>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {filteredItems.map((item) => {
               const expanded = expandedId === item.id;
               const answers = formatQuestionCorrectAnswers(item, item.question_type);
@@ -215,20 +212,20 @@ export default function QuestionBank() {
               return (
                 <li
                   key={item.id}
-                  className={`rounded-xl border ${
+                  className={`min-w-0 max-w-full overflow-hidden rounded-2xl border backdrop-blur-md ${
                     theme === "dark"
-                      ? "border-white/10 bg-white/[0.03]"
+                      ? "border-white/10 bg-white/[0.04]"
                       : "border-emerald-700/15 en-bg-elevated"
                   }`}
                 >
-                  <div className="flex items-center gap-2 p-2.5">
+                  <div className="flex min-w-0 items-center gap-2 p-2.5">
                     <button
                       type="button"
                       onClick={() => setExpandedId(expanded ? null : item.id)}
-                      className="min-w-0 flex-1 text-left"
+                      className="min-w-0 flex-1 overflow-hidden text-left"
                       title={item.question || preview}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                             theme === "dark"
@@ -239,7 +236,7 @@ export default function QuestionBank() {
                           {getQuestionBankTypeLabel(item.question_type).replace("Multiple Choice", "MC")}
                         </span>
                         <p
-                          className={`truncate text-sm font-medium ${
+                          className={`min-w-0 truncate text-sm font-medium ${
                             theme === "dark" ? "text-gray-100" : "text-[#1a332c]"
                           }`}
                         >

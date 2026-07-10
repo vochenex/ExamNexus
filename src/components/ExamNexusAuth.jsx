@@ -3,6 +3,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   Eye,
   EyeOff,
+  ChevronDown,
+  ChevronUp,
+  UserRound,
+  X,
 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { primaryButtonFull } from "../utils/themeButtons";
@@ -39,7 +43,16 @@ import SignupFormFields from "./auth/SignupFormFields";
 import PendingApprovalModal from "./auth/PendingApprovalModal";
 import ExamNexusBrand from "./ExamNexusBrand";
 import HomeSiteHeader from "./home/HomeSiteHeader";
+import NativeAuthHeader from "./NativeAuthHeader";
 import LogoSplashScreen from "./LogoSplashScreen";
+import { isNativeApp } from "../utils/platform";
+import {
+  getRememberedPassword,
+  getSavedAccounts,
+  removeSavedAccount,
+  setRememberedPassword,
+  upsertSavedAccount,
+} from "../utils/savedAccounts";
 import "../styles/home.css";
 
 export default function ExamNexusAuth() {
@@ -57,6 +70,9 @@ const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [authNotice, setAuthNotice] = useState(null);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState(() => getSavedAccounts());
+  const [savedOpen, setSavedOpen] = useState(false);
 
   const [form, setForm] = useState({
   firstName: "",
@@ -333,6 +349,16 @@ function getAuthInputProps(theme) {
         JSON.stringify(profile)
       );
 
+      upsertSavedAccount({
+        email: form.email,
+        role: profile.role,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        avatar_url: profile.avatar_url,
+      });
+      setRememberedPassword(form.email, form.password, rememberMe);
+      setSavedAccounts(getSavedAccounts());
+
       // Re-bind this device's push token to the signed-in student/faculty account.
       import("../utils/pushNotifications")
         .then(({ syncPushTokenForCurrentUser }) => syncPushTokenForCurrentUser())
@@ -474,7 +500,7 @@ function getAuthInputProps(theme) {
   />
   {loading && <LogoSplashScreen theme={theme} />}
 
-  <HomeSiteHeader />
+  {isNativeApp() ? <NativeAuthHeader /> : <HomeSiteHeader />}
 
   <div className="en-auth-body en-page-enter">
   {/* Background Orb 1 */}
@@ -537,7 +563,7 @@ function getAuthInputProps(theme) {
         
         {/* Branding Panel — desktop only; slides to the right on sign up */}
         <div
-          className={`en-auth-panel-brand hidden md:flex flex-col items-center p-10 ${
+          className={`en-auth-panel-brand hidden lg:flex flex-col items-center p-10 ${
             theme === "dark"
               ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
               : "bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#134e4a]"
@@ -574,7 +600,7 @@ function getAuthInputProps(theme) {
           }`}
         >
           <div className="en-auth-form-inner">
-  <div className="mb-6 flex flex-col items-center gap-4 md:hidden">
+  <div className={`mb-6 flex flex-col items-center gap-4 ${isNativeApp() ? "hidden" : "lg:hidden"}`}>
     <ExamNexusBrand
       variant="panel"
       idSuffix="auth-mobile"
@@ -692,6 +718,82 @@ function getAuthInputProps(theme) {
                 )}
 
                 <div className="space-y-4">
+                  {authView === "login" && savedAccounts.length > 0 && (
+                    <div
+                      className={`overflow-hidden rounded-xl border ${
+                        theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200 bg-emerald-50/40"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSavedOpen((open) => !open)}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-semibold"
+                      >
+                        <span>Saved accounts ({savedAccounts.length})</span>
+                        {savedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      {savedOpen && (
+                        <div className="space-y-1 border-t border-inherit px-2 pb-2 pt-1">
+                          {savedAccounts.map((account) => {
+                            const label =
+                              [account.first_name, account.last_name].filter(Boolean).join(" ") ||
+                              account.email;
+                            return (
+                              <div
+                                key={account.email}
+                                className={`flex items-center gap-2 rounded-lg px-2 py-2 ${
+                                  theme === "dark" ? "hover:bg-white/5" : "hover:bg-white/80"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                  onClick={() => {
+                                    const remembered = getRememberedPassword(account.email);
+                                    setForm((current) => ({
+                                      ...current,
+                                      email: account.email,
+                                      password: remembered || "",
+                                    }));
+                                    setRememberMe(Boolean(remembered));
+                                    setEmailManuallyEdited(true);
+                                    setErrors({});
+                                    setServerError("");
+                                  }}
+                                >
+                                  <span
+                                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                      theme === "dark" ? "bg-emerald-500/15 text-emerald-300" : "bg-teal-100 text-teal-800"
+                                    }`}
+                                  >
+                                    <UserRound size={14} />
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-sm font-medium">{label}</span>
+                                    <span className={`block truncate text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                      Continue as {account.email} · password still required
+                                    </span>
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${account.email}`}
+                                  onClick={() => {
+                                    setSavedAccounts(removeSavedAccount(account.email));
+                                    setRememberedPassword(account.email, "", false);
+                                  }}
+                                  className="shrink-0 rounded-md p-1 text-gray-400 hover:text-red-400"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <label
                       className={`mb-1.5 block text-sm font-medium ${
@@ -747,6 +849,19 @@ function getAuthInputProps(theme) {
 
                     {errors.password && (
                       <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+                    )}
+                    {authView === "login" && (
+                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-emerald-400 text-emerald-500 focus:ring-emerald-500"
+                        />
+                        <span className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
+                          Remember me on this device
+                        </span>
+                      </label>
                     )}
                     {authView === "login" && (
                       <button

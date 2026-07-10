@@ -9,8 +9,8 @@
   box-sizing: border-box;
 }
 
-/* Mobile: stacked, brand hidden */
-@media (max-width: 767px) {
+/* Mobile + tablet: stacked, brand hidden — form uses full width */
+@media (max-width: 1023px) {
   .en-auth-card {
     height: auto;
     min-height: 0;
@@ -33,8 +33,8 @@
   }
 }
 
-/* Desktop: two halves slide by animating `left` (no transform) */
-@media (min-width: 768px) {
+/* Large desktop only: two halves slide by animating transform */
+@media (min-width: 1024px) {
   .en-auth-card {
     position: relative;
     height: min(92vh, 680px);
@@ -56,12 +56,8 @@
     flex-direction: column;
     overflow-x: hidden;
     overflow-y: auto;
-    /* Reserve space for the scrollbar so the centered form doesn't shift
-       sideways when the scrollbar appears/disappears (e.g. as an error banner
-       is cleared on the first keystroke). */
-    scrollbar-gutter: stable;
-    /* Hide scrollbar visuals (layout stability comes from scrollbar-gutter). */
-    scrollbar-width: none; /* Firefox */
+    scrollbar-gutter: auto;
+    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     transform: translateX(0);
     transition: transform 0.9s cubic-bezier(0.33, 1, 0.68, 1);
@@ -96,7 +92,6 @@
 
   /* Sign up — swap sides; extra height for long signup form */
   .en-auth-card--signup {
-    /* Keep signup the same height as login; the panel itself is scrollable. */
     height: min(92vh, 680px);
     min-height: 560px;
   }
@@ -117,7 +112,7 @@
   margin-right: auto;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .en-auth-form-inner {
     max-width: 22rem;
   }

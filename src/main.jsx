@@ -1,6 +1,7 @@
 import "./styles/motion.css";
 import "./styles/splash.css";
 import "./index.css";
+import "./styles/native-app.css";
 import "./styles/auth.css";
 import React from "react";
 import ReactDOM from "react-dom/client";

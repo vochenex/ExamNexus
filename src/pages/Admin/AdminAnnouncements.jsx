@@ -113,7 +113,7 @@ export default function AdminAnnouncements() {
       </form>
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="overflow-x-auto">
+        <div className="en-inner-scroll max-h-[28rem] overflow-auto">
           <table className={adminTableClass(theme)}>
             <thead>
               <tr>

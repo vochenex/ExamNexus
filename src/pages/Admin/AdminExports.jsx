@@ -8,13 +8,26 @@ import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
   fetchAdminAssessments,
+  fetchAdminAssessmentReport,
   fetchAdminExportAssessments,
   fetchAdminExportResults,
 } from "../../utils/adminData";
-import { downloadCsv } from "../../utils/exportCsv";
+import { downloadCsv, downloadHtml } from "../../utils/exportCsv";
+import {
+  buildAssessmentReportHtml,
+  slugifyFilename,
+} from "../../utils/assessmentReport";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+
+async function finishExport(result, success, warning, sharedMsg, downloadMsg) {
+  if (!result?.ok) {
+    warning("Could not start the download.");
+    return;
+  }
+  await success(result.shared ? sharedMsg : downloadMsg);
+}
 
 export default function AdminExports() {
   const { theme } = useTheme();
@@ -50,7 +63,7 @@ export default function AdminExports() {
         warning("No assessments to export.");
         return;
       }
-      const ok = downloadCsv("examnexus-assessments.csv", rows, [
+      const result = await downloadCsv("examnexus-assessments.csv", rows, [
         { key: "assessment_id", label: "Assessment ID" },
         { key: "title", label: "Title" },
         { key: "type", label: "Type" },
@@ -61,7 +74,13 @@ export default function AdminExports() {
         { key: "end", label: "End" },
         { key: "submissions", label: "Submissions" },
       ]);
-      if (ok) await success("Assessments exported.");
+      await finishExport(
+        result,
+        success,
+        warning,
+        "Export ready — you chose where to save the assessments CSV.",
+        "Assessments CSV saved to your downloads."
+      );
     } catch (err) {
       error(err.message || "Export failed.");
     } finally {
@@ -69,7 +88,32 @@ export default function AdminExports() {
     }
   };
 
-  const exportResults = async (examId = null) => {
+  const exportAssessmentReport = async (examId) => {
+    if (!examId) {
+      warning("Select a specific assessment first.");
+      return;
+    }
+    try {
+      setExporting(examId);
+      const report = await fetchAdminAssessmentReport(examId);
+      const html = buildAssessmentReportHtml(report);
+      const filename = `examnexus-${slugifyFilename(report.title)}-report.html`;
+      const result = await downloadHtml(filename, html);
+      await finishExport(
+        result,
+        success,
+        warning,
+        "Report ready — you chose where to save it. Open the HTML later to Print → Save as PDF.",
+        "Assessment report saved. Open the HTML file to print or save as PDF."
+      );
+    } catch (err) {
+      error(err.message || "Export failed. If this keeps happening, run database/admin_export_assessment_report.sql in Supabase.");
+    } finally {
+      setExporting("");
+    }
+  };
+
+  const exportResultsCsv = async (examId = null) => {
     try {
       setExporting(examId || "all-results");
       const rows = await fetchAdminExportResults(examId || null);
@@ -80,7 +124,7 @@ export default function AdminExports() {
       const filename = examId
         ? `examnexus-results-${examId}.csv`
         : "examnexus-all-results.csv";
-      const ok = downloadCsv(filename, rows, [
+      const result = await downloadCsv(filename, rows, [
         { key: "exam_title", label: "Assessment" },
         { key: "subject", label: "Subject" },
         { key: "student_name", label: "Student" },
@@ -91,7 +135,13 @@ export default function AdminExports() {
         { key: "percentage", label: "Percentage" },
         { key: "submitted_at", label: "Submitted At" },
       ]);
-      if (ok) await success("Results exported.");
+      await finishExport(
+        result,
+        success,
+        warning,
+        "Export ready — you chose where to save the results CSV.",
+        "Results CSV saved to your downloads."
+      );
     } catch (err) {
       error(err.message || "Export failed.");
     } finally {
@@ -107,7 +157,7 @@ export default function AdminExports() {
         theme={theme}
         icon={Download}
         title="Export data"
-        subtitle="Download assessment and results data as CSV files."
+        subtitle="Export asks where to save the file — use Files, Downloads, Drive, or another app."
       />
 
       {loadError && (
@@ -115,7 +165,7 @@ export default function AdminExports() {
       )}
 
       <div className={`${panelClass(theme)} mb-5 space-y-4`}>
-        <h2 className="font-semibold">Export assessments</h2>
+        <h2 className="font-semibold">Export assessments list</h2>
         <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
           Download a CSV of all assessments across subjects.
         </p>
@@ -131,35 +181,46 @@ export default function AdminExports() {
       </div>
 
       <div className={`${panelClass(theme)} space-y-4`}>
-        <h2 className="font-semibold">Export results</h2>
+        <h2 className="font-semibold">Export assessment report / results</h2>
         <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-          Export all results or filter by a specific assessment.
+          Pick one assessment for a full HTML report (faculty, students, scores,
+          questions, pass/fail chart, and description). Or export raw results as CSV.
         </p>
         <Select value={selectedExamId} onChange={(e) => setSelectedExamId(e.target.value)}>
-          <option value="">All assessments</option>
+          <option value="">Select an assessment</option>
           {assessments.map((exam) => (
             <option key={exam.id} value={exam.id}>
-              {exam.title} — {exam.subject_name}
+              {[exam.title, exam.subject_name].filter(Boolean).join(" — ")}
             </option>
           ))}
         </Select>
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => exportResults(selectedExamId || null)}
-            disabled={Boolean(exporting)}
+            onClick={() => exportAssessmentReport(selectedExamId)}
+            disabled={Boolean(exporting) || !selectedExamId}
             className={primaryButton(theme, "disabled:opacity-60")}
           >
             <Download size={18} />
-            {exporting && exporting !== "assessments" ? "Exporting..." : "Export results CSV"}
+            {exporting && exporting === selectedExamId
+              ? "Exporting..."
+              : "Export full report"}
           </button>
           <button
             type="button"
-            onClick={() => exportResults(null)}
+            onClick={() => exportResultsCsv(selectedExamId || null)}
+            disabled={Boolean(exporting) || !selectedExamId}
+            className={secondaryButton(theme, "disabled:opacity-60")}
+          >
+            Export selected results CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => exportResultsCsv(null)}
             disabled={Boolean(exporting)}
             className={secondaryButton(theme, "disabled:opacity-60")}
           >
-            Export all results
+            {exporting === "all-results" ? "Exporting..." : "Export all results CSV"}
           </button>
         </div>
       </div>

@@ -1,12 +1,12 @@
 export default function PageHeader({ icon: Icon, title, subtitle, theme, actions }) {
   return (
-    <div className={`mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between en-fade-in-up`}>
+    <div className={`en-page-header mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between en-fade-in-up`}>
       <div>
         <div className="mb-2 flex items-center gap-2.5">
           {Icon && (
             <Icon
               size={28}
-              className={`${theme === "dark" ? "text-emerald-400" : "text-teal-700"} en-pop-in`}
+              className={`en-page-header-icon ${theme === "dark" ? "text-emerald-400" : "text-teal-700"} en-pop-in`}
             />
           )}
           <h1

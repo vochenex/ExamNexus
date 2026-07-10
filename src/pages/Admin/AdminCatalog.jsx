@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Building2, Plus, Trash2 } from "lucide-react";
+import { Building2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -19,13 +19,20 @@ import {
 } from "../../components/admin/adminTableStyles";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
-import { primaryButtonSm, secondaryButtonSm, dangerButton, primaryButton } from "../../utils/themeButtons";
+import {
+  primaryButtonSm,
+  secondaryButtonSm,
+  dangerButton,
+  primaryButton,
+} from "../../utils/themeButtons";
 
 const TABS = [
   { id: "department", label: "Departments" },
   { id: "course", label: "Courses" },
   { id: "section", label: "Sections" },
 ];
+
+const EMPTY_FORM = { code: "", label: "", parent_code: "" };
 
 export default function AdminCatalog() {
   const { theme } = useTheme();
@@ -34,7 +41,22 @@ export default function AdminCatalog() {
   const [tab, setTab] = useState("department");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [form, setForm] = useState({ code: "", label: "", parent_code: "" });
+  // Separate draft per tab so values never bleed across Departments/Courses/Sections.
+  const [forms, setForms] = useState({
+    department: { ...EMPTY_FORM },
+    course: { ...EMPTY_FORM },
+    section: { ...EMPTY_FORM },
+  });
+  const [editingId, setEditingId] = useState(null);
+
+  const form = forms[tab] || EMPTY_FORM;
+
+  const setForm = (next) => {
+    setForms((prev) => ({
+      ...prev,
+      [tab]: typeof next === "function" ? next(prev[tab] || EMPTY_FORM) : next,
+    }));
+  };
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -63,20 +85,44 @@ export default function AdminCatalog() {
     [catalog]
   );
 
-  const handleAdd = async () => {
+  const switchTab = (nextTab) => {
+    setTab(nextTab);
+    setEditingId(null);
+  };
+
+  const clearCurrentForm = () => {
+    setEditingId(null);
+    setForm({ ...EMPTY_FORM });
+  };
+
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setForm({
+      code: item.code || "",
+      label: item.label || "",
+      parent_code: item.parent_code || "",
+    });
+  };
+
+  const handleSave = async () => {
     if (!form.code.trim() || !form.label.trim()) {
       error("Code and label are required.");
       return;
     }
+    if (tab === "course" && !form.parent_code) {
+      error("Select a department for this course.");
+      return;
+    }
     try {
       await upsertAdminCatalogItem({
+        id: editingId || null,
         item_type: tab,
         code: form.code,
         label: form.label,
         parent_code: tab === "course" ? form.parent_code : null,
       });
-      await success("Catalog item saved.");
-      setForm({ code: "", label: "", parent_code: "" });
+      await success(editingId ? "Catalog item updated." : "Catalog item saved.");
+      clearCurrentForm();
       await load(true);
     } catch (err) {
       error(err.message || "Failed to save catalog item.");
@@ -93,6 +139,7 @@ export default function AdminCatalog() {
     if (!ok) return;
     try {
       await deleteAdminCatalogItem(item.id);
+      if (editingId === item.id) clearCurrentForm();
       await success("Item removed.");
       await load(true);
     } catch (err) {
@@ -101,6 +148,8 @@ export default function AdminCatalog() {
   };
 
   if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
+
+  const singular = TABS.find((t) => t.id === tab)?.label.slice(0, -1) || "Item";
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-7xl")}>
@@ -120,17 +169,38 @@ export default function AdminCatalog() {
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
-            className={secondaryButtonSm(theme, tab === item.id ? "ring-2 ring-emerald-400/40" : "")}
+            onClick={() => switchTab(item.id)}
+            className={secondaryButtonSm(
+              theme,
+              tab === item.id ? "ring-2 ring-emerald-400/40" : ""
+            )}
           >
             {item.label}
           </button>
         ))}
       </div>
 
-      <div className={`${panelClass(theme)} mb-6`}>
-        <h2 className="mb-3 font-semibold">Add {TABS.find((t) => t.id === tab)?.label.slice(0, -1)}</h2>
-        <div className="grid gap-3 md:grid-cols-3">
+      <div className={`${panelClass(theme, "mb-6 !p-4")}`}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">
+            {editingId ? `Edit ${singular}` : `Add ${singular}`}
+          </h2>
+          {editingId && (
+            <button
+              type="button"
+              onClick={clearCurrentForm}
+              className={secondaryButtonSm(theme, "text-xs")}
+            >
+              <X size={14} />
+              Cancel edit
+            </button>
+          )}
+        </div>
+        <div
+          className={`grid gap-3 ${
+            tab === "course" ? "md:grid-cols-3" : "md:grid-cols-2"
+          }`}
+        >
           <input
             className={inputClass(theme)}
             placeholder="Code (e.g. CCS)"
@@ -157,20 +227,23 @@ export default function AdminCatalog() {
             </Select>
           )}
         </div>
-        <button type="button" onClick={handleAdd} className={`${primaryButton(theme)} mt-4`}>
+        <button type="button" onClick={handleSave} className={`${primaryButton(theme)} mt-3`}>
           <Plus size={18} />
-          Save item
+          {editingId ? "Update item" : "Save item"}
         </button>
       </div>
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="overflow-x-auto">
-          <table className={adminTableClass(theme)}>
+        <div className="en-inner-scroll max-h-[28rem] overflow-auto">
+          <table className={`${adminTableClass(theme)} min-w-[40rem]`}>
             <thead>
               <tr>
+                <th className={`${adminThClass(theme)} w-12`}>#</th>
                 <th className={adminThClass(theme)}>Code</th>
                 <th className={adminThClass(theme)}>Label</th>
-                {tab === "course" && <th className={adminThClass(theme)}>Department</th>}
+                {tab === "course" && (
+                  <th className={adminThClass(theme)}>Department</th>
+                )}
                 <th className={adminThClass(theme)}>Actions</th>
               </tr>
             </thead>
@@ -178,32 +251,47 @@ export default function AdminCatalog() {
               {!rows.length ? (
                 <tr>
                   <td
-                    colSpan={tab === "course" ? 4 : 3}
+                    colSpan={tab === "course" ? 5 : 4}
                     className={`${adminTdClass(theme)} py-8 text-center`}
                   >
                     No {TABS.find((t) => t.id === tab)?.label.toLowerCase()} yet.
                   </td>
                 </tr>
               ) : (
-              rows.map((item) => (
-                <tr key={item.id}>
-                  <td className={adminTdClass(theme)}>{item.code}</td>
-                  <td className={adminTdClass(theme)}>{item.label}</td>
-                  {tab === "course" && (
-                    <td className={adminTdClass(theme)}>{item.parent_code || "—"}</td>
-                  )}
-                  <td className={adminTdClass(theme)}>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item)}
-                      className={dangerButton(theme, "text-xs px-2 py-1")}
-                    >
-                      <Trash2 size={14} />
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))
+                rows.map((item, index) => (
+                  <tr key={item.id}>
+                    <td className={`${adminTdClass(theme)} tabular-nums text-gray-500`}>
+                      {index + 1}
+                    </td>
+                    <td className={adminTdClass(theme)}>{item.code}</td>
+                    <td className={adminTdClass(theme)}>{item.label}</td>
+                    {tab === "course" && (
+                      <td className={adminTdClass(theme)}>
+                        {item.parent_code || "—"}
+                      </td>
+                    )}
+                    <td className={adminTdClass(theme)}>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(item)}
+                          className={secondaryButtonSm(theme, "text-xs px-2 py-1")}
+                        >
+                          <Pencil size={14} />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item)}
+                          className={dangerButton(theme, "text-xs px-2 py-1")}
+                        >
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

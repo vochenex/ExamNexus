@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, MoreHorizontal, X } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import ProfileAvatar from "../ProfileAvatar";
 import { getMobileNav } from "./mobileNav";
+import { forceUnlockBodyScroll } from "../ui/ModalPortal";
 
 function isPathActive(pathname, to, end) {
   if (end) return pathname === to;
@@ -29,7 +30,7 @@ function TabButton({ item, active, theme, onClick }) {
             : ""
         }`}
       >
-        <Icon size={21} strokeWidth={active ? 2.4 : 2} />
+        <Icon size={18} strokeWidth={active ? 2.4 : 2} />
       </span>
       <span className={`en-tabbar-label ${active ? "en-tabbar-label--active" : ""}`}>
         {item.label}
@@ -43,6 +44,11 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { primary, more } = getMobileNav(role);
+
+  useEffect(() => {
+    setSheetOpen(false);
+    forceUnlockBodyScroll();
+  }, [location.pathname]);
 
   const hasMore = more.length > 0;
   const moreActive = more.some((item) =>
@@ -83,7 +89,7 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
                     : ""
                 }`}
               >
-                <MoreHorizontal size={21} strokeWidth={moreActive || sheetOpen ? 2.4 : 2} />
+                <MoreHorizontal size={18} strokeWidth={moreActive || sheetOpen ? 2.4 : 2} />
               </span>
               <span
                 className={`en-tabbar-label ${

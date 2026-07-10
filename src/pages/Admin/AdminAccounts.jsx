@@ -219,11 +219,21 @@ export default function AdminAccounts() {
         </Select>
       </div>
 
-      <div className={adminTableWrapClass(theme)}>
-        <div className="overflow-x-auto">
-          <table className={`${adminTableClass(theme)} min-w-[72rem]`}>
+      <div className={`${adminTableWrapClass(theme)} min-w-0`}>
+      {users.length === 0 ? (
+        <div
+          className={`flex min-h-[12rem] w-full items-center justify-center px-4 py-10 text-center text-sm ${
+            theme === "dark" ? "text-gray-400" : "text-gray-600"
+          }`}
+        >
+          No accounts match the current filters.
+        </div>
+      ) : (
+        <div className="en-inner-scroll en-table-scroll w-full max-w-full overflow-x-auto overflow-y-visible overscroll-x-contain touch-pan-x touch-pan-y">
+          <table className={`${adminTableClass(theme)} min-w-[76rem]`}>
             <thead>
               <tr>
+                <th className={`${adminThClass(theme)} w-12`}>#</th>
                 <th className={`${adminThClass(theme)} min-w-[11rem]`}>Name</th>
                 <th className={`${adminThClass(theme)} min-w-[14rem]`}>Email</th>
                 <th className={`${adminThClass(theme)} min-w-[7rem]`}>School ID</th>
@@ -234,20 +244,16 @@ export default function AdminAccounts() {
               </tr>
             </thead>
             <tbody>
-              {users.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={`${adminTdClass(theme)} py-8 text-center`}>
-                    No accounts match the current filters.
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => {
+              {users.map((user, index) => {
                   const status = getAccountStatus(user);
                   const isPending = status === "pending";
                   const isAdmin = String(user.role || "").toLowerCase() === "admin";
 
                   return (
                     <tr key={user.id}>
+                      <td className={`${adminTdClass(theme)} tabular-nums text-gray-500`}>
+                        {index + 1}
+                      </td>
                       <td className={`${adminTdClass(theme)} min-w-[11rem] whitespace-nowrap`}>
                         {[user.first_name, user.last_name].filter(Boolean).join(" ") || "—"}
                       </td>
@@ -301,11 +307,11 @@ export default function AdminAccounts() {
                       </td>
                     </tr>
                   );
-                })
-              )}
+                })}
             </tbody>
           </table>
         </div>
+      )}
       </div>
 
       {editing && (

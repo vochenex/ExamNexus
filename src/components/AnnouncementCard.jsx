@@ -260,30 +260,36 @@ export default function AnnouncementCard({
           )}
 
           {allowInteract && (
-            <form onSubmit={handleComment} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Write a comment..."
-                className={`flex-1 p-2.5 rounded-xl text-sm outline-none ${
+            <form onSubmit={handleComment} className="flex w-full min-w-0 items-center gap-0">
+              <div
+                className={`flex min-w-0 flex-1 items-center gap-1 rounded-xl border pr-1 ${
                   theme === "dark"
-                    ? "bg-white/10 border border-white/10 text-white"
-                    : "en-bg-elevated border border-emerald-200 text-gray-900"
+                    ? "border-white/10 bg-white/10"
+                    : "border-emerald-200 en-bg-elevated"
                 }`}
-              />
-              <button
-                type="submit"
-                disabled={submitting || !commentText.trim()}
-                className={`p-2.5 rounded-xl ${
-                  theme === "dark"
-                    ? "bg-emerald-500 text-black"
-                    : "bg-emerald-500 text-white"
-                } disabled:opacity-50`}
-                aria-label="Post comment"
               >
-                <Send size={16} />
-              </button>
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  className={`min-w-0 flex-1 bg-transparent p-2.5 text-sm outline-none ${
+                    theme === "dark" ? "text-white placeholder:text-gray-500" : "text-gray-900"
+                  }`}
+                />
+                <button
+                  type="submit"
+                  disabled={submitting || !commentText.trim()}
+                  className={`shrink-0 rounded-lg p-2 ${
+                    theme === "dark"
+                      ? "bg-emerald-500 text-black"
+                      : "bg-emerald-500 text-white"
+                  } disabled:opacity-50`}
+                  aria-label="Post comment"
+                >
+                  <Send size={16} />
+                </button>
+              </div>
             </form>
           )}
         </div>

@@ -26,12 +26,14 @@ import RequiredSchoolIdGate from "../components/RequiredSchoolIdGate";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
 import MobileTabBar from "../components/mobile/MobileTabBar";
 import useMobileNav from "../hooks/useMobileNav";
+import { isNativeApp } from "../utils/platform";
 import { motion } from "../utils/motion";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
+  const nativeApp = isNativeApp();
   const [user, setUser] = useState(() =>
     JSON.parse(localStorage.getItem("examnexus_user") || "{}")
   );
@@ -84,7 +86,7 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        <nav className="mt-5 flex-1 space-y-5 overflow-y-auto pr-1">
+        <nav className="mt-5 flex-1 space-y-5 overflow-y-auto en-scroll-region pr-1">
           <SidebarSection title="Overview" theme={theme}>
             <SidebarNavLink to="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" end />
             <SidebarNavLink to="/admin/profile" icon={UserCircle} label="Profile" />
@@ -159,19 +161,37 @@ export default function AdminLayout() {
       )}
 
       <main
-        className={`relative h-screen flex-1 overflow-y-auto ${
-          mobileNav ? "p-4 sm:p-6 en-has-tabbar" : "p-8"
-        } ${theme === "dark" ? "text-white" : "en-text-primary"}`}
+        className={`relative flex h-screen min-w-0 flex-1 flex-col ${
+          theme === "dark" ? "text-white" : "en-text-primary"
+        }`}
       >
+        {nativeApp ? (
+          <header className="en-native-topbar shrink-0">
+            <ExamNexusLogo size={28} idSuffix="admin-native-top" />
+            <div className="en-native-topbar-actions">
+              <ThemeToggle inverted compact />
+              <NotificationBell compact />
+            </div>
+          </header>
+        ) : (
+          <div
+            className={`absolute ${mobileNav ? "right-4 top-4" : "right-8 top-6"} z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+          >
+            <InstallIconButton />
+            <ThemeToggle />
+            <NotificationBell />
+          </div>
+        )}
         <div
-          className={`absolute ${mobileNav ? "right-4 top-4" : "right-8 top-6"} z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+          className={`en-scroll-region min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto touch-pan-y ${
+            mobileNav
+              ? "p-4 sm:p-6 en-has-tabbar pb-[calc(var(--en-tabbar-height,3.35rem)+2rem)]"
+              : "p-8"
+          }`}
         >
-          <InstallIconButton />
-          <ThemeToggle />
-          <NotificationBell />
+          <Outlet />
+          <RequiredSchoolIdGate theme={theme} onResolved={setUser} />
         </div>
-        <Outlet />
-        <RequiredSchoolIdGate theme={theme} onResolved={setUser} />
       </main>
 
       {mobileNav && (

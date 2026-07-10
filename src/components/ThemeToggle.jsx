@@ -5,14 +5,14 @@ export default function ThemeToggle({ inverted = false, compact = false }) {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
   const onDarkSurface = isDark || inverted;
-  const iconSize = compact ? 18 : 30;
+  const iconSize = compact ? 20 : 30;
 
   return (
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={`flex shrink-0 items-center justify-center rounded-xl transition-colors duration-150 ${
-        compact ? "h-10 w-10" : "rounded-2xl p-3.5"
+      className={`en-header-action-btn en-theme-toggle-btn flex shrink-0 items-center justify-center transition-colors duration-150 ${
+        compact ? "h-10 w-10 rounded-xl" : "rounded-2xl p-3.5"
       } ${
         onDarkSurface
           ? "border border-white/15 bg-white/10 text-emerald-200 hover:bg-white/15"

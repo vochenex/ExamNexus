@@ -2193,6 +2193,7 @@ export async function fetchStudentAssessments(studentId) {
     const retakeStatus = retakeByExamId.get(exam.id) || null;
     const submitted =
       submittedExamIds.has(exam.id) && retakeStatus !== "approved";
+    const studentSection = sectionBySubject.get(exam.subject_id) || "A";
 
     return enrichExamRecord({
       ...exam,
@@ -2200,6 +2201,8 @@ export async function fetchStudentAssessments(studentId) {
         exam.subjects?.name ||
         subjectNameById.get(exam.subject_id) ||
         "Unknown Subject",
+      student_section: studentSection,
+      student_section_label: `Section ${studentSection}`,
       submitted,
       retake_status: retakeStatus,
       retake_approved: retakeStatus === "approved",
@@ -2255,6 +2258,32 @@ export async function fetchSubjectAnnouncements(subjectId) {
 
   if (error) throw error;
   return [];
+}
+
+/** Recent announcements posted by the signed-in faculty across their subjects. */
+export async function fetchFacultyAnnouncements(limit = 40) {
+  await requireSession();
+  const subjects = await fetchTeacherSubjects();
+  const subjectIds = (subjects || []).map((s) => s.id).filter(Boolean);
+  if (!subjectIds.length) return [];
+
+  const subjectNameById = Object.fromEntries(
+    (subjects || []).map((s) => [s.id, s.name || "Subject"])
+  );
+
+  const { data, error } = await supabase
+    .from("announcements")
+    .select("id, subject_id, title, body, target_sections, created_at, like_count, comment_count")
+    .in("subject_id", subjectIds)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return (data || []).map((row) => ({
+    ...row,
+    subject_name: subjectNameById[row.subject_id] || "Subject",
+  }));
 }
 
 export async function createAnnouncement({

@@ -7,7 +7,6 @@ import PageHeader from "../../components/ui/PageHeader";
 import AlertBanner from "../../components/ui/AlertBanner";
 import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
-import Button from "../../components/ui/Button";
 import ChipToggle from "../../components/ui/ChipToggle";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
@@ -15,6 +14,7 @@ import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { getSectionsForSubjects, normalizeTargetSections } from "../../utils/sections";
 import {
   createFacultyAnnouncements,
+  fetchFacultyAnnouncements,
   fetchTeacherSubjects,
 } from "../../utils/supabaseData";
 import {
@@ -24,6 +24,13 @@ import {
 } from "../../utils/avatar";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import {
+  adminTableClass,
+  adminTableWrapClass,
+  adminTdClass,
+  adminThClass,
+} from "../../components/admin/adminTableStyles";
+import { primaryButton } from "../../utils/themeButtons";
 
 export default function FacultyAnnouncementsHub() {
   const { theme } = useTheme();
@@ -32,11 +39,18 @@ export default function FacultyAnnouncementsHub() {
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
 
   const [subjects, setSubjects] = useState([]);
+  const [posted, setPosted] = useState([]);
   const [scope, setScope] = useState("all");
   const [selectedSubjectIds, setSelectedSubjectIds] = useState([]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [targetSections, setTargetSections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const facultyCanManage = canFacultyManageSubjects(cachedUser);
 
   const announcementSections = useMemo(() => {
     if (scope === "specific" && selectedSubjectIds.length > 0) {
@@ -53,31 +67,31 @@ export default function FacultyAnnouncementsHub() {
     );
   }, [announcementSections]);
 
-  const [loading, setLoading] = useState(true);
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const facultyCanManage = canFacultyManageSubjects(cachedUser);
-
-  const load = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setLoading(true);
-      const rows = await fetchTeacherSubjects(cachedUser.school_id);
-      setSubjects(rows || []);
-    } catch (err) {
-      setError(err.message || "Failed to load subjects.");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [cachedUser.school_id]);
-
   useEffect(() => {
     if (isFacultyRole(cachedUser.role) && !facultyCanManage) {
       showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       navigate("/faculty/profile");
     }
-  }, [cachedUser.role, facultyCanManage, navigate]);
+  }, [cachedUser.role, facultyCanManage, navigate, showWarning]);
+
+  const load = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) setLoading(true);
+        const [rows, announcementRows] = await Promise.all([
+          fetchTeacherSubjects(cachedUser.school_id),
+          fetchFacultyAnnouncements(),
+        ]);
+        setSubjects(rows || []);
+        setPosted(announcementRows || []);
+      } catch (err) {
+        setError(err.message || "Failed to load announcements.");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [cachedUser.school_id]
+  );
 
   usePolling(load, [cachedUser.school_id]);
 
@@ -121,6 +135,7 @@ export default function FacultyAnnouncementsHub() {
       setSuccess(
         `Announcement posted to ${count} subject${count === 1 ? "" : "s"}. Students will see it in notifications.`
       );
+      await load(true);
     } catch (err) {
       setError(err.message || "Failed to post announcement.");
     } finally {
@@ -129,87 +144,161 @@ export default function FacultyAnnouncementsHub() {
   };
 
   if (loading) {
-    return <PageLoadingSkeleton theme={theme} variant="list" />;
+    return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 
   return (
-    <div className={pageShellClass(theme)}>
-      <div className="mx-auto max-w-3xl">
-        <BackButton />
+    <div className={pageShellClass(theme, "mx-auto max-w-5xl")}>
+      <BackButton />
 
-        <PageHeader
-          theme={theme}
-          icon={Megaphone}
-          title="Make Announcement"
-          subtitle="Notify students across all subjects, one subject, or specific sections."
-        />
+      <PageHeader
+        theme={theme}
+        icon={Megaphone}
+        title="Faculty announcements"
+        subtitle="Notify students across all subjects, one subject, or specific sections."
+      />
 
-        <form onSubmit={handlePost} className={panelClass(theme)}>
-          {error && <AlertBanner variant="error">{error}</AlertBanner>}
-          {success && <AlertBanner variant="success">{success}</AlertBanner>}
+      <form onSubmit={handlePost} className={`${panelClass(theme)} mb-6 space-y-4`}>
+        {error && <AlertBanner variant="error">{error}</AlertBanner>}
+        {success && <AlertBanner variant="success">{success}</AlertBanner>}
 
-          <div className="mb-4">
-            <p
-              className={`text-sm font-medium mb-2 ${
-                theme === "dark" ? "text-emerald-400" : "text-teal-700"
-              }`}
-            >
-              Subject scope
-            </p>
-            <div className="flex flex-wrap gap-2 mb-3">
-              <ChipToggle active={scope === "all"} onClick={() => setScope("all")}>
-                All my subjects ({subjects.length})
-              </ChipToggle>
-              <ChipToggle active={scope === "specific"} onClick={() => setScope("specific")}>
-                Specific subject(s)
-              </ChipToggle>
-            </div>
-
-            {scope === "specific" && (
-              <div className="flex flex-wrap gap-2">
-                {subjects.map((subject) => (
-                  <ChipToggle
-                    key={subject.id}
-                    active={selectedSubjectIds.includes(subject.id)}
-                    onClick={() => toggleSubject(subject.id)}
-                  >
-                    {subject.name}
-                  </ChipToggle>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <SectionPicker
-            value={targetSections}
-            onChange={setTargetSections}
-            sections={announcementSections}
-            label="Notify sections"
-            hint="Only students in these sections will receive the announcement."
-          />
-
+        <div>
+          <label
+            className={`mb-1.5 block text-sm font-medium ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
+            Title
+          </label>
           <Input
-            type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Announcement title"
             required
-            className="mt-4"
           />
+        </div>
 
+        <div>
+          <label
+            className={`mb-1.5 block text-sm font-medium ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
+            Message
+          </label>
           <Textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Announcement message..."
-            rows={5}
-            className="mt-3"
+            rows={4}
             required
           />
+        </div>
 
-          <Button type="submit" disabled={posting} size="sm" className="mt-4">
-            {posting ? "Posting..." : "Post Announcement"}
-          </Button>
-        </form>
+        <div>
+          <label
+            className={`mb-1.5 block text-sm font-medium ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
+            Subject scope
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <ChipToggle active={scope === "all"} onClick={() => setScope("all")}>
+              All my subjects ({subjects.length})
+            </ChipToggle>
+            <ChipToggle active={scope === "specific"} onClick={() => setScope("specific")}>
+              Specific subject(s)
+            </ChipToggle>
+          </div>
+          {scope === "specific" && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {subjects.map((subject) => (
+                <ChipToggle
+                  key={subject.id}
+                  active={selectedSubjectIds.includes(subject.id)}
+                  onClick={() => toggleSubject(subject.id)}
+                >
+                  {subject.name}
+                </ChipToggle>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <SectionPicker
+          value={targetSections}
+          onChange={setTargetSections}
+          sections={announcementSections}
+          label="Audience (sections)"
+          hint="Only students in these sections will receive the announcement."
+        />
+
+        <button
+          type="submit"
+          disabled={posting}
+          className={primaryButton(theme, "disabled:opacity-60")}
+        >
+          {posting ? "Publishing..." : "Publish announcement"}
+        </button>
+      </form>
+
+      <div className={adminTableWrapClass(theme)}>
+        <div className="en-inner-scroll max-h-[28rem] overflow-auto">
+          <table className={adminTableClass(theme)}>
+            <thead>
+              <tr>
+                <th className={adminThClass(theme)}>Title</th>
+                <th className={adminThClass(theme)}>Subject</th>
+                <th className={adminThClass(theme)}>Audience</th>
+                <th className={adminThClass(theme)}>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!posted.length ? (
+                <tr>
+                  <td colSpan={4} className={`${adminTdClass(theme)} py-8 text-center`}>
+                    No announcements published yet.
+                  </td>
+                </tr>
+              ) : (
+                posted.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer"
+                    onClick={() =>
+                      navigate(
+                        `/faculty/subject/${row.subject_id}/social?highlight=${row.id}`
+                      )
+                    }
+                  >
+                    <td className={adminTdClass(theme)}>
+                      <p className="font-medium">{row.title}</p>
+                      {row.body && (
+                        <p
+                          className={`mt-1 line-clamp-2 text-xs ${
+                            theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          {row.body}
+                        </p>
+                      )}
+                    </td>
+                    <td className={adminTdClass(theme)}>{row.subject_name}</td>
+                    <td className={adminTdClass(theme)}>
+                      {Array.isArray(row.target_sections) && row.target_sections.length
+                        ? row.target_sections.join(", ")
+                        : "All sections"}
+                    </td>
+                    <td className={adminTdClass(theme)}>
+                      {row.created_at ? new Date(row.created_at).toLocaleString() : "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

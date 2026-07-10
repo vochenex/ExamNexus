@@ -1,5 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import AppModal from "../components/ui/AppModal";
+import { forceUnlockBodyScroll } from "../components/ui/ModalPortal";
 
 const AppModalContext = createContext(null);
 
@@ -12,6 +14,7 @@ function normalizeAlertOptions(input, defaults = {}) {
 
 export function AppModalProvider({ children }) {
   const [modal, setModal] = useState(null);
+  const location = useLocation();
 
   const close = useCallback((result = false) => {
     setModal((current) => {
@@ -19,6 +22,15 @@ export function AppModalProvider({ children }) {
       return null;
     });
   }, []);
+
+  // Navigating via the tab bar must never leave a modal overlay eating touches.
+  useEffect(() => {
+    setModal((current) => {
+      current?.resolve?.(false);
+      return null;
+    });
+    forceUnlockBodyScroll();
+  }, [location.pathname]);
 
   const alert = useCallback((input) => {
     const options = normalizeAlertOptions(input, {

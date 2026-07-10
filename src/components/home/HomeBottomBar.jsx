@@ -78,7 +78,7 @@ export default function HomeBottomBar() {
             )}
           </span>
           <span className={`en-tabbar-label ${onAuthPage ? "en-tabbar-label--active" : ""}`}>
-            {dashboardTo ? "App" : "Login"}
+            {dashboardTo ? "Dashboard" : "Login"}
           </span>
         </Link>
       </div>

@@ -89,8 +89,7 @@ export default function StudentSubjectDetails() {
 
   return (
     <div className={pageShellClass(theme)}>
-      <div className="mx-auto max-w-7xl">
-        <BackButton />
+      <BackButton />
 
         <PageHeader
           theme={theme}
@@ -181,7 +180,6 @@ export default function StudentSubjectDetails() {
             ))}
           </div>
         )}
-      </div>
     </div>
   );
 }

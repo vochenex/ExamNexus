@@ -265,6 +265,111 @@ export async function fetchAdminExportResults(examId = null) {
   return normalizeJson(data);
 }
 
+/**
+ * Full assessment report for HTML export.
+ * Tries admin_export_assessment_report RPC; on any failure (including stale
+ * SQL that still references q.options) composes the report from safe queries.
+ */
+export async function fetchAdminAssessmentReport(examId) {
+  await requireSession();
+  if (!examId) throw new Error("Assessment id is required.");
+
+  try {
+    const { data, error } = await supabase.rpc("admin_export_assessment_report", {
+      p_exam_id: examId,
+    });
+
+    if (!error && data) {
+      const report = typeof data === "string" ? JSON.parse(data) : data;
+      const questions = Array.isArray(report.questions)
+        ? report.questions.map((row) => ({
+            ...row,
+            question_text: row.question_text || row.question,
+            options:
+              (Array.isArray(row.options) && row.options.length
+                ? row.options
+                : null) ||
+              [row.option_a, row.option_b, row.option_c, row.option_d].filter(Boolean),
+            points: row.points ?? (Number(row.grading_options?.points) || 1),
+          }))
+        : [];
+      return { ...report, questions };
+    }
+  } catch (err) {
+    console.warn("admin_export_assessment_report RPC failed, using fallback:", err);
+  }
+
+  const [results, assessments, faculty] = await Promise.all([
+    fetchAdminExportResults(examId),
+    fetchAdminExportAssessments(),
+    fetchAdminFaculty(),
+  ]);
+
+  const meta =
+    assessments.find((row) => String(row.assessment_id) === String(examId)) ||
+    {};
+  const facultyMember = faculty.find(
+    (row) => String(row.school_id) === String(meta.faculty_school_id || "")
+  );
+
+  let questions = [];
+  try {
+    const { data: questionRows, error: qError } = await supabase
+      .from("questions")
+      .select(
+        "id, question, question_type, option_a, option_b, option_c, option_d, correct_answer, correct_answers, grading_options, created_at"
+      )
+      .eq("exam_id", examId)
+      .order("created_at", { ascending: true });
+    if (!qError) {
+      questions = (questionRows || []).map((row) => ({
+        ...row,
+        question_text: row.question,
+        options: [row.option_a, row.option_b, row.option_c, row.option_d].filter(Boolean),
+        points: Number(row.grading_options?.points) || 1,
+      }));
+    }
+  } catch {
+    questions = [];
+  }
+
+  let description = "";
+  try {
+    const { data: examRow } = await supabase
+      .from("exams")
+      .select("description, instructions, exam_type, assessment_category, start_datetime, end_datetime")
+      .eq("id", examId)
+      .maybeSingle();
+    description = examRow?.description || "";
+    if (examRow) {
+      meta.type = meta.type || examRow.exam_type;
+      meta.category = meta.category || examRow.assessment_category;
+      meta.start = meta.start || examRow.start_datetime;
+      meta.end = meta.end || examRow.end_datetime;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    id: examId,
+    title: meta.title || results[0]?.exam_title || "Assessment",
+    description,
+    type: meta.type,
+    category: meta.category,
+    subject: meta.subject || results[0]?.subject,
+    faculty_school_id: meta.faculty_school_id,
+    faculty_name: facultyMember
+      ? [facultyMember.first_name, facultyMember.last_name].filter(Boolean).join(" ")
+      : meta.faculty_school_id || "",
+    start: meta.start,
+    end: meta.end,
+    pass_mark: 50,
+    questions,
+    students: results,
+  };
+}
+
 export function getAccountStatus(profile) {
   const explicit = profile?.account_status;
   if (explicit) return explicit;

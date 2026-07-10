@@ -1,9 +1,16 @@
 import { getAuthSession } from "./authUser";
 import { resolvePromptGenerationSettings } from "./promptPreferences";
 
-import { API_BASE } from "./apiBase.js";
+import { API_BASE, isLocalApiBase } from "./apiBase.js";
 
 const AI_REQUEST_TIMEOUT_MS = 600000;
+
+function backendUnreachableMessage() {
+  if (isLocalApiBase()) {
+    return `Cannot reach the backend at ${API_BASE}. On a local APK, start the backend (npm start in backend/), keep the phone on the same Wi‑Fi, and rebuild. For public users, deploy to Vercel and build with npm run cap:apk:prod.`;
+  }
+  return `Cannot reach the backend at ${API_BASE}. Check that the API is online (Vercel /api/health), then try again.`;
+}
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -230,7 +237,7 @@ export async function fetchAssessmentAiStatus() {
     return {
       configured: false,
       error: isBackendUnreachable(error)
-        ? "Cannot reach the backend. Start it with npm start in the backend folder."
+        ? backendUnreachableMessage()
         : error.message,
     };
   }
@@ -275,9 +282,7 @@ export async function generateAssessmentFromPrompt({
   } catch (error) {
     stopWaiting();
     if (isBackendUnreachable(error)) {
-      throw new Error(
-        "Cannot reach the backend. Start it with npm start in the backend folder."
-      );
+      throw new Error(backendUnreachableMessage());
     }
     throw error;
   } finally {
@@ -343,9 +348,7 @@ export async function generateAssessmentFromDocument({
   } catch (error) {
     stopWaiting();
     if (isBackendUnreachable(error)) {
-      throw new Error(
-        "Cannot reach the backend. Start it with npm start in the backend folder."
-      );
+      throw new Error(backendUnreachableMessage());
     }
     throw error;
   } finally {

@@ -27,6 +27,7 @@ import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
 import AnimatedPage from "../components/ui/AnimatedPage";
 import MobileTabBar from "../components/mobile/MobileTabBar";
 import useMobileNav from "../hooks/useMobileNav";
+import { isNativeApp } from "../utils/platform";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
 import { motion } from "../utils/motion";
 
@@ -35,6 +36,7 @@ export default function DashboardLayout() {
   const { isLockdownActive, lockdown } = useAssessmentLockdown();
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
+  const nativeApp = isNativeApp();
   const cachedUser = getCachedExamNexusUser();
   const [accessState, setAccessState] = useState(cachedUser ? "allowed" : "checking");
   const [sessionUser, setSessionUser] = useState(
@@ -137,7 +139,7 @@ export default function DashboardLayout() {
           </div>
 
           {/* Navigation */}
-          <nav className="mt-5 flex-1 space-y-5 overflow-y-auto pr-1">
+          <nav className="mt-5 flex-1 space-y-5 overflow-y-auto en-scroll-region pr-1">
             <SidebarSection title="Main" theme={theme}>
               <SidebarNavLink
                 to={isStudent ? "/student/dashboard" : "/faculty/dashboard"}
@@ -236,15 +238,13 @@ export default function DashboardLayout() {
       )}
 
       <main
-        className={`relative h-screen flex-1 overflow-y-auto ${
-          isLockdownActive ? "p-0" : mobileNav ? "p-4 sm:p-6" : "p-8"
-        } ${mobileNav && !isLockdownActive ? "en-has-tabbar" : ""} ${
+        className={`relative flex h-screen min-w-0 flex-1 flex-col ${
           theme === "dark" ? "text-white" : "en-text-primary"
         }`}
       >
         {isLockdownActive && (
           <div
-            className={`sticky top-0 z-50 flex items-center gap-2 border-b px-4 py-2 text-xs font-medium ${
+            className={`z-50 flex shrink-0 items-center gap-2 border-b px-4 py-2 text-xs font-medium ${
               theme === "dark"
                 ? "border-amber-500/20 bg-amber-500/10 text-amber-200"
                 : "border-amber-200 bg-amber-50 text-amber-900"
@@ -257,18 +257,36 @@ export default function DashboardLayout() {
         )}
 
         {!isLockdownActive && (
-          <div
-            className={`absolute ${mobileNav ? "right-4 top-4" : "right-8 top-6"} z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
-          >
-            <InstallIconButton />
-            <ThemeToggle />
-            <NotificationBell />
-          </div>
+          <>
+            {nativeApp ? (
+              <header className="en-native-topbar shrink-0">
+                <ExamNexusLogo size={28} idSuffix="native-top" />
+                <div className="en-native-topbar-actions">
+                  <ThemeToggle inverted compact />
+                  <NotificationBell compact />
+                </div>
+              </header>
+            ) : (
+              <div
+                className={`absolute ${mobileNav ? "right-4 top-4" : "right-8 top-6"} z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+              >
+                <InstallIconButton />
+                <ThemeToggle />
+                <NotificationBell />
+              </div>
+            )}
+          </>
         )}
-        <AnimatedPage>
-          <Outlet />
-        </AnimatedPage>
-        <RequiredSchoolIdGate theme={theme} onResolved={setSessionUser} />
+        <div
+          className={`en-scroll-region min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto touch-pan-y ${
+            isLockdownActive ? "p-0" : mobileNav ? "p-4 sm:p-6" : "p-8"
+          } ${mobileNav && !isLockdownActive ? "en-has-tabbar pb-[calc(var(--en-tabbar-height,3.35rem)+2rem)]" : ""}`}
+        >
+          <AnimatedPage>
+            <Outlet />
+          </AnimatedPage>
+          <RequiredSchoolIdGate theme={theme} onResolved={setSessionUser} />
+        </div>
       </main>
 
       {mobileNav && !isLockdownActive && (

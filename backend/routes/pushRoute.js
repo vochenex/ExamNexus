@@ -4,7 +4,8 @@ const { resolveUserIdFromAccessToken } = require("../lib/verifyAccessToken");
 const {
   notifyAnnouncementRecipients,
   sendPushToUsers,
-  getFcmServerKey,
+  isPushConfigured,
+  getPushApiMode,
 } = require("../lib/pushSender");
 
 const router = express.Router();
@@ -29,7 +30,8 @@ async function requireAuth(req, res, next) {
 router.get("/status", (_req, res) => {
   res.json({
     ok: true,
-    fcmConfigured: Boolean(getFcmServerKey()),
+    fcmConfigured: isPushConfigured(),
+    api: getPushApiMode(),
   });
 });
 

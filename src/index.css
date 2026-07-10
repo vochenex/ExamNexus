@@ -148,11 +148,18 @@ body {
   background-color: #0a0f0c;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Prevent the whole page from shifting horizontally when scrollbars appear/disappear
-     (this was visible when typing into auth inputs and after navigating pages). */
-  scrollbar-gutter: stable;
-  /* Hide scrollbar visuals while keeping layout stability. */
+  /* Do not reserve scrollbar gutter — it shrinks the header and feels like a
+     separate scroll strip on mobile WebViews. Overlay scrollbars instead. */
+  scrollbar-gutter: auto;
   scrollbar-width: none; /* Firefox */
+}
+
+html.en-native-app,
+html.en-native-app body {
+  scrollbar-gutter: auto !important;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body::-webkit-scrollbar {
@@ -429,6 +436,11 @@ html.light .en-tabbar-icon {
   letter-spacing: 0.01em;
   color: #94a3b8;
   transition: color 0.2s ease;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
 html.light .en-tabbar-label {
@@ -441,6 +453,151 @@ html.light .en-tabbar-label {
 
 html:not(.light) .en-tabbar-label--active {
   color: #6ee7b7;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Visible scrollbars — overlay style (do not steal swipe / layout width)     */
+/* -------------------------------------------------------------------------- */
+
+.en-scroll-region,
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 185, 129, 0.45) transparent;
+  /* Swipe/wheel the content itself — never require grabbing the thumb */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: auto;
+  touch-action: pan-x pan-y;
+}
+
+/* Nested tables / panels: allow vertical page scroll while swiping inside */
+.en-inner-scroll,
+.en-table-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  max-width: 100%;
+}
+
+html.en-native-app .en-table-scroll,
+html.en-native-app .en-inner-scroll {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+}
+
+html.en-native-app .en-table-scroll::-webkit-scrollbar,
+html.en-native-app .en-inner-scroll::-webkit-scrollbar {
+  height: 6px !important;
+  width: 6px !important;
+  display: block !important;
+}
+
+html.en-native-app .en-table-scroll::-webkit-scrollbar-thumb,
+html.en-native-app .en-inner-scroll::-webkit-scrollbar-thumb {
+  background: rgba(52, 211, 153, 0.45);
+  border-radius: 999px;
+}
+
+html:not(.light) .en-scroll-region,
+html:not(.light) .overflow-y-auto,
+html:not(.light) .overflow-x-auto,
+html:not(.light) .overflow-auto {
+  scrollbar-color: rgba(52, 211, 153, 0.45) transparent;
+}
+
+/* Overlay scrollbars: zero layout width so headers stay full-bleed */
+.en-scroll-region::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.en-scroll-region::-webkit-scrollbar-track,
+.overflow-y-auto::-webkit-scrollbar-track,
+.overflow-x-auto::-webkit-scrollbar-track,
+.overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.en-scroll-region::-webkit-scrollbar-thumb,
+.overflow-y-auto::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb,
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: rgba(13, 148, 136, 0.4);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html:not(.light) .en-scroll-region::-webkit-scrollbar-thumb,
+html:not(.light) .overflow-y-auto::-webkit-scrollbar-thumb,
+html:not(.light) .overflow-x-auto::-webkit-scrollbar-thumb,
+html:not(.light) .overflow-auto::-webkit-scrollbar-thumb {
+  background: rgba(52, 211, 153, 0.4);
+  background-clip: padding-box;
+}
+
+/* Native: hide scrollbar chrome — swipe/scroll the page itself */
+html.en-native-app .en-scroll-region,
+html.en-native-app .overflow-y-auto,
+html.en-native-app .overflow-x-auto,
+html.en-native-app .overflow-auto,
+html.en-native-app main,
+html.en-native-app .en-auth-body {
+  scrollbar-width: none !important;
+  touch-action: pan-y;
+}
+
+html.en-native-app .en-scroll-region::-webkit-scrollbar,
+html.en-native-app .overflow-y-auto::-webkit-scrollbar,
+html.en-native-app .overflow-x-auto::-webkit-scrollbar,
+html.en-native-app .overflow-auto::-webkit-scrollbar,
+html.en-native-app main::-webkit-scrollbar,
+html.en-native-app .en-auth-body::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
+}
+
+/* Compact chart preview stays inside the card; expanded modal scrolls separately */
+html.en-native-app .en-chart-shell {
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+html.en-native-app .en-chart-shell > .en-chart-scroll {
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden !important;
+}
+
+/* Notification panel (portaled — avoids header backdrop-filter trapping touches) */
+.en-notif-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: rgba(2, 12, 11, 0.45);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.en-notif-panel {
+  display: flex;
+  flex-direction: column;
+  z-index: 80;
 }
 
 /* Bottom sheet ("More") */

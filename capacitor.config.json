@@ -5,12 +5,12 @@
   "backgroundColor": "#031d1f",
   "plugins": {
     "StatusBar": {
-      "overlaysWebView": false,
+      "overlaysWebView": true,
       "style": "DARK",
       "backgroundColor": "#031d1f"
     },
     "Keyboard": {
-      "resize": "native"
+      "resize": "body"
     },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]

@@ -275,8 +275,8 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <div className={`rounded-2xl border p-4 ${panelClass(theme)}`}>
+      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className={`min-w-0 overflow-hidden rounded-2xl border p-4 ${panelClass(theme)}`}>
           <div className="mb-3 flex items-center gap-2">
             <CalendarDays size={16} className="text-emerald-400" />
             <h3 className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-teal-800"}`}>
@@ -287,10 +287,11 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
           <AdminVerticalBarChart
             items={submissionsByDate}
             emptyMessage="No submissions in the last two weeks."
+            title="Submissions by date"
           />
         </div>
 
-        <div className={`rounded-2xl border p-4 ${panelClass(theme)}`}>
+        <div className={`min-w-0 overflow-hidden rounded-2xl border p-4 ${panelClass(theme)}`}>
           <div className="mb-3 flex items-center gap-2">
             <Users size={16} className="text-emerald-400" />
             <h3 className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-teal-800"}`}>
@@ -300,10 +301,11 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
           <AdminVerticalBarChart
             items={submissionsBySection}
             emptyMessage="No section breakdown yet."
+            title="Submissions by section"
           />
         </div>
 
-        <div className={`rounded-2xl border p-4 md:col-span-2 xl:col-span-1 ${panelClass(theme)}`}>
+        <div className={`rounded-2xl border p-4 md:col-span-2 xl:col-span-1 min-w-0 overflow-hidden ${panelClass(theme)}`}>
           <div className="mb-3 flex items-center gap-2">
             <BarChart3 size={16} className="text-emerald-400" />
             <h3 className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-teal-800"}`}>
@@ -313,6 +315,7 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
           <AdminVerticalBarChart
             items={filteredAssessments}
             emptyMessage="No submission data for recent assessments."
+            title="Recent assessment volume"
           />
         </div>
       </div>
@@ -326,7 +329,7 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
         {filteredAssessments.length === 0 ? (
           <p className={`text-sm ${muted}`}>No assessments match these filters.</p>
         ) : (
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-2 min-w-0">
             {filteredAssessments.map((row) => {
               const rate =
                 row.enrolled > 0 ? Math.round((row.submitted / row.enrolled) * 100) : 0;
@@ -336,25 +339,25 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
                   key={row.key}
                   type="button"
                   onClick={() => navigate(`/faculty/assessment/${row.examId}`)}
-                  className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition hover:opacity-95 ${
+                  className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border px-3 py-2.5 text-left transition hover:opacity-95 ${
                     theme === "dark"
                       ? "border-white/10 bg-black/20 hover:border-emerald-500/25"
                       : "border-emerald-100 bg-white hover:border-teal-300"
                   }`}
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 overflow-hidden">
                     <p className={`truncate text-sm font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
                       {row.fullTitle}
                     </p>
-                    <p className={`mt-0.5 text-xs ${muted}`}>
+                    <p className={`mt-0.5 truncate text-xs ${muted}`}>
                       {row.subjectName} · {formatAssessmentDate(row.date)}
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
+                  <div className="w-[4.5rem] shrink-0 text-right">
                     <p className={`text-sm font-bold tabular-nums ${theme === "dark" ? "text-emerald-300" : "text-teal-700"}`}>
                       {row.submitted}/{row.enrolled}
                     </p>
-                    <p className={`text-[10px] ${muted}`}>{rate}% submitted</p>
+                    <p className={`truncate text-[10px] ${muted}`}>{rate}% submitted</p>
                   </div>
                 </button>
               );

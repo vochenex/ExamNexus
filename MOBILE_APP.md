@@ -34,6 +34,8 @@ See the PWA section below; ship with normal `npm run build` over HTTPS.
 
 ## Capacitor native app
 
+For a **public launch** (any network + AI), deploy the web/API to Vercel first — see [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md) — then build the store/release APK with `npm run cap:apk:prod`.
+
 Same React app wrapped with [Capacitor](https://capacitorjs.com/).
 
 ### One-time setup
@@ -51,7 +53,20 @@ npm run cap:add:ios        # macOS + Xcode + CocoaPods only
 npm run cap:android    # build web, sync, open Android Studio
 npm run cap:ios        # build web, sync, open Xcode
 npm run cap:sync       # rebuild web + copy into native projects
+npm run cap:apk        # build installable debug APK (no Android Studio UI)
+npm run cap:icons      # regenerate Android launcher icon from public/icons/logo.svg
 ```
+
+### App icon
+
+The Android home-screen icon is generated from `public/icons/logo.svg` (ExamNexus logo on `#031d1f`).
+
+```bash
+npm run cap:icons
+npm run cap:apk
+```
+
+Users must install/update the APK to see a new launcher icon.
 
 ### Configuration
 
@@ -61,7 +76,9 @@ npm run cap:sync       # rebuild web + copy into native projects
 | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | root `.env` — same as web |
 | `VITE_API_BASE_URL` | root `.env` — backend used for push dispatch |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` |
-| `FCM_SERVER_KEY` | `backend/.env` — Firebase Cloud Messaging key for push delivery |
+| `FCM_SERVICE_ACCOUNT_PATH` | `backend/.env` — path to Firebase service account JSON (v1 API) |
+| `FCM_PROJECT_ID` | `backend/.env` — optional if set in the JSON (`examnexus-9d77a`) |
+| `FCM_SERVER_KEY` | `backend/.env` — legacy only (deprecated; new projects cannot use this) |
 | `appId` / `appName` | `capacitor.config.json` (`com.examnexus.app`) |
 
 ### Push notifications (students)
@@ -70,18 +87,23 @@ When a faculty announcement is posted, the app:
 
 1. Saves each native device token into Supabase `push_devices` (run `database/push_notification_devices.sql`).
 2. Calls backend `POST /push/announce` after create.
-3. Backend looks up enrolled students for that subject/section and sends an FCM push.
+3. Backend looks up enrolled students for that subject/section and sends an FCM push (HTTP v1 via service account).
 
 **Setup checklist**
 
 1. Run `database/push_notification_devices.sql` in Supabase SQL Editor.
 2. Create a Firebase project, enable Cloud Messaging, add Android (`com.examnexus.app`) and/or iOS apps.
-3. Put the FCM server key in `backend/.env` as `FCM_SERVER_KEY=...`.
-4. For Android: add `google-services.json` under `android/app/` after `cap add android`.
+3. Firebase → **Project settings** → **Service accounts** → **Generate new private key** → save as `backend/firebase-service-account.json`.
+4. In `backend/.env`:
+   ```env
+   FCM_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
+   FCM_PROJECT_ID=examnexus-9d77a
+   ```
+5. For Android: add `google-services.json` under `android/app/` after `cap add android`.
 5. For iOS: enable Push capability in Xcode, upload APNs key to Firebase, sync pods.
 6. Rebuild/sync: `npm run cap:sync`.
 
-Without `FCM_SERVER_KEY`, tokens still register but sends are skipped (logged).
+Without a service account JSON (or legacy server key), tokens still register but sends are skipped (logged).
 
 ### Key files
 

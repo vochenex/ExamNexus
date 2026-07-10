@@ -39,7 +39,7 @@ export default function ActionDialog({
 
   return (
     <ModalPortal>
-    <div className={`fixed inset-0 z-[120] flex items-center justify-center p-4 ${motion.overlay}`}>
+    <div className={`fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 ${motion.overlay}`}>
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm en-fade-in"
         onClick={showCancel && !loading ? onCancel : undefined}
@@ -50,7 +50,7 @@ export default function ActionDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="action-dialog-title"
-        className={`${motion.scaleIn} relative z-10 w-full max-w-md rounded-2xl border p-6 shadow-2xl ${toneStyles}`}
+        className={`${motion.scaleIn} en-modal-panel relative z-10 mx-auto max-h-[min(90dvh,40rem)] w-full max-w-[min(100%,28rem)] overflow-y-auto rounded-3xl border p-4 shadow-2xl sm:p-6 ${toneStyles}`}
         onClick={(e) => e.stopPropagation()}
       >
         <h2

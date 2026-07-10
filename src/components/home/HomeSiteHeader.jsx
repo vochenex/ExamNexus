@@ -7,6 +7,7 @@ import InstallIconButton from "../pwa/InstallIconButton";
 import ExamNexusBrand from "../ExamNexusBrand";
 import HomeBottomBar from "./HomeBottomBar";
 import useMobileNav from "../../hooks/useMobileNav";
+import { isNativeApp } from "../../utils/platform";
 import { getCachedExamNexusUser } from "../../utils/authUser";
 import { primaryButton } from "../../utils/themeButtons";
 import { homeNavSectionFromHref, useHomeActiveSection } from "../../hooks/useHomeActiveSection";
@@ -272,7 +273,7 @@ export default function HomeSiteHeader() {
         </div>
       </header>
 
-      {mobileNav && <HomeBottomBar />}
+      {mobileNav && !isNativeApp() && <HomeBottomBar />}
 
       {!mobileNav && menuOpen && (
         <div className="en-home-mobile-menu-root" role="presentation">

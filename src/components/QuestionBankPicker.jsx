@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Archive, Check, Search, X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ModalShell from "./ui/ModalShell";
+import Select from "./ui/Select";
 import { primaryButton, secondaryButton } from "../utils/themeButtons";
 import {
   bankRowToBuilderQuestion,
@@ -184,14 +185,10 @@ export default function QuestionBankPicker({ open, onClose, onImport, filterType
                 }`}
               />
             </div>
-            <select
+            <Select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className={`rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
-                theme === "dark"
-                  ? "border border-white/10 bg-white/10 text-white"
-                  : "border border-emerald-200 en-bg-elevated text-gray-900"
-              }`}
+              className="!py-2.5"
             >
               <option value="all">All formats</option>
               {Object.entries(EXAM_TYPE_LABELS)
@@ -201,7 +198,7 @@ export default function QuestionBankPicker({ open, onClose, onImport, filterType
                     {label}
                   </option>
                 ))}
-            </select>
+            </Select>
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">

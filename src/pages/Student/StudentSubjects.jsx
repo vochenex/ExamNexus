@@ -354,9 +354,10 @@ export default function StudentSubjects() {
                 en-interactive-card
                 relative
                 w-full
-                md:w-[390px]
+                max-w-full
                 p-5
-                rounded-2xl
+                rounded-3xl
+                backdrop-blur-md
                 cursor-pointer
                 transition-all
                 duration-300
@@ -364,7 +365,7 @@ export default function StudentSubjects() {
                 hover:shadow-xl
                 ${
                   theme === "dark"
-                    ? "bg-white/5 border border-white/10 hover:border-emerald-500/30 hover:shadow-[0_0_30px_rgba(16,185,129,0.12)]"
+                    ? "bg-white/[0.045] border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.22)] hover:border-emerald-500/30 hover:shadow-[0_0_30px_rgba(16,185,129,0.12)]"
                     : "en-bg-elevated border border-emerald-200 shadow-md hover:border-emerald-400"
                 }
               `}

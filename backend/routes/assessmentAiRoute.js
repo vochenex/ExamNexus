@@ -19,8 +19,9 @@ const {
 
 const router = express.Router();
 
+// Memory storage works on Vercel (no persistent disk). Local runs also fine.
 const upload = multer({
-  dest: "uploads/",
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 

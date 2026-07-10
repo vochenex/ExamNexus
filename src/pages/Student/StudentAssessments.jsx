@@ -10,10 +10,14 @@ import {
   getAssessmentCategoryStyles,
 } from "../../utils/assessmentCategories";
 import { ASSESSMENT_SORT_OPTIONS } from "../../utils/assessmentStatus";
-import { BookOpen, ArrowUpDown } from "lucide-react";
+import { BookOpen, ArrowUpDown, ChevronDown, ChevronUp } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
 import Select from "../../components/ui/Select";
-import { pageShellWithBellClass, emptyStateClass, staggerGridClass } from "../../utils/themeInputs";
+import {
+  pageShellWithBellClass,
+  emptyStateClass,
+  panelClass,
+} from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 
@@ -38,56 +42,87 @@ function CategoryLegend({ theme }) {
   );
 }
 
-function SubjectAssessmentGroup({ group, theme, focusId, onRetakeUpdated }) {
+function SubjectAssessmentGroup({
+  group,
+  theme,
+  focusId,
+  onRetakeUpdated,
+  defaultOpen = false,
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const hasFocus = group.assessments.some(
+      (assessment) => String(assessment.id) === String(focusId)
+    );
+    if (hasFocus) setOpen(true);
+  }, [focusId, group.assessments]);
+
   return (
-    <section
-      className={`flex h-full flex-col rounded-2xl border p-4 md:p-5 ${
-        theme === "dark"
-          ? "border-white/10 bg-white/[0.03]"
-          : "border-emerald-200/80 en-bg-surface-soft shadow-sm"
-      }`}
-    >
-      <div className="mb-4 flex items-start gap-3 border-b pb-4 border-inherit">
+    <section className={`${panelClass(theme)} !p-0 overflow-hidden`}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={`flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3.5 text-left ${
+          theme === "dark" ? "text-emerald-300" : "text-teal-800"
+        }`}
+      >
+        <span className="flex min-w-0 items-start gap-3">
+          <span
+            className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              theme === "dark"
+                ? "bg-emerald-500/10 text-emerald-300"
+                : "en-bg-skeleton text-teal-700"
+            }`}
+          >
+            <BookOpen size={18} />
+          </span>
+          <span className="min-w-0 overflow-hidden">
+            <span
+              className={`block truncate text-base font-bold ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {group.subjectName}
+            </span>
+            <span
+              className={`mt-0.5 block truncate text-xs ${
+                theme === "dark" ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              {group.assessments.length} assessment
+              {group.assessments.length === 1 ? "" : "s"}
+              {group.sectionLabel ? ` · ${group.sectionLabel}` : ""}
+              {group.courseName ? ` · ${group.courseName}` : ""}
+            </span>
+          </span>
+        </span>
+        {open ? (
+          <ChevronUp size={18} className="shrink-0" />
+        ) : (
+          <ChevronDown size={18} className="shrink-0" />
+        )}
+      </button>
+
+      {open && (
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-            theme === "dark"
-              ? "bg-emerald-500/10 text-emerald-300"
-              : "en-bg-skeleton text-teal-700"
+          className={`space-y-3 border-t px-3 py-3 sm:px-4 sm:py-4 ${
+            theme === "dark" ? "border-white/10" : "border-emerald-100"
           }`}
         >
-          <BookOpen size={18} />
+          {group.assessments.map((assessment) => (
+            <StudentAssessmentCard
+              key={assessment.id}
+              assessment={assessment}
+              showSubject={false}
+              compact
+              highlighted={focusId === String(assessment.id)}
+              onRetakeUpdated={onRetakeUpdated}
+            />
+          ))}
         </div>
-        <div className="min-w-0">
-          <h2
-            className={`truncate text-lg font-bold ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {group.subjectName}
-          </h2>
-          <p
-            className={`text-sm ${
-              theme === "dark" ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
-            {group.assessments.length} assessment
-            {group.assessments.length === 1 ? "" : "s"}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-3">
-        {group.assessments.map((assessment) => (
-          <StudentAssessmentCard
-            key={assessment.id}
-            assessment={assessment}
-            showSubject={false}
-            compact
-            highlighted={focusId === String(assessment.id)}
-            onRetakeUpdated={onRetakeUpdated}
-          />
-        ))}
-      </div>
+      )}
     </section>
   );
 }
@@ -143,20 +178,16 @@ export default function StudentAssessments() {
 
   return (
     <div className={pageShellWithBellClass(theme)}>
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto w-full max-w-7xl min-w-0">
         <PageHeader
           theme={theme}
           icon={BookOpen}
           title="My Assessments"
-          subtitle="Subjects are grouped side by side. Sort assessments within each subject by type, name, due date, or date created."
+          subtitle="Subjects are grouped and collapsible. Sort assessments within each subject by type, name, due date, or date created."
         />
 
         <div
-          className={`mb-6 flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-            theme === "dark"
-              ? "border-white/10 bg-white/[0.03]"
-              : "border-emerald-200/80 en-bg-surface-soft"
-          }`}
+          className={`${panelClass(theme)} mb-6 flex flex-col gap-3 !py-3 sm:flex-row sm:items-center sm:justify-between`}
         >
           <div className="flex items-center gap-2 text-sm font-medium">
             <ArrowUpDown
@@ -185,14 +216,15 @@ export default function StudentAssessments() {
         {groupedAssessments.length === 0 ? (
           <div className={emptyStateClass(theme)}>No assessments available.</div>
         ) : (
-          <div className={staggerGridClass("grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3")}>
-            {groupedAssessments.map((group) => (
+          <div className="flex w-full min-w-0 flex-col gap-3">
+            {groupedAssessments.map((group, index) => (
               <SubjectAssessmentGroup
                 key={group.subjectId}
                 group={group}
                 theme={theme}
                 focusId={focusId}
                 onRetakeUpdated={loadAssessments}
+                defaultOpen={index === 0 || Boolean(focusId)}
               />
             ))}
           </div>

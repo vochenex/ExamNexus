@@ -14,6 +14,7 @@ export async function initNativeApp() {
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
     const isDark = !document.documentElement.classList.contains("light");
+    await StatusBar.setOverlaysWebView({ overlay: true });
     await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
     if (getPlatform() === "android") {
       await StatusBar.setBackgroundColor({ color: "#031d1f" });
@@ -33,6 +34,14 @@ export async function initNativeApp() {
     });
   } catch (err) {
     console.warn("App back-button init skipped:", err);
+  }
+
+  try {
+    const { Keyboard, KeyboardResize } = await import("@capacitor/keyboard");
+    await Keyboard.setResizeMode({ mode: KeyboardResize.Body });
+    await Keyboard.setScroll({ isDisabled: false });
+  } catch (err) {
+    console.warn("Keyboard init skipped:", err);
   }
 
   // Register for push after a short delay so auth/session can settle.

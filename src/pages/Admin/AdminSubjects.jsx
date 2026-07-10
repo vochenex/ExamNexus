@@ -254,35 +254,42 @@ export default function AdminSubjects() {
       </div>
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="overflow-x-auto">
-          <table className={adminTableClass(theme)}>
+        <div className="overflow-x-auto en-scroll-region">
+          <table className={`${adminTableClass(theme)} min-w-[64rem]`}>
             <thead>
               <tr>
-                <th className={adminThClass(theme)}>Subject</th>
-                <th className={adminThClass(theme)}>Invite code</th>
-                <th className={adminThClass(theme)}>Assigned faculty</th>
-                <th className={adminThClass(theme)}>Sections</th>
-                <th className={adminThClass(theme)}>Enrolled</th>
-                <th className={adminThClass(theme)}>Assessments</th>
-                <th className={adminThClass(theme)}>Actions</th>
+                <th className={`${adminThClass(theme)} w-12`}>#</th>
+                <th className={`${adminThClass(theme)} min-w-[10rem]`}>Subject</th>
+                <th className={`${adminThClass(theme)} min-w-[7rem]`}>Invite code</th>
+                <th className={`${adminThClass(theme)} min-w-[16rem]`}>Assigned faculty</th>
+                <th className={`${adminThClass(theme)} min-w-[9rem]`}>Sections</th>
+                <th className={`${adminThClass(theme)} min-w-[5rem]`}>Enrolled</th>
+                <th className={`${adminThClass(theme)} min-w-[6rem]`}>Assessments</th>
+                <th className={`${adminThClass(theme)} min-w-[6rem]`}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {!subjects.length ? (
                 <tr>
-                  <td colSpan={7} className={`${adminTdClass(theme)} py-8 text-center`}>
+                  <td colSpan={8} className={`${adminTdClass(theme)} py-8 text-center`}>
                     No subjects yet. Create one above to get started.
                   </td>
                 </tr>
               ) : (
-              subjects.map((subject) => (
+              subjects.map((subject, index) => (
                 <tr key={subject.id}>
-                  <td className={adminTdClass(theme)}>{subject.name}</td>
-                  <td className={adminTdClass(theme)}>{subject.invite_code}</td>
-                  <td className={adminTdClass(theme)}>
+                  <td className={`${adminTdClass(theme)} tabular-nums text-gray-500`}>
+                    {index + 1}
+                  </td>
+                  <td className={`${adminTdClass(theme)} min-w-[10rem]`}>{subject.name}</td>
+                  <td className={`${adminTdClass(theme)} min-w-[7rem] whitespace-nowrap`}>
+                    {subject.invite_code}
+                  </td>
+                  <td className={`${adminTdClass(theme)} min-w-[16rem]`}>
                     <Select
                       value={subject.teacher_school_id || ""}
                       onChange={(e) => handleAssign(subject.id, e.target.value)}
+                      className="min-w-[15rem] w-full"
                     >
                       <option value="">Unassigned</option>
                       {faculty.map((f) => (
@@ -292,12 +299,13 @@ export default function AdminSubjects() {
                       ))}
                     </Select>
                   </td>
-                  <td className={adminTdClass(theme)}>
+                  <td className={`${adminTdClass(theme)} min-w-[9rem]`}>
                     <Select
                       value={String(subject.section_count || DEFAULT_SECTION_COUNT)}
                       onChange={(e) =>
                         handleSectionCount(subject.id, Number(e.target.value))
                       }
+                      className="min-w-[8rem] w-full"
                     >
                       {[1, 2, 3, 4, 5, 6].map((n) => (
                         <option key={n} value={n}>

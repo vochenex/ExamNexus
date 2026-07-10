@@ -2,6 +2,8 @@ import { DEFAULT_AVATAR_PATH } from "./avatar";
 import { getAuthSession } from "./authUser";
 import { normalizeSchoolId } from "./schoolIdRules";
 import { normalizeYearLevelForStorage } from "./yearLevels";
+import { isNativeApp } from "./platform";
+import { nativeLandingPathForRole } from "./nativeRoutes";
 
 import { formatSupabaseError } from "./supabaseErrors";
 import { canAccessPlatform } from "./adminData";
@@ -262,7 +264,10 @@ export function navigateForRole(navigate, role, options = {}) {
   } else if (normalized === "admin") {
     navigate("/admin/dashboard", options);
   } else {
-    navigate("/student/dashboard", options);
+    navigate(
+      isNativeApp() ? nativeLandingPathForRole(role) : "/student/dashboard",
+      options
+    );
   }
 }
 

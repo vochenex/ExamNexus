@@ -90,9 +90,9 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
   return (
     <>
       <div
-        className={`rounded-2xl border p-5 ${
+        className={`rounded-3xl border p-5 backdrop-blur-md ${
           theme === "dark"
-            ? "border-white/10 bg-white/[0.03]"
+            ? "border-white/10 bg-white/[0.045] shadow-[0_12px_40px_rgba(0,0,0,0.22)]"
             : "border-emerald-200/80 en-bg-elevated shadow-sm"
         }`}
       >
@@ -111,7 +111,7 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
             No students have submitted this assessment yet.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
             {submissions.map((student, index) => {
               const tier = tierStyles[student.alertTier] || tierStyles.blue;
               const rowClass = theme === "dark" ? tier.dark : tier.light;
@@ -122,31 +122,25 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
                   key={student.studentId}
                   type="button"
                   onClick={() => openAlertsDetail(student)}
-                  className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition hover:opacity-95 ${rowClass}`}
+                  className={`min-w-[14rem] max-w-xs rounded-xl border px-3 py-2.5 text-left transition hover:opacity-95 ${rowClass}`}
                 >
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{student.name}</p>
-                    <p className="text-xs opacity-80">
-                      Rank #{index + 1} ·{" "}
-                      {pendingReview
-                        ? "Submitted — score pending review"
-                        : `Score ${student.scorePct}% (${student.score}/${student.total})`}
+                    <p className="truncate text-sm font-semibold">{student.name}</p>
+                    <p className="mt-1 text-[11px] leading-tight opacity-80">
+                      Rank #{index + 1}
                       {" · "}
-                      Tap to view alerts
+                      {pendingReview
+                        ? "Score pending review"
+                        : `${student.scorePct}% (${student.score}/${student.total})`}
                     </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <div className="text-right">
+                    <div className="mt-2 flex items-center justify-between gap-2">
                       <span
-                        className={`inline-flex min-w-[4.5rem] justify-center rounded-full px-2.5 py-1 text-xs font-bold ${tier.badge}`}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${tier.badge}`}
                       >
                         {student.alertCount} alert{student.alertCount === 1 ? "" : "s"}
                       </span>
-                      <p className="mt-1 text-[10px] uppercase tracking-wide opacity-70">
-                        {tier.label}
-                      </p>
+                      <ChevronRight size={14} className="opacity-50" />
                     </div>
-                    <ChevronRight size={16} className="opacity-50" />
                   </div>
                 </button>
               );

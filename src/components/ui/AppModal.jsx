@@ -146,12 +146,12 @@ export default function AppModal({
   return (
     <ModalPortal>
       <div
-        className={`fixed inset-0 z-[200] flex items-center justify-center p-4 ${motion.overlay}`}
+        className={`fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 ${motion.overlay}`}
         role="presentation"
       >
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm en-fade-in"
-        onClick={!loading && showClose && !isSuccessAlert ? onCancel : undefined}
+        onClick={!loading ? onCancel : undefined}
         aria-hidden="true"
       />
 
@@ -159,7 +159,7 @@ export default function AppModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="app-modal-title"
-        className={`${motion.scaleIn} relative z-10 w-full max-w-md rounded-2xl border p-6 shadow-2xl ${
+        className={`${motion.scaleIn} relative z-10 mx-auto max-h-[min(90dvh,40rem)] w-full max-w-[min(100%,28rem)] overflow-y-auto rounded-3xl border p-4 shadow-2xl sm:p-6 ${
           isDark ? config.panel.dark : config.panel.light
         }`}
         onClick={(e) => e.stopPropagation()}

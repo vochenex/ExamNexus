@@ -35,8 +35,15 @@ async function extractPdfText(buffer) {
   }
 }
 
-async function extractDocxText(filePath) {
-  const result = await mammoth.extractRawText({ path: filePath });
+async function extractDocxText(file) {
+  if (file?.buffer) {
+    const result = await mammoth.extractRawText({ buffer: file.buffer });
+    return String(result?.value || "").trim();
+  }
+  if (!file?.path) {
+    throw new Error("Could not read the uploaded Word document.");
+  }
+  const result = await mammoth.extractRawText({ path: file.path });
   return String(result?.value || "").trim();
 }
 
@@ -64,10 +71,7 @@ async function extractDocumentText(file) {
     const buffer = file.buffer || fs.readFileSync(file.path);
     rawText = await extractPdfText(buffer);
   } else {
-    if (!file.path) {
-      throw new Error("Could not read the uploaded Word document.");
-    }
-    rawText = await extractDocxText(file.path);
+    rawText = await extractDocxText(file);
   }
 
   const text = normalizeExtractedText(rawText);

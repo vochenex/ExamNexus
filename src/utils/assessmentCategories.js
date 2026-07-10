@@ -106,11 +106,19 @@ export function groupAssessmentsBySubject(assessments, sortBy = "hierarchy") {
   for (const assessment of assessments) {
     const subjectId = assessment.subject_id || "unknown";
     const subjectName = assessment.subject_name || "Unknown Subject";
+    const sectionLabel =
+      assessment.student_section_label ||
+      assessment.section_label ||
+      (assessment.student_section
+        ? `Section ${String(assessment.student_section).toUpperCase()}`
+        : "");
 
     if (!groups.has(subjectId)) {
       groups.set(subjectId, {
         subjectId,
         subjectName,
+        sectionLabel,
+        courseName: assessment.course_name || "",
         assessments: [],
       });
     }

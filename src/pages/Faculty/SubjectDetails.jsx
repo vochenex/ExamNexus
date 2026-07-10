@@ -36,6 +36,7 @@ import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPa
 import { pageShellWithBellClass } from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
 
 function getAssessmentStatus(assessment) {
   const now = new Date();
@@ -329,43 +330,22 @@ export default function SubjectDetails() {
         </div>
 
         {/* ASSESSMENTS */}
-        <div
-  className={`
-    p-5
-    rounded-2xl
-
-    ${
-      theme === "dark"
-        ? "bg-white/5 border border-white/10"
-        : "en-bg-surface border border-emerald-300"
-    }
-  `}
->
-         <h2
-  className={`font-semibold text-lg ${
-    theme === "dark"
-      ? "text-emerald-400"
-      : "text-teal-700"
-  }`}
->
-  Assessments
-</h2>
-
-
+        <CollapsiblePanel
+          title="Assessments"
+          subtitle={`${assessments.length} assessment${assessments.length === 1 ? "" : "s"} for this subject`}
+          defaultOpen={assessments.length > 0 && assessments.length <= 4}
+          className="mb-4"
+        >
           {assessments.length === 0 ? (
-            <p
-                className={`${
-                    theme === "dark" ? "text-white" : "text-black"
-                }`}
-                >
-                No assessments yet
-                </p>
+            <p className={theme === "dark" ? "text-white" : "text-black"}>
+              No assessments yet
+            </p>
           ) : (
-           assessments.map((assessment) => (
-  <div
-    key={assessment.id}
-    onClick={() => navigate(`/faculty/assessment/${assessment.id}`)}
-    className={`
+            assessments.map((assessment) => (
+              <div
+                key={assessment.id}
+                onClick={() => navigate(`/faculty/assessment/${assessment.id}`)}
+                className={`
       mb-3
       p-4
       rounded-xl
@@ -387,47 +367,41 @@ export default function SubjectDetails() {
       transition-all
       duration-300
     `}
-  >        
- <div className="flex items-center justify-between">
-  <h3
-    className={`font-semibold ${
-      theme === "dark"
-        ? "text-emerald-400"
-        : "text-[#0f766e]"
-    }`}
-  >
-    {assessment.title}
-  </h3>
-  {getAssessmentStatus(assessment) === "active" && (
-    <span className="text-emerald-400 font-bold text-xs font-medium">
-      🟢 Active
-    </span>
-  )}
+              >
+                <div className="flex items-center justify-between">
+                  <h3
+                    className={`font-semibold ${
+                      theme === "dark" ? "text-emerald-400" : "text-[#0f766e]"
+                    }`}
+                  >
+                    {assessment.title}
+                  </h3>
+                  {getAssessmentStatus(assessment) === "active" && (
+                    <span className="text-emerald-400 font-bold text-xs font-medium">
+                      🟢 Active
+                    </span>
+                  )}
 
-  {getAssessmentStatus(assessment) === "scheduled" && (
-    <span className="text-amber-500 font-bold text-xs font-medium">
-      🟡 Scheduled
-    </span>
-  )}
+                  {getAssessmentStatus(assessment) === "scheduled" && (
+                    <span className="text-amber-500 font-bold text-xs font-medium">
+                      🟡 Scheduled
+                    </span>
+                  )}
 
-  {getAssessmentStatus(assessment) === "closed" && (
-    <span className="text-red-500 font-bold text-xs font-medium">
-      🔴 Closed
-    </span>
-  )}
-</div>
+                  {getAssessmentStatus(assessment) === "closed" && (
+                    <span className="text-red-500 font-bold text-xs font-medium">
+                      🔴 Closed
+                    </span>
+                  )}
+                </div>
 
-        <p
-  className={`
+                <p
+                  className={`
     text-xs
     mt-1
-    ${
-      theme === "dark"
-        ? "text-white"
-        : "text-black"
-    }
+    ${theme === "dark" ? "text-white" : "text-black"}
   `}
->
+                >
   {assessment.exam_type}
 </p>
 
@@ -461,7 +435,7 @@ export default function SubjectDetails() {
               </div>
             ))
           )}
-        </div>
+        </CollapsiblePanel>
 
         {/* ANALYTICS */}
         <SubjectClassAnalyticsPanel analytics={classAnalytics} loading={analyticsLoading} />
@@ -469,7 +443,7 @@ export default function SubjectDetails() {
       </div>
       {showAssessmentModal && (
   <ModalPortal>
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4" role="presentation">
     <div
       className="absolute inset-0 bg-black/60 backdrop-blur-sm"
       onClick={() => setShowAssessmentModal(false)}
@@ -481,15 +455,17 @@ export default function SubjectDetails() {
   onClick={(event) => event.stopPropagation()}
   className={`
   relative z-10
-  w-[900px]
-  max-w-[calc(100vw-2rem)]
+  w-full
+  max-w-[min(100%,56rem)]
+  max-h-[min(90dvh,40rem)]
+  overflow-y-auto
 
   rounded-3xl
-  p-8
+  p-5 sm:p-8
 
   ${
     theme === "dark"
-      ? "bg-[#031d1f] border border-white/10"
+      ? "bg-[#031d1f]/95 border border-white/10 backdrop-blur-md"
       : "en-bg-surface border border-emerald-300"
   }
 

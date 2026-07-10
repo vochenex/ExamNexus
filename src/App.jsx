@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./guards/ProtectedRoute";
 import AdminRouteGuard from "./components/AdminRouteGuard";
 import RouteFallback from "./components/RouteFallback";
+import WebOnlyHomeRoute from "./components/WebOnlyHomeRoute";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const ExamNexusAuth = lazy(() => import("./components/ExamNexusAuth"));
@@ -40,7 +41,14 @@ export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route
+          path="/"
+          element={
+            <WebOnlyHomeRoute>
+              <HomePage />
+            </WebOnlyHomeRoute>
+          }
+        />
         <Route path="/auth" element={<ExamNexusAuth />} />
 
         <Route element={<AdminRouteGuard />}>
