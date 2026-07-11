@@ -24,14 +24,20 @@ const PRECACHE_URLS = [
 ];
 
 self.addEventListener("install", (event) => {
-  // Note: we intentionally do NOT call self.skipWaiting() here. A new worker
-  // stays in "waiting" until the user accepts the update prompt, which then
-  // posts SKIP_WAITING (see the message handler below).
   event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch(() => {})
+    (async () => {
+      try {
+        const cache = await caches.open(SHELL_CACHE);
+        await cache.addAll(PRECACHE_URLS);
+      } catch {
+        // Precache best-effort — missing one asset must not block installability.
+      }
+      // First install: activate immediately so Chrome can fire beforeinstallprompt
+      // without requiring a second visit. Updates still wait for SKIP_WAITING.
+      if (!self.registration.active) {
+        await self.skipWaiting();
+      }
+    })()
   );
 });
 

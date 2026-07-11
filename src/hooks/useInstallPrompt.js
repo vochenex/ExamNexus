@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { isNativeApp } from "../utils/platform";
-import { isIOS, isStandalonePWA } from "../utils/pwa";
+import { ensureServiceWorkerReady, isIOS, isStandalonePWA } from "../utils/pwa";
 
 /**
  * Shared PWA install state. A single module-level listener captures the
- * `beforeinstallprompt` event so multiple UI affordances (header icon +
- * floating pill) stay in sync and never fight over the deferred prompt.
+ * `beforeinstallprompt` event so multiple UI affordances stay in sync.
  */
 let deferredPrompt = null;
 let installed = false;
@@ -20,14 +19,11 @@ function initInstallListeners() {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
 
-  // Seed from the early capture in index.html (the browser may have fired
-  // beforeinstallprompt before this bundle loaded).
   if (window.__enInstall) {
     deferredPrompt = window.__enInstall.prompt || null;
     installed = Boolean(window.__enInstall.installed);
   }
 
-  // Custom events relayed from the early-capture script in index.html.
   window.addEventListener("en:installprompt", () => {
     deferredPrompt = window.__enInstall?.prompt || deferredPrompt;
     notify();
@@ -38,21 +34,44 @@ function initInstallListeners() {
     notify();
   });
 
-  // Direct listeners as a fallback (in case the inline script didn't run).
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     deferredPrompt = event;
+    if (window.__enInstall) window.__enInstall.prompt = event;
     notify();
   });
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
     installed = true;
+    if (window.__enInstall) {
+      window.__enInstall.prompt = null;
+      window.__enInstall.installed = true;
+    }
     notify();
   });
 }
 
-// Register as early as this module is imported so we don't miss the event.
 initInstallListeners();
+
+function waitForDeferredPrompt(timeoutMs = 8000) {
+  if (deferredPrompt) return Promise.resolve(deferredPrompt);
+
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const tick = () => {
+      if (deferredPrompt) {
+        resolve(deferredPrompt);
+        return;
+      }
+      if (Date.now() - started >= timeoutMs) {
+        resolve(null);
+        return;
+      }
+      window.setTimeout(tick, 250);
+    };
+    tick();
+  });
+}
 
 export function useInstallPrompt() {
   const [, forceRender] = useState(0);
@@ -68,27 +87,36 @@ export function useInstallPrompt() {
   const supported = !isNativeApp() && !isStandalonePWA() && !installed;
   const hasNativePrompt = !!deferredPrompt;
   const iOS = isIOS();
-
-  // Prefer native prompt when present; still treat install as available on any
-  // supported browser so the header download icon stays visible.
   const available = supported;
 
   /**
-   * Trigger the install flow. Returns:
-   *  - "accepted" / "dismissed" for the native Chrome/Edge prompt
-   *  - "ios" when on iOS (caller should show iOS steps)
-   *  - "manual" when no deferred prompt (caller should show desktop steps)
+   * Prepare the service worker, wait for Chrome's install prompt, then open it.
+   * Returns: accepted | dismissed | ios | unavailable
    */
   const promptInstall = useCallback(async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       deferredPrompt = null;
+      if (window.__enInstall) window.__enInstall.prompt = null;
       notify();
       return choice?.outcome || "dismissed";
     }
+
     if (isIOS()) return "ios";
-    return "manual";
+
+    await ensureServiceWorkerReady();
+    const promptEvent = await waitForDeferredPrompt(8000);
+    if (promptEvent) {
+      promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      deferredPrompt = null;
+      if (window.__enInstall) window.__enInstall.prompt = null;
+      notify();
+      return choice?.outcome || "dismissed";
+    }
+
+    return "unavailable";
   }, []);
 
   return { available, supported, hasNativePrompt, isIOS: iOS, promptInstall };
