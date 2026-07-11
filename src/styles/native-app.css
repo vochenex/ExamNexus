@@ -22,6 +22,31 @@
   min-height: 100dvh;
 }
 
+/* Native auth uses an in-flow header — do not reserve space for the fixed marketing header
+   (that leftover padding showed up as a blank black bar above the login header). */
+html.en-native-app .en-auth-shell {
+  padding-top: 0 !important;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-native-auth-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-height: calc(3.25rem + var(--en-safe-top));
+  padding: var(--en-safe-top) var(--en-native-px) 0.5rem;
+  background: #031d1f;
+  border-bottom: 1px solid rgba(52, 211, 153, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-body {
   padding: 0.75rem var(--en-native-px) 1.25rem;
   overflow-y: auto !important;
@@ -161,25 +186,6 @@
   background: #f8fafc;
   border-bottom-color: rgba(15, 23, 42, 0.1);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-}
-
-:is(html.en-native-app, html.en-mobile-shell) .en-native-auth-header {
-  position: relative;
-  top: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  width: 100%;
-  max-width: 100%;
-  min-height: calc(var(--en-native-topbar-height) + var(--en-safe-top));
-  padding: var(--en-safe-top) var(--en-native-px) 0.55rem;
-  background: #031d1f;
-  border-bottom: 1px solid rgba(52, 211, 153, 0.18);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  box-sizing: border-box;
-  flex-shrink: 0;
 }
 
 :is(html.light.en-native-app, html.light.en-mobile-shell) .en-native-auth-header {

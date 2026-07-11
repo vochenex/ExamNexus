@@ -17,6 +17,8 @@ import {
   UserRound,
   Compass,
   LogOut,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { cardClass, inputClass } from "../utils/themeInputs";
 import Select from "../components/ui/Select";
@@ -181,6 +183,11 @@ export default function Profile() {
     current: "",
     new: "",
     confirm: "",
+  });
+  const [showPasswordFields, setShowPasswordFields] = useState({
+    current: false,
+    new: false,
+    confirm: false,
   });
   const [passwordStatus, setPasswordStatus] = useState("idle");
   const [passwordMessage, setPasswordMessage] = useState("");
@@ -1023,36 +1030,60 @@ export default function Profile() {
               </div>
 
               <div className="space-y-2.5">
-                <input
-                  type="password"
-                  value={passwordForm.current}
-                  onChange={(e) =>
-                    setPasswordForm({ ...passwordForm, current: e.target.value })
-                  }
-                  placeholder="Current password"
-                  autoComplete="current-password"
-                  className={inputStyle(theme)}
-                />
-                <input
-                  type="password"
-                  value={passwordForm.new}
-                  onChange={(e) =>
-                    setPasswordForm({ ...passwordForm, new: e.target.value })
-                  }
-                  placeholder="New password"
-                  autoComplete="new-password"
-                  className={inputStyle(theme)}
-                />
-                <input
-                  type="password"
-                  value={passwordForm.confirm}
-                  onChange={(e) =>
-                    setPasswordForm({ ...passwordForm, confirm: e.target.value })
-                  }
-                  placeholder="Confirm new password"
-                  autoComplete="new-password"
-                  className={inputStyle(theme)}
-                />
+                {[
+                  {
+                    key: "current",
+                    placeholder: "Current password",
+                    autoComplete: "current-password",
+                  },
+                  {
+                    key: "new",
+                    placeholder: "New password",
+                    autoComplete: "new-password",
+                  },
+                  {
+                    key: "confirm",
+                    placeholder: "Confirm new password",
+                    autoComplete: "new-password",
+                  },
+                ].map((field) => (
+                  <div key={field.key} className="relative">
+                    <input
+                      type={showPasswordFields[field.key] ? "text" : "password"}
+                      value={passwordForm[field.key]}
+                      onChange={(e) =>
+                        setPasswordForm({
+                          ...passwordForm,
+                          [field.key]: e.target.value,
+                        })
+                      }
+                      placeholder={field.placeholder}
+                      autoComplete={field.autoComplete}
+                      className={`${inputStyle(theme)} pr-12`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPasswordFields((prev) => ({
+                          ...prev,
+                          [field.key]: !prev[field.key],
+                        }))
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-emerald-400"
+                      aria-label={
+                        showPasswordFields[field.key]
+                          ? `Hide ${field.placeholder.toLowerCase()}`
+                          : `Show ${field.placeholder.toLowerCase()}`
+                      }
+                    >
+                      {showPasswordFields[field.key] ? (
+                        <Eye size={18} />
+                      ) : (
+                        <EyeOff size={18} />
+                      )}
+                    </button>
+                  </div>
+                ))}
               </div>
 
               {passwordMessage && (
