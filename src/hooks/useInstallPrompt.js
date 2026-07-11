@@ -69,13 +69,15 @@ export function useInstallPrompt() {
   const hasNativePrompt = !!deferredPrompt;
   const iOS = isIOS();
 
-  // Whether to surface any install affordance at all.
-  const available = supported && (hasNativePrompt || iOS);
+  // Prefer native prompt when present; still treat install as available on any
+  // supported browser so the header download icon stays visible.
+  const available = supported;
 
   /**
    * Trigger the install flow. Returns:
    *  - "accepted" / "dismissed" for the native Chrome/Edge prompt
-   *  - "ios" when there is no native prompt (caller should show iOS steps)
+   *  - "ios" when on iOS (caller should show iOS steps)
+   *  - "manual" when no deferred prompt (caller should show desktop steps)
    */
   const promptInstall = useCallback(async () => {
     if (deferredPrompt) {
@@ -85,7 +87,8 @@ export function useInstallPrompt() {
       notify();
       return choice?.outcome || "dismissed";
     }
-    return "ios";
+    if (isIOS()) return "ios";
+    return "manual";
   }, []);
 
   return { available, supported, hasNativePrompt, isIOS: iOS, promptInstall };

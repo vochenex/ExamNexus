@@ -6,8 +6,9 @@ import IosInstallSheet from "./IosInstallSheet";
 
 /**
  * Compact install button for headers — sits beside the theme toggle.
- * Shows a tooltip on hover/focus and triggers the PWA install (or iOS steps).
- * Renders nothing when the app can't be installed (native app / already installed).
+ * Always visible on the website when install is supported (not native APK /
+ * not already installed). If the browser has no native prompt yet, tapping
+ * shows install instructions instead of hiding the icon.
  *
  * `inverted` matches ThemeToggle: use on dark headers (e.g. homepage).
  */
@@ -15,17 +16,26 @@ export default function InstallIconButton({ inverted = false, compact = false })
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const onDarkSurface = isDark || inverted;
-  const { available, promptInstall } = useInstallPrompt();
+  const { supported, hasNativePrompt, isIOS, promptInstall } = useInstallPrompt();
 
-  const [showIosSheet, setShowIosSheet] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetVariant, setSheetVariant] = useState("ios");
   const iconSize = compact ? 18 : 22;
 
   const handleInstall = useCallback(async () => {
     const result = await promptInstall();
-    if (result === "ios") setShowIosSheet(true);
-  }, [promptInstall]);
+    if (result === "accepted" || result === "dismissed") return;
+    if (result === "ios" || isIOS) {
+      setSheetVariant("ios");
+      setSheetOpen(true);
+      return;
+    }
+    setSheetVariant("desktop");
+    setSheetOpen(true);
+  }, [promptInstall, isIOS]);
 
-  if (!available) return null;
+  // Hide only inside the Capacitor APK or when already installed as a PWA.
+  if (!supported) return null;
 
   return (
     <>
@@ -40,21 +50,28 @@ export default function InstallIconButton({ inverted = false, compact = false })
               ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20"
               : "en-bg-elevated border border-emerald-700/20 text-teal-800 en-hover"
           }`}
-          aria-label="Install ExamNexus — add to home screen"
+          aria-label="Install ExamNexus — add to desktop or home screen"
         >
           <Download size={iconSize} strokeWidth={2.25} />
         </button>
 
         <span role="tooltip" className="en-install-tip">
           <strong>Install ExamNexus</strong>
-          <span>Add to home screen</span>
+          <span>
+            {hasNativePrompt
+              ? "Add to desktop / home screen"
+              : isIOS
+                ? "Add to Home Screen"
+                : "Download to desktop"}
+          </span>
         </span>
       </div>
 
       <IosInstallSheet
-        open={showIosSheet}
-        onClose={() => setShowIosSheet(false)}
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
         isDark={isDark}
+        variant={sheetVariant}
       />
     </>
   );
