@@ -28,7 +28,10 @@ import { buildSubjectClassAnalytics } from "./subjectClassAnalytics";
 import { normalizeYearLevelForStorage } from "./yearLevels";
 import { durationFieldsForDb } from "./assessmentDuration";
 import { dedupeExamQuestions } from "./assessmentTake";
-import { API_BASE } from "./apiBase.js";
+import {
+  dispatchPushToUsers,
+  dispatchSubjectAnnouncementPush,
+} from "./pushDispatch.js";
 import {
   buildExamFacultyAnalytics,
   buildSubmissionAlertRankings,
@@ -667,6 +670,9 @@ export async function createExam(examPayload, questions) {
     target_sections: normalizeTargetSections(examPayload.target_sections),
     instructions: examPayload.instructions || "",
     shuffle_questions: Boolean(examPayload.shuffle_questions),
+    lock_completed_sections:
+      Boolean(examPayload.lock_completed_sections) ||
+      Boolean(examPayload.shuffle_questions),
     allow_review: examPayload.allow_review !== false,
     allow_student_view: examPayload.show_result !== false,
     allow_question_review:
@@ -700,6 +706,7 @@ export async function createExam(examPayload, questions) {
     delete rowWithoutVisibility.allow_question_review;
     delete rowWithoutVisibility.allow_student_view;
     delete rowWithoutVisibility.allow_show_correct_answers;
+    delete rowWithoutVisibility.lock_completed_sections;
 
     const fallbackRows = [
       rowWithoutVisibility,
@@ -802,6 +809,32 @@ export async function createExam(examPayload, questions) {
 
   await insertExamQuestions(exam.id, formattedQuestions);
 
+  try {
+    const { data: enrolled } = await supabase
+      .from("subject_students")
+      .select("student_id, section")
+      .eq("subject_id", exam.subject_id);
+
+    const sections = normalizeTargetSections(exam.target_sections);
+    const recipientIds = (enrolled || [])
+      .filter((row) => isVisibleToSection(sections, row.section))
+      .map((row) => row.student_id);
+
+    await dispatchPushToUsers({
+      userIds: recipientIds,
+      title: `New assessment: ${exam.title}`,
+      body: "A new assessment was posted. Open ExamNexus to view details.",
+      data: {
+        kind: "assessment",
+        path: `/student/assessments?focus=${exam.id}`,
+        exam_id: exam.id,
+        subject_id: exam.subject_id || "",
+      },
+    });
+  } catch (err) {
+    console.warn("Assessment push skipped:", err?.message || err);
+  }
+
   return exam;
 }
 
@@ -870,6 +903,163 @@ export async function fetchExamWithQuestions(examId) {
   };
 }
 
+async function updateExamRowWithColumnFallback(examId, examUpdate) {
+  const attempts = [
+    examUpdate,
+    (() => {
+      const next = { ...examUpdate };
+      delete next.lock_completed_sections;
+      return next;
+    })(),
+    (() => {
+      const next = { ...examUpdate };
+      delete next.lock_completed_sections;
+      delete next.assessment_category;
+      return next;
+    })(),
+    {
+      title: examUpdate.title,
+      description: examUpdate.description,
+      exam_type: examUpdate.exam_type,
+      start_datetime: examUpdate.start_datetime,
+      end_datetime: examUpdate.end_datetime,
+      target_sections: examUpdate.target_sections,
+      instructions: examUpdate.instructions,
+      shuffle_questions: examUpdate.shuffle_questions,
+      allow_review: examUpdate.allow_review,
+      allow_student_view: examUpdate.allow_student_view,
+      allow_question_review: examUpdate.allow_question_review,
+      allow_show_correct_answers: examUpdate.allow_show_correct_answers,
+      duration_value: examUpdate.duration_value,
+      duration_unit: examUpdate.duration_unit,
+    },
+    {
+      title: examUpdate.title,
+      description: examUpdate.description,
+      exam_type: examUpdate.exam_type,
+      start_datetime: examUpdate.start_datetime,
+      end_datetime: examUpdate.end_datetime,
+      target_sections: examUpdate.target_sections,
+      allow_student_view: examUpdate.allow_student_view,
+      allow_question_review: examUpdate.allow_question_review,
+      allow_show_correct_answers: examUpdate.allow_show_correct_answers,
+    },
+    {
+      title: examUpdate.title,
+      description: examUpdate.description,
+      exam_type: examUpdate.exam_type,
+      start_datetime: examUpdate.start_datetime,
+      end_datetime: examUpdate.end_datetime,
+      target_sections: examUpdate.target_sections,
+    },
+  ];
+
+  let lastError = null;
+  for (const payload of attempts) {
+    const cleaned = Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value !== undefined)
+    );
+    const { error } = await supabase.from("exams").update(cleaned).eq("id", examId);
+    if (!error) return;
+    lastError = error;
+    if (!error.message?.includes("column")) {
+      throw error;
+    }
+  }
+
+  throw lastError;
+}
+
+/** Student result detail with question review (RPC with direct-query fallback). */
+export async function fetchStudentExamResultReview(examId, studentId) {
+  await requireSession();
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "get_student_exam_result_review",
+    {
+      p_exam_id: examId,
+      p_student_id: studentId || null,
+    }
+  );
+
+  if (!rpcError && rpcData) {
+    return {
+      exam: rpcData.exam || null,
+      result: rpcData.result || null,
+      questions: dedupeExamQuestions(rpcData.questions || []),
+      answers: rpcData.answers || [],
+      showScore: rpcData.show_score !== false,
+      showQuestionReview: rpcData.show_question_review !== false,
+      showCorrectAnswers: rpcData.show_correct_answers !== false,
+      source: "rpc",
+    };
+  }
+
+  const [
+    { data: examData, error: examError },
+    { data: resultData, error: resultError },
+    { data: questionData, error: questionError },
+    { data: answerData, error: answerError },
+  ] = await Promise.all([
+    supabase.from("exams").select("*").eq("id", examId).single(),
+    supabase
+      .from("exam_results")
+      .select("*")
+      .eq("exam_id", examId)
+      .eq("student_id", studentId)
+      .single(),
+    supabase
+      .from("questions")
+      .select("*")
+      .eq("exam_id", examId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("student_answers")
+      .select("*")
+      .eq("exam_id", examId)
+      .eq("student_id", studentId),
+  ]);
+
+  if (examError) throw examError;
+  if (resultError) throw resultError;
+  if (questionError) throw questionError;
+  if (answerError) throw answerError;
+
+  const showScore = examData?.allow_student_view !== false;
+  const showQuestionReview =
+    showScore && examData?.allow_question_review !== false;
+  const showCorrectAnswers =
+    showQuestionReview && examData?.allow_show_correct_answers !== false;
+
+  let questions = dedupeExamQuestions(questionData || []);
+  if (!showCorrectAnswers) {
+    questions = questions.map((question) => ({
+      ...question,
+      correct_answer: null,
+      correct_answers: null,
+      grading_options: null,
+    }));
+  }
+
+  return {
+    exam: examData
+      ? {
+          ...examData,
+          allow_student_view: showScore,
+          allow_question_review: showQuestionReview,
+          allow_show_correct_answers: showCorrectAnswers,
+        }
+      : null,
+    result: resultData,
+    questions: showQuestionReview ? questions : [],
+    answers: showQuestionReview ? answerData || [] : [],
+    showScore,
+    showQuestionReview,
+    showCorrectAnswers,
+    source: "direct",
+  };
+}
+
 export async function updateExam(examId, exam, questions) {
   await requireSession();
 
@@ -891,6 +1081,8 @@ export async function updateExam(examId, exam, questions) {
     target_sections: normalizeTargetSections(exam.target_sections),
     instructions: exam.instructions || "",
     shuffle_questions: Boolean(exam.shuffle_questions),
+    lock_completed_sections:
+      Boolean(exam.lock_completed_sections) || Boolean(exam.shuffle_questions),
     allow_review: exam.allow_review !== false,
     allow_student_view: exam.show_result !== false,
     allow_question_review:
@@ -915,21 +1107,13 @@ export async function updateExam(examId, exam, questions) {
       .update(fallbackUpdate)
       .eq("id", examId);
 
-    if (fallbackError) throw fallbackError;
+    if (fallbackError?.message?.includes("column")) {
+      await updateExamRowWithColumnFallback(examId, fallbackUpdate);
+    } else if (fallbackError) {
+      throw fallbackError;
+    }
   } else if (examError?.message?.includes("column")) {
-    const { error: fallbackError } = await supabase
-      .from("exams")
-      .update({
-        title: exam.title,
-        description: exam.description,
-        exam_type: exam.exam_type,
-        start_datetime: exam.start_datetime,
-        end_datetime: exam.end_datetime,
-        target_sections: normalizeTargetSections(exam.target_sections),
-      })
-      .eq("id", examId);
-
-    if (fallbackError) throw fallbackError;
+    await updateExamRowWithColumnFallback(examId, examUpdate);
   } else if (examError) {
     throw examError;
   }
@@ -2261,9 +2445,25 @@ export async function fetchSubjectAnnouncements(subjectId) {
 }
 
 /** Recent announcements posted by the signed-in faculty across their subjects. */
-export async function fetchFacultyAnnouncements(limit = 40) {
+export async function fetchFacultyAnnouncements(limit = 40, teacherSchoolId = null) {
   await requireSession();
-  const subjects = await fetchTeacherSubjects();
+
+  let schoolId = teacherSchoolId;
+  if (!schoolId) {
+    const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+    schoolId = cached.school_id || null;
+  }
+  if (!schoolId) {
+    const session = await requireSession();
+    const { data: profile } = await supabase
+      .from("users")
+      .select("school_id")
+      .eq("id", session.user.id)
+      .maybeSingle();
+    schoolId = profile?.school_id || null;
+  }
+
+  const subjects = await fetchTeacherSubjects(schoolId);
   const subjectIds = (subjects || []).map((s) => s.id).filter(Boolean);
   if (!subjectIds.length) return [];
 
@@ -2271,12 +2471,21 @@ export async function fetchFacultyAnnouncements(limit = 40) {
     (subjects || []).map((s) => [s.id, s.name || "Subject"])
   );
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("announcements")
-    .select("id, subject_id, title, body, target_sections, created_at, like_count, comment_count")
+    .select("id, subject_id, title, body, target_sections, created_at, created_by")
     .in("subject_id", subjectIds)
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (error?.message?.includes("created_by")) {
+    ({ data, error } = await supabase
+      .from("announcements")
+      .select("id, subject_id, title, body, target_sections, created_at")
+      .in("subject_id", subjectIds)
+      .order("created_at", { ascending: false })
+      .limit(limit));
+  }
 
   if (error) throw error;
 
@@ -2359,16 +2568,60 @@ export async function fetchUserNotifications(limit = 40) {
     p_limit: limit,
   });
 
+  let items = [];
   if (!error && data) {
-    return normalizeJsonList(data);
+    items = normalizeJsonList(data);
+  } else if (error && !error.message?.includes("Could not find the function")) {
+    throw error;
   }
 
-  if (error?.message?.includes("Could not find the function")) {
-    return [];
+  // Fallback / merge: admin broadcasts (works even before SQL migration is applied)
+  try {
+    const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+    const role = String(user.role || "").toLowerCase();
+    const { data: broadcasts } = await supabase
+      .from("admin_announcements")
+      .select("id, title, body, audience, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    const adminItems = (broadcasts || [])
+      .filter((row) => {
+        const audience = String(row.audience || "all").toLowerCase();
+        if (audience === "all") return role === "faculty" || role === "student";
+        if (audience === "faculty") return role === "faculty";
+        if (audience === "students") return role === "student";
+        return false;
+      })
+      .map((row) => ({
+        kind: "admin_announcement",
+        id: row.id,
+        title: row.title,
+        body: String(row.body || "").slice(0, 160),
+        created_at: row.created_at,
+        audience: row.audience,
+        status: "posted",
+        subject_name: "ExamNexus",
+      }));
+
+    const seen = new Set(
+      items
+        .filter((item) => item.kind === "admin_announcement")
+        .map((item) => String(item.id))
+    );
+    for (const item of adminItems) {
+      if (!seen.has(String(item.id))) items.push(item);
+    }
+  } catch {
+    // ignore if table/policy unavailable
   }
 
-  if (error) throw error;
-  return [];
+  items.sort(
+    (a, b) =>
+      new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  );
+
+  return items.slice(0, limit);
 }
 
 export async function toggleAnnouncementHeart(announcementId) {
@@ -2379,6 +2632,38 @@ export async function toggleAnnouncementHeart(announcementId) {
   });
 
   if (error) throw error;
+
+  try {
+    if (data?.user_reacted) {
+      const { data: announcement } = await supabase
+        .from("announcements")
+        .select("id, title, created_by, subject_id")
+        .eq("id", announcementId)
+        .maybeSingle();
+
+      const session = await requireSession();
+      const actorId = session?.user?.id;
+      if (
+        announcement?.created_by &&
+        announcement.created_by !== actorId
+      ) {
+        await dispatchPushToUsers({
+          userIds: [announcement.created_by],
+          title: "New reaction",
+          body: `Someone reacted to "${announcement.title}"`,
+          data: {
+            kind: "reaction",
+            path: `/faculty/subject/${announcement.subject_id}/social?highlight=${announcement.id}`,
+            announcement_id: announcement.id,
+            subject_id: announcement.subject_id || "",
+          },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Reaction push skipped:", err?.message || err);
+  }
+
   return data;
 }
 
@@ -2417,6 +2702,67 @@ export async function postAnnouncementComment(announcementId, body) {
   });
 
   if (error) throw error;
+
+  try {
+    const { data: announcement } = await supabase
+      .from("announcements")
+      .select("id, title, created_by, subject_id")
+      .eq("id", announcementId)
+      .maybeSingle();
+
+    const session = await requireSession();
+    const actorId = session?.user?.id;
+    const authorId =
+      announcement?.created_by && announcement.created_by !== actorId
+        ? announcement.created_by
+        : null;
+
+    const { data: priorComments } = await supabase
+      .from("announcement_comments")
+      .select("user_id")
+      .eq("announcement_id", announcementId)
+      .neq("user_id", actorId)
+      .limit(40);
+
+    const otherIds = [
+      ...new Set(
+        (priorComments || [])
+          .map((row) => row.user_id)
+          .filter((id) => id && id !== authorId)
+      ),
+    ];
+
+    if (authorId) {
+      await dispatchPushToUsers({
+        userIds: [authorId],
+        title: "New comment",
+        body: `New comment on "${announcement?.title || "announcement"}"`,
+        data: {
+          kind: "comment",
+          path: `/faculty/subject/${announcement.subject_id}/social?highlight=${announcementId}&comments=1`,
+          announcement_id: announcementId,
+          subject_id: announcement?.subject_id || "",
+        },
+      });
+    }
+
+    if (otherIds.length && announcement?.subject_id) {
+      await dispatchPushToUsers({
+        userIds: otherIds,
+        title: "New comment",
+        body: `New comment on "${announcement?.title || "announcement"}"`,
+        data: {
+          kind: "comment",
+          path: `/student/subject/${announcement.subject_id}/social?highlight=${announcementId}&comments=1`,
+          announcement_id: announcementId,
+          subject_id: announcement.subject_id,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn("Comment push skipped:", err?.message || err);
+  }
+
   return data;
 }
 
@@ -2426,33 +2772,12 @@ async function dispatchAnnouncementPush({
   body,
   targetSections,
 }) {
-  try {
-    const session = await requireSession();
-    const token = session?.access_token;
-    if (!token || !subjectIds.length) return;
-
-    const sections = normalizeTargetSections(targetSections);
-    await Promise.allSettled(
-      subjectIds.map((subjectId) =>
-        fetch(`${API_BASE}/push/announce`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            subjectId,
-            title,
-            body,
-            targetSections: sections,
-            path: `/student/subject/${subjectId}/social`,
-          }),
-        })
-      )
-    );
-  } catch (err) {
-    console.warn("Announcement push dispatch skipped:", err?.message || err);
-  }
+  await dispatchSubjectAnnouncementPush({
+    subjectIds,
+    title,
+    body,
+    targetSections: normalizeTargetSections(targetSections),
+  });
 }
 
 export async function createFacultyAnnouncements({
@@ -2483,7 +2808,7 @@ export async function createFacultyAnnouncements({
       body,
       targetSections,
     });
-    return rows.length;
+    return { count: rows.length, rows };
   }
 
   if (error?.message?.includes("Could not find the function")) {
@@ -2492,10 +2817,10 @@ export async function createFacultyAnnouncements({
       ? subjectIds
       : (await fetchTeacherSubjects(user.school_id)).map((s) => s.id);
 
-    let created = 0;
+    const createdRows = [];
 
     for (const subjectId of ids) {
-      await createAnnouncement({
+      const row = await createAnnouncement({
         subjectId,
         title,
         body,
@@ -2503,7 +2828,7 @@ export async function createFacultyAnnouncements({
         createdBy: user.id,
         skipPush: true,
       });
-      created += 1;
+      createdRows.push(row);
     }
 
     await dispatchAnnouncementPush({
@@ -2513,11 +2838,11 @@ export async function createFacultyAnnouncements({
       targetSections,
     });
 
-    return created;
+    return { count: createdRows.length, rows: createdRows };
   }
 
   if (error) throw error;
-  return 0;
+  return { count: 0, rows: [] };
 }
 
 export async function requestExamRetake(examId, message = "") {

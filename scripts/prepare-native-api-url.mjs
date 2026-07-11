@@ -112,18 +112,23 @@ const backendEnv = readEnvFile(path.join(root, "backend", ".env"));
 let nextUrl = "";
 
 if (wantProduction) {
-  const production =
-    process.env.VITE_PRODUCTION_API_URL ||
-    getEnvValue(rootEnv, "VITE_PRODUCTION_API_URL") ||
-    process.env.VITE_API_BASE_URL ||
-    getEnvValue(rootEnv, "VITE_API_BASE_URL") ||
-    process.env.VITE_WEBSITE_URL ||
-    getEnvValue(rootEnv, "VITE_WEBSITE_URL") ||
-    "";
+  const candidates = [
+    process.env.VITE_PRODUCTION_API_URL,
+    getEnvValue(rootEnv, "VITE_PRODUCTION_API_URL"),
+    process.env.VITE_WEBSITE_URL,
+    getEnvValue(rootEnv, "VITE_WEBSITE_URL"),
+    process.env.VITE_API_BASE_URL,
+    getEnvValue(rootEnv, "VITE_API_BASE_URL"),
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    // Local API URLs are for dev only — never use them for a public APK.
+    .filter((value) => !/localhost|127\.0\.0\.1|192\.168\./i.test(value));
 
+  const production = candidates[0] || "";
   nextUrl = toPublicApiBase(production);
 
-  if (!nextUrl || /localhost|127\.0\.0\.1|192\.168\./i.test(nextUrl)) {
+  if (!nextUrl) {
     console.error(
       "[prepare-native-api-url] --production needs a public URL.\n" +
         "  Set VITE_WEBSITE_URL=https://your-app.vercel.app in root .env\n" +

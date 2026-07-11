@@ -2,7 +2,7 @@ import { LIGHT_BG } from "./themeColors";
 import { motion } from "./motion";
 
 export function inputClass(theme, extra = "") {
-  return `w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all duration-200 ${
+  return `box-border w-full max-w-full min-w-0 rounded-xl px-3 py-2 text-sm outline-none transition-all duration-200 ${
     theme === "dark"
       ? "border border-white/10 bg-[#dff8f3]/10 text-white placeholder:text-gray-500"
       : `border border-slate-200/90 ${LIGHT_BG.input} text-[var(--en-text-primary)] placeholder:text-[var(--en-text-muted)]`
@@ -10,7 +10,7 @@ export function inputClass(theme, extra = "") {
 }
 
 export function selectClass(theme, extra = "") {
-  return `en-select relative w-full min-w-0 overflow-hidden rounded-xl py-2.5 pl-3.5 pr-11 text-sm outline-none transition-all duration-200 appearance-none cursor-pointer ${
+  return `en-select relative box-border w-full max-w-full min-w-0 overflow-hidden rounded-xl py-2 pl-3 pr-10 text-sm outline-none transition-all duration-200 appearance-none cursor-pointer ${
     theme === "dark"
       ? "border border-white/10 bg-[#0a1614] text-emerald-50 hover:border-emerald-500/35 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/25 disabled:bg-white/[0.04] disabled:text-gray-500"
       : `border border-slate-200/90 ${LIGHT_BG.input} text-[var(--en-text-primary)] hover:border-teal-400/50 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 disabled:text-[var(--en-text-muted)]`
@@ -26,7 +26,7 @@ export function textareaClass(theme, extra = "") {
 }
 
 export function cardClass(theme, extra = "") {
-  return `rounded-3xl border p-5 backdrop-blur-md ${motion.interactiveCard} ${
+  return `rounded-2xl border p-4 backdrop-blur-md sm:rounded-3xl sm:p-5 ${motion.interactiveCard} ${
     theme === "dark"
       ? "bg-white/[0.04] border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
       : `${LIGHT_BG.surface} border-slate-200/80 en-panel-glow`
@@ -34,7 +34,7 @@ export function cardClass(theme, extra = "") {
 }
 
 export function panelClass(theme, extra = "") {
-  return `rounded-3xl border p-5 backdrop-blur-md ${motion.interactiveCard} ${
+  return `rounded-2xl border p-4 backdrop-blur-md sm:rounded-3xl sm:p-5 ${motion.interactiveCard} ${
     theme === "dark"
       ? "bg-white/[0.045] border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.22)]"
       : `${LIGHT_BG.surface} border-slate-200/80 en-panel-glow`
@@ -42,7 +42,7 @@ export function panelClass(theme, extra = "") {
 }
 
 export function pageShellClass(theme, extra = "") {
-  return `en-page-shell min-h-full w-full max-w-full min-w-0 bg-transparent p-4 sm:p-6 md:p-8 ${
+  return `en-page-shell box-border min-h-full w-full max-w-full min-w-0 overflow-x-hidden bg-transparent p-3 sm:p-5 md:p-7 ${
     theme === "dark" ? "text-white" : "en-text-primary"
   } ${extra}`;
 }
@@ -51,7 +51,8 @@ export function pageShellClass(theme, extra = "") {
 export function pageShellWithBellClass(theme, extra = "") {
   const native =
     typeof document !== "undefined" &&
-    document.documentElement.classList.contains("en-native-app");
+    (document.documentElement.classList.contains("en-native-app") ||
+      document.documentElement.classList.contains("en-mobile-shell"));
   const bellPad = native ? "" : "pr-16 md:pr-24";
   return pageShellClass(theme, `${bellPad} ${extra}`.trim());
 }

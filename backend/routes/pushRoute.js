@@ -3,6 +3,7 @@ const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
 const { resolveUserIdFromAccessToken } = require("../lib/verifyAccessToken");
 const {
   notifyAnnouncementRecipients,
+  notifyBroadcastAudience,
   sendPushToUsers,
   isPushConfigured,
   getPushApiMode,
@@ -66,6 +67,39 @@ router.post("/announce", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("push/announce:", err);
     res.status(500).json({ error: err.message || "Failed to send push" });
+  }
+});
+
+/**
+ * POST /push/broadcast
+ * body: { audience: 'all'|'faculty'|'students', title, body, path? }
+ * Admin platform announcement → push to matching roles.
+ */
+router.post("/broadcast", requireAuth, async (req, res) => {
+  try {
+    const admin = getSupabaseAdmin();
+    if (!admin) {
+      return res.status(503).json({
+        error: "SUPABASE_SERVICE_ROLE_KEY is required to send push notifications",
+      });
+    }
+
+    const { audience, title, body, path } = req.body || {};
+    if (!title) {
+      return res.status(400).json({ error: "title is required" });
+    }
+
+    const result = await notifyBroadcastAudience(admin, {
+      audience: audience || "all",
+      title,
+      body,
+      path: path || "/student/dashboard",
+    });
+
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("push/broadcast:", err);
+    res.status(500).json({ error: err.message || "Failed to send broadcast push" });
   }
 });
 

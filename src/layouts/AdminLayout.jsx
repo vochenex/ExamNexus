@@ -165,17 +165,18 @@ export default function AdminLayout() {
           theme === "dark" ? "text-white" : "en-text-primary"
         }`}
       >
-        {nativeApp ? (
+        {mobileNav ? (
           <header className="en-native-topbar shrink-0">
-            <ExamNexusLogo size={28} idSuffix="admin-native-top" />
+            <ExamNexusLogo size={28} idSuffix="admin-mobile-top" />
             <div className="en-native-topbar-actions">
+              {!nativeApp && <InstallIconButton compact />}
               <ThemeToggle inverted compact />
               <NotificationBell compact />
             </div>
           </header>
         ) : (
           <div
-            className={`absolute ${mobileNav ? "right-4 top-4" : "right-8 top-6"} z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+            className={`absolute right-8 top-6 z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
           >
             <InstallIconButton />
             <ThemeToggle />
@@ -183,9 +184,9 @@ export default function AdminLayout() {
           </div>
         )}
         <div
-          className={`en-scroll-region min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto touch-pan-y ${
+          className={`en-scroll-region min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto ${
             mobileNav
-              ? "p-4 sm:p-6 en-has-tabbar pb-[calc(var(--en-tabbar-height,3.35rem)+2rem)]"
+              ? "p-3 sm:p-5 en-has-tabbar pb-[calc(var(--en-tabbar-height,3.35rem)+2rem)]"
               : "p-8"
           }`}
         >

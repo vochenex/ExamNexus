@@ -547,6 +547,7 @@ function getAuthInputProps(theme) {
     relative
     w-full
     max-w-5xl
+    mx-auto
     rounded-[32px]
     overflow-hidden
     backdrop-blur-2xl
@@ -561,9 +562,9 @@ function getAuthInputProps(theme) {
   `}
 >
         
-        {/* Branding Panel — desktop only; slides to the right on sign up */}
+        {/* Branding Panel — tablet/desktop; slides to the right on sign up */}
         <div
-          className={`en-auth-panel-brand hidden lg:flex flex-col items-center p-10 ${
+          className={`en-auth-panel-brand hidden md:flex flex-col items-center p-8 md:p-10 ${
             theme === "dark"
               ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
               : "bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#134e4a]"
@@ -600,7 +601,7 @@ function getAuthInputProps(theme) {
           }`}
         >
           <div className="en-auth-form-inner">
-  <div className={`mb-6 flex flex-col items-center gap-4 ${isNativeApp() ? "hidden" : "lg:hidden"}`}>
+  <div className={`mb-6 flex flex-col items-center gap-4 ${isNativeApp() ? "hidden" : "md:hidden"}`}>
     <ExamNexusBrand
       variant="panel"
       idSuffix="auth-mobile"

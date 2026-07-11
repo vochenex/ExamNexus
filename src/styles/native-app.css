@@ -1,15 +1,15 @@
 /* Native Capacitor shell — compact layout tuned for phone screens. */
 
-html.en-native-app {
+:is(html.en-native-app, html.en-mobile-shell) {
   --en-tabbar-height: 3.35rem;
   --en-native-topbar-height: 2.75rem;
-  --en-native-px: 0.875rem;
+  --en-native-px: 0.75rem;
   --en-safe-top: env(safe-area-inset-top, 0px);
-  font-size: 15px;
+  font-size: 14.5px;
   color-scheme: dark;
 }
 
-html.light.en-native-app {
+:is(html.light.en-native-app, html.light.en-mobile-shell) {
   color-scheme: light;
 }
 
@@ -17,12 +17,12 @@ html.light.en-native-app {
 /* Auth (login / signup)                                                      */
 /* -------------------------------------------------------------------------- */
 
-html.en-native-app .en-auth-shell {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-shell {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   min-height: 100dvh;
 }
 
-html.en-native-app .en-auth-body {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-body {
   padding: 0.75rem var(--en-native-px) 1.25rem;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
@@ -31,7 +31,7 @@ html.en-native-app .en-auth-body {
   min-height: 0;
 }
 
-html.en-native-app .en-auth-card {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-card {
   max-width: 100%;
   width: 100%;
   margin-top: 0.25rem;
@@ -41,7 +41,7 @@ html.en-native-app .en-auth-card {
   overflow: visible !important;
 }
 
-html.en-native-app .en-auth-panel-form {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-form {
   position: relative !important;
   left: auto !important;
   width: 100% !important;
@@ -53,34 +53,91 @@ html.en-native-app .en-auth-panel-form {
   display: block !important;
 }
 
-html.en-native-app .en-auth-form-inner {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner {
   max-width: 28rem;
   margin-left: auto;
   margin-right: auto;
 }
 
-html.en-native-app .en-auth-form-inner h2 {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner h2 {
   font-size: 1.35rem !important;
   margin-top: 0.15rem;
 }
 
-html.en-native-app .en-auth-panel-brand {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-brand {
   display: none !important;
+}
+
+/* Native tablet: split logo | form, centered like web */
+@media (min-width: 768px) {
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-body {
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: calc(100dvh - var(--en-native-topbar-height) - var(--en-safe-top) - 1rem);
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {
+    max-width: min(52rem, 94vw);
+    margin-inline: auto;
+    height: min(78dvh, 600px) !important;
+    min-height: 440px !important;
+    overflow: hidden !important;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-brand {
+    display: flex !important;
+    position: absolute !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 50% !important;
+    max-width: 50% !important;
+    padding: 1.5rem !important;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-form {
+    position: absolute !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 50% !important;
+    max-width: 50% !important;
+    height: auto !important;
+    transform: translateX(100%) !important;
+    padding: 1.25rem 1.5rem !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-panel-brand {
+    transform: translateX(100%) !important;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-panel-form {
+    transform: translateX(0) !important;
+    justify-content: flex-start;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner {
+    max-width: 22rem;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
 /* Dashboard shell / header                                                   */
 /* -------------------------------------------------------------------------- */
 
-html.en-native-app main.en-has-tabbar {
+:is(html.en-native-app, html.en-mobile-shell) main.en-has-tabbar {
   padding: 0 !important;
   padding-bottom: calc(var(--en-tabbar-height) + var(--en-safe-bottom) + 0.75rem) !important;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
-html.en-native-app .en-native-topbar {
+:is(html.en-native-app, html.en-mobile-shell) .en-native-topbar {
   position: relative;
   top: 0;
   z-index: 45;
@@ -100,13 +157,13 @@ html.en-native-app .en-native-topbar {
   flex-shrink: 0;
 }
 
-html.light.en-native-app .en-native-topbar {
+:is(html.light.en-native-app, html.light.en-mobile-shell) .en-native-topbar {
   background: #f8fafc;
   border-bottom-color: rgba(15, 23, 42, 0.1);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 }
 
-html.en-native-app .en-native-auth-header {
+:is(html.en-native-app, html.en-mobile-shell) .en-native-auth-header {
   position: relative;
   top: 0;
   z-index: 40;
@@ -125,13 +182,13 @@ html.en-native-app .en-native-auth-header {
   flex-shrink: 0;
 }
 
-html.light.en-native-app .en-native-auth-header {
+:is(html.light.en-native-app, html.light.en-mobile-shell) .en-native-auth-header {
   background: #f8fafc;
   border-bottom-color: rgba(15, 23, 42, 0.1);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 }
 
-html.en-native-app .en-native-topbar-actions {
+:is(html.en-native-app, html.en-mobile-shell) .en-native-topbar-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -139,10 +196,10 @@ html.en-native-app .en-native-topbar-actions {
   height: 2.5rem;
 }
 
-html.en-native-app .en-header-action-btn,
-html.en-native-app .en-native-topbar .en-theme-toggle-btn,
-html.en-native-app .en-native-topbar .en-notif-btn,
-html.en-native-app .en-native-auth-header .en-theme-toggle-btn {
+:is(html.en-native-app, html.en-mobile-shell) .en-header-action-btn,
+:is(html.en-native-app, html.en-mobile-shell) .en-native-topbar .en-theme-toggle-btn,
+:is(html.en-native-app, html.en-mobile-shell) .en-native-topbar .en-notif-btn,
+:is(html.en-native-app, html.en-mobile-shell) .en-native-auth-header .en-theme-toggle-btn {
   width: 2.5rem !important;
   height: 2.5rem !important;
   min-width: 2.5rem;
@@ -156,16 +213,16 @@ html.en-native-app .en-native-auth-header .en-theme-toggle-btn {
   line-height: 0;
 }
 
-html.en-native-app .en-header-action-btn svg,
-html.en-native-app .en-native-topbar .en-notif-btn svg,
-html.en-native-app .en-native-topbar .en-theme-toggle-btn svg,
-html.en-native-app .en-native-auth-header .en-theme-toggle-btn svg {
+:is(html.en-native-app, html.en-mobile-shell) .en-header-action-btn svg,
+:is(html.en-native-app, html.en-mobile-shell) .en-native-topbar .en-notif-btn svg,
+:is(html.en-native-app, html.en-mobile-shell) .en-native-topbar .en-theme-toggle-btn svg,
+:is(html.en-native-app, html.en-mobile-shell) .en-native-auth-header .en-theme-toggle-btn svg {
   width: 1.25rem !important;
   height: 1.25rem !important;
   flex-shrink: 0;
 }
 
-html.en-native-app .en-notif-badge {
+:is(html.en-native-app, html.en-mobile-shell) .en-notif-badge {
   min-width: 1.05rem !important;
   height: 1.05rem !important;
   font-size: 0.625rem !important;
@@ -173,7 +230,7 @@ html.en-native-app .en-notif-badge {
 }
 
 /* Full-bleed page shells (subject details, dashboards, etc.) */
-html.en-native-app .en-page-shell {
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell {
   width: 100% !important;
   max-width: none !important;
   min-height: 100% !important;
@@ -184,12 +241,12 @@ html.en-native-app .en-page-shell {
   background-image: none !important;
 }
 
-html.en-native-app .mx-auto.max-w-7xl,
-html.en-native-app .mx-auto.max-w-6xl,
-html.en-native-app .mx-auto.max-w-5xl,
-html.en-native-app .mx-auto.max-w-4xl,
-html.en-native-app .mx-auto.max-w-3xl,
-html.en-native-app .mx-auto.w-full.max-w-7xl {
+:is(html.en-native-app, html.en-mobile-shell) .mx-auto.max-w-7xl,
+:is(html.en-native-app, html.en-mobile-shell) .mx-auto.max-w-6xl,
+:is(html.en-native-app, html.en-mobile-shell) .mx-auto.max-w-5xl,
+:is(html.en-native-app, html.en-mobile-shell) .mx-auto.max-w-4xl,
+:is(html.en-native-app, html.en-mobile-shell) .mx-auto.max-w-3xl,
+:is(html.en-native-app, html.en-mobile-shell) .mx-auto.w-full.max-w-7xl {
   max-width: 100% !important;
   width: 100% !important;
   margin-left: 0 !important;
@@ -197,18 +254,30 @@ html.en-native-app .mx-auto.w-full.max-w-7xl {
 }
 
 /* Glass panels like Profile — avoid solid vertical slabs */
-html.en-native-app .en-page-shell > div,
-html.en-native-app .en-page-shell .rounded-2xl,
-html.en-native-app .en-page-shell .rounded-3xl {
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell > div,
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell .rounded-2xl,
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell .rounded-3xl {
   max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
-html.en-native-app .en-page-shell .backdrop-blur-md {
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell input,
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell textarea,
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell select,
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell .en-select,
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell .en-select-trigger {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-page-shell .backdrop-blur-md {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
 
-html.en-native-app .md\:w-\[390px\] {
+:is(html.en-native-app, html.en-mobile-shell) .md\:w-\[390px\] {
   width: 100% !important;
   max-width: 100% !important;
 }
@@ -217,25 +286,25 @@ html.en-native-app .md\:w-\[390px\] {
 /* Bottom tab bar                                                             */
 /* -------------------------------------------------------------------------- */
 
-html.en-native-app .en-tabbar {
+:is(html.en-native-app, html.en-mobile-shell) .en-tabbar {
   width: min(26rem, calc(100vw - 1rem));
   bottom: calc(0.35rem + var(--en-safe-bottom));
   padding: 0.28rem;
   border-radius: 1.05rem;
 }
 
-html.en-native-app .en-tabbar-item {
+:is(html.en-native-app, html.en-mobile-shell) .en-tabbar-item {
   gap: 0.05rem;
   padding: 0.2rem 0.05rem;
 }
 
-html.en-native-app .en-tabbar-icon {
+:is(html.en-native-app, html.en-mobile-shell) .en-tabbar-icon {
   width: 2rem;
   height: 1.45rem;
   border-radius: 0.65rem;
 }
 
-html.en-native-app .en-tabbar-label {
+:is(html.en-native-app, html.en-mobile-shell) .en-tabbar-label {
   font-size: 0.5625rem;
 }
 
@@ -243,25 +312,25 @@ html.en-native-app .en-tabbar-label {
 /* Charts                                                                     */
 /* -------------------------------------------------------------------------- */
 
-html.en-native-app .en-chart-scroll {
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll {
   width: 100%;
   max-width: 100%;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
-html.en-native-app .en-chart-scroll::-webkit-scrollbar {
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll::-webkit-scrollbar {
   width: 0 !important;
   height: 0 !important;
   display: none !important;
 }
 
-html.light.en-native-app .en-chart-scroll {
+:is(html.light.en-native-app, html.light.en-mobile-shell) .en-chart-scroll {
   scrollbar-width: none;
 }
 
-html.en-native-app main.en-scroll-region,
-html.en-native-app .en-scroll-region {
+:is(html.en-native-app, html.en-mobile-shell) main.en-scroll-region,
+:is(html.en-native-app, html.en-mobile-shell) .en-scroll-region {
   -webkit-overflow-scrolling: touch;
 }
 
@@ -269,14 +338,14 @@ html.en-native-app .en-scroll-region {
 /* Themed select sheet                                                        */
 /* -------------------------------------------------------------------------- */
 
-html.en-native-app .en-select-sheet {
+:is(html.en-native-app, html.en-mobile-shell) .en-select-sheet {
   border-color: rgba(52, 211, 153, 0.28) !important;
   box-shadow:
     0 -8px 40px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(52, 211, 153, 0.08) inset;
 }
 
-html.en-native-app .en-select-sheet-list {
+:is(html.en-native-app, html.en-mobile-shell) .en-select-sheet-list {
   padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
 }
 
@@ -284,36 +353,36 @@ html.en-native-app .en-select-sheet-list {
 /* Typography + page chrome                                                   */
 /* -------------------------------------------------------------------------- */
 
-html.en-native-app h1 {
+:is(html.en-native-app, html.en-mobile-shell) h1 {
   font-size: 1.35rem !important;
   line-height: 1.25;
 }
 
-html.en-native-app h2 {
+:is(html.en-native-app, html.en-mobile-shell) h2 {
   font-size: 1.1rem !important;
 }
 
-html.en-native-app .text-3xl {
+:is(html.en-native-app, html.en-mobile-shell) .text-3xl {
   font-size: 1.35rem !important;
   line-height: 1.25;
 }
 
-html.en-native-app .text-4xl,
-html.en-native-app .md\:text-4xl {
+:is(html.en-native-app, html.en-mobile-shell) .text-4xl,
+:is(html.en-native-app, html.en-mobile-shell) .md\:text-4xl {
   font-size: 1.5rem !important;
 }
 
-html.en-native-app .text-2xl {
+:is(html.en-native-app, html.en-mobile-shell) .text-2xl {
   font-size: 1.15rem !important;
 }
 
-html.en-native-app .text-xl {
+:is(html.en-native-app, html.en-mobile-shell) .text-xl {
   font-size: 1rem !important;
 }
 
-html.en-native-app .min-h-full.p-6,
-html.en-native-app .min-h-full.p-6.md\:p-8,
-html.en-native-app .p-6.md\:p-8 {
+:is(html.en-native-app, html.en-mobile-shell) .min-h-full.p-6,
+:is(html.en-native-app, html.en-mobile-shell) .min-h-full.p-6.md\:p-8,
+:is(html.en-native-app, html.en-mobile-shell) .p-6.md\:p-8 {
   padding-left: var(--en-native-px) !important;
   padding-right: var(--en-native-px) !important;
   padding-top: 0.75rem !important;
@@ -323,96 +392,112 @@ html.en-native-app .p-6.md\:p-8 {
   box-sizing: border-box;
 }
 
-html.en-native-app .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+:is(html.en-native-app, html.en-mobile-shell) .space-y-8 > :not([hidden]) ~ :not([hidden]) {
   margin-top: 1rem;
 }
 
-html.en-native-app .mb-6 {
+:is(html.en-native-app, html.en-mobile-shell) .mb-6 {
   margin-bottom: 0.85rem;
 }
 
-html.en-native-app .gap-4 {
+:is(html.en-native-app, html.en-mobile-shell) .gap-4 {
   gap: 0.65rem;
 }
 
-html.en-native-app .gap-3 {
+:is(html.en-native-app, html.en-mobile-shell) .gap-3 {
   gap: 0.5rem;
 }
 
-html.en-native-app .rounded-2xl {
+:is(html.en-native-app, html.en-mobile-shell) .rounded-2xl {
   border-radius: 0.85rem;
 }
 
-html.en-native-app .rounded-3xl {
+:is(html.en-native-app, html.en-mobile-shell) .rounded-3xl {
   border-radius: 1rem;
 }
 
-html.en-native-app .p-5,
-html.en-native-app .p-6 {
-  padding: 0.85rem;
+:is(html.en-native-app, html.en-mobile-shell) .p-5,
+:is(html.en-native-app, html.en-mobile-shell) .p-6 {
+  padding: 0.7rem;
 }
 
-html.en-native-app .px-5,
-html.en-native-app .px-6 {
-  padding-left: 0.85rem;
-  padding-right: 0.85rem;
+:is(html.en-native-app, html.en-mobile-shell) .px-5,
+:is(html.en-native-app, html.en-mobile-shell) .px-6 {
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
 }
 
-html.en-native-app .py-4 {
-  padding-top: 0.65rem;
-  padding-bottom: 0.65rem;
+:is(html.en-native-app, html.en-mobile-shell) .py-4 {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
 }
 
-html.en-native-app button,
-html.en-native-app .en-btn {
+:is(html.en-native-app, html.en-mobile-shell) button,
+:is(html.en-native-app, html.en-mobile-shell) .en-btn {
+  font-size: 0.78rem;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) input,
+:is(html.en-native-app, html.en-mobile-shell) select,
+:is(html.en-native-app, html.en-mobile-shell) textarea,
+:is(html.en-native-app, html.en-mobile-shell) .en-select-trigger {
   font-size: 0.8125rem;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
 }
 
-html.en-native-app input,
-html.en-native-app select,
-html.en-native-app textarea,
-html.en-native-app .en-select-trigger {
-  font-size: 0.875rem;
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page .rounded-2xl,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page .rounded-3xl {
+  border-radius: 0.9rem;
 }
 
-html.en-native-app .en-page-header-icon {
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page input,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page select,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page textarea,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page .en-select-trigger {
+  font-size: 0.78rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-page-header-icon {
   width: 1.15rem;
   height: 1.15rem;
 }
 
-html.en-native-app .en-page-header h1 {
+:is(html.en-native-app, html.en-mobile-shell) .en-page-header h1 {
   font-size: 1.2rem !important;
 }
 
-html.en-native-app .en-page-header .text-sm {
+:is(html.en-native-app, html.en-mobile-shell) .en-page-header .text-sm {
   font-size: 0.75rem;
   line-height: 1.35;
 }
 
-html.en-native-app .grid.gap-4.md\:grid-cols-2 {
+:is(html.en-native-app, html.en-mobile-shell) .grid.gap-4.md\:grid-cols-2 {
   gap: 0.65rem;
 }
 
-html.en-native-app .en-stat-value {
+:is(html.en-native-app, html.en-mobile-shell) .en-stat-value {
   font-size: 1.35rem !important;
 }
 
-html.en-native-app .en-modal-panel {
+:is(html.en-native-app, html.en-mobile-shell) .en-modal-panel {
   max-width: calc(100vw - 1.5rem);
   margin: 0.75rem;
 }
 
-html.en-native-app .en-modal-panel h2,
-html.en-native-app .en-modal-panel h3 {
+:is(html.en-native-app, html.en-mobile-shell) .en-modal-panel h2,
+:is(html.en-native-app, html.en-mobile-shell) .en-modal-panel h3 {
   font-size: 1rem !important;
 }
 
-html.en-native-app .en-modal-panel p {
+:is(html.en-native-app, html.en-mobile-shell) .en-modal-panel p {
   font-size: 0.8125rem;
   line-height: 1.45;
 }
 
-html.en-native-app .en-modal-panel button {
+:is(html.en-native-app, html.en-mobile-shell) .en-modal-panel button {
   padding-top: 0.55rem;
   padding-bottom: 0.55rem;
 }

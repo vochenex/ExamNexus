@@ -60,20 +60,26 @@ export function canStudentTakeAssessment(assessment) {
   );
 }
 
+/** Faculty visibility flags: only explicit `false` means off (null/undefined = on). */
+export function isStudentResultsFlagEnabled(value) {
+  return value !== false;
+}
+
 export function canStudentAccessResults(exam) {
-  return exam?.allow_student_view !== false;
+  return isStudentResultsFlagEnabled(exam?.allow_student_view);
 }
 
 export function canStudentViewResultsFromCard(assessment) {
   if (getStudentAssessmentStatus(assessment) !== "completed") return false;
-  if (assessment?.allow_student_view === false) return false;
-  return assessment?.allow_show_correct_answers !== false;
+  return canStudentAccessResults(assessment);
 }
 
 export function getStudentResultsReleaseLabel(exam) {
   if (!canStudentAccessResults(exam)) return "Completed";
-  if (exam?.allow_question_review === false) return "Score only";
-  if (exam?.allow_show_correct_answers === false) return "Review (no answers)";
+  if (!isStudentResultsFlagEnabled(exam?.allow_question_review)) return "Score only";
+  if (!isStudentResultsFlagEnabled(exam?.allow_show_correct_answers)) {
+    return "Review (no answers)";
+  }
   return "Full review";
 }
 

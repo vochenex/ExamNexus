@@ -9,8 +9,8 @@
   box-sizing: border-box;
 }
 
-/* Mobile + tablet: stacked, brand hidden — form uses full width */
-@media (max-width: 1023px) {
+/* Phone only: stacked, brand hidden — form uses full width */
+@media (max-width: 767px) {
   .en-auth-card {
     height: auto;
     min-height: 0;
@@ -33,12 +33,14 @@
   }
 }
 
-/* Large desktop only: two halves slide by animating transform */
-@media (min-width: 1024px) {
+/* Tablet + desktop: two halves (logo | fields), vertically centered */
+@media (min-width: 768px) {
   .en-auth-card {
     position: relative;
-    height: min(92vh, 680px);
-    min-height: 560px;
+    height: min(88vh, 640px);
+    min-height: 480px;
+    max-width: min(56rem, 92vw);
+    margin-inline: auto;
     overflow: hidden;
     isolation: isolate;
   }
@@ -52,7 +54,7 @@
     width: 50% !important;
     max-width: 50% !important;
     min-width: 0;
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     overflow-x: hidden;
     overflow-y: auto;
@@ -75,9 +77,9 @@
   }
 
   .en-auth-panel-form {
-    justify-content: flex-start;
-    padding-top: 2.5rem;
-    padding-bottom: 2.5rem;
+    justify-content: center;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
   }
 
   /* Login: logo left, form right */
@@ -92,8 +94,8 @@
 
   /* Sign up — swap sides; extra height for long signup form */
   .en-auth-card--signup {
-    height: min(92vh, 680px);
-    min-height: 560px;
+    height: min(90vh, 680px);
+    min-height: 520px;
   }
 
   .en-auth-card--signup .en-auth-panel-brand {
@@ -102,6 +104,7 @@
 
   .en-auth-card--signup .en-auth-panel-form {
     transform: translateX(0);
+    justify-content: flex-start;
   }
 }
 
@@ -112,7 +115,7 @@
   margin-right: auto;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .en-auth-form-inner {
     max-width: 22rem;
   }

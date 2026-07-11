@@ -11,11 +11,18 @@ async function lockLandscape() {
       await ScreenOrientation.lock({ orientation: "landscape" });
       return;
     }
+    // Mobile browsers often require a short fullscreen gesture before lock works.
+    const root = document.documentElement;
+    if (root.requestFullscreen) {
+      await root.requestFullscreen().catch(() => {});
+    } else if (root.webkitRequestFullscreen) {
+      root.webkitRequestFullscreen();
+    }
     if (screen?.orientation?.lock) {
       await screen.orientation.lock("landscape");
     }
   } catch {
-    /* unsupported on some browsers / devices */
+    /* unsupported on some browsers / devices — modal still works in current orientation */
   }
 }
 
@@ -25,6 +32,13 @@ async function unlockOrientation() {
       const { ScreenOrientation } = await import("@capacitor/screen-orientation");
       await ScreenOrientation.unlock();
       return;
+    }
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
     }
     if (screen?.orientation?.unlock) {
       screen.orientation.unlock();
@@ -63,24 +77,26 @@ export function AdminStatBadge({ value, label, alert = false }) {
   );
 }
 
-function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact, centered }) {
+function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact }) {
   const maxValue = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
-  const barWidth = compact ? "w-8" : centered ? "w-14" : "w-12";
-  const trackHeight = compact ? "96px" : centered ? "min(42vh, 220px)" : "160px";
+  const colWidth = compact ? undefined : 72;
+  const trackHeight = compact ? "88px" : "min(48vh, 220px)";
   const minTrackWidth = compact
     ? undefined
-    : Math.max(items.length * (centered ? 56 : 48), centered ? 280 : 200);
+    : Math.max(items.length * colWidth, Math.min(items.length, 1) * 120);
 
   return (
     <div
-      className={`en-chart-scroll flex max-w-full items-end gap-1.5 ${
+      className={`en-chart-scroll flex items-end gap-1.5 ${
         compact
-          ? "h-32 w-full justify-between overflow-hidden"
-          : centered
-            ? "mx-auto h-[min(50vh,240px)] w-full max-w-5xl justify-center gap-2"
-            : "h-56 gap-2"
+          ? "h-28 w-full max-w-full justify-between overflow-hidden"
+          : "h-[min(56vh,260px)] gap-2"
       }`}
-      style={minTrackWidth && !compact ? { minWidth: `${minTrackWidth}px` } : undefined}
+      style={
+        minTrackWidth
+          ? { minWidth: `${minTrackWidth}px`, width: "max-content" }
+          : undefined
+      }
     >
       {items.map((item) => {
         const value = Number(item[valueKey]) || 0;
@@ -90,9 +106,10 @@ function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact, ce
         return (
           <div
             key={item.key || item[labelKey]}
-            className={`flex ${barWidth} ${
-              compact ? "min-w-0 flex-1" : "shrink-0"
-            } flex-col items-center justify-end gap-1`}
+            className={`flex flex-col items-center justify-end gap-1 ${
+              compact ? "min-w-0 w-8 flex-1" : "w-[4.5rem] shrink-0"
+            }`}
+            style={!compact ? { width: colWidth } : undefined}
           >
             <span
               className={`text-[10px] font-bold tabular-nums ${
@@ -106,7 +123,7 @@ function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact, ce
               style={{ height: trackHeight }}
             >
               <div
-                className={`w-full max-w-[2.5rem] rounded-t-lg bg-gradient-to-t from-emerald-600 to-teal-400 ${
+                className={`pointer-events-none w-full max-w-[2.75rem] rounded-t-lg bg-gradient-to-t from-emerald-600 to-teal-400 ${
                   value === 0 ? "opacity-30" : ""
                 } ${barClassName}`}
                 style={{ height: `${height}%` }}
@@ -114,9 +131,9 @@ function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact, ce
               />
             </div>
             <span
-              className={`w-full truncate text-center text-[9px] font-medium leading-tight ${
-                theme === "dark" ? "text-gray-400" : "text-gray-600"
-              }`}
+              className={`w-full text-center text-[9px] font-medium leading-tight ${
+                compact ? "truncate" : "break-words"
+              } ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
               title={label}
             >
               {label}
@@ -199,14 +216,14 @@ export function AdminVerticalBarChart({
               onClick={closeExpanded}
             />
             <div
-              className={`relative z-10 flex w-full max-w-[min(96vw,56rem)] flex-col overflow-hidden rounded-3xl border shadow-2xl ${
+              className={`relative z-10 flex max-h-[96dvh] w-full max-w-[min(96vw,56rem)] flex-col overflow-hidden rounded-2xl border shadow-2xl sm:rounded-3xl ${
                 theme === "dark"
                   ? "border-emerald-500/25 bg-[#071412]/95 backdrop-blur-md"
                   : "border-emerald-200 bg-white/95 backdrop-blur-md"
               }`}
             >
               <div
-                className={`flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 ${
+                className={`flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2.5 ${
                   theme === "dark" ? "border-white/10" : "border-emerald-100"
                 }`}
               >
@@ -230,16 +247,18 @@ export function AdminVerticalBarChart({
                   <X size={18} />
                 </button>
               </div>
-              <div className="flex items-center justify-center overflow-x-auto p-4 sm:p-6">
-                <ChartBars
-                  items={items}
-                  valueKey={valueKey}
-                  labelKey={labelKey}
-                  theme={theme}
-                  barClassName={barClassName}
-                  compact={false}
-                  centered
-                />
+              {/* Scroll works when dragging on bars or empty padding around them */}
+              <div className="en-chart-scroll-area en-chart-expanded en-inner-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain p-3 sm:p-5">
+                <div className="inline-block min-w-full py-1">
+                  <ChartBars
+                    items={items}
+                    valueKey={valueKey}
+                    labelKey={labelKey}
+                    theme={theme}
+                    barClassName={barClassName}
+                    compact={false}
+                  />
+                </div>
               </div>
             </div>
           </div>

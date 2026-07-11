@@ -111,25 +111,6 @@ export function getActiveSectionIndex(navGroups, questions, examType, answersByQ
   return Math.max(0, navGroups.length - 1);
 }
 
-/** Unlocked sections: current active section and all completed sections before it. */
-export function isIndexNavigable(index, navGroups, questions, examType, answersByQuestionId) {
-  const activeSection = getActiveSectionIndex(
-    navGroups,
-    questions,
-    examType,
-    answersByQuestionId
-  );
-
-  for (let groupIndex = 0; groupIndex < navGroups.length; groupIndex += 1) {
-    const inGroup = navGroups[groupIndex].items.some((item) => item.index === index);
-    if (inGroup) {
-      return groupIndex <= activeSection;
-    }
-  }
-
-  return false;
-}
-
 export function getAllUnansweredIndices(questions, examType, answersByQuestionId) {
   return questions.reduce((indices, question, index) => {
     if (!isQuestionAnswered(question, examType, answersByQuestionId)) {
@@ -144,12 +125,13 @@ export function getNextUnansweredIndex(
   questions,
   examType,
   answersByQuestionId,
-  navGroups
+  navGroups,
+  options = {}
 ) {
   const navigable = questions
     .map((_, index) => index)
     .filter((index) =>
-      isIndexNavigable(index, navGroups, questions, examType, answersByQuestionId)
+      isIndexNavigable(index, navGroups, questions, examType, answersByQuestionId, options)
     );
 
   const unanswered = navigable.filter(
@@ -169,14 +151,15 @@ export function getPreviousNavigableIndex(
   navGroups,
   questions,
   examType,
-  answersByQuestionId
+  answersByQuestionId,
+  options = {}
 ) {
   const navigable = questions
     .map((_, index) => index)
     .filter(
       (index) =>
         index < currentIndex &&
-        isIndexNavigable(index, navGroups, questions, examType, answersByQuestionId)
+        isIndexNavigable(index, navGroups, questions, examType, answersByQuestionId, options)
     );
 
   return navigable.length > 0 ? navigable[navigable.length - 1] : null;
@@ -203,7 +186,8 @@ export function isSectionLocked(
   navGroups,
   questions,
   examType,
-  answersByQuestionId
+  answersByQuestionId,
+  options = {}
 ) {
   const activeSection = getActiveSectionIndex(
     navGroups,
@@ -211,7 +195,56 @@ export function isSectionLocked(
     examType,
     answersByQuestionId
   );
-  return groupIndex > activeSection;
+
+  // Sections after the current incomplete section stay locked (progressive unlock).
+  if (groupIndex > activeSection) return true;
+
+  // Faculty setting: once the student has moved into a later section, earlier
+  // completed sections cannot be revisited (anti-cheating / no answer recheck).
+  const furthest = Number(options.furthestSectionIndex);
+  if (
+    options.lockCompletedSections &&
+    Number.isFinite(furthest) &&
+    groupIndex < furthest
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isIndexNavigable(
+  index,
+  navGroups,
+  questions,
+  examType,
+  answersByQuestionId,
+  options = {}
+) {
+  for (let groupIndex = 0; groupIndex < navGroups.length; groupIndex += 1) {
+    const inGroup = navGroups[groupIndex].items.some((item) => item.index === index);
+    if (inGroup) {
+      return !isSectionLocked(
+        groupIndex,
+        navGroups,
+        questions,
+        examType,
+        answersByQuestionId,
+        options
+      );
+    }
+  }
+
+  return false;
+}
+
+export function getSectionIndexForQuestion(index, navGroups) {
+  for (let groupIndex = 0; groupIndex < navGroups.length; groupIndex += 1) {
+    if (navGroups[groupIndex].items.some((item) => item.index === index)) {
+      return groupIndex;
+    }
+  }
+  return 0;
 }
 
 function hashSeed(value) {

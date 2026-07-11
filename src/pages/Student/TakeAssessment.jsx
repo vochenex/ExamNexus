@@ -34,9 +34,11 @@ import {
   isSectionLocked,
   getNextUnansweredIndex,
   getPreviousNavigableIndex,
+  getSectionIndexForQuestion,
   shouldShowSubmitButton,
   shuffleQuestionsForStudent,
   orderQuestionsByIds,
+  isQuestionAnswered,
 } from "../../utils/assessmentTake";
 import {
   formatAssessmentDurationLabel,
@@ -153,6 +155,7 @@ function TakeAssessmentExperience() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
   const [flaggedIndices, setFlaggedIndices] = useState(() => new Set());
+  const [furthestSectionIndex, setFurthestSectionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [error, setError] = useState("");
@@ -316,6 +319,7 @@ function TakeAssessmentExperience() {
           setAnswers(session.answers || {});
           setCurrentQuestion(session.currentQuestion || 0);
           setFlaggedIndices(new Set(session.flaggedIndices || []));
+          setFurthestSectionIndex(Number(session.furthestSectionIndex) || 0);
           setTimeLeft(remaining);
           setTotalSeconds(activeTotalSeconds);
           replaceTimes(session.questionTimes || {});
@@ -353,6 +357,7 @@ function TakeAssessmentExperience() {
       answers,
       currentQuestion,
       flaggedIndices: [...flaggedIndices],
+      furthestSectionIndex,
       questionOrder: existing?.questionOrder || questions.map((question) => question.id),
       questionTimes: getTimesSnapshot(),
     });
@@ -360,6 +365,7 @@ function TakeAssessmentExperience() {
     answers,
     currentQuestion,
     flaggedIndices,
+    furthestSectionIndex,
     getTimesSnapshot,
     id,
     isActive,
@@ -395,20 +401,45 @@ function TakeAssessmentExperience() {
     [answers, currentQuestion, exam, questions]
   );
 
+  const lockCompletedSections =
+    Boolean(exam?.lock_completed_sections) || Boolean(exam?.shuffle_questions);
+
+  const sectionNavOptions = useMemo(
+    () => ({
+      lockCompletedSections,
+      furthestSectionIndex,
+    }),
+    [furthestSectionIndex, lockCompletedSections]
+  );
+
   const checkNavigable = useCallback(
     (index) =>
       exam
-        ? isIndexNavigable(index, navGroups, questions, exam.exam_type, answers)
+        ? isIndexNavigable(
+            index,
+            navGroups,
+            questions,
+            exam.exam_type,
+            answers,
+            sectionNavOptions
+          )
         : false,
-    [answers, exam, navGroups, questions]
+    [answers, exam, navGroups, questions, sectionNavOptions]
   );
 
   const checkSectionLocked = useCallback(
     (groupIndex) =>
       exam
-        ? isSectionLocked(groupIndex, navGroups, questions, exam.exam_type, answers)
+        ? isSectionLocked(
+            groupIndex,
+            navGroups,
+            questions,
+            exam.exam_type,
+            answers,
+            sectionNavOptions
+          )
         : true,
-    [answers, exam, navGroups, questions]
+    [answers, exam, navGroups, questions, sectionNavOptions]
   );
 
   const previousIndex = useMemo(
@@ -419,10 +450,11 @@ function TakeAssessmentExperience() {
             navGroups,
             questions,
             exam.exam_type,
-            answers
+            answers,
+            sectionNavOptions
           )
         : null,
-    [answers, currentQuestion, exam, navGroups, questions]
+    [answers, currentQuestion, exam, navGroups, questions, sectionNavOptions]
   );
 
   const nextUnansweredIndex = useMemo(
@@ -433,35 +465,82 @@ function TakeAssessmentExperience() {
             questions,
             exam.exam_type,
             answers,
-            navGroups
+            navGroups,
+            sectionNavOptions
           )
         : null,
-    [answers, currentQuestion, exam, navGroups, questions]
+    [answers, currentQuestion, exam, navGroups, questions, sectionNavOptions]
   );
 
   useEffect(() => {
     if (!isActive || !exam || !questions.length) return;
+    const section = getSectionIndexForQuestion(currentQuestion, navGroups);
+    setFurthestSectionIndex((prev) => Math.max(prev, section));
+  }, [currentQuestion, exam, isActive, navGroups, questions.length]);
 
-    if (!isIndexNavigable(currentQuestion, navGroups, questions, exam.exam_type, answers)) {
+  useEffect(() => {
+    if (!isActive || !exam || !questions.length) return;
+
+    if (
+      !isIndexNavigable(
+        currentQuestion,
+        navGroups,
+        questions,
+        exam.exam_type,
+        answers,
+        sectionNavOptions
+      )
+    ) {
       const fallback =
         getNextUnansweredIndex(
           -1,
           questions,
           exam.exam_type,
           answers,
-          navGroups
+          navGroups,
+          sectionNavOptions
         ) ??
         navGroups
           .flatMap((group) => group.items)
           .find((item) =>
-            isIndexNavigable(item.index, navGroups, questions, exam.exam_type, answers)
+            isIndexNavigable(
+              item.index,
+              navGroups,
+              questions,
+              exam.exam_type,
+              answers,
+              sectionNavOptions
+            )
           )?.index;
 
       if (fallback != null && fallback !== currentQuestion) {
         setCurrentQuestion(fallback);
       }
     }
-  }, [isActive, exam, questions, navGroups, answers, currentQuestion]);
+  }, [
+    isActive,
+    exam,
+    questions,
+    navGroups,
+    answers,
+    currentQuestion,
+    sectionNavOptions,
+  ]);
+
+  const clearFlagIfAnswered = useCallback(
+    (questionIndex) => {
+      const question = questions[questionIndex];
+      if (!question || !exam) return;
+      if (!isQuestionAnswered(question, exam.exam_type, answers)) return;
+      setFlaggedIndices((prev) => {
+        if (!prev.has(questionIndex)) return prev;
+        const next = new Set(prev);
+        next.delete(questionIndex);
+        return next;
+      });
+    },
+    [answers, exam, questions]
+  );
 
   const submitExam = useCallback(async (options = {}) => {
     const { reason } = options;
@@ -673,7 +752,10 @@ function TakeAssessmentExperience() {
   };
 
   const toggleFlag = () => {
-    if (!isActive) return;
+    if (!isActive || !exam || !currentQ) return;
+
+    // Answering already marks the item done — flagging an answered item is for review.
+    // Toggling off always works; toggling on is allowed only to mark for later revisit.
     setFlaggedIndices((prev) => {
       const next = new Set(prev);
       if (next.has(currentQuestion)) {
@@ -688,17 +770,24 @@ function TakeAssessmentExperience() {
   const goToQuestion = (index) => {
     if (!isActive || !exam) return;
     if (index >= 0 && index < questions.length && checkNavigable(index)) {
+      clearFlagIfAnswered(currentQuestion);
+      const section = getSectionIndexForQuestion(index, navGroups);
+      setFurthestSectionIndex((prev) => Math.max(prev, section));
       setCurrentQuestion(index);
     }
   };
 
   const goToNextUnanswered = () => {
+    clearFlagIfAnswered(currentQuestion);
     if (nextUnansweredIndex != null) {
+      const section = getSectionIndexForQuestion(nextUnansweredIndex, navGroups);
+      setFurthestSectionIndex((prev) => Math.max(prev, section));
       setCurrentQuestion(nextUnansweredIndex);
     }
   };
 
   const goToPrevious = () => {
+    clearFlagIfAnswered(currentQuestion);
     if (previousIndex != null) {
       setCurrentQuestion(previousIndex);
     }

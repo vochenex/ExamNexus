@@ -31,7 +31,8 @@ export default function AssessmentQuestionNav({
         Items
       </h2>
       <p className={`mb-4 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-        Complete each section before the next unlocks. Numbers jump within open sections only.
+        Complete each section before the next unlocks. Finished sections may stay locked when
+        your teacher enables section locking.
       </p>
 
       <div className="space-y-5">
@@ -91,22 +92,22 @@ export default function AssessmentQuestionNav({
                               ? theme === "dark"
                                 ? "bg-emerald-500 text-black ring-2 ring-emerald-300"
                                 : "bg-emerald-500 text-white ring-2 ring-teal-300"
+                              : answered
+                              ? theme === "dark"
+                                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                                : "bg-emerald-50 text-teal-800 border border-emerald-200"
                               : flagged
                                 ? theme === "dark"
                                   ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                                   : "bg-amber-50 text-amber-800 border border-amber-300"
-                                : answered
-                                  ? theme === "dark"
-                                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                                    : "bg-emerald-50 text-teal-800 border border-emerald-200"
-                                  : theme === "dark"
-                                    ? "bg-white/5 text-gray-300 border border-white/10 hover:border-emerald-500/30"
-                                    : "en-bg-elevated text-gray-700 border border-emerald-100 hover:border-emerald-300"
+                                : theme === "dark"
+                                  ? "bg-white/5 text-gray-300 border border-white/10 hover:border-emerald-500/30"
+                                  : "en-bg-elevated text-gray-700 border border-emerald-100 hover:border-emerald-300"
                         }
                       `}
                     >
                       {item.number}
-                      {flagged && !disabled && (
+                      {flagged && !answered && !disabled && (
                         <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-400" />
                       )}
                     </button>
@@ -141,7 +142,7 @@ export default function AssessmentQuestionNav({
         </div>
         <div className="flex items-center gap-2">
           <Lock size={12} className="opacity-60" />
-          Section locked until current section is complete
+          Section locked (not open yet, or finished and locked by teacher)
         </div>
       </div>
     </aside>

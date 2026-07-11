@@ -324,9 +324,50 @@ async function notifyAnnouncementRecipients(admin, {
   });
 }
 
+/**
+ * Push an admin broadcast to faculty and/or students by audience.
+ */
+async function notifyBroadcastAudience(admin, {
+  audience = "all",
+  title,
+  body,
+  path = "/student/dashboard",
+}) {
+  const normalized = String(audience || "all").toLowerCase();
+  let query = admin
+    .from("users")
+    .select("id, role, account_status")
+    .in("role", ["Student", "student", "Faculty", "faculty", "Teacher", "teacher"]);
+
+  const { data: rows, error } = await query;
+  if (error) throw error;
+
+  const recipientIds = (rows || [])
+    .filter((row) => {
+      const role = String(row.role || "").toLowerCase();
+      const status = String(row.account_status || "approved").toLowerCase();
+      if (status && status !== "approved") return false;
+      if (normalized === "faculty") return role === "faculty" || role === "teacher";
+      if (normalized === "students") return role === "student";
+      return role === "faculty" || role === "teacher" || role === "student";
+    })
+    .map((row) => row.id);
+
+  return sendPushToUsers(admin, recipientIds, {
+    title: title || "ExamNexus announcement",
+    body: body || "You have a new platform announcement.",
+    data: {
+      kind: "admin_announcement",
+      path,
+      audience: normalized,
+    },
+  });
+}
+
 module.exports = {
   sendPushToUsers,
   notifyAnnouncementRecipients,
+  notifyBroadcastAudience,
   getFcmServerKey,
   isPushConfigured,
   getPushApiMode,

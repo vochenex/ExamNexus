@@ -154,8 +154,8 @@ body {
   scrollbar-width: none; /* Firefox */
 }
 
-html.en-native-app,
-html.en-native-app body {
+:is(html.en-native-app, html.en-mobile-shell),
+:is(html.en-native-app, html.en-mobile-shell) body {
   scrollbar-gutter: auto !important;
   width: 100%;
   max-width: 100%;
@@ -471,6 +471,19 @@ html:not(.light) .en-tabbar-label--active {
   touch-action: pan-x pan-y;
 }
 
+.en-chart-scroll-area,
+.en-chart-expanded {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  max-width: 100%;
+}
+
+.en-chart-scroll-area *,
+.en-chart-expanded * {
+  touch-action: pan-x pan-y;
+}
+
 /* Nested tables / panels: allow vertical page scroll while swiping inside */
 .en-inner-scroll,
 .en-table-scroll {
@@ -480,23 +493,23 @@ html:not(.light) .en-tabbar-label--active {
   max-width: 100%;
 }
 
-html.en-native-app .en-table-scroll,
-html.en-native-app .en-inner-scroll {
+:is(html.en-native-app, html.en-mobile-shell) .en-table-scroll,
+:is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll {
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
   scrollbar-width: thin;
 }
 
-html.en-native-app .en-table-scroll::-webkit-scrollbar,
-html.en-native-app .en-inner-scroll::-webkit-scrollbar {
+:is(html.en-native-app, html.en-mobile-shell) .en-table-scroll::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll::-webkit-scrollbar {
   height: 6px !important;
   width: 6px !important;
   display: block !important;
 }
 
-html.en-native-app .en-table-scroll::-webkit-scrollbar-thumb,
-html.en-native-app .en-inner-scroll::-webkit-scrollbar-thumb {
+:is(html.en-native-app, html.en-mobile-shell) .en-table-scroll::-webkit-scrollbar-thumb,
+:is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll::-webkit-scrollbar-thumb {
   background: rgba(52, 211, 153, 0.45);
   border-radius: 999px;
 }
@@ -543,41 +556,91 @@ html:not(.light) .overflow-auto::-webkit-scrollbar-thumb {
 }
 
 /* Native: hide scrollbar chrome — swipe/scroll the page itself */
-html.en-native-app .en-scroll-region,
-html.en-native-app .overflow-y-auto,
-html.en-native-app .overflow-x-auto,
-html.en-native-app .overflow-auto,
-html.en-native-app main,
-html.en-native-app .en-auth-body {
+:is(html.en-native-app, html.en-mobile-shell) .en-scroll-region,
+:is(html.en-native-app, html.en-mobile-shell) main,
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-body {
   scrollbar-width: none !important;
   touch-action: pan-y;
 }
 
-html.en-native-app .en-scroll-region::-webkit-scrollbar,
-html.en-native-app .overflow-y-auto::-webkit-scrollbar,
-html.en-native-app .overflow-x-auto::-webkit-scrollbar,
-html.en-native-app .overflow-auto::-webkit-scrollbar,
-html.en-native-app main::-webkit-scrollbar,
-html.en-native-app .en-auth-body::-webkit-scrollbar {
+:is(html.en-native-app, html.en-mobile-shell) .en-scroll-region::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) main::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-body::-webkit-scrollbar {
   width: 0 !important;
   height: 0 !important;
   display: none !important;
   background: transparent !important;
 }
 
+/*
+ * Horizontal / nested scroll areas must allow pan-x (and pan-y) so users can
+ * drag on chart bars, table cells, and inner content — not only empty padding.
+ */
+:is(html.en-native-app, html.en-mobile-shell) .overflow-x-auto,
+:is(html.en-native-app, html.en-mobile-shell) .overflow-auto,
+:is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll,
+:is(html.en-native-app, html.en-mobile-shell) .en-table-scroll,
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll-area,
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded {
+  scrollbar-width: thin !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y !important;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .overflow-x-auto *,
+:is(html.en-native-app, html.en-mobile-shell) .overflow-auto *,
+:is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll *,
+:is(html.en-native-app, html.en-mobile-shell) .en-table-scroll *,
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll-area *,
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded * {
+  touch-action: pan-x pan-y;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .overflow-x-auto::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .overflow-auto::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .en-table-scroll::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll-area::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  display: block !important;
+}
+
 /* Compact chart preview stays inside the card; expanded modal scrolls separately */
-html.en-native-app .en-chart-shell {
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-shell {
   max-width: 100%;
   width: 100%;
   min-width: 0;
   overflow: hidden;
 }
 
-html.en-native-app .en-chart-shell > .en-chart-scroll {
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-shell > .en-chart-scroll {
   max-width: 100%;
   width: 100%;
   min-width: 0;
   overflow: hidden !important;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-landscape-modal .en-chart-scroll-area,
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-landscape-modal .en-chart-expanded {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  touch-action: pan-x pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Landscape phones/tablets viewing the website: give charts max horizontal room */
+@media (orientation: landscape) and (max-height: 560px) {
+  :is(html.en-native-app, html.en-mobile-shell) .en-chart-landscape-modal > .relative {
+    max-height: 96dvh;
+    max-width: 98vw;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-chart-landscape-modal .en-chart-scroll-area {
+    max-height: calc(96dvh - 3.25rem);
+  }
 }
 
 /* Notification panel (portaled — avoids header backdrop-filter trapping touches) */

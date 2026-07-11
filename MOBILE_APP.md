@@ -7,12 +7,16 @@ There are two ways to ship ExamNexus as an app, both from the **same React code*
 
 ## What's different on mobile
 
-| Area | Computer / laptop website | Mobile app + phones/tablets/iPads |
-|------|---------------------------|----------------------------------|
-| Navigation | Top header / left sidebar | **Bottom tab bar** + "More" sheet |
+| Area | Computer / laptop website | Mobile app + phones/tablets/iPads (website **or** APK) |
+|------|---------------------------|------------------------------------------------------|
+| Layout density | Comfortable desktop spacing | **Compact shell** (`en-mobile-shell` / `en-native-app`) — smaller type, cards, icons |
+| Navigation | Top header / left sidebar | **Bottom tab bar** + compact top bar |
+| Charts | Inline + expand | Expand → landscape/fullscreen; **sideways scroll on the bars** |
 | Taking an assessment | Allowed (fullscreen lockdown) | **Blocked everywhere** — desktop/laptop only |
-| Announcements / notifications | In-app bell | In-app bell **+ native push** to the phone |
-| Everything else | ✅ | ✅ identical |
+| Announcements / notifications | In-app bell | In-app bell; **native push** on APK (FCM on Vercel for delivery) |
+| Everything else | ✅ | ✅ same product features |
+
+See [MOBILE_WEB_PARITY.md](./MOBILE_WEB_PARITY.md) for the full APK→website change list.
 
 ### Desktop-only assessments (important)
 

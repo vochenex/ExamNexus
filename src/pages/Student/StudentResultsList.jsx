@@ -37,15 +37,35 @@ export default function StudentResultsList() {
 
       setStudentId(resolvedId);
 
-      const { data: examResults, error } = await supabase
+      let { data: examResults, error } = await supabase
         .from("exam_results")
-        .select("*, exam(*)")
+        .select("*, exam:exams(*)")
         .eq("student_id", resolvedId)
         .order("id", { ascending: false });
 
+      if (error?.message?.includes("exam") || error?.code === "PGRST200") {
+        ({ data: examResults, error } = await supabase
+          .from("exam_results")
+          .select("*, exams(*)")
+          .eq("student_id", resolvedId)
+          .order("id", { ascending: false }));
+
+        if (!error && examResults) {
+          examResults = examResults.map((row) => ({
+            ...row,
+            exam: row.exam || row.exams || null,
+          }));
+        }
+      }
+
       if (error) throw error;
 
-      setResults(examResults || []);
+      setResults(
+        (examResults || []).map((row) => ({
+          ...row,
+          exam: row.exam || row.exams || null,
+        }))
+      );
     } catch (err) {
       console.error("Failed to fetch results:", err);
     } finally {

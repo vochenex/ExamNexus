@@ -1,6 +1,33 @@
 .rdp-root {
   --rdp-accent-color: #10b981;
   --rdp-accent-background-color: rgba(16, 185, 129, 0.25);
+  --rdp-day-height: 2rem;
+  --rdp-day-width: 2rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.en-assessment-calendar .rdp,
+.en-assessment-calendar .rdp-root,
+.en-assessment-calendar .rdp-months,
+.en-assessment-calendar .rdp-month {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.en-assessment-calendar .rdp-month_caption,
+.en-assessment-calendar .rdp-caption {
+  padding-inline: 0.15rem;
+}
+
+@media (max-width: 480px) {
+  .en-assessment-calendar .rdp-root {
+    --rdp-day-height: 1.85rem;
+    --rdp-day-width: 1.85rem;
+    font-size: 0.8125rem;
+  }
 }
 
 /* Month title */

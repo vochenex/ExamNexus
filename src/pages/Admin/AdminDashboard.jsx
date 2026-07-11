@@ -253,7 +253,7 @@ export default function AdminDashboard() {
               </div>
               <AdminStatBadge value={analytics?.exams_today ?? 0} label="today" />
             </div>
-            <div className="mt-6 overflow-x-auto">
+            <div className="en-chart-scroll-area en-inner-scroll mt-6 overflow-x-auto overscroll-x-contain">
               <div className="min-w-[520px]">
                 <AdminVerticalBarChart
                   items={analytics?.exams_per_day || []}

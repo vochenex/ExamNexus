@@ -112,15 +112,31 @@ export default function AssessmentSettingsPanel({
       <ToggleRow
         theme={theme}
         label="Shuffle questions"
-        hint="Randomize question order for each student."
+        hint="Randomize question order for each student. Also locks finished sections so students cannot jump back after moving on."
         checked={Boolean(exam.shuffle_questions)}
-        onChange={(checked) => onChange({ shuffle_questions: checked })}
+        onChange={(checked) =>
+          onChange({
+            shuffle_questions: checked,
+            ...(checked ? { lock_completed_sections: true } : {}),
+          })
+        }
+      />
+
+      <ToggleRow
+        theme={theme}
+        label="Lock finished sections"
+        hint="When a student finishes a section (e.g. Multiple Choice) and moves to the next (e.g. Enumeration), they cannot go back to change earlier answers."
+        checked={
+          Boolean(exam.lock_completed_sections) || Boolean(exam.shuffle_questions)
+        }
+        disabled={Boolean(exam.shuffle_questions)}
+        onChange={(checked) => onChange({ lock_completed_sections: checked })}
       />
 
       <ToggleRow
         theme={theme}
         label="Allow answer review"
-        hint="Let students revisit questions before submitting."
+        hint="Let students revisit questions before submitting (within unlocked sections)."
         checked={exam.allow_review !== false}
         onChange={(checked) => onChange({ allow_review: checked })}
       />

@@ -6,7 +6,6 @@ import {
   ChevronUp,
   FileSearch,
   FileUp,
-  Loader2,
   Wand2,
   X,
 } from "lucide-react";
@@ -471,7 +470,7 @@ export default function AssessmentAiGenerator({
                 : "border-teal-500 bg-teal-50 text-teal-800 hover:bg-teal-100"
           }`}
         >
-          {loading ? <Loader2 className="animate-spin" size={18} /> : <FileSearch size={18} />}
+          <FileSearch size={18} />
           {loading ? "Analyzing document…" : "Analyze document"}
         </button>
       ) : (
@@ -487,7 +486,7 @@ export default function AssessmentAiGenerator({
                 : "bg-teal-600 text-white hover:bg-teal-500"
           }`}
         >
-          {loading ? <Loader2 className="animate-spin" size={18} /> : <BrainCircuit size={18} />}
+          <BrainCircuit size={18} />
           {loading ? "Generating questions…" : "Generate questions"}
         </button>
       )}

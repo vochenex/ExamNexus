@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "../../supabaseClient";
 import { useTheme } from "../../layouts/ThemeContext";
 import BackButton from "../../components/BackButton";
 import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
@@ -16,6 +15,8 @@ import {
   getQuestionFormatType,
   groupQuestionsForNavigation,
 } from "../../utils/assessmentTake";
+import { fetchStudentExamResultReview } from "../../utils/supabaseData";
+import { isStudentResultsFlagEnabled } from "../../utils/assessmentStatus";
 
 function QuestionResultCard({
   question,
@@ -109,38 +110,37 @@ export default function StudentResults() {
   const [questions, setQuestions] = useState([]);
   const [result, setResult] = useState(null);
   const [answers, setAnswers] = useState([]);
+  const [showQuestionReview, setShowQuestionReview] = useState(true);
+  const [showCorrectAnswers, setShowCorrectAnswers] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [{ data: examData }, { data: resultData }, { data: questionData }, { data: answerData }] =
-        await Promise.all([
-          supabase.from("exams").select("*").eq("id", examId).single(),
-          supabase
-            .from("exam_results")
-            .select("*")
-            .eq("exam_id", examId)
-            .eq("student_id", studentId)
-            .single(),
-          supabase
-            .from("questions")
-            .select("*")
-            .eq("exam_id", examId)
-            .order("created_at", { ascending: true }),
-          supabase
-            .from("student_answers")
-            .select("*")
-            .eq("exam_id", examId)
-            .eq("student_id", studentId),
-        ]);
+      setLoadError("");
 
-      setExam(examData);
-      setResult(resultData);
-      setQuestions(dedupeExamQuestions(questionData || []));
-      setAnswers(answerData || []);
+      const data = await fetchStudentExamResultReview(examId, studentId);
+
+      setExam(data.exam);
+      setResult(data.result);
+      setQuestions(dedupeExamQuestions(data.questions || []));
+      setAnswers(data.answers || []);
+      setShowQuestionReview(
+        data.showQuestionReview ??
+          isStudentResultsFlagEnabled(data.exam?.allow_question_review)
+      );
+      setShowCorrectAnswers(
+        data.showCorrectAnswers ??
+          isStudentResultsFlagEnabled(data.exam?.allow_show_correct_answers)
+      );
     } catch (err) {
-      console.error(err.message);
+      console.error(err?.message || err);
+      setLoadError(err?.message || "Could not load results.");
+      setExam(null);
+      setResult(null);
+      setQuestions([]);
+      setAnswers([]);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -190,6 +190,15 @@ export default function StudentResults() {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 
+  if (loadError) {
+    return (
+      <div className={pageShellWithBellClass(theme)}>
+        <BackButton />
+        <p className="mt-4 text-red-400">{loadError}</p>
+      </div>
+    );
+  }
+
   if (!exam || !result) {
     return (
       <div className={pageShellWithBellClass(theme)}>
@@ -199,7 +208,7 @@ export default function StudentResults() {
     );
   }
 
-  if (!exam.allow_student_view) {
+  if (!isStudentResultsFlagEnabled(exam.allow_student_view)) {
     return (
       <div className={`${pageShellWithBellClass(theme)} text-center`}>
         <h1 className="text-2xl font-bold text-red-400">Results hidden</h1>
@@ -210,8 +219,6 @@ export default function StudentResults() {
     );
   }
 
-  const showQuestionReview = exam.allow_question_review !== false;
-  const showCorrectAnswers = exam.allow_show_correct_answers !== false;
   const hasEssayQuestions = questions.some(
     (question) => getQuestionTypeFor(question) === "essay"
   );
@@ -332,46 +339,59 @@ export default function StudentResults() {
           <div className="space-y-8">
             <h2 className="text-xl font-bold">Question review</h2>
 
-            {questionGroups.map((group) => (
-              <section key={group.type} className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <h3
-                    className={`text-sm font-semibold uppercase tracking-wide ${
-                      theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                    }`}
-                  >
-                    {group.label}
-                  </h3>
-                  <span
-                    className={`text-xs ${
-                      theme === "dark" ? "text-gray-500" : "text-gray-500"
-                    }`}
-                  >
-                    {group.items.length} question{group.items.length === 1 ? "" : "s"}
-                  </span>
-                </div>
+            {!questions.length ? (
+              <div
+                className={`rounded-2xl border px-5 py-4 text-sm ${
+                  theme === "dark"
+                    ? "border-white/10 bg-white/[0.03] text-gray-300"
+                    : "border-emerald-200/80 en-bg-muted text-gray-700"
+                }`}
+              >
+                No questions were found for this assessment review. Ask your teacher to
+                confirm the assessment still has questions, then refresh this page.
+              </div>
+            ) : (
+              questionGroups.map((group) => (
+                <section key={group.type} className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <h3
+                      className={`text-sm font-semibold uppercase tracking-wide ${
+                        theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                      }`}
+                    >
+                      {group.label}
+                    </h3>
+                    <span
+                      className={`text-xs ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-500"
+                      }`}
+                    >
+                      {group.items.length} question{group.items.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
 
-                <div className="space-y-4">
-                  {group.items.map((item) => {
-                    const question = questions[item.index];
-                    if (!question) return null;
+                  <div className="space-y-4">
+                    {group.items.map((item) => {
+                      const question = questions[item.index];
+                      if (!question) return null;
 
-                    return (
-                      <QuestionResultCard
-                        key={question.id}
-                        question={question}
-                        questionNumber={item.number}
-                        entry={answerByQuestionId[question.id]}
-                        examType={examType}
-                        theme={theme}
-                        showCorrectAnswers={showCorrectAnswers}
-                        formatStudentAnswer={formatStudentAnswer}
-                      />
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+                      return (
+                        <QuestionResultCard
+                          key={question.id}
+                          question={question}
+                          questionNumber={item.number}
+                          entry={answerByQuestionId[question.id]}
+                          examType={examType}
+                          theme={theme}
+                          showCorrectAnswers={showCorrectAnswers}
+                          formatStudentAnswer={formatStudentAnswer}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              ))
+            )}
           </div>
         )}
 

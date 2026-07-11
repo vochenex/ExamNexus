@@ -42,6 +42,7 @@ const defaultAssessment = {
   instructions: "",
   allow_review: true,
   shuffle_questions: false,
+  lock_completed_sections: false,
   show_result: true,
   show_question_review: true,
   show_correct_answers: true,
@@ -358,7 +359,7 @@ export default function CreateAssessment() {
         </p>
 
         <div
-          className={`mt-4 inline-flex flex-wrap gap-2 rounded-xl border p-1 ${
+          className={`mt-4 grid w-full max-w-full grid-cols-3 gap-1 rounded-xl border p-1 ${
             theme === "dark"
               ? "border-white/10 bg-white/[0.03]"
               : "border-emerald-700/20 en-bg-elevated en-panel-glow"
@@ -366,7 +367,7 @@ export default function CreateAssessment() {
         >
           {[
             { id: "manual", label: "Manual" },
-            { id: "document", label: "Upload document" },
+            { id: "document", label: "Upload" },
             { id: "prompt", label: "AI prompt" },
           ].map((option) => (
             <button
@@ -376,7 +377,7 @@ export default function CreateAssessment() {
                 setCreationMode(option.id);
                 clearError();
               }}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-center text-xs font-medium transition sm:px-3 sm:text-sm ${
                 creationMode === option.id
                   ? theme === "dark"
                     ? "bg-emerald-500 text-[#031d1f]"
@@ -386,7 +387,10 @@ export default function CreateAssessment() {
                     : "text-gray-700 hover:bg-emerald-50"
               }`}
             >
-              {option.label}
+              <span className="block truncate sm:hidden">{option.label}</span>
+              <span className="hidden sm:block">
+                {option.id === "document" ? "Upload document" : option.label}
+              </span>
             </button>
           ))}
         </div>

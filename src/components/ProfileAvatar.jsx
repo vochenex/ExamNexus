@@ -3,10 +3,12 @@ import { hasCustomProfilePhoto } from "../utils/avatar";
 import DefaultAvatarIcon from "./DefaultAvatarIcon";
 
 const SIZE_MAP = {
-  xs: { box: "h-8 w-8", icon: 24, ring: "ring-1" },
-  sm: { box: "h-10 w-10", icon: 30, ring: "ring-2" },
-  md: { box: "h-14 w-14", icon: 42, ring: "ring-2" },
-  lg: { box: "h-32 w-32", icon: 96, ring: "ring-4" },
+  xs: { box: "h-8 w-8", icon: 22, border: "border" },
+  sm: { box: "h-10 w-10", icon: 28, border: "border-2" },
+  md: { box: "h-12 w-12", icon: 36, border: "border-2" },
+  /** Compact profile header — small enough to avoid clipping in tight cards */
+  lg: { box: "h-[4.25rem] w-[4.25rem] sm:h-20 sm:w-20", icon: 52, border: "border-2" },
+  xl: { box: "h-24 w-24", icon: 72, border: "border-2" },
 };
 
 export default function ProfileAvatar({
@@ -23,19 +25,21 @@ export default function ProfileAvatar({
   const config = SIZE_MAP[size] || SIZE_MAP.sm;
   const isInteractive = clickable && custom && typeof onClick === "function";
 
+  // Use inset border (not ring/box-shadow) so parents with overflow-hidden cannot clip it.
   const shellClass = `
     ${config.box}
+    box-border
     shrink-0
     overflow-hidden
     rounded-full
     flex
     items-center
     justify-center
-    ${showRing ? config.ring : ""}
+    ${showRing ? config.border : ""}
     ${
       theme === "dark"
-        ? `${showRing ? "ring-emerald-500/40" : ""} bg-emerald-500/10`
-        : `${showRing ? "ring-emerald-400/60" : ""} en-bg-muted`
+        ? `${showRing ? "border-emerald-400/55" : ""} bg-emerald-500/10`
+        : `${showRing ? "border-emerald-500/50" : ""} en-bg-muted`
     }
     ${isInteractive ? "cursor-pointer transition hover:opacity-90 hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" : ""}
     ${className}
@@ -43,7 +47,7 @@ export default function ProfileAvatar({
 
   if (custom) {
     const content = (
-      <img src={src} alt={alt} className="h-full w-full object-cover" />
+      <img src={src} alt={alt} className="h-full w-full object-cover" draggable={false} />
     );
 
     if (isInteractive) {

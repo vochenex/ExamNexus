@@ -11,6 +11,12 @@ async function lockLandscape() {
       await ScreenOrientation.lock({ orientation: "landscape" });
       return;
     }
+    const root = document.documentElement;
+    if (root.requestFullscreen) {
+      await root.requestFullscreen().catch(() => {});
+    } else if (root.webkitRequestFullscreen) {
+      root.webkitRequestFullscreen();
+    }
     if (screen?.orientation?.lock) {
       await screen.orientation.lock("landscape");
     }
@@ -25,6 +31,13 @@ async function unlockOrientation() {
       const { ScreenOrientation } = await import("@capacitor/screen-orientation");
       await ScreenOrientation.unlock();
       return;
+    }
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
     }
     if (screen?.orientation?.unlock) {
       screen.orientation.unlock();
@@ -113,10 +126,12 @@ export default function ExpandableChart({
                   <X size={14} />
                 </button>
               </div>
-              <div className="en-chart-expanded flex min-h-0 flex-1 items-center justify-center overflow-x-auto overflow-y-auto p-4 sm:p-6">
-                {typeof children === "function"
-                  ? children({ expanded: true, previewMaxBars })
-                  : children}
+              <div className="en-chart-scroll-area en-chart-expanded en-inner-scroll flex min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain p-3 sm:p-5">
+                <div className="inline-block min-w-full py-1">
+                  {typeof children === "function"
+                    ? children({ expanded: true, previewMaxBars })
+                    : children}
+                </div>
               </div>
             </div>
           </div>

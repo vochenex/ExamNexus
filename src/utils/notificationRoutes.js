@@ -6,6 +6,33 @@ export function getNotificationDestination(item, { isStudent, userId } = {}) {
     };
   }
 
+  if (item.kind === "admin_announcement") {
+    return {
+      path: isStudent ? "/student/dashboard" : "/faculty/dashboard",
+      label: "View platform announcement",
+    };
+  }
+
+  if (item.kind === "account") {
+    return {
+      path: "/login",
+      label: "Open sign in",
+    };
+  }
+
+  if (item.kind === "reaction") {
+    const announcementId = item.announcement_id || item.id;
+    const base = isStudent
+      ? `/student/subject/${item.subject_id}/social`
+      : `/faculty/subject/${item.subject_id}/social`;
+    return {
+      path: `${base}?highlight=${announcementId}`,
+      label: item.subject_name
+        ? `Open ${item.subject_name} announcements`
+        : "View announcement",
+    };
+  }
+
   if (item.kind === "announcement") {
     const base = isStudent
       ? `/student/subject/${item.subject_id}/social`
@@ -20,8 +47,11 @@ export function getNotificationDestination(item, { isStudent, userId } = {}) {
 
   if (item.kind === "comment") {
     const announcementId = item.announcement_id || item.id;
+    const base = isStudent
+      ? `/student/subject/${item.subject_id}/social`
+      : `/faculty/subject/${item.subject_id}/social`;
     return {
-      path: `/faculty/subject/${item.subject_id}/social?highlight=${announcementId}&comments=1`,
+      path: `${base}?highlight=${announcementId}&comments=1`,
       label: item.subject_name
         ? `View comment in ${item.subject_name}`
         : "View comment thread",

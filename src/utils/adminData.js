@@ -2,6 +2,10 @@ import { supabase } from "../supabaseClient";
 import { requireSession, generateInviteCode } from "./supabaseData";
 import { normalizeSectionCount } from "./sections";
 import { normalizeYearLevelForStorage as normalizeYearLevel } from "./yearLevels";
+import {
+  dispatchBroadcastPush,
+  dispatchPushToUsers,
+} from "./pushDispatch";
 
 function isMissingRpcError(error) {
   const message = error?.message || "";
@@ -88,6 +92,21 @@ export async function reviewAdminAccount(userId, action) {
     p_action: action,
   });
   if (error) throw error;
+
+  const approved = String(action || "").toLowerCase() === "approve";
+  await dispatchPushToUsers({
+    userIds: [userId],
+    title: approved ? "Account approved" : "Account not approved",
+    body: approved
+      ? "Your ExamNexus account was approved. You can sign in now."
+      : "Your ExamNexus registration was not approved. Contact an administrator if you need help.",
+    data: {
+      kind: "account",
+      path: "/login",
+      status: approved ? "approved" : "rejected",
+    },
+  });
+
   return data;
 }
 
@@ -230,6 +249,18 @@ export async function createAdminBroadcast({ title, body, audience }) {
     p_audience: audience,
   });
   if (error) throw error;
+
+  const audienceValue = audience || data?.audience || "all";
+  await dispatchBroadcastPush({
+    audience: audienceValue,
+    title: title || "ExamNexus announcement",
+    body: body || "You have a new platform announcement.",
+    path:
+      String(audienceValue).toLowerCase() === "faculty"
+        ? "/faculty/dashboard"
+        : "/student/dashboard",
+  });
+
   return data;
 }
 

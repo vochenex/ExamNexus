@@ -26,8 +26,11 @@ import { motion } from "../utils/motion";
 import ModalPortal from "./ui/ModalPortal";
 
 function statusLabel(item) {
+  if (item.kind === "admin_announcement") return "Platform announcement";
   if (item.kind === "announcement") return "Announcement";
   if (item.kind === "comment") return "Comment";
+  if (item.kind === "reaction") return "Reaction";
+  if (item.kind === "account") return "Account";
   if (item.status === "scheduled") return "Scheduled assessment";
   if (item.status === "active") return "Active assessment";
   if (item.status === "closed") return "Closed assessment";
@@ -35,6 +38,9 @@ function statusLabel(item) {
 }
 
 function statusColor(item, theme) {
+  if (item.kind === "admin_announcement") {
+    return theme === "dark" ? "text-violet-300" : "text-violet-700";
+  }
   if (item.kind === "announcement" || item.status === "posted") {
     return theme === "dark" ? "text-purple-400" : "text-purple-700";
   }
@@ -47,10 +53,21 @@ function statusColor(item, theme) {
   if (item.kind === "comment" || item.status === "comment") {
     return theme === "dark" ? "text-cyan-400" : "text-cyan-700";
   }
+  if (item.kind === "reaction" || item.status === "reaction") {
+    return theme === "dark" ? "text-rose-300" : "text-rose-700";
+  }
+  if (item.kind === "account") {
+    return theme === "dark" ? "text-teal-300" : "text-teal-700";
+  }
   return theme === "dark" ? "text-gray-400" : "text-gray-600";
 }
 
 function kindIconStyles(item, theme) {
+  if (item.kind === "admin_announcement") {
+    return theme === "dark"
+      ? "bg-violet-500/15 text-violet-300"
+      : "bg-violet-100 text-violet-700";
+  }
   if (item.kind === "announcement") {
     return theme === "dark"
       ? "bg-purple-500/10 text-purple-400"
@@ -60,6 +77,16 @@ function kindIconStyles(item, theme) {
     return theme === "dark"
       ? "bg-cyan-500/10 text-cyan-400"
       : "bg-cyan-100 text-cyan-700";
+  }
+  if (item.kind === "reaction") {
+    return theme === "dark"
+      ? "bg-rose-500/10 text-rose-300"
+      : "bg-rose-100 text-rose-700";
+  }
+  if (item.kind === "account") {
+    return theme === "dark"
+      ? "bg-teal-500/10 text-teal-300"
+      : "bg-teal-100 text-teal-800";
   }
   if (item.status === "active") {
     return theme === "dark"
@@ -77,8 +104,12 @@ function kindIconStyles(item, theme) {
 }
 
 function kindIcon(item) {
-  if (item.kind === "announcement") return Megaphone;
+  if (item.kind === "admin_announcement" || item.kind === "announcement") {
+    return Megaphone;
+  }
   if (item.kind === "comment") return MessageCircle;
+  if (item.kind === "reaction") return Bell;
+  if (item.kind === "account") return Bell;
   return ClipboardCheck;
 }
 

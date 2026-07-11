@@ -206,8 +206,8 @@ export function ScoreTrendChart({ points }) {
   const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${height - padding} L ${coords[0].x} ${height - padding} Z`;
 
   return (
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[280px] w-full h-36">
+    <div className="en-chart-scroll-area en-inner-scroll overflow-x-auto overscroll-x-contain">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-36 min-w-[280px] w-full">
         {[0, 25, 50, 75, 100].map((tick) => {
           const y =
             height -

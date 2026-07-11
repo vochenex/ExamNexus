@@ -80,7 +80,7 @@ export default function FacultyAnnouncementsHub() {
         if (!silent) setLoading(true);
         const [rows, announcementRows] = await Promise.all([
           fetchTeacherSubjects(cachedUser.school_id),
-          fetchFacultyAnnouncements(),
+          fetchFacultyAnnouncements(40, cachedUser.school_id),
         ]);
         setSubjects(rows || []);
         setPosted(announcementRows || []);
@@ -121,12 +121,15 @@ export default function FacultyAnnouncementsHub() {
       setError("");
       setSuccess("");
 
-      const count = await createFacultyAnnouncements({
+      const result = await createFacultyAnnouncements({
         subjectIds: scope === "all" ? null : selectedSubjectIds,
         title,
         body,
         targetSections,
       });
+
+      const count = result?.count ?? result ?? 0;
+      const createdRows = Array.isArray(result?.rows) ? result.rows : [];
 
       setTitle("");
       setBody("");
@@ -135,6 +138,21 @@ export default function FacultyAnnouncementsHub() {
       setSuccess(
         `Announcement posted to ${count} subject${count === 1 ? "" : "s"}. Students will see it in notifications.`
       );
+
+      if (createdRows.length) {
+        const subjectNameById = Object.fromEntries(
+          subjects.map((subject) => [subject.id, subject.name || "Subject"])
+        );
+        setPosted((prev) => {
+          const mapped = createdRows.map((row) => ({
+            ...row,
+            subject_name: subjectNameById[row.subject_id] || "Subject",
+          }));
+          const seen = new Set(mapped.map((row) => row.id));
+          return [...mapped, ...prev.filter((row) => !seen.has(row.id))];
+        });
+      }
+
       await load(true);
     } catch (err) {
       setError(err.message || "Failed to post announcement.");
@@ -257,7 +275,7 @@ export default function FacultyAnnouncementsHub() {
             <tbody>
               {!posted.length ? (
                 <tr>
-                  <td colSpan={4} className={`${adminTdClass(theme)} py-8 text-center`}>
+                  <td colSpan={4} className={`${adminTdClass(theme)} whitespace-normal break-words py-8 text-center`}>
                     No announcements published yet.
                   </td>
                 </tr>
