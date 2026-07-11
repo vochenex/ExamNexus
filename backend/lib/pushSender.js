@@ -10,6 +10,9 @@ const fs = require("fs");
 const path = require("path");
 const jwt = require("jsonwebtoken");
 
+const ALERTS_CHANNEL_ID = "examnexus_alerts";
+const BRAND_COLOR = "#10B981";
+
 let cachedServiceAccount = null;
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
@@ -67,6 +70,99 @@ function getPushApiMode() {
   return "none";
 }
 
+function truncate(text, max) {
+  const value = String(text || "").trim();
+  if (value.length <= max) return value;
+  return `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+function roleLabel(role) {
+  const normalized = String(role || "").toLowerCase();
+  if (normalized === "admin") return "Admin";
+  if (normalized === "faculty" || normalized === "teacher") return "Faculty";
+  if (normalized === "student") return "Student";
+  return role ? String(role) : "";
+}
+
+function kindLabel(kind) {
+  switch (String(kind || "").toLowerCase()) {
+    case "admin_announcement":
+      return "Admin announcement";
+    case "assessment":
+      return "New assessment";
+    case "comment":
+      return "New comment";
+    case "reaction":
+      return "New reaction";
+    case "account":
+      return "Account update";
+    case "announcement":
+    default:
+      return "Announcement";
+  }
+}
+
+/**
+ * Build a themed, scannable notification: category title + who/where + content.
+ */
+function buildRichPushPayload({
+  kind = "announcement",
+  title,
+  body,
+  actorName = "",
+  actorRole = "",
+  actorAvatar = "",
+  subjectName = "",
+  path = "",
+  tag = "",
+  extraData = {},
+}) {
+  const category = kindLabel(kind);
+  const actor = String(actorName || "").trim();
+  const role = roleLabel(actorRole);
+  const subject = String(subjectName || "").trim();
+  const contentTitle = String(title || "").trim();
+  const contentBody = String(body || "").trim();
+
+  const displayTitle = subject
+    ? truncate(`${category} · ${subject}`, 65)
+    : truncate(category, 65);
+
+  const lines = [];
+  if (actor) {
+    lines.push(role ? `From ${actor} · ${role}` : `From ${actor}`);
+  }
+  if (contentTitle && contentTitle.toLowerCase() !== category.toLowerCase()) {
+    lines.push(contentTitle);
+  }
+  if (contentBody) {
+    lines.push(contentBody);
+  }
+  if (!lines.length) {
+    lines.push("Open ExamNexus to view details.");
+  }
+
+  return {
+    title: displayTitle,
+    body: truncate(lines.join("\n"), 240),
+    imageUrl: String(actorAvatar || "").trim(),
+    tag: tag || undefined,
+    data: {
+      kind: String(kind || "announcement"),
+      path: String(path || ""),
+      actor_name: actor,
+      actor_role: role,
+      actor_avatar: String(actorAvatar || "").trim(),
+      subject_name: subject,
+      content_title: contentTitle,
+      content_body: contentBody,
+      ...Object.fromEntries(
+        Object.entries(extraData || {}).map(([k, v]) => [k, String(v ?? "")])
+      ),
+    },
+  };
+}
+
 async function getFcmAccessToken() {
   const account = loadServiceAccount();
   if (!account?.private_key || !account?.client_email) {
@@ -111,7 +207,7 @@ async function getFcmAccessToken() {
   return cachedAccessToken;
 }
 
-async function sendViaFcmV1(tokens, { title, body, data = {} }) {
+async function sendViaFcmV1(tokens, { title, body, data = {}, imageUrl = "", tag }) {
   const projectId = getFcmProjectId();
   if (!projectId) {
     return { sent: 0, skipped: tokens.length, reason: "FCM_PROJECT_ID not configured" };
@@ -127,6 +223,31 @@ async function sendViaFcmV1(tokens, { title, body, data = {} }) {
   const dataPayload = Object.fromEntries(
     Object.entries(data).map(([k, v]) => [k, String(v ?? "")])
   );
+
+  const notification = {
+    title,
+    body,
+  };
+  if (imageUrl && /^https?:\/\//i.test(imageUrl)) {
+    notification.image = imageUrl;
+  }
+
+  const androidNotification = {
+    channel_id: ALERTS_CHANNEL_ID,
+    sound: "default",
+    default_sound: true,
+    default_vibrate_timings: true,
+    notification_priority: "PRIORITY_MAX",
+    visibility: "PUBLIC",
+    color: BRAND_COLOR,
+    ticker: title,
+  };
+  if (notification.image) {
+    androidNotification.image = notification.image;
+  }
+  if (tag) {
+    androidNotification.tag = String(tag).slice(0, 64);
+  }
 
   let sent = 0;
   const failures = [];
@@ -145,28 +266,33 @@ async function sendViaFcmV1(tokens, { title, body, data = {} }) {
                 Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
               },
-                  body: JSON.stringify({
+              body: JSON.stringify({
                 message: {
                   token,
-                  notification: { title, body },
+                  notification,
                   data: dataPayload,
                   android: {
                     priority: "HIGH",
-                    notification: {
-                      sound: "default",
-                      default_sound: true,
-                      notification_priority: "PRIORITY_HIGH",
-                      visibility: "PUBLIC",
-                    },
+                    ttl: "3600s",
+                    collapse_key: String(data.kind || "examnexus").slice(0, 32),
+                    notification: androidNotification,
                   },
                   apns: {
-                    headers: { "apns-priority": "10" },
+                    headers: {
+                      "apns-priority": "10",
+                      "apns-push-type": "alert",
+                    },
                     payload: {
                       aps: {
+                        alert: { title, body },
                         sound: "default",
-                        "content-available": 1,
+                        "mutable-content": 1,
+                        "interruption-level": "time-sensitive",
                       },
                     },
+                    fcm_options: notification.image
+                      ? { image: notification.image }
+                      : undefined,
                   },
                 },
               }),
@@ -193,7 +319,7 @@ async function sendViaFcmV1(tokens, { title, body, data = {} }) {
   };
 }
 
-async function sendViaFcmLegacy(tokens, { title, body, data = {} }) {
+async function sendViaFcmLegacy(tokens, { title, body, data = {}, imageUrl = "" }) {
   const key = getFcmServerKey();
   if (!key) {
     return { sent: 0, skipped: tokens.length, reason: "FCM not configured" };
@@ -212,6 +338,18 @@ async function sendViaFcmLegacy(tokens, { title, body, data = {} }) {
   const failures = [];
 
   for (const chunk of chunks) {
+    const notification = {
+      title,
+      body,
+      sound: "default",
+      android_channel_id: ALERTS_CHANNEL_ID,
+      color: BRAND_COLOR,
+      priority: "high",
+    };
+    if (imageUrl && /^https?:\/\//i.test(imageUrl)) {
+      notification.image = imageUrl;
+    }
+
     const response = await fetch("https://fcm.googleapis.com/fcm/send", {
       method: "POST",
       headers: {
@@ -221,15 +359,11 @@ async function sendViaFcmLegacy(tokens, { title, body, data = {} }) {
       body: JSON.stringify({
         registration_ids: chunk,
         priority: "high",
-        notification: {
-          title,
-          body,
-          sound: "default",
-        },
+        content_available: true,
+        notification,
         data: Object.fromEntries(
           Object.entries(data).map(([k, v]) => [k, String(v ?? "")])
         ),
-        content_available: true,
       }),
     });
 
@@ -256,17 +390,63 @@ async function sendViaFcm(tokens, payload) {
   return sendViaFcmLegacy(tokens, payload);
 }
 
+async function loadUserProfile(admin, userId) {
+  if (!userId) return null;
+  const { data, error } = await admin
+    .from("users")
+    .select("id, first_name, last_name, role, avatar_url")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const name = `${data.first_name || ""} ${data.last_name || ""}`.trim();
+  return {
+    id: data.id,
+    name: name || "ExamNexus user",
+    role: data.role || "",
+    avatar: data.avatar_url || "",
+  };
+}
+
+async function loadSubjectName(admin, subjectId) {
+  if (!subjectId) return "";
+  const { data } = await admin
+    .from("subjects")
+    .select("name")
+    .eq("id", subjectId)
+    .maybeSingle();
+  return data?.name || "";
+}
+
 /**
  * Send a push notification to a list of user ids.
- * @param {import('@supabase/supabase-js').SupabaseClient} admin
- * @param {string[]} userIds
- * @param {{ title: string, body: string, data?: Record<string, string|number> }} payload
  */
 async function sendPushToUsers(admin, userIds, payload) {
   const uniqueIds = [...new Set((userIds || []).filter(Boolean))];
   if (!uniqueIds.length) {
     return { sent: 0, skipped: 0, recipients: 0 };
   }
+
+  const rich =
+    payload?.rich === false
+      ? {
+          title: payload.title,
+          body: payload.body || "",
+          imageUrl: payload.imageUrl || "",
+          tag: payload.tag,
+          data: payload.data || {},
+        }
+      : buildRichPushPayload({
+          kind: payload?.data?.kind || payload?.kind || "announcement",
+          title: payload.title,
+          body: payload.body,
+          actorName: payload.actorName || payload.data?.actor_name,
+          actorRole: payload.actorRole || payload.data?.actor_role,
+          actorAvatar: payload.actorAvatar || payload.data?.actor_avatar || payload.imageUrl,
+          subjectName: payload.subjectName || payload.data?.subject_name,
+          path: payload.path || payload.data?.path,
+          tag: payload.tag,
+          extraData: payload.data || {},
+        });
 
   const { data: devices, error } = await admin
     .from("push_devices")
@@ -284,7 +464,7 @@ async function sendPushToUsers(admin, userIds, payload) {
   }
 
   const tokens = [...new Set((devices || []).map((row) => row.token).filter(Boolean))];
-  const result = await sendViaFcm(tokens, payload);
+  const result = await sendViaFcm(tokens, rich);
   return { ...result, recipients: uniqueIds.length, devices: tokens.length };
 }
 
@@ -297,6 +477,11 @@ async function notifyAnnouncementRecipients(admin, {
   body,
   targetSections = null,
   path = "/student/subjects",
+  actorUserId = null,
+  actorName = "",
+  actorRole = "",
+  actorAvatar = "",
+  subjectName = "",
 }) {
   let recipientIds = [];
 
@@ -331,9 +516,27 @@ async function notifyAnnouncementRecipients(admin, {
       .map((row) => row.student_id);
   }
 
+  const [actor, resolvedSubjectName] = await Promise.all([
+    actorName
+      ? Promise.resolve({
+          name: actorName,
+          role: actorRole,
+          avatar: actorAvatar,
+        })
+      : loadUserProfile(admin, actorUserId),
+    subjectName || loadSubjectName(admin, subjectId),
+  ]);
+
   return sendPushToUsers(admin, recipientIds, {
+    kind: "announcement",
     title: title || "New announcement",
     body: body || "You have a new ExamNexus announcement.",
+    actorName: actor?.name || actorName,
+    actorRole: actor?.role || actorRole || "Faculty",
+    actorAvatar: actor?.avatar || actorAvatar,
+    subjectName: resolvedSubjectName || subjectName,
+    path,
+    tag: `announcement-${subjectId || "general"}`,
     data: {
       kind: "announcement",
       path,
@@ -350,14 +553,17 @@ async function notifyBroadcastAudience(admin, {
   title,
   body,
   path = "/student/dashboard",
+  actorUserId = null,
+  actorName = "",
+  actorRole = "",
+  actorAvatar = "",
 }) {
   const normalized = String(audience || "all").toLowerCase();
-  let query = admin
+  const { data: rows, error } = await admin
     .from("users")
     .select("id, role, account_status")
     .in("role", ["Student", "student", "Faculty", "faculty", "Teacher", "teacher"]);
 
-  const { data: rows, error } = await query;
   if (error) throw error;
 
   const recipientIds = (rows || [])
@@ -371,9 +577,19 @@ async function notifyBroadcastAudience(admin, {
     })
     .map((row) => row.id);
 
+  const actor = actorName
+    ? { name: actorName, role: actorRole || "Admin", avatar: actorAvatar }
+    : await loadUserProfile(admin, actorUserId);
+
   return sendPushToUsers(admin, recipientIds, {
+    kind: "admin_announcement",
     title: title || "ExamNexus announcement",
     body: body || "You have a new platform announcement.",
+    actorName: actor?.name || "ExamNexus Admin",
+    actorRole: actor?.role || "Admin",
+    actorAvatar: actor?.avatar || "",
+    path,
+    tag: `broadcast-${normalized}`,
     data: {
       kind: "admin_announcement",
       path,
@@ -386,6 +602,7 @@ module.exports = {
   sendPushToUsers,
   notifyAnnouncementRecipients,
   notifyBroadcastAudience,
+  buildRichPushPayload,
   getFcmServerKey,
   isPushConfigured,
   getPushApiMode,

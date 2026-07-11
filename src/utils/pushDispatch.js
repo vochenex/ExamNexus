@@ -1,6 +1,20 @@
 import { API_BASE } from "./apiBase.js";
 import { getAuthSession } from "./authUser";
 
+function readCachedActor() {
+  try {
+    const user = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+    const name = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+    return {
+      actorName: name || user.email || "",
+      actorRole: user.role || "",
+      actorAvatar: user.avatar_url || "",
+    };
+  } catch {
+    return { actorName: "", actorRole: "", actorAvatar: "" };
+  }
+}
+
 async function authHeaders() {
   const session = await getAuthSession();
   const token = session?.access_token;
@@ -17,16 +31,30 @@ export async function dispatchPushToUsers({
   title,
   body = "",
   data = {},
+  actorName,
+  actorRole,
+  actorAvatar,
+  subjectName,
 }) {
   try {
     const headers = await authHeaders();
     const ids = [...new Set((userIds || []).filter(Boolean))];
     if (!headers || !ids.length || !title) return;
 
+    const actor = readCachedActor();
     await fetch(`${API_BASE}/push/notify-users`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ userIds: ids, title, body, data }),
+      body: JSON.stringify({
+        userIds: ids,
+        title,
+        body,
+        data,
+        actorName: actorName ?? actor.actorName,
+        actorRole: actorRole ?? actor.actorRole,
+        actorAvatar: actorAvatar ?? actor.actorAvatar,
+        subjectName: subjectName || "",
+      }),
     });
   } catch (err) {
     console.warn("Push to users skipped:", err?.message || err);
@@ -44,10 +72,18 @@ export async function dispatchBroadcastPush({
     const headers = await authHeaders();
     if (!headers || !title) return;
 
+    const actor = readCachedActor();
     await fetch(`${API_BASE}/push/broadcast`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ audience, title, body, path }),
+      body: JSON.stringify({
+        audience,
+        title,
+        body,
+        path,
+        ...actor,
+        actorRole: actor.actorRole || "Admin",
+      }),
     });
   } catch (err) {
     console.warn("Broadcast push skipped:", err?.message || err);
@@ -60,12 +96,14 @@ export async function dispatchSubjectAnnouncementPush({
   title,
   body = "",
   targetSections = null,
+  subjectName = "",
 }) {
   try {
     const headers = await authHeaders();
     const ids = [...new Set((subjectIds || []).filter(Boolean))];
     if (!headers || !ids.length || !title) return;
 
+    const actor = readCachedActor();
     await Promise.allSettled(
       ids.map((subjectId) =>
         fetch(`${API_BASE}/push/announce`, {
@@ -77,6 +115,9 @@ export async function dispatchSubjectAnnouncementPush({
             body,
             targetSections,
             path: `/student/subject/${subjectId}/social`,
+            subjectName,
+            ...actor,
+            actorRole: actor.actorRole || "Faculty",
           }),
         })
       )

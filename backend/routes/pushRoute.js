@@ -61,6 +61,11 @@ router.post("/announce", requireAuth, async (req, res) => {
       body,
       targetSections: Array.isArray(targetSections) ? targetSections : null,
       path: path || `/student/subject/${subjectId}/social`,
+      actorUserId: req.authUserId,
+      actorName: req.body?.actorName || "",
+      actorRole: req.body?.actorRole || "",
+      actorAvatar: req.body?.actorAvatar || "",
+      subjectName: req.body?.subjectName || "",
     });
 
     res.json({ ok: true, ...result });
@@ -94,6 +99,10 @@ router.post("/broadcast", requireAuth, async (req, res) => {
       title,
       body,
       path: path || "/student/dashboard",
+      actorUserId: req.authUserId,
+      actorName: req.body?.actorName || "",
+      actorRole: req.body?.actorRole || "Admin",
+      actorAvatar: req.body?.actorAvatar || "",
     });
 
     res.json({ ok: true, ...result });
@@ -124,6 +133,12 @@ router.post("/notify-users", requireAuth, async (req, res) => {
     const result = await sendPushToUsers(admin, userIds, {
       title,
       body: body || "",
+      kind: data?.kind || "announcement",
+      actorName: req.body?.actorName || data?.actor_name || "",
+      actorRole: req.body?.actorRole || data?.actor_role || "",
+      actorAvatar: req.body?.actorAvatar || data?.actor_avatar || "",
+      subjectName: req.body?.subjectName || data?.subject_name || "",
+      path: data?.path || "",
       data: data || {},
     });
 

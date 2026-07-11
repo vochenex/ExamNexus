@@ -822,7 +822,7 @@ export async function createExam(examPayload, questions) {
 
     await dispatchPushToUsers({
       userIds: recipientIds,
-      title: `New assessment: ${exam.title}`,
+      title: exam.title || "New assessment",
       body: "A new assessment was posted. Open ExamNexus to view details.",
       data: {
         kind: "assessment",
