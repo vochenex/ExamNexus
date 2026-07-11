@@ -10,6 +10,8 @@ UPDATE public.exams SET allow_student_view = true WHERE allow_student_view IS NU
 UPDATE public.exams SET allow_question_review = true WHERE allow_question_review IS NULL;
 UPDATE public.exams SET allow_show_correct_answers = true WHERE allow_show_correct_answers IS NULL;
 
+DROP FUNCTION IF EXISTS public.get_student_exam_result_review(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION public.get_student_exam_result_review(
   p_exam_id uuid,
   p_student_id uuid DEFAULT NULL
@@ -121,8 +123,8 @@ BEGIN
 END;
 $$;
 
+-- One function with a default 2nd arg — grant only the (uuid, uuid) signature.
 GRANT EXECUTE ON FUNCTION public.get_student_exam_result_review(uuid, uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_student_exam_result_review(uuid) TO authenticated;
 
 COMMENT ON FUNCTION public.get_student_exam_result_review(uuid, uuid) IS
   'Returns a student''s own exam result with questions/answers gated by faculty visibility settings.';
