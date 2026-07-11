@@ -39,9 +39,13 @@ export default function AdminLayout() {
   );
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("examnexus_user");
-    navigate("/auth");
+    const { clearLocalSessionAndLogout } = await import("../utils/sessionLogout");
+    await clearLocalSessionAndLogout({
+      email: user?.email,
+      userId: user?.id,
+      navigate,
+      navigateTo: "/auth",
+    });
   };
 
   const displayName = user.first_name

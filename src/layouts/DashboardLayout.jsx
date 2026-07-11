@@ -82,9 +82,13 @@ export default function DashboardLayout() {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("examnexus_user");
-    navigate("/auth");
+    const { clearLocalSessionAndLogout } = await import("../utils/sessionLogout");
+    await clearLocalSessionAndLogout({
+      email: sessionUser?.email,
+      userId: sessionUser?.id,
+      navigate,
+      navigateTo: "/auth",
+    });
   };
 
   const displayName = user.first_name

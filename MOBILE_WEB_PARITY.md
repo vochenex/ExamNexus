@@ -47,11 +47,15 @@ via `html.en-mobile-shell` (`src/utils/mobileShell.js`).
     admin broadcasts, and account status (requires SQL: `database/notifications_expand_feed.sql`).
 19. Push expanded beyond faculty announcements: admin broadcasts, assessments posted,
     comments, reactions, account approval (needs `FCM_SERVICE_ACCOUNT_JSON` on Vercel).
+    Multi-account: all Saved Accounts on one APK keep receiving OS banners (run
+    `database/push_devices_multi_account.sql`). Web/PWA still uses the in-app bell.
 20. Student Results: visibility uses `allow_student_view === false` (null no longer hides results);
     correct answers respect teacher settings.
+21. Faculty announcements hub, lock-completed-sections, assessment polish, and results
+    review ship in the **shared React app** — Vercel website and rebuilt APK both get them.
 
 ### AI create flow
-21. Removed duplicate gray spinner; keep Gemini progress bar only.
+22. Removed duplicate gray spinner; keep Gemini progress bar only.
 
 ---
 

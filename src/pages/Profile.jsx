@@ -351,13 +351,14 @@ export default function Profile() {
     });
     if (!confirmed) return;
 
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // Ignore sign-out network errors; still clear the local session below.
-    }
-    localStorage.removeItem("examnexus_user");
-    navigate("/auth", { replace: true });
+    const { clearLocalSessionAndLogout } = await import("../utils/sessionLogout");
+    await clearLocalSessionAndLogout({
+      email: profile?.email || user?.email,
+      userId: profile?.id || user?.id,
+      navigate,
+      navigateTo: "/auth",
+      replace: true,
+    });
   };
 
   const handleSave = async (updatedProfile) => {

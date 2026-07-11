@@ -21,19 +21,44 @@ export function getSavedAccounts() {
   return Array.isArray(list) ? list : [];
 }
 
-export function upsertSavedAccount({ email, role, first_name, last_name, avatar_url }) {
+export function findSavedAccount(emailOrId) {
+  const needle = String(emailOrId || "").trim().toLowerCase();
+  if (!needle) return null;
+  return (
+    getSavedAccounts().find((account) => {
+      if (account.user_id && String(account.user_id).toLowerCase() === needle) {
+        return true;
+      }
+      return String(account.email || "").toLowerCase() === needle;
+    }) || null
+  );
+}
+
+export function upsertSavedAccount({
+  email,
+  role,
+  first_name,
+  last_name,
+  avatar_url,
+  user_id,
+}) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) return getSavedAccounts();
+
+  const existing = getSavedAccounts().find(
+    (account) => String(account.email || "").toLowerCase() === normalizedEmail
+  );
 
   const next = getSavedAccounts().filter(
     (account) => String(account.email || "").toLowerCase() !== normalizedEmail
   );
   next.unshift({
     email: normalizedEmail,
-    role: role || "",
-    first_name: first_name || "",
-    last_name: last_name || "",
-    avatar_url: avatar_url || "",
+    role: role || existing?.role || "",
+    first_name: first_name || existing?.first_name || "",
+    last_name: last_name || existing?.last_name || "",
+    avatar_url: avatar_url || existing?.avatar_url || "",
+    user_id: user_id || existing?.user_id || "",
     lastUsedAt: new Date().toISOString(),
   });
   writeJson(ACCOUNTS_KEY, next.slice(0, 8));
@@ -42,11 +67,14 @@ export function upsertSavedAccount({ email, role, first_name, last_name, avatar_
 
 export function removeSavedAccount(email) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
+  const removed = getSavedAccounts().find(
+    (account) => String(account.email || "").toLowerCase() === normalizedEmail
+  );
   const next = getSavedAccounts().filter(
     (account) => String(account.email || "").toLowerCase() !== normalizedEmail
   );
   writeJson(ACCOUNTS_KEY, next);
-  return next;
+  return { accounts: next, removed };
 }
 
 export function getRememberedPassword(email) {

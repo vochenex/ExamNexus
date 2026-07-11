@@ -145,12 +145,29 @@ async function sendViaFcmV1(tokens, { title, body, data = {} }) {
                 Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({
+                  body: JSON.stringify({
                 message: {
                   token,
                   notification: { title, body },
                   data: dataPayload,
-                  android: { priority: "HIGH" },
+                  android: {
+                    priority: "HIGH",
+                    notification: {
+                      sound: "default",
+                      default_sound: true,
+                      notification_priority: "PRIORITY_HIGH",
+                      visibility: "PUBLIC",
+                    },
+                  },
+                  apns: {
+                    headers: { "apns-priority": "10" },
+                    payload: {
+                      aps: {
+                        sound: "default",
+                        "content-available": 1,
+                      },
+                    },
+                  },
                 },
               }),
             }
@@ -212,6 +229,7 @@ async function sendViaFcmLegacy(tokens, { title, body, data = {} }) {
         data: Object.fromEntries(
           Object.entries(data).map(([k, v]) => [k, String(v ?? "")])
         ),
+        content_available: true,
       }),
     });
 

@@ -87,27 +87,32 @@ Users must install/update the APK to see a new launcher icon.
 
 ### Push notifications (students)
 
-When a faculty announcement is posted, the app:
+When a faculty announcement (or other push event) is posted, the app:
 
-1. Saves each native device token into Supabase `push_devices` (run `database/push_notification_devices.sql`).
-2. Calls backend `POST /push/announce` after create.
-3. Backend looks up enrolled students for that subject/section and sends an FCM push (HTTP v1 via service account).
+1. Saves each native device token into Supabase `push_devices` (run `database/push_notification_devices.sql`, then `database/push_devices_multi_account.sql` if upgrading).
+2. Calls backend push routes after create (`/push/announce`, `/push/broadcast`, `/push/notify-users`).
+3. Backend looks up recipient user ids and sends an FCM push (HTTP v1 via service account).
+4. The phone shows a **system banner** even when ExamNexus is closed or another app is open (needs internet + notification permission).
+
+**Multi-account on one phone:** every Saved Account that has logged in on that device keeps its own `push_devices` row for the same FCM token. Logging into account B no longer steals push from account A. Removing a Saved Account stops push for that user on this device.
 
 **Setup checklist**
 
-1. Run `database/push_notification_devices.sql` in Supabase SQL Editor.
+1. Run `database/push_notification_devices.sql` (and `push_devices_multi_account.sql` on existing projects) in Supabase SQL Editor.
 2. Create a Firebase project, enable Cloud Messaging, add Android (`com.examnexus.app`) and/or iOS apps.
 3. Firebase → **Project settings** → **Service accounts** → **Generate new private key** → save as `backend/firebase-service-account.json`.
-4. In `backend/.env`:
+4. In `backend/.env` (local) / Vercel env (production):
    ```env
-   FCM_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
+   FCM_SERVICE_ACCOUNT_JSON=...one-line JSON...
    FCM_PROJECT_ID=examnexus-9d77a
    ```
 5. For Android: add `google-services.json` under `android/app/` after `cap add android`.
-5. For iOS: enable Push capability in Xcode, upload APNs key to Firebase, sync pods.
-6. Rebuild/sync: `npm run cap:sync`.
+6. For iOS: enable Push capability in Xcode, upload APNs key to Firebase, sync pods.
+7. Rebuild/sync: `npm run cap:sync` then `npm run cap:apk:prod` for a release APK.
 
 Without a service account JSON (or legacy server key), tokens still register but sends are skipped (logged).
+
+Website/PWA uses the **same product features** (announcements, lock sections, results review, mobile shell). OS push banners are **APK/native** only; the web app uses the in-app notification bell while open.
 
 ### Key files
 

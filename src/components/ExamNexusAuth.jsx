@@ -355,11 +355,12 @@ function getAuthInputProps(theme) {
         first_name: profile.first_name,
         last_name: profile.last_name,
         avatar_url: profile.avatar_url,
+        user_id: profile.id || data.user.id,
       });
       setRememberedPassword(form.email, form.password, rememberMe);
       setSavedAccounts(getSavedAccounts());
 
-      // Re-bind this device's push token to the signed-in student/faculty account.
+      // Bind this device's push token to the signed-in account (keeps other saved accounts too).
       import("../utils/pushNotifications")
         .then(({ syncPushTokenForCurrentUser }) => syncPushTokenForCurrentUser())
         .catch(() => {});
@@ -780,8 +781,18 @@ function getAuthInputProps(theme) {
                                   type="button"
                                   aria-label={`Remove ${account.email}`}
                                   onClick={() => {
-                                    setSavedAccounts(removeSavedAccount(account.email));
+                                    const { accounts, removed } = removeSavedAccount(
+                                      account.email
+                                    );
+                                    setSavedAccounts(accounts);
                                     setRememberedPassword(account.email, "", false);
+                                    if (removed?.user_id) {
+                                      import("../utils/pushNotifications")
+                                        .then(({ removePushBindingForSavedAccount }) =>
+                                          removePushBindingForSavedAccount(removed.user_id)
+                                        )
+                                        .catch(() => {});
+                                    }
                                   }}
                                   className="shrink-0 rounded-md p-1 text-gray-400 hover:text-red-400"
                                 >

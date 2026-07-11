@@ -1,24 +1,35 @@
--- Push notification device tokens for ExamNexus native mobile app.
--- Run in Supabase SQL Editor after notifications_and_announcement_social.sql.
--- For existing projects that already ran an older version, also run
--- database/push_devices_multi_account.sql.
+-- Multi-account push on one device: keep the same FCM token bound to every
+-- saved account that has logged in on this phone (do not steal the token).
+-- Run in Supabase SQL Editor (safe to re-run).
 
-CREATE TABLE IF NOT EXISTS public.push_devices (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  token text NOT NULL,
-  platform text NOT NULL DEFAULT 'unknown'
-    CHECK (platform IN ('ios', 'android', 'web', 'unknown')),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+ALTER TABLE public.push_devices
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
-CREATE INDEX IF NOT EXISTS push_devices_user_idx
-  ON public.push_devices (user_id);
+-- Drop the old "one owner per token" uniqueness if present.
+DO $$
+DECLARE
+  v_con text;
+BEGIN
+  SELECT c.conname INTO v_con
+  FROM pg_constraint c
+  JOIN pg_class t ON t.oid = c.conrelid
+  JOIN pg_namespace n ON n.oid = t.relnamespace
+  WHERE n.nspname = 'public'
+    AND t.relname = 'push_devices'
+    AND c.contype = 'u'
+    AND pg_get_constraintdef(c.oid) ILIKE '%(token)%'
+    AND pg_get_constraintdef(c.oid) NOT ILIKE '%user_id%';
 
-CREATE INDEX IF NOT EXISTS push_devices_token_idx
-  ON public.push_devices (token);
+  IF v_con IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.push_devices DROP CONSTRAINT %I', v_con);
+  END IF;
+END $$;
 
+DROP INDEX IF EXISTS public.push_devices_token_key;
+DROP INDEX IF EXISTS public.push_devices_token_uidx;
+DROP INDEX IF EXISTS public.push_devices_user_token_uidx;
+
+-- Prefer a named UNIQUE constraint so ON CONFLICT (user_id, token) is reliable.
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -38,30 +49,10 @@ EXCEPTION
     NULL;
 END $$;
 
-ALTER TABLE public.push_devices ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS push_devices_token_idx
+  ON public.push_devices (token);
 
-DROP POLICY IF EXISTS push_devices_select_own ON public.push_devices;
-DROP POLICY IF EXISTS push_devices_insert_own ON public.push_devices;
-DROP POLICY IF EXISTS push_devices_update_own ON public.push_devices;
-DROP POLICY IF EXISTS push_devices_delete_own ON public.push_devices;
-
-CREATE POLICY push_devices_select_own
-  ON public.push_devices FOR SELECT TO authenticated
-  USING (user_id = auth.uid());
-
-CREATE POLICY push_devices_insert_own
-  ON public.push_devices FOR INSERT TO authenticated
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY push_devices_update_own
-  ON public.push_devices FOR UPDATE TO authenticated
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY push_devices_delete_own
-  ON public.push_devices FOR DELETE TO authenticated
-  USING (user_id = auth.uid());
-
+-- Bind current user to this device token WITHOUT removing other accounts.
 CREATE OR REPLACE FUNCTION public.upsert_push_device(
   p_token text,
   p_platform text DEFAULT 'unknown'
@@ -101,6 +92,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.upsert_push_device(text, text) TO authenticated;
 
+-- Remove only the signed-in user's binding for this token.
 CREATE OR REPLACE FUNCTION public.remove_push_device(p_token text)
 RETURNS void
 LANGUAGE plpgsql
@@ -120,6 +112,8 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.remove_push_device(text) TO authenticated;
 
+-- Remove another saved account's binding from THIS device (proved by token).
+-- Caller must already have a row for the same token (they own the phone).
 CREATE OR REPLACE FUNCTION public.remove_push_device_binding(
   p_token text,
   p_user_id uuid
@@ -164,28 +158,5 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.remove_push_device_binding(text, uuid) TO authenticated;
-
--- Helper: student user ids who should receive a subject-section announcement.
-CREATE OR REPLACE FUNCTION public.get_announcement_recipient_ids(
-  p_subject_id uuid,
-  p_target_sections text[] DEFAULT NULL
-)
-RETURNS uuid[]
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-STABLE
-AS $$
-  SELECT coalesce(array_agg(DISTINCT ss.student_id), ARRAY[]::uuid[])
-  FROM public.subject_students ss
-  WHERE ss.subject_id = p_subject_id
-    AND (
-      p_target_sections IS NULL
-      OR cardinality(p_target_sections) = 0
-      OR public.sections_overlap(ss.section, p_target_sections)
-    );
-$$;
-
-GRANT EXECUTE ON FUNCTION public.get_announcement_recipient_ids(uuid, text[]) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
