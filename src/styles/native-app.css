@@ -18,6 +18,8 @@
 /* -------------------------------------------------------------------------- */
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-shell {
+  display: flex;
+  flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   min-height: 100dvh;
 }
@@ -48,18 +50,22 @@ html.en-native-app .en-auth-shell {
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-body {
+  flex: 1 1 auto;
+  display: flex !important;
   padding: 0.75rem var(--en-native-px) 1.25rem;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  align-items: flex-start !important;
-  min-height: 0;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: calc(100dvh - 3.75rem - var(--en-safe-top));
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {
   max-width: 100%;
   width: 100%;
-  margin-top: 0.25rem;
+  margin-top: 0;
+  margin-bottom: 0;
   border-radius: 1.25rem !important;
   height: auto !important;
   min-height: 0 !important;
