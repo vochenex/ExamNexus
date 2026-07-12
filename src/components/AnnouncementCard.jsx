@@ -74,16 +74,13 @@ export default function AnnouncementCard({
     try {
       if (!silent) setLoadingComments(true);
       const rows = await fetchComments(announcement.id);
-      setComments((prev) => {
-        const byId = new Map((rows || []).map((row) => [row.id, row]));
-        for (const row of prev) {
-          if (row?.id && !byId.has(row.id)) byId.set(row.id, row);
-        }
-        return [...byId.values()].sort(
+      // Trust the server list — merging missing local rows re-showed deleted comments.
+      setComments(
+        [...(rows || [])].sort(
           (a, b) =>
             new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-        );
-      });
+        )
+      );
       setCommentCount((rows || []).length);
       lastCountRef.current = (rows || []).length;
     } catch (err) {

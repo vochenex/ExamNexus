@@ -1,7 +1,9 @@
 import { Capacitor } from "@capacitor/core";
 import { isNativeApp, getPlatform } from "./platform";
+import { isIOS, isStandalonePWA } from "./pwa";
 import { supabase } from "../supabaseClient";
 import { getSavedAccounts } from "./savedAccounts";
+import { API_BASE } from "./apiBase.js";
 
 const PENDING_REMOVALS_KEY = "examnexus_push_pending_removals";
 
@@ -32,13 +34,24 @@ function queuePendingRemoval(userId) {
   writePendingRemovals([...readPendingRemovals(), String(userId)]);
 }
 
-async function upsertToken(token) {
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) {
+    output[i] = raw.charCodeAt(i);
+  }
+  return output;
+}
+
+async function upsertToken(token, platform = getPlatform()) {
   if (!token) return;
   lastToken = token;
   try {
     const { error } = await supabase.rpc("upsert_push_device", {
       p_token: token,
-      p_platform: getPlatform(),
+      p_platform: platform,
     });
     if (error && !error.message?.includes("upsert_push_device")) {
       console.warn("Push token upsert failed:", error.message);
@@ -68,14 +81,73 @@ async function flushPendingRemovals() {
   writePendingRemovals(remaining);
 }
 
+async function fetchVapidPublicKey() {
+  const res = await fetch(`${API_BASE}/push/vapid-public-key`);
+  if (!res.ok) return "";
+  const json = await res.json().catch(() => ({}));
+  return String(json.publicKey || "").trim();
+}
+
+/** True when this browser can use Web Push (iOS requires Add to Home Screen). */
+export function canUseWebPush() {
+  if (typeof window === "undefined") return false;
+  if (isNativeApp()) return false;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+  if (!("Notification" in window)) return false;
+  // iOS Safari only delivers Web Push from a home-screen / standalone PWA.
+  if (isIOS() && !isStandalonePWA()) return false;
+  return true;
+}
+
+/**
+ * Register Web Push for installed PWA (desktop + iOS Add to Home Screen).
+ */
+export async function initWebPushNotifications({ requestPermission = true } = {}) {
+  if (!canUseWebPush()) return false;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    let permission = Notification.permission;
+    if (permission === "default" && requestPermission) {
+      permission = await Notification.requestPermission();
+    }
+    if (permission !== "granted") {
+      console.warn("Web push permission not granted");
+      return false;
+    }
+
+    const vapidKey = await fetchVapidPublicKey();
+    if (!vapidKey) {
+      console.warn("Web push VAPID public key unavailable");
+      return false;
+    }
+
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      });
+    }
+
+    const token = JSON.stringify(subscription.toJSON());
+    await upsertToken(token, "web");
+    await flushPendingRemovals();
+    initialized = true;
+    return true;
+  } catch (err) {
+    console.warn("Web push init skipped:", err?.message || err);
+    return false;
+  }
+}
+
 /**
  * Register for native push notifications (Capacitor iOS/Android only).
- * Saves the FCM/APNs token against the signed-in user so the backend can
- * deliver announcement / notification pushes to their phone — including when
- * the app is in the background or closed (OS system banner).
  */
 export async function initPushNotifications() {
-  if (!isNativeApp()) return;
+  if (!isNativeApp()) {
+    return initWebPushNotifications({ requestPermission: true });
+  }
   if (initialized) {
     if (lastToken) await upsertToken(lastToken);
     return;
@@ -127,7 +199,21 @@ export async function initPushNotifications() {
 
 /** Add this device token for the signed-in user (does not remove other accounts). */
 export async function syncPushTokenForCurrentUser() {
-  if (!isNativeApp()) return;
+  if (!isNativeApp()) {
+    if (lastToken) {
+      await upsertToken(lastToken, "web");
+      await flushPendingRemovals();
+      return;
+    }
+    await initWebPushNotifications({
+      // Don't spam permission on every page load for desktop browsers;
+      // iOS standalone + already-granted re-sync is fine.
+      requestPermission:
+        Notification.permission === "granted" ||
+        (isIOS() && isStandalonePWA()),
+    });
+    return;
+  }
   if (lastToken) {
     await upsertToken(lastToken);
     await flushPendingRemovals();
@@ -137,12 +223,10 @@ export async function syncPushTokenForCurrentUser() {
 }
 
 /**
- * On logout: keep the FCM binding if this account stays in Saved Accounts,
- * so they still get system banners while offline from the app / using other apps.
- * Otherwise remove only this user's binding for the device token.
+ * On logout: keep the binding if this account stays in Saved Accounts.
  */
 export async function releasePushTokenOnLogout({ email, userId } = {}) {
-  if (!isNativeApp() || !lastToken) return;
+  if (!lastToken) return;
 
   const saved = getSavedAccounts();
   const emailNorm = String(email || "").trim().toLowerCase();
@@ -165,7 +249,6 @@ export async function releasePushTokenOnLogout({ email, userId } = {}) {
 /** When a saved account is removed from this phone, stop pushing to that user on this token. */
 export async function removePushBindingForSavedAccount(userId) {
   if (!userId) return;
-  if (!isNativeApp()) return;
 
   if (!lastToken) {
     queuePendingRemoval(userId);
@@ -184,7 +267,7 @@ export async function removePushBindingForSavedAccount(userId) {
 }
 
 export async function removeCurrentPushToken() {
-  if (!isNativeApp() || !lastToken) return;
+  if (!lastToken) return;
   try {
     await supabase.rpc("remove_push_device", { p_token: lastToken });
   } catch {
@@ -193,5 +276,8 @@ export async function removeCurrentPushToken() {
 }
 
 export function isPushAvailable() {
-  return isNativeApp() && Capacitor.isPluginAvailable("PushNotifications");
+  if (isNativeApp()) {
+    return Capacitor.isPluginAvailable("PushNotifications");
+  }
+  return canUseWebPush();
 }

@@ -1,14 +1,16 @@
 /**
- * Push sender for ExamNexus native apps.
+ * Push sender for ExamNexus native apps + web/PWA (including iOS Add to Home Screen).
  *
- * Delivery backends (first match wins):
- * - FCM_SERVICE_ACCOUNT_PATH / GOOGLE_APPLICATION_CREDENTIALS → FCM HTTP v1 (recommended)
- * - FCM_SERVER_KEY → legacy FCM HTTP API (deprecated; unavailable on new Firebase projects)
+ * Delivery backends (first match wins per device):
+ * - platform=web / JSON subscription → Web Push (VAPID) for Safari/Chrome PWA
+ * - FCM_SERVICE_ACCOUNT_* → FCM HTTP v1 (Android APK / native)
+ * - FCM_SERVER_KEY → legacy FCM HTTP API
  */
 
 const fs = require("fs");
 const path = require("path");
 const jwt = require("jsonwebtoken");
+const webpush = require("web-push");
 
 const ALERTS_CHANNEL_ID = "examnexus_alerts";
 const BRAND_COLOR = "#10B981";
@@ -16,6 +18,7 @@ const BRAND_COLOR = "#10B981";
 let cachedServiceAccount = null;
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
+let vapidConfigured = false;
 
 function getFcmServerKey() {
   return process.env.FCM_SERVER_KEY || process.env.FIREBASE_SERVER_KEY || "";
@@ -61,13 +64,83 @@ function getFcmProjectId() {
 }
 
 function isPushConfigured() {
-  return Boolean(getFcmServerKey() || loadServiceAccount());
+  return Boolean(getFcmServerKey() || loadServiceAccount() || getVapidPublicKey());
 }
 
 function getPushApiMode() {
-  if (loadServiceAccount()) return "v1";
-  if (getFcmServerKey()) return "legacy";
-  return "none";
+  const modes = [];
+  if (loadServiceAccount()) modes.push("fcm-v1");
+  else if (getFcmServerKey()) modes.push("fcm-legacy");
+  if (getVapidPublicKey() && getVapidPrivateKey()) modes.push("web-push");
+  return modes.length ? modes.join("+") : "none";
+}
+
+function getVapidPublicKey() {
+  return String(process.env.VAPID_PUBLIC_KEY || "").trim();
+}
+
+function getVapidPrivateKey() {
+  return String(process.env.VAPID_PRIVATE_KEY || "").trim();
+}
+
+function getVapidSubject() {
+  return String(
+    process.env.VAPID_SUBJECT || "mailto:support@examnexus.app"
+  ).trim();
+}
+
+function getPublicSiteUrl() {
+  return String(
+    process.env.WEBSITE_URL ||
+      process.env.VITE_WEBSITE_URL ||
+      "https://exam-nexus-eta.vercel.app"
+  )
+    .trim()
+    .replace(/\/+$/, "");
+}
+
+function absoluteMediaUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+  if (raw.startsWith("/")) return `${getPublicSiteUrl()}${raw}`;
+  return raw;
+}
+
+function ensureVapidConfigured() {
+  if (vapidConfigured) return true;
+  const publicKey = getVapidPublicKey();
+  const privateKey = getVapidPrivateKey();
+  if (!publicKey || !privateKey) return false;
+  webpush.setVapidDetails(getVapidSubject(), publicKey, privateKey);
+  vapidConfigured = true;
+  return true;
+}
+
+function parseWebPushSubscription(token) {
+  if (!token) return null;
+  const raw = String(token).trim();
+  if (!raw) return null;
+
+  if (raw.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.endpoint && parsed?.keys?.p256dh && parsed?.keys?.auth) {
+        return parsed;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function isWebPushDevice(device) {
+  if (!device) return false;
+  if (String(device.platform || "").toLowerCase() === "web") return true;
+  return Boolean(parseWebPushSubscription(device.token));
 }
 
 function truncate(text, max) {
@@ -381,10 +454,67 @@ async function sendViaFcmLegacy(tokens, { title, body, data = {}, imageUrl = "" 
 }
 
 async function sendViaFcm(tokens, payload) {
+  if (!tokens.length) return { sent: 0, skipped: 0 };
   if (loadServiceAccount()) {
     return sendViaFcmV1(tokens, payload);
   }
   return sendViaFcmLegacy(tokens, payload);
+}
+
+async function sendViaWebPush(subscriptions, payload) {
+  if (!ensureVapidConfigured()) {
+    return {
+      sent: 0,
+      skipped: subscriptions.length,
+      reason: "VAPID keys not configured",
+    };
+  }
+  if (!subscriptions.length) return { sent: 0, skipped: 0 };
+
+  const site = getPublicSiteUrl();
+  const appIcon = `${site}/icons/pwa-192.png`;
+  const actorAvatar = absoluteMediaUrl(
+    payload?.data?.actor_avatar || payload?.imageUrl || ""
+  );
+  // Prefer actor avatar as the notification icon (Android Chrome PWA + best-effort iOS).
+  const icon = actorAvatar || appIcon;
+
+  const body = JSON.stringify({
+    title: payload.title,
+    body: payload.body || "",
+    icon,
+    badge: appIcon,
+    image: actorAvatar || undefined,
+    tag: payload.tag || "examnexus",
+    data: {
+      ...(payload.data || {}),
+      path: payload.data?.path || "",
+      actor_avatar: actorAvatar,
+    },
+  });
+
+  let sent = 0;
+  const failures = [];
+
+  await Promise.all(
+    subscriptions.map(async (subscription) => {
+      try {
+        await webpush.sendNotification(subscription, body, {
+          TTL: 3600,
+          urgency: "high",
+        });
+        sent += 1;
+      } catch (err) {
+        failures.push(err?.body || err?.message || "web-push failed");
+      }
+    })
+  );
+
+  return {
+    sent,
+    skipped: 0,
+    failures: failures.length ? failures.slice(0, 5) : undefined,
+  };
 }
 
 async function loadUserProfile(admin, userId) {
@@ -477,12 +607,15 @@ async function sendPushToUsers(admin, userIds, payload) {
   for (const row of devices || []) {
     if (!row?.token || !row?.user_id) continue;
     if (!byUser.has(row.user_id)) byUser.set(row.user_id, []);
-    byUser.get(row.user_id).push(row.token);
+    byUser.get(row.user_id).push({
+      token: row.token,
+      platform: row.platform || "unknown",
+    });
   }
 
   let sent = 0;
   let failures = [];
-  for (const [userId, tokens] of byUser.entries()) {
+  for (const [userId, deviceRows] of byUser.entries()) {
     const accountName = nameById.get(userId) || "Your account";
     const personalized = {
       ...baseRich,
@@ -494,9 +627,32 @@ async function sendPushToUsers(admin, userIds, payload) {
         recipient_user_id: String(userId),
       },
     };
-    const result = await sendViaFcm([...new Set(tokens)], personalized);
-    sent += Number(result.sent || 0);
-    if (result.failures?.length) failures = failures.concat(result.failures);
+
+    const fcmTokens = [];
+    const webSubs = [];
+    const seen = new Set();
+    for (const device of deviceRows) {
+      const key = String(device.token);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (isWebPushDevice(device)) {
+        const sub = parseWebPushSubscription(device.token);
+        if (sub) webSubs.push(sub);
+      } else {
+        fcmTokens.push(device.token);
+      }
+    }
+
+    if (fcmTokens.length) {
+      const result = await sendViaFcm(fcmTokens, personalized);
+      sent += Number(result.sent || 0);
+      if (result.failures?.length) failures = failures.concat(result.failures);
+    }
+    if (webSubs.length) {
+      const result = await sendViaWebPush(webSubs, personalized);
+      sent += Number(result.sent || 0);
+      if (result.failures?.length) failures = failures.concat(result.failures);
+    }
   }
 
   return {
@@ -676,4 +832,5 @@ module.exports = {
   isPushConfigured,
   getPushApiMode,
   getFcmProjectId,
+  getVapidPublicKey,
 };

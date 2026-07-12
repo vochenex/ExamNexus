@@ -55,6 +55,64 @@ self.addEventListener("message", (event) => {
   }
 });
 
+/** Web Push (desktop PWA + iOS Add to Home Screen) */
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : "" };
+  }
+
+  const title = payload.title || "ExamNexus";
+  const icon =
+    payload.icon ||
+    payload.data?.actor_avatar ||
+    "/icons/pwa-192.png";
+  const options = {
+    body: payload.body || "",
+    icon,
+    badge: payload.badge || "/icons/pwa-192.png",
+    tag: payload.tag || "examnexus",
+    renotify: true,
+    data: payload.data || payload,
+  };
+  if (payload.image) {
+    options.image = payload.image;
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  const path =
+    typeof data.path === "string" && data.path.startsWith("/")
+      ? data.path
+      : "/";
+  const targetUrl = new URL(path, self.location.origin).href;
+
+  event.waitUntil(
+    (async () => {
+      const clientList = await clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          client.postMessage({ type: "en:push-navigate", path });
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+      return undefined;
+    })()
+  );
+});
+
 function isBuildAsset(url) {
   return (
     url.pathname.startsWith("/assets/") ||

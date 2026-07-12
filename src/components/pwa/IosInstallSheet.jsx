@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Check, Copy, Share, SquarePlus, ExternalLink } from "lucide-react";
-import { isIOSSafari } from "../../utils/pwa";
+import { Check, Copy, Share, SquarePlus, ExternalLink, Bell } from "lucide-react";
+import { isIOSSafari, isStandalonePWA } from "../../utils/pwa";
+import { initWebPushNotifications, canUseWebPush } from "../../utils/pushNotifications";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import ModalPortal from "../ui/ModalPortal";
 import { motion } from "../../utils/motion";
@@ -13,11 +14,15 @@ const SITE_URL = "https://exam-nexus-eta.vercel.app";
  */
 export default function IosInstallSheet({ open, onClose, isDark }) {
   const [copied, setCopied] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushNote, setPushNote] = useState("");
   useModalDismiss(onClose, { enabled: open });
 
   if (!open) return null;
 
   const inSafari = isIOSSafari();
+  const standalone = isStandalonePWA();
+  const showPushCta = standalone && canUseWebPush();
 
   const copyLink = async () => {
     try {
@@ -27,6 +32,28 @@ export default function IosInstallSheet({ open, onClose, isDark }) {
     } catch {
       window.prompt("Copy this link and open it in Safari:", SITE_URL);
     }
+  };
+
+  const enablePush = async () => {
+    setPushBusy(true);
+    setPushNote("");
+    try {
+      const ok = await initWebPushNotifications({ requestPermission: true });
+      setPushNote(
+        ok
+          ? "Notifications enabled — you’ll get announcement alerts on this Home Screen app."
+          : "Could not enable notifications. Check Settings → ExamNexus → Notifications."
+      );
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleDone = async () => {
+    if (showPushCta && Notification.permission !== "granted") {
+      await enablePush();
+    }
+    onClose();
   };
 
   return (
@@ -98,6 +125,13 @@ export default function IosInstallSheet({ open, onClose, isDark }) {
               Tap <strong>Add</strong> — ExamNexus appears on your home screen like
               an app.
             </li>
+            <li>
+              <span className="en-install-step-icon">
+                <Bell size={16} />
+              </span>
+              Open the Home Screen app and allow <strong>Notifications</strong> so
+              you get announcement alerts (same as Android).
+            </li>
           </ol>
 
           {!inSafari && (
@@ -115,7 +149,33 @@ export default function IosInstallSheet({ open, onClose, isDark }) {
             </button>
           )}
 
-          <button type="button" onClick={onClose} className="en-install-sheet-done">
+          {showPushCta && (
+            <button
+              type="button"
+              onClick={enablePush}
+              disabled={pushBusy}
+              className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold disabled:opacity-60 ${
+                isDark
+                  ? "border-sky-400/30 bg-sky-500/15 text-sky-100"
+                  : "border-sky-200 bg-sky-50 text-sky-900"
+              }`}
+            >
+              <Bell size={16} />
+              {pushBusy ? "Enabling…" : "Enable announcement alerts"}
+            </button>
+          )}
+
+          {pushNote && (
+            <p
+              className={`mb-2 text-center text-xs ${
+                isDark ? "text-emerald-200/90" : "text-teal-800"
+              }`}
+            >
+              {pushNote}
+            </p>
+          )}
+
+          <button type="button" onClick={handleDone} className="en-install-sheet-done">
             Got it
           </button>
         </div>

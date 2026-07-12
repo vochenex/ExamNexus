@@ -7,6 +7,7 @@ const {
   sendPushToUsers,
   isPushConfigured,
   getPushApiMode,
+  getVapidPublicKey,
 } = require("../lib/pushSender");
 
 const router = express.Router();
@@ -32,8 +33,18 @@ router.get("/status", (_req, res) => {
   res.json({
     ok: true,
     fcmConfigured: isPushConfigured(),
+    webPushConfigured: Boolean(getVapidPublicKey()),
     api: getPushApiMode(),
   });
+});
+
+/** Public VAPID key for browser / iOS PWA PushManager.subscribe */
+router.get("/vapid-public-key", (_req, res) => {
+  const publicKey = getVapidPublicKey();
+  if (!publicKey) {
+    return res.status(503).json({ error: "Web Push is not configured" });
+  }
+  res.json({ publicKey });
 });
 
 /**

@@ -11,8 +11,6 @@ function PushNavigationBridge() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isNativeApp()) return undefined;
-
     syncPushTokenForCurrentUser();
 
     const onPushNavigate = (event) => {
@@ -22,8 +20,23 @@ function PushNavigationBridge() {
       }
     };
 
+    const onSwMessage = (event) => {
+      const data = event?.data;
+      if (data?.type === "en:push-navigate" && typeof data.path === "string") {
+        if (data.path.startsWith("/")) navigate(data.path);
+      }
+    };
+
     window.addEventListener("en:push-navigate", onPushNavigate);
-    return () => window.removeEventListener("en:push-navigate", onPushNavigate);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", onSwMessage);
+    }
+    return () => {
+      window.removeEventListener("en:push-navigate", onPushNavigate);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", onSwMessage);
+      }
+    };
   }, [navigate]);
 
   return null;
