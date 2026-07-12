@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, X } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import ExamNexusLogo from "../ExamNexusLogo";
 import {
@@ -8,8 +8,8 @@ import {
 } from "../../utils/pwa";
 
 /**
- * Modal that appears when a new version of ExamNexus has been deployed and is
- * ready to activate. "Update now" swaps to the fresh build and reloads.
+ * Modal that appears briefly while ExamNexus auto-activates a new deploy.
+ * Desktop/installed PWA updates apply automatically via the service worker.
  */
 export default function UpdatePrompt() {
   const { theme } = useTheme();
@@ -19,7 +19,12 @@ export default function UpdatePrompt() {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    return subscribeServiceWorkerUpdate(() => setVisible(true));
+    return subscribeServiceWorkerUpdate(() => {
+      setVisible(true);
+      setUpdating(true);
+      // Safety net if auto-apply in pwa.js was blocked.
+      window.setTimeout(() => applyServiceWorkerUpdate(), 400);
+    });
   }, []);
 
   if (!visible) return null;
@@ -30,38 +35,19 @@ export default function UpdatePrompt() {
   };
 
   return (
-    <div className="en-update-root" role="dialog" aria-modal="true" aria-label="Update available">
-      <div className="en-update-overlay" onClick={() => setVisible(false)} aria-hidden="true" />
+    <div className="en-update-root" role="dialog" aria-modal="true" aria-label="Updating ExamNexus">
+      <div className="en-update-overlay" aria-hidden="true" />
       <div className={`en-update-card ${isDark ? "en-update-card--dark" : "en-update-card--light"}`}>
-        <button
-          type="button"
-          className="en-update-dismiss"
-          onClick={() => setVisible(false)}
-          aria-label="Dismiss"
-          disabled={updating}
-        >
-          <X size={18} />
-        </button>
-
         <span className="en-update-badge">
           <ExamNexusLogo size={40} showGlow={false} idSuffix="update-prompt" />
         </span>
 
-        <h3 className="en-update-title">A new version is available</h3>
+        <h3 className="en-update-title">Updating ExamNexus…</h3>
         <p className="en-update-text">
-          ExamNexus has been updated with the latest improvements. Update now to
-          get the newest version.
+          A newer version was found. The desktop app is refreshing automatically.
         </p>
 
         <div className="en-update-actions">
-          <button
-            type="button"
-            className="en-update-later"
-            onClick={() => setVisible(false)}
-            disabled={updating}
-          >
-            Later
-          </button>
           <button
             type="button"
             className="en-update-cta"
@@ -69,7 +55,7 @@ export default function UpdatePrompt() {
             disabled={updating}
           >
             <RefreshCw size={16} className={updating ? "en-update-spin" : ""} />
-            {updating ? "Updating…" : "Update now"}
+            {updating ? "Updating…" : "Reload now"}
           </button>
         </div>
       </div>

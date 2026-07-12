@@ -32,11 +32,9 @@ self.addEventListener("install", (event) => {
       } catch {
         // Precache best-effort — missing one asset must not block installability.
       }
-      // First install: activate immediately so Chrome can fire beforeinstallprompt
-      // without requiring a second visit. Updates still wait for SKIP_WAITING.
-      if (!self.registration.active) {
-        await self.skipWaiting();
-      }
+      // Activate immediately so desktop/installed PWAs pick up deploys without
+      // waiting for a manual "Update now" click.
+      await self.skipWaiting();
     })()
   );
 });

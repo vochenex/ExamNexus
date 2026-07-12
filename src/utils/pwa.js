@@ -10,6 +10,15 @@ let registrationPromise = null;
 function emitUpdateReady(worker) {
   waitingWorker = worker || null;
   window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
+  // Desktop / installed PWA: activate the new build automatically.
+  // (Users can still see a brief update UI; they don't have to click.)
+  try {
+    window.setTimeout(() => {
+      if (waitingWorker) applyServiceWorkerUpdate();
+    }, 1200);
+  } catch {
+    // ignore
+  }
 }
 
 /** True once a newer service worker is installed and waiting to activate. */
@@ -78,8 +87,16 @@ export function registerServiceWorker() {
   if (!import.meta.env.PROD) return;
   if (registrationPromise) return;
 
+  let hadControllerAtStart = Boolean(navigator.serviceWorker.controller);
+  let refreshing = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!reloadOnControllerChange) return;
+    // First time a worker takes control: don't bounce the page.
+    if (!hadControllerAtStart) {
+      hadControllerAtStart = true;
+      return;
+    }
+    if (refreshing) return;
+    refreshing = true;
     reloadOnControllerChange = false;
     window.location.reload();
   });
