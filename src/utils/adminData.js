@@ -251,17 +251,30 @@ export async function createAdminBroadcast({ title, body, audience }) {
   if (error) throw error;
 
   const audienceValue = audience || data?.audience || "all";
+  const announcementId = data?.id || "";
+  const facultyPath = announcementId
+    ? `/faculty/platform-announcements?highlight=${announcementId}&comments=1`
+    : "/faculty/platform-announcements";
+  const studentPath = announcementId
+    ? `/student/platform-announcements?highlight=${announcementId}&comments=1`
+    : "/student/platform-announcements";
+
   await dispatchBroadcastPush({
     audience: audienceValue,
     title: title || "ExamNexus announcement",
     body: body || "You have a new platform announcement.",
-    path:
-      String(audienceValue).toLowerCase() === "faculty"
-        ? "/faculty/dashboard"
-        : "/student/dashboard",
+    path: studentPath,
+    facultyPath,
+    studentPath,
   });
 
   return data;
+}
+
+export async function deleteAdminBroadcast(id) {
+  await requireSession();
+  const { error } = await supabase.rpc("admin_delete_broadcast", { p_id: id });
+  if (error) throw error;
 }
 
 export async function fetchAdminAssessments() {

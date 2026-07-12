@@ -71,10 +71,15 @@ html.en-native-app .en-auth-shell {
   width: 100%;
   margin-top: 0;
   margin-bottom: 0;
-  border-radius: 1.75rem !important;
+  border-radius: 2rem !important;
   height: auto !important;
   min-height: 0 !important;
-  overflow: visible !important;
+  overflow: hidden !important;
+  isolation: isolate;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-card .en-auth-panel-form {
+  border-radius: 0 !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-form {

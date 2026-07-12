@@ -1,22 +1,9 @@
 import { useCallback, useState } from "react";
-import { Megaphone } from "lucide-react";
-import { useTheme } from "../../layouts/ThemeContext";
-import { useAppModal } from "../../contexts/AppModalContext";
-import PageHeader from "../../components/ui/PageHeader";
-import Select from "../../components/ui/Select";
-import Textarea from "../../components/ui/Textarea";
-import Input from "../../components/ui/Input";
-import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
-import { usePolling } from "../../hooks/useRealtimeFetch";
-import { createAdminBroadcast, fetchAdminBroadcasts } from "../../utils/adminData";
-import { adminTdClass, adminThClass, adminTableClass, adminTableWrapClass } from "../../components/admin/adminTableStyles";
-import { pageShellClass, panelClass } from "../../utils/themeInputs";
-import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
-import { primaryButton } from "../../utils/themeButtons";
+import { Megaphone, Trash2 } from "lucide-react";
 
 export default function AdminAnnouncements() {
   const { theme } = useTheme();
-  const { success, error } = useAppModal();
+  const { success, error, confirm } = useAppModal();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -59,6 +46,24 @@ export default function AdminAnnouncements() {
     }
   };
 
+  const handleDeleteRow = async (row) => {
+    const ok = await confirm({
+      title: "Delete announcement?",
+      message: `"${row.title}" will be permanently removed.`,
+      tone: "danger",
+      confirmLabel: "Delete",
+      cancelLabel: "Keep",
+    });
+    if (!ok) return;
+    try {
+      await deleteAdminBroadcast(row.id);
+      await success("Announcement deleted.");
+      await load(true);
+    } catch (err) {
+      error(err.message || "Could not delete announcement.");
+    }
+  };
+
   if (loading) return <PageLoadingSkeleton theme={theme} variant="detail" />;
 
   return (
@@ -67,7 +72,7 @@ export default function AdminAnnouncements() {
         theme={theme}
         icon={Megaphone}
         title="Admin announcements"
-        subtitle="Broadcast messages to all users, teachers only, or students only."
+        subtitle="Broadcast messages to all users, teachers only, or students only. Tap a row to delete."
       />
 
       {loadError && (
@@ -120,18 +125,26 @@ export default function AdminAnnouncements() {
                 <th className={adminThClass(theme)}>Title</th>
                 <th className={adminThClass(theme)}>Audience</th>
                 <th className={adminThClass(theme)}>Date</th>
+                <th className={adminThClass(theme)}> </th>
               </tr>
             </thead>
             <tbody>
               {!rows.length ? (
                 <tr>
-                  <td colSpan={3} className={`${adminTdClass(theme)} py-8 text-center`}>
+                  <td colSpan={4} className={`${adminTdClass(theme)} py-8 text-center`}>
                     No announcements published yet.
                   </td>
                 </tr>
               ) : (
                 rows.map((row) => (
-                <tr key={row.id}>
+                <tr
+                  key={row.id}
+                  className={`cursor-pointer transition ${
+                    theme === "dark" ? "hover:bg-white/5" : "hover:bg-emerald-50/80"
+                  }`}
+                  onClick={() => handleDeleteRow(row)}
+                  title="Click to delete this announcement"
+                >
                   <td className={adminTdClass(theme)}>
                     <p className="font-medium">{row.title}</p>
                     {row.body && (
@@ -143,6 +156,23 @@ export default function AdminAnnouncements() {
                   <td className={adminTdClass(theme)}>{row.audience}</td>
                   <td className={adminTdClass(theme)}>
                     {row.created_at ? new Date(row.created_at).toLocaleString() : "—"}
+                  </td>
+                  <td className={adminTdClass(theme)}>
+                    <button
+                      type="button"
+                      className={`inline-flex rounded-lg p-2 ${
+                        theme === "dark"
+                          ? "text-red-400 hover:bg-red-500/20"
+                          : "text-red-600 hover:bg-red-50"
+                      }`}
+                      aria-label={`Delete ${row.title}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDeleteRow(row);
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
                 ))

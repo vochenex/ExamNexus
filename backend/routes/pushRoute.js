@@ -89,7 +89,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
       });
     }
 
-    const { audience, title, body, path } = req.body || {};
+    const { audience, title, body, path, facultyPath, studentPath } = req.body || {};
     if (!title) {
       return res.status(400).json({ error: "title is required" });
     }
@@ -98,7 +98,9 @@ router.post("/broadcast", requireAuth, async (req, res) => {
       audience: audience || "all",
       title,
       body,
-      path: path || "/student/dashboard",
+      path: path || "/student/platform-announcements",
+      facultyPath: facultyPath || "/faculty/platform-announcements",
+      studentPath: studentPath || "/student/platform-announcements",
       actorUserId: req.authUserId,
       actorName: req.body?.actorName || "",
       actorRole: req.body?.actorRole || "Admin",

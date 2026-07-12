@@ -26,7 +26,7 @@ $webApk = Join-Path $publicDownloadsDir "ExamNexus-Android.apk"
 
 Push-Location $androidDir
 try {
-  & .\gradlew.bat assembleDebug --no-daemon
+  & .\gradlew.bat assembleDebug
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   $apk = Join-Path $androidDir "app\build\outputs\apk\debug\app-debug.apk"

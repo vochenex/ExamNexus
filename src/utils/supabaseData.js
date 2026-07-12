@@ -2548,6 +2548,122 @@ export async function deleteAnnouncement(announcementId) {
   if (error) throw error;
 }
 
+export async function fetchPlatformAnnouncements() {
+  await requireSession();
+  const { data, error } = await supabase.rpc("get_platform_announcements");
+  if (!error && data) return normalizeJsonList(data);
+
+  if (error?.message?.includes("Could not find the function")) {
+    const { data: rows, error: directError } = await supabase
+      .from("admin_announcements")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (directError) throw directError;
+    return (rows || []).map((row) => ({
+      ...row,
+      heart_count: 0,
+      comment_count: 0,
+      user_reacted: false,
+      author_first_name: "ExamNexus",
+      author_last_name: "Admin",
+    }));
+  }
+
+  if (error) throw error;
+  return [];
+}
+
+export async function fetchAdminAnnouncementComments(announcementId) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("get_admin_announcement_comments", {
+    p_announcement_id: announcementId,
+  });
+  if (!error && data) return normalizeJsonList(data);
+  if (error) throw error;
+  return [];
+}
+
+export async function postAdminAnnouncementComment(announcementId, body) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("add_admin_announcement_comment", {
+    p_announcement_id: announcementId,
+    p_body: body,
+  });
+  if (error) throw error;
+
+  try {
+    const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+    const actorName =
+      [cached.first_name, cached.last_name].filter(Boolean).join(" ").trim() ||
+      "Someone";
+    const session = await requireSession();
+    const actorId = session?.user?.id;
+
+    const { data: announcement } = await supabase
+      .from("admin_announcements")
+      .select("id, title, created_by")
+      .eq("id", announcementId)
+      .maybeSingle();
+
+    const { data: priorComments } = await supabase
+      .from("admin_announcement_comments")
+      .select("user_id")
+      .eq("announcement_id", announcementId)
+      .neq("user_id", actorId)
+      .limit(40);
+
+    const otherIds = [
+      ...new Set((priorComments || []).map((row) => row.user_id).filter(Boolean)),
+    ];
+    const authorId =
+      announcement?.created_by && announcement.created_by !== actorId
+        ? announcement.created_by
+        : null;
+    const peerIds = otherIds.filter((id) => id !== authorId);
+
+    if (authorId) {
+      await dispatchPushToUsers({
+        userIds: [authorId],
+        title: "New comment",
+        body: `${actorName} commented on "${announcement?.title || "announcement"}"`,
+        data: {
+          kind: "comment",
+          platform: "1",
+          path: `/admin/announcements`,
+          announcement_id: announcementId,
+        },
+      });
+    }
+
+    if (peerIds.length) {
+      await dispatchPushToUsers({
+        userIds: peerIds,
+        title: `${actorName} also commented`,
+        body: `${actorName} also commented on the announcement you commented on ("${announcement?.title || "announcement"}").`,
+        data: {
+          kind: "comment",
+          platform: "1",
+          path: `/student/platform-announcements?highlight=${announcementId}&comments=1`,
+          announcement_id: announcementId,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn("Admin comment push skipped:", err?.message || err);
+  }
+
+  return data;
+}
+
+export async function toggleAdminAnnouncementHeart(announcementId) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("toggle_admin_announcement_reaction", {
+    p_announcement_id: announcementId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 function normalizeJsonList(data) {
   if (Array.isArray(data)) return data;
   if (typeof data === "string") {
@@ -2712,6 +2828,10 @@ export async function postAnnouncementComment(announcementId, body) {
 
     const session = await requireSession();
     const actorId = session?.user?.id;
+    const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+    const actorName =
+      [cached.first_name, cached.last_name].filter(Boolean).join(" ").trim() ||
+      "Someone";
     const authorId =
       announcement?.created_by && announcement.created_by !== actorId
         ? announcement.created_by
@@ -2732,16 +2852,21 @@ export async function postAnnouncementComment(announcementId, body) {
       ),
     ];
 
+    const facultyPath = `/faculty/subject/${announcement?.subject_id}/social?highlight=${announcementId}&comments=1`;
+    const studentPath = `/student/subject/${announcement?.subject_id}/social?highlight=${announcementId}&comments=1`;
+
     if (authorId) {
       await dispatchPushToUsers({
         userIds: [authorId],
         title: "New comment",
-        body: `New comment on "${announcement?.title || "announcement"}"`,
+        body: `${actorName} commented on "${announcement?.title || "announcement"}"`,
+        actorName,
         data: {
           kind: "comment",
-          path: `/faculty/subject/${announcement.subject_id}/social?highlight=${announcementId}&comments=1`,
+          path: facultyPath,
           announcement_id: announcementId,
           subject_id: announcement?.subject_id || "",
+          actor_name: actorName,
         },
       });
     }
@@ -2749,13 +2874,15 @@ export async function postAnnouncementComment(announcementId, body) {
     if (otherIds.length && announcement?.subject_id) {
       await dispatchPushToUsers({
         userIds: otherIds,
-        title: "New comment",
-        body: `New comment on "${announcement?.title || "announcement"}"`,
+        title: `${actorName} also commented`,
+        body: `${actorName} also commented on the announcement you commented on ("${announcement?.title || "announcement"}").`,
+        actorName,
         data: {
           kind: "comment",
-          path: `/student/subject/${announcement.subject_id}/social?highlight=${announcementId}&comments=1`,
+          path: studentPath,
           announcement_id: announcementId,
           subject_id: announcement.subject_id,
+          actor_name: actorName,
         },
       });
     }

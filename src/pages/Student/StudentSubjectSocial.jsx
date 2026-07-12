@@ -24,6 +24,7 @@ export default function StudentSubjectSocial() {
   const { subjectId } = useParams();
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
+  const openComments = searchParams.get("comments") === "1";
 
   const [subject, setSubject] = useState(null);
   const [faculty, setFaculty] = useState(null);
@@ -113,6 +114,9 @@ export default function StudentSubjectSocial() {
                     announcement={announcement}
                     allowInteract
                     highlighted={highlightId === String(announcement.id)}
+                    autoExpandComments={
+                      openComments && highlightId === String(announcement.id)
+                    }
                     onUpdated={loadPage}
                   />
                 ))}

@@ -606,7 +606,7 @@ function getAuthInputProps(theme) {
     w-full
     max-w-5xl
     mx-auto
-    rounded-[32px]
+    rounded-[2rem]
     overflow-hidden
     backdrop-blur-2xl
     border

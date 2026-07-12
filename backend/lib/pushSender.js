@@ -423,7 +423,7 @@ async function sendPushToUsers(admin, userIds, payload) {
     return { sent: 0, skipped: 0, recipients: 0 };
   }
 
-  const rich =
+  const baseRich =
     payload?.rich === false
       ? {
           title: payload.title,
@@ -445,10 +445,16 @@ async function sendPushToUsers(admin, userIds, payload) {
           extraData: payload.data || {},
         });
 
-  const { data: devices, error } = await admin
-    .from("push_devices")
-    .select("token, user_id, platform")
-    .in("user_id", uniqueIds);
+  const [{ data: devices, error }, { data: profiles }] = await Promise.all([
+    admin
+      .from("push_devices")
+      .select("token, user_id, platform")
+      .in("user_id", uniqueIds),
+    admin
+      .from("users")
+      .select("id, first_name, last_name")
+      .in("id", uniqueIds),
+  ]);
 
   if (error) {
     if (
@@ -460,9 +466,46 @@ async function sendPushToUsers(admin, userIds, payload) {
     throw error;
   }
 
-  const tokens = [...new Set((devices || []).map((row) => row.token).filter(Boolean))];
-  const result = await sendViaFcm(tokens, rich);
-  return { ...result, recipients: uniqueIds.length, devices: tokens.length };
+  const nameById = new Map(
+    (profiles || []).map((row) => {
+      const name = `${row.first_name || ""} ${row.last_name || ""}`.trim();
+      return [row.id, name || "Your account"];
+    })
+  );
+
+  const byUser = new Map();
+  for (const row of devices || []) {
+    if (!row?.token || !row?.user_id) continue;
+    if (!byUser.has(row.user_id)) byUser.set(row.user_id, []);
+    byUser.get(row.user_id).push(row.token);
+  }
+
+  let sent = 0;
+  let failures = [];
+  for (const [userId, tokens] of byUser.entries()) {
+    const accountName = nameById.get(userId) || "Your account";
+    const personalized = {
+      ...baseRich,
+      title: truncate(`For ${accountName}: ${baseRich.title}`, 65),
+      body: truncate(`${baseRich.body}\nAccount: ${accountName}`, 240),
+      data: {
+        ...(baseRich.data || {}),
+        for_account: accountName,
+        recipient_user_id: String(userId),
+      },
+    };
+    const result = await sendViaFcm([...new Set(tokens)], personalized);
+    sent += Number(result.sent || 0);
+    if (result.failures?.length) failures = failures.concat(result.failures);
+  }
+
+  return {
+    sent,
+    skipped: 0,
+    recipients: uniqueIds.length,
+    devices: [...byUser.values()].flat().length,
+    failures: failures.length ? failures.slice(0, 5) : undefined,
+  };
 }
 
 /**
@@ -549,7 +592,9 @@ async function notifyBroadcastAudience(admin, {
   audience = "all",
   title,
   body,
-  path = "/student/dashboard",
+  path = "/student/platform-announcements",
+  facultyPath = "/faculty/platform-announcements",
+  studentPath = "/student/platform-announcements",
   actorUserId = null,
   actorName = "",
   actorRole = "",
@@ -563,36 +608,63 @@ async function notifyBroadcastAudience(admin, {
 
   if (error) throw error;
 
-  const recipientIds = (rows || [])
-    .filter((row) => {
-      const role = String(row.role || "").toLowerCase();
-      const status = String(row.account_status || "approved").toLowerCase();
-      if (status && status !== "approved") return false;
-      if (normalized === "faculty") return role === "faculty" || role === "teacher";
-      if (normalized === "students") return role === "student";
-      return role === "faculty" || role === "teacher" || role === "student";
-    })
-    .map((row) => row.id);
+  const facultyIds = [];
+  const studentIds = [];
+  for (const row of rows || []) {
+    const role = String(row.role || "").toLowerCase();
+    const status = String(row.account_status || "approved").toLowerCase();
+    if (status && status !== "approved") continue;
+    const isFaculty = role === "faculty" || role === "teacher";
+    const isStudent = role === "student";
+    if (normalized === "faculty" && isFaculty) facultyIds.push(row.id);
+    else if (normalized === "students" && isStudent) studentIds.push(row.id);
+    else if (normalized === "all") {
+      if (isFaculty) facultyIds.push(row.id);
+      if (isStudent) studentIds.push(row.id);
+    }
+  }
 
   const actor = actorName
     ? { name: actorName, role: actorRole || "Admin", avatar: actorAvatar }
     : await loadUserProfile(admin, actorUserId);
 
-  return sendPushToUsers(admin, recipientIds, {
-    kind: "admin_announcement",
-    title: title || "ExamNexus announcement",
-    body: body || "You have a new platform announcement.",
-    actorName: actor?.name || "ExamNexus Admin",
-    actorRole: actor?.role || "Admin",
-    actorAvatar: actor?.avatar || "",
-    path,
-    tag: `broadcast-${normalized}`,
-    data: {
+  const sendGroup = (ids, destPath) =>
+    sendPushToUsers(admin, ids, {
       kind: "admin_announcement",
-      path,
-      audience: normalized,
-    },
-  });
+      title: title || "ExamNexus announcement",
+      body: body || "You have a new platform announcement.",
+      actorName: actor?.name || "ExamNexus Admin",
+      actorRole: actor?.role || "Admin",
+      actorAvatar: actor?.avatar || "",
+      path: destPath,
+      tag: `broadcast-${normalized}`,
+      data: {
+        kind: "admin_announcement",
+        path: destPath,
+        audience: normalized,
+      },
+    });
+
+  const results = [];
+  if (facultyIds.length) {
+    results.push(await sendGroup(facultyIds, facultyPath || path));
+  }
+  if (studentIds.length) {
+    results.push(await sendGroup(studentIds, studentPath || path));
+  }
+  if (!results.length) {
+    return { sent: 0, skipped: 0, recipients: 0 };
+  }
+
+  return results.reduce(
+    (acc, row) => ({
+      sent: acc.sent + Number(row.sent || 0),
+      skipped: acc.skipped + Number(row.skipped || 0),
+      recipients: acc.recipients + Number(row.recipients || 0),
+      devices: Number(acc.devices || 0) + Number(row.devices || 0),
+    }),
+    { sent: 0, skipped: 0, recipients: 0, devices: 0 }
+  );
 }
 
 module.exports = {

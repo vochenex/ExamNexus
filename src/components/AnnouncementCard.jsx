@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ProfileAvatar from "./ProfileAvatar";
 import { useAppModal } from "../contexts/AppModalContext";
 import { formatTargetSectionsLabel } from "../utils/sections";
+import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
 import {
   fetchAnnouncementComments,
   postAnnouncementComment,
@@ -11,18 +12,34 @@ import {
   deleteAnnouncement,
 } from "../utils/supabaseData";
 
+function formatCommentTime(value) {
+  if (!value) return "";
+  try {
+    return new Date(value).toLocaleString("en-PH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function AnnouncementCard({
   announcement,
   canDelete = false,
   allowInteract = true,
   highlighted = false,
   autoExpandComments = false,
+  hideSections = false,
   onDeleted,
   onUpdated,
+  fetchComments = fetchAnnouncementComments,
+  postComment = postAnnouncementComment,
+  toggleHeart = toggleAnnouncementHeart,
+  removeAnnouncement = deleteAnnouncement,
 }) {
   const { theme } = useTheme();
   const { error, confirm } = useAppModal();
-  const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
 
   const [heartCount, setHeartCount] = useState(announcement.heart_count || 0);
   const [userReacted, setUserReacted] = useState(Boolean(announcement.user_reacted));
@@ -32,6 +49,8 @@ export default function AnnouncementCard({
   const [commentText, setCommentText] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const commentsOpenRef = useRef(false);
+  const lastCountRef = useRef(announcement.comment_count || 0);
 
   useEffect(() => {
     setHeartCount(announcement.heart_count || 0);
@@ -39,29 +58,72 @@ export default function AnnouncementCard({
     setCommentCount(announcement.comment_count || 0);
   }, [announcement]);
 
-  const loadComments = async () => {
+  const loadComments = async ({ silent = false } = {}) => {
     try {
-      setLoadingComments(true);
-      const rows = await fetchAnnouncementComments(announcement.id);
+      if (!silent) setLoadingComments(true);
+      const rows = await fetchComments(announcement.id);
       setComments(rows);
       setCommentCount(rows.length);
+      lastCountRef.current = rows.length;
     } catch (err) {
       console.error(err);
     } finally {
-      setLoadingComments(false);
+      if (!silent) setLoadingComments(false);
     }
   };
 
   useEffect(() => {
     if (!autoExpandComments) return;
     setShowComments(true);
+    commentsOpenRef.current = true;
     loadComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExpandComments, announcement.id]);
+
+  // Keep open comment threads fresh when parent poll updates counts.
+  useEffect(() => {
+    const nextCount = Number(announcement.comment_count || 0);
+    if (!showComments) {
+      lastCountRef.current = nextCount;
+      return;
+    }
+    if (nextCount !== lastCountRef.current) {
+      lastCountRef.current = nextCount;
+      loadComments({ silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [announcement.comment_count, showComments, announcement.id]);
+
+  // While comments are open and the tab is visible, refresh the thread.
+  useEffect(() => {
+    if (!showComments) return undefined;
+
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      if (document.visibilityState === "hidden") return;
+      await loadComments({ silent: true });
+    };
+
+    const timer = window.setInterval(tick, REALTIME_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showComments, announcement.id]);
 
   const handleToggleComments = async () => {
     const next = !showComments;
     setShowComments(next);
-    if (next && comments.length === 0) {
+    commentsOpenRef.current = next;
+    if (next) {
       await loadComments();
     }
   };
@@ -70,7 +132,7 @@ export default function AnnouncementCard({
     if (!allowInteract) return;
 
     try {
-      const result = await toggleAnnouncementHeart(announcement.id);
+      const result = await toggleHeart(announcement.id);
       setUserReacted(result.user_reacted);
       setHeartCount(result.heart_count);
       onUpdated?.();
@@ -85,10 +147,11 @@ export default function AnnouncementCard({
 
     try {
       setSubmitting(true);
-      const row = await postAnnouncementComment(announcement.id, commentText.trim());
+      const row = await postComment(announcement.id, commentText.trim());
       setComments((prev) => [...prev, row]);
       setCommentText("");
       setCommentCount((prev) => prev + 1);
+      lastCountRef.current += 1;
       setShowComments(true);
       onUpdated?.();
     } catch (err) {
@@ -111,7 +174,7 @@ export default function AnnouncementCard({
     if (!confirmed) return;
 
     try {
-      await deleteAnnouncement(announcement.id);
+      await removeAnnouncement(announcement.id);
       onDeleted?.(announcement.id);
     } catch (err) {
       error(err.message || "Could not delete announcement.");
@@ -120,7 +183,9 @@ export default function AnnouncementCard({
 
   const authorName = announcement.author_first_name
     ? `${announcement.author_first_name} ${announcement.author_last_name || ""}`.trim()
-    : "Faculty";
+    : hideSections
+      ? "ExamNexus Admin"
+      : "Faculty";
 
   return (
     <article
@@ -181,13 +246,25 @@ export default function AnnouncementCard({
         {announcement.body || "—"}
       </p>
 
-      <p
-        className={`mt-2 text-xs ${
-          theme === "dark" ? "text-emerald-400" : "text-teal-700"
-        }`}
-      >
-        {formatTargetSectionsLabel(announcement.target_sections)}
-      </p>
+      {!hideSections && (
+        <p
+          className={`mt-2 text-xs ${
+            theme === "dark" ? "text-emerald-400" : "text-teal-700"
+          }`}
+        >
+          {formatTargetSectionsLabel(announcement.target_sections)}
+        </p>
+      )}
+
+      {hideSections && announcement.audience && (
+        <p
+          className={`mt-2 text-xs ${
+            theme === "dark" ? "text-emerald-400" : "text-teal-700"
+          }`}
+        >
+          Audience: {announcement.audience}
+        </p>
+      )}
 
       <div className="mt-4 flex items-center gap-4">
         <button
@@ -222,7 +299,7 @@ export default function AnnouncementCard({
 
       {showComments && (
         <div className="mt-4 space-y-3">
-          {loadingComments ? (
+          {loadingComments && comments.length === 0 ? (
             <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
               Loading comments...
             </p>
@@ -231,32 +308,45 @@ export default function AnnouncementCard({
               No comments yet.
             </p>
           ) : (
-            comments.map((comment) => (
-              <div key={comment.id} className="flex items-start gap-2">
-                <ProfileAvatar
-                  src={comment.avatar_url}
-                  alt={comment.first_name || "User"}
-                  size="xs"
-                  showRing={false}
-                />
-                <div
-                  className={`flex-1 rounded-xl px-3 py-2 text-sm ${
-                    theme === "dark" ? "bg-white/5" : "en-bg-muted"
-                  }`}
-                >
-                  <p
-                    className={`text-xs font-medium ${
-                      theme === "dark" ? "text-emerald-400" : "text-teal-700"
+            <div className="en-announcement-comments en-scroll-region max-h-48 space-y-2 overflow-y-auto overscroll-contain pr-1">
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex items-start gap-2">
+                  <ProfileAvatar
+                    src={comment.avatar_url}
+                    alt={comment.first_name || "User"}
+                    size="xs"
+                    showRing={false}
+                  />
+                  <div
+                    className={`flex-1 rounded-xl px-3 py-2 text-sm ${
+                      theme === "dark" ? "bg-white/5" : "en-bg-muted"
                     }`}
                   >
-                    {`${comment.first_name || "User"} ${comment.last_name || ""}`.trim()}
-                  </p>
-                  <p className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
-                    {comment.body}
-                  </p>
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                      <p
+                        className={`text-xs font-medium ${
+                          theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                        }`}
+                      >
+                        {`${comment.first_name || "User"} ${comment.last_name || ""}`.trim()}
+                      </p>
+                      {comment.created_at && (
+                        <p
+                          className={`text-[10px] ${
+                            theme === "dark" ? "text-gray-500" : "text-gray-500"
+                          }`}
+                        >
+                          {formatCommentTime(comment.created_at)}
+                        </p>
+                      )}
+                    </div>
+                    <p className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
+                      {comment.body}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
 
           {allowInteract && (

@@ -113,6 +113,12 @@ function kindIcon(item) {
   return ClipboardCheck;
 }
 
+function accountLabelForItem(item, fallbackUser) {
+  if (item?.for_account) return item.for_account;
+  const name = `${fallbackUser?.first_name || ""} ${fallbackUser?.last_name || ""}`.trim();
+  return name || fallbackUser?.email || "Your account";
+}
+
 export default function NotificationBell({ compact = false }) {
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -418,6 +424,7 @@ export default function NotificationBell({ compact = false }) {
                       isStudent,
                       userId: user.id,
                     });
+                    const forAccount = accountLabelForItem(item, user);
 
                     return (
                       <button
@@ -446,6 +453,13 @@ export default function NotificationBell({ compact = false }) {
                             >
                               {statusLabel(item)}
                               {item.subject_name ? ` · ${item.subject_name}` : ""}
+                            </p>
+                            <p
+                              className={`mt-0.5 text-[11px] font-semibold ${
+                                theme === "dark" ? "text-amber-300/90" : "text-amber-700"
+                              }`}
+                            >
+                              For: {forAccount}
                             </p>
                             <p
                               className={`text-sm font-semibold truncate ${

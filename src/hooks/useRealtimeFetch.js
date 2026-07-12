@@ -1,8 +1,65 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const REALTIME_POLL_MS = 5000;
+export const REALTIME_POLL_MS = 2500;
+export const REALTIME_POLL_HIDDEN_MS = 15000;
 
-export default function useRealtimeFetch(fetchFn, deps = [], intervalMs = REALTIME_POLL_MS) {
+/**
+ * Keep polls responsive while the tab is focused. Chrome heavily throttles
+ * background-tab timers, which made the website look "not realtime" vs APK.
+ */
+function schedulePoll(callback, visibleMs, hiddenMs) {
+  let timerId = null;
+  let stopped = false;
+
+  const clear = () => {
+    if (timerId != null) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+
+  const tick = async () => {
+    if (stopped) return;
+    try {
+      await callback();
+    } catch {
+      // caller handles errors
+    }
+    if (stopped) return;
+    const delay =
+      typeof document !== "undefined" && document.visibilityState === "hidden"
+        ? hiddenMs
+        : visibleMs;
+    timerId = window.setTimeout(tick, delay);
+  };
+
+  const onVisibility = () => {
+    if (stopped) return;
+    if (document.visibilityState === "visible") {
+      clear();
+      tick();
+    }
+  };
+
+  tick();
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibility);
+  }
+
+  return () => {
+    stopped = true;
+    clear();
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibility);
+    }
+  };
+}
+
+export default function useRealtimeFetch(
+  fetchFn,
+  deps = [],
+  intervalMs = REALTIME_POLL_MS
+) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -41,11 +98,11 @@ export default function useRealtimeFetch(fetchFn, deps = [], intervalMs = REALTI
     };
 
     run(false);
-    const timer = setInterval(() => run(true), intervalMs);
+    const stop = schedulePoll(() => run(true), intervalMs, REALTIME_POLL_HIDDEN_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, intervalMs]);
@@ -67,11 +124,11 @@ export function usePolling(loadFn, deps = [], intervalMs = REALTIME_POLL_MS) {
     };
 
     run(false);
-    const timer = setInterval(() => run(true), intervalMs);
+    const stop = schedulePoll(() => run(true), intervalMs, REALTIME_POLL_HIDDEN_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, intervalMs]);

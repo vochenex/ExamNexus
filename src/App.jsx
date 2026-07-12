@@ -36,6 +36,7 @@ const AdminAssessments = lazy(() => import("./pages/Admin/AdminAssessments"));
 const AdminExamLogs = lazy(() => import("./pages/Admin/AdminExamLogs"));
 const AdminExports = lazy(() => import("./pages/Admin/AdminExports"));
 const AdminPasswordResets = lazy(() => import("./pages/Admin/AdminPasswordResets"));
+const PlatformAnnouncements = lazy(() => import("./pages/PlatformAnnouncements"));
 
 export default function App() {
   return (
@@ -71,8 +72,10 @@ export default function App() {
           <Route element={<DashboardLayout />}>
             <Route path="/faculty/profile" element={<Profile />} />
             <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
+            <Route path="/faculty/platform-announcements" element={<PlatformAnnouncements />} />
             <Route path="/student/dashboard" element={<StudentDashboard />} />
             <Route path="/student/profile" element={<Profile />} />
+            <Route path="/student/platform-announcements" element={<PlatformAnnouncements />} />
             <Route path="/student/assessments" element={<StudentAssessments />} />
             <Route path="/student/results" element={<StudentResultsList />} />
             <Route path="/student/results/:examId/:studentId" element={<StudentResults />} />
