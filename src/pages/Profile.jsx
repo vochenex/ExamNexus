@@ -82,7 +82,13 @@ function FieldLabel({ children, theme, htmlFor, hint }) {
 
 function ProfileSelect({ id, value, onChange, disabled, children }) {
   return (
-    <Select id={id} value={value} onChange={onChange} disabled={disabled}>
+    <Select
+      id={id}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      className="en-profile-select"
+    >
       {children}
     </Select>
   );

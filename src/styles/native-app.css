@@ -507,9 +507,28 @@
 :is(html.en-native-app, html.en-mobile-shell) .en-profile-page select,
 :is(html.en-native-app, html.en-mobile-shell) .en-profile-page textarea,
 :is(html.en-native-app, html.en-mobile-shell) .en-profile-page .en-select-trigger {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 2.85rem !important;
   font-size: 16px !important;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
+  line-height: 1.25 !important;
+  padding-top: 0.7rem !important;
+  padding-bottom: 0.7rem !important;
+  padding-left: 0.75rem !important;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page .en-select-trigger {
+  /* Same height as inputs; extra right padding for the chevron */
+  display: flex !important;
+  align-items: center !important;
+  padding-right: 2.5rem !important;
+  background-color: rgba(223, 248, 243, 0.1) !important;
+}
+
+html.light.en-native-app .en-profile-page .en-select-trigger,
+html.light.en-mobile-shell .en-profile-page .en-select-trigger {
+  background-color: transparent !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-profile-page .rounded-2xl,

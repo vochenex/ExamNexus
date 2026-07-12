@@ -2,7 +2,7 @@ import { LIGHT_BG } from "./themeColors";
 import { motion } from "./motion";
 
 export function inputClass(theme, extra = "") {
-  return `box-border w-full max-w-full min-w-0 rounded-xl px-3 py-2 text-sm outline-none transition-all duration-200 ${
+  return `box-border w-full max-w-full min-w-0 rounded-xl px-3 py-2.5 text-sm leading-normal outline-none transition-all duration-200 ${
     theme === "dark"
       ? "border border-white/10 bg-[#dff8f3]/10 text-white placeholder:text-gray-500"
       : `border border-slate-200/90 ${LIGHT_BG.input} text-[var(--en-text-primary)] placeholder:text-[var(--en-text-muted)]`
@@ -10,9 +10,10 @@ export function inputClass(theme, extra = "") {
 }
 
 export function selectClass(theme, extra = "") {
-  return `en-select relative box-border w-full max-w-full min-w-0 overflow-hidden rounded-xl py-2 pl-3 pr-10 text-sm outline-none transition-all duration-200 appearance-none cursor-pointer ${
+  // Match inputClass sizing/fill so profile dropdowns align with text fields.
+  return `en-select relative box-border flex w-full max-w-full min-w-0 items-center overflow-hidden rounded-xl py-2.5 pl-3 pr-10 text-sm leading-normal outline-none transition-all duration-200 appearance-none cursor-pointer ${
     theme === "dark"
-      ? "border border-white/10 bg-[#0a1614] text-emerald-50 hover:border-emerald-500/35 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/25 disabled:bg-white/[0.04] disabled:text-gray-500"
+      ? "border border-white/10 bg-[#dff8f3]/10 text-white hover:border-emerald-500/35 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/25 disabled:bg-white/[0.04] disabled:text-gray-500"
       : `border border-slate-200/90 ${LIGHT_BG.input} text-[var(--en-text-primary)] hover:border-teal-400/50 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 disabled:text-[var(--en-text-muted)]`
   } disabled:cursor-not-allowed disabled:opacity-70 ${extra}`;
 }

@@ -954,62 +954,65 @@ html:not(.light) .en-sheet-logout {
 .en-install-sheet-root {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 120;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
 }
 
 .en-install-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(2, 12, 11, 0.55);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  background: rgba(2, 12, 11, 0.7);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   animation: en-fade-in 0.25s ease both;
 }
 
 .en-install-sheet {
   position: relative;
   z-index: 1;
-  width: min(28rem, calc(100vw - 1rem));
-  margin-bottom: calc(0.6rem + var(--en-safe-bottom, 0px));
-  border-radius: 1.6rem;
-  padding: 0.75rem 1.4rem calc(1.4rem + var(--en-safe-bottom, 0px));
-  animation: en-sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: min(85dvh, 36rem);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  border-radius: 1.5rem;
+  padding: 1.25rem 1.35rem 1.35rem;
+  animation: en-scale-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .en-install-sheet--dark {
-  background: rgba(11, 17, 20, 0.98);
-  border: 1px solid rgba(52, 211, 153, 0.16);
+  background: #0a1f1f;
+  border: 1px solid rgba(52, 211, 153, 0.18);
   color: #e2e8f0;
-  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
 }
 
 .en-install-sheet--light {
   background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.1);
   color: #1f2937;
-  box-shadow: 0 -12px 48px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
 }
 
 .en-install-sheet-handle {
-  width: 2.5rem;
-  height: 0.28rem;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0.2;
-  margin: 0.15rem auto 1rem;
+  display: none;
 }
 
 .en-install-sheet-title {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 800;
   text-align: center;
 }
 
 .en-install-sheet-text {
-  margin-top: 0.4rem;
+  margin-top: 0.45rem;
   font-size: 0.85rem;
   text-align: center;
   opacity: 0.75;
@@ -1054,10 +1057,10 @@ html:not(.light) .en-install-step-num {
 
 .en-install-sheet-done {
   width: 100%;
-  margin-top: 1.4rem;
-  padding: 0.8rem;
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
   border-radius: 1rem;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #fff;
   background: linear-gradient(135deg, #0d9488, #0891b2);

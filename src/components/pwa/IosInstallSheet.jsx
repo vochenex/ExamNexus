@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { Check, Copy, Share, SquarePlus, ExternalLink } from "lucide-react";
 import { isIOSSafari } from "../../utils/pwa";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
+import ModalPortal from "../ui/ModalPortal";
+import { motion } from "../../utils/motion";
 
 const SITE_URL = "https://exam-nexus-eta.vercel.app";
 
 /**
- * Bottom sheet with Safari Add to Home Screen steps for iPhone / iPad.
- * Chrome on iOS cannot show that menu — we detect and redirect users to Safari.
+ * Centered install help for iPhone / iPad (Safari Add to Home Screen).
+ * Chrome on iOS cannot show that menu — we detect and guide users to Safari.
  */
 export default function IosInstallSheet({ open, onClose, isDark }) {
   const [copied, setCopied] = useState(false);
+  useModalDismiss(onClose, { enabled: open });
+
   if (!open) return null;
 
   const inSafari = isIOSSafari();
@@ -25,85 +30,96 @@ export default function IosInstallSheet({ open, onClose, isDark }) {
   };
 
   return (
-    <div className="en-install-sheet-root" role="dialog" aria-modal="true">
-      <div className="en-install-overlay" onClick={onClose} aria-hidden="true" />
+    <ModalPortal>
       <div
-        className={`en-install-sheet ${isDark ? "en-install-sheet--dark" : "en-install-sheet--light"}`}
+        className={`en-install-sheet-root fixed inset-0 z-[120] flex items-center justify-center p-4 ${motion.overlay}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ios-install-title"
       >
-        <div className="en-install-sheet-handle" aria-hidden="true" />
-        <h3 className="en-install-sheet-title">Add to Home Screen</h3>
+        <div className="en-install-overlay" onClick={onClose} aria-hidden="true" />
+        <div
+          className={`en-install-sheet ${
+            isDark ? "en-install-sheet--dark" : "en-install-sheet--light"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 id="ios-install-title" className="en-install-sheet-title">
+            Install ExamNexus
+          </h3>
 
-        {!inSafari && (
-          <div
-            className={`mb-3 rounded-2xl border px-3 py-2.5 text-sm ${
-              isDark
-                ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
-                : "border-amber-200 bg-amber-50 text-amber-900"
-            }`}
-          >
-            You are not in Safari right now (Chrome / another browser on iPhone
-            does not show <strong>Add to Home Screen</strong>).
-            <br />
-            Open ExamNexus in <strong>Safari</strong> first, then use Share.
-          </div>
-        )}
-
-        <p className="en-install-sheet-text">
-          {inSafari
-            ? "Use Safari’s Share menu — Add to Home Screen is not under the ⋯ page menu."
-            : "After you open this site in Safari:"}
-        </p>
-
-        <ol className="en-install-steps">
           {!inSafari && (
+            <div
+              className={`mb-3 rounded-2xl border px-3 py-2.5 text-sm ${
+                isDark
+                  ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
+                  : "border-amber-200 bg-amber-50 text-amber-900"
+              }`}
+            >
+              You are not in Safari right now (Chrome / another browser on iPhone
+              does not show <strong>Add to Home Screen</strong>).
+              <br />
+              Open ExamNexus in <strong>Safari</strong> first, then use Share.
+            </div>
+          )}
+
+          <p className="en-install-sheet-text">
+            {inSafari
+              ? "Use Safari’s Share menu — Add to Home Screen is not under the ⋯ page menu."
+              : "After you open this site in Safari:"}
+          </p>
+
+          <ol className="en-install-steps">
+            {!inSafari && (
+              <li>
+                <span className="en-install-step-icon">
+                  <ExternalLink size={16} />
+                </span>
+                Open the <strong>Safari</strong> app and go to ExamNexus (copy the
+                link below).
+              </li>
+            )}
             <li>
               <span className="en-install-step-icon">
-                <ExternalLink size={16} />
+                <Share size={16} />
               </span>
-              Open the <strong>Safari</strong> app and go to ExamNexus (copy the
-              link below).
+              Tap the <strong>Share</strong> button
+              {inSafari ? " at the bottom of Safari" : " in Safari’s toolbar"} (box
+              with an upward arrow).
             </li>
+            <li>
+              <span className="en-install-step-icon">
+                <SquarePlus size={16} />
+              </span>
+              Scroll the share sheet and tap <strong>Add to Home Screen</strong>.
+            </li>
+            <li>
+              <span className="en-install-step-num">✓</span>
+              Tap <strong>Add</strong> — ExamNexus appears on your home screen like
+              an app.
+            </li>
+          </ol>
+
+          {!inSafari && (
+            <button
+              type="button"
+              onClick={copyLink}
+              className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
+                isDark
+                  ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
+                  : "border-emerald-200 bg-emerald-50 text-teal-800"
+              }`}
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              {copied ? "Link copied" : "Copy Safari link"}
+            </button>
           )}
-          <li>
-            <span className="en-install-step-icon">
-              <Share size={16} />
-            </span>
-            Tap the <strong>Share</strong> button
-            {inSafari ? " at the bottom of Safari" : " in Safari’s toolbar"} (box
-            with an upward arrow).
-          </li>
-          <li>
-            <span className="en-install-step-icon">
-              <SquarePlus size={16} />
-            </span>
-            Scroll the share sheet and tap <strong>Add to Home Screen</strong>.
-          </li>
-          <li>
-            <span className="en-install-step-num">✓</span>
-            Tap <strong>Add</strong> — ExamNexus appears on your home screen like
-            an app.
-          </li>
-        </ol>
 
-        {!inSafari && (
-          <button
-            type="button"
-            onClick={copyLink}
-            className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
-              isDark
-                ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
-                : "border-emerald-200 bg-emerald-50 text-teal-800"
-            }`}
-          >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
-            {copied ? "Link copied" : "Copy Safari link"}
+          <button type="button" onClick={onClose} className="en-install-sheet-done">
+            Got it
           </button>
-        )}
-
-        <button type="button" onClick={onClose} className="en-install-sheet-done">
-          Got it
-        </button>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
