@@ -519,7 +519,8 @@ html.en-ios input,
 html.en-ios textarea,
 html.en-ios select,
 html.en-ios .en-select-trigger,
-html.en-ios .examnexus-auth-input {
+html.en-ios .examnexus-auth-input,
+html.en-ios [contenteditable="true"] {
   font-size: 16px !important;
 }
 
