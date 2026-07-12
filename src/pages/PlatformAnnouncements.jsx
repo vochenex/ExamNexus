@@ -14,6 +14,8 @@ import {
   fetchAdminAnnouncementComments,
   postAdminAnnouncementComment,
   toggleAdminAnnouncementHeart,
+  updateAdminAnnouncementComment,
+  deleteAdminAnnouncementComment,
 } from "../utils/supabaseData";
 
 /**
@@ -94,6 +96,8 @@ export default function PlatformAnnouncements() {
                   fetchComments={fetchAdminAnnouncementComments}
                   postComment={postAdminAnnouncementComment}
                   toggleHeart={toggleAdminAnnouncementHeart}
+                  updateComment={updateAdminAnnouncementComment}
+                  removeComment={deleteAdminAnnouncementComment}
                 />
               ))}
             </div>

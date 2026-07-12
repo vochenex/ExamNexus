@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
+import { Check, Heart, MessageCircle, Pencil, Send, Trash2, X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ProfileAvatar from "./ProfileAvatar";
 import { useAppModal } from "../contexts/AppModalContext";
@@ -9,6 +9,8 @@ import {
   postAnnouncementComment,
   toggleAnnouncementHeart,
   deleteAnnouncement,
+  updateAnnouncementComment,
+  deleteAnnouncementComment,
 } from "../utils/supabaseData";
 
 function formatCommentTime(value) {
@@ -36,9 +38,17 @@ export default function AnnouncementCard({
   postComment = postAnnouncementComment,
   toggleHeart = toggleAnnouncementHeart,
   removeAnnouncement = deleteAnnouncement,
+  updateComment = updateAnnouncementComment,
+  removeComment = deleteAnnouncementComment,
 }) {
   const { theme } = useTheme();
   const { error, confirm } = useAppModal();
+  const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+  const myUserId = cachedUser.id || cachedUser.user_id || "";
+  const isModerator =
+    canDelete ||
+    String(cachedUser.role || "").toLowerCase() === "admin" ||
+    announcement.created_by === myUserId;
 
   const [heartCount, setHeartCount] = useState(announcement.heart_count || 0);
   const [userReacted, setUserReacted] = useState(Boolean(announcement.user_reacted));
@@ -48,6 +58,9 @@ export default function AnnouncementCard({
   const [commentText, setCommentText] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const commentsOpenRef = useRef(false);
   const lastCountRef = useRef(announcement.comment_count || 0);
 
@@ -62,7 +75,6 @@ export default function AnnouncementCard({
       if (!silent) setLoadingComments(true);
       const rows = await fetchComments(announcement.id);
       setComments((prev) => {
-        // Prefer server order; keep optimistic rows that haven't landed yet.
         const byId = new Map((rows || []).map((row) => [row.id, row]));
         for (const row of prev) {
           if (row?.id && !byId.has(row.id)) byId.set(row.id, row);
@@ -89,7 +101,6 @@ export default function AnnouncementCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExpandComments, announcement.id]);
 
-  // Keep open comment threads fresh when parent poll updates counts.
   useEffect(() => {
     const nextCount = Number(announcement.comment_count || 0);
     if (!showComments) {
@@ -103,7 +114,6 @@ export default function AnnouncementCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [announcement.comment_count, showComments, announcement.id]);
 
-  // Invisible refresh every 5s while the thread is open.
   useEffect(() => {
     if (!showComments) return undefined;
 
@@ -119,7 +129,6 @@ export default function AnnouncementCard({
       if (document.visibilityState === "visible") tick();
     };
     document.addEventListener("visibilitychange", onVisible);
-    // First silent sync shortly after open so peers appear without toggling.
     const kick = window.setTimeout(tick, 400);
 
     return () => {
@@ -141,7 +150,6 @@ export default function AnnouncementCard({
   };
 
   const notifyParentQuietly = () => {
-    // Parents must refresh silently — never remount with a skeleton.
     if (typeof onUpdated === "function") onUpdated(true);
   };
 
@@ -175,12 +183,69 @@ export default function AnnouncementCard({
       lastCountRef.current += 1;
       setShowComments(true);
       notifyParentQuietly();
-      // Pull peers' comments without UI flash.
       window.setTimeout(() => loadComments({ silent: true }), 600);
     } catch (err) {
       error(err.message || "Could not post comment.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const canManageComment = (comment) => {
+    if (!comment) return false;
+    if (comment.user_id && myUserId && comment.user_id === myUserId) return true;
+    return Boolean(isModerator);
+  };
+
+  const canEditComment = (comment) =>
+    Boolean(comment?.user_id && myUserId && comment.user_id === myUserId);
+
+  const startEdit = (comment) => {
+    setEditingId(comment.id);
+    setEditText(comment.body || "");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const saveEdit = async (commentId) => {
+    if (!editText.trim() || savingEdit) return;
+    try {
+      setSavingEdit(true);
+      const updated = await updateComment(commentId, editText.trim());
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, ...updated, body: updated.body || editText.trim() } : c))
+      );
+      cancelEdit();
+      notifyParentQuietly();
+    } catch (err) {
+      error(err.message || "Could not update comment.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteComment = async (comment) => {
+    const ok = await confirm({
+      title: "Delete comment?",
+      message: "This comment will be removed permanently.",
+      tone: "danger",
+      confirmLabel: "Delete",
+      cancelLabel: "Keep",
+    });
+    if (!ok) return;
+
+    try {
+      await removeComment(comment.id);
+      setComments((prev) => prev.filter((c) => c.id !== comment.id));
+      setCommentCount((prev) => Math.max(0, prev - 1));
+      lastCountRef.current = Math.max(0, lastCountRef.current - 1);
+      if (editingId === comment.id) cancelEdit();
+      notifyParentQuietly();
+    } catch (err) {
+      error(err.message || "Could not delete comment.");
     }
   };
 
@@ -209,6 +274,10 @@ export default function AnnouncementCard({
     : hideSections
       ? "ExamNexus Admin"
       : "Faculty";
+
+  const inputClass = `min-w-0 flex-1 bg-transparent p-2.5 text-base outline-none ${
+    theme === "dark" ? "text-white placeholder:text-gray-500" : "text-gray-900"
+  } disabled:opacity-70`;
 
   return (
     <article
@@ -353,19 +422,88 @@ export default function AnnouncementCard({
                       >
                         {`${comment.first_name || "User"} ${comment.last_name || ""}`.trim()}
                       </p>
-                      {comment.created_at && (
-                        <p
-                          className={`text-[10px] ${
-                            theme === "dark" ? "text-gray-500" : "text-gray-500"
-                          }`}
-                        >
-                          {formatCommentTime(comment.created_at)}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {comment.created_at && (
+                          <p
+                            className={`text-[10px] ${
+                              theme === "dark" ? "text-gray-500" : "text-gray-500"
+                            }`}
+                          >
+                            {formatCommentTime(comment.created_at)}
+                          </p>
+                        )}
+                        {allowInteract && canEditComment(comment) && editingId !== comment.id && (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(comment)}
+                            className={`rounded p-1 ${
+                              theme === "dark"
+                                ? "text-gray-400 hover:text-emerald-300"
+                                : "text-gray-500 hover:text-teal-700"
+                            }`}
+                            aria-label="Edit comment"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                        {allowInteract && canManageComment(comment) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(comment)}
+                            className={`rounded p-1 ${
+                              theme === "dark"
+                                ? "text-gray-400 hover:text-red-400"
+                                : "text-gray-500 hover:text-red-600"
+                            }`}
+                            aria-label="Delete comment"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <p className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
-                      {comment.body}
-                    </p>
+
+                    {editingId === comment.id ? (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          disabled={savingEdit}
+                          className={`w-full rounded-lg border px-2.5 py-2 text-base outline-none ${
+                            theme === "dark"
+                              ? "border-white/15 bg-black/20 text-white"
+                              : "border-emerald-200 bg-white text-gray-900"
+                          }`}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={savingEdit || !editText.trim()}
+                            onClick={() => saveEdit(comment.id)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                          >
+                            <Check size={12} />
+                            {savingEdit ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingEdit}
+                            onClick={cancelEdit}
+                            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                              theme === "dark" ? "text-gray-300 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100"
+                            }`}
+                          >
+                            <X size={12} />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
+                        {comment.body}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -387,9 +525,7 @@ export default function AnnouncementCard({
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder={submitting ? "Posting…" : "Write a comment..."}
                   disabled={submitting}
-                  className={`min-w-0 flex-1 bg-transparent p-2.5 text-sm outline-none ${
-                    theme === "dark" ? "text-white placeholder:text-gray-500" : "text-gray-900"
-                  } disabled:opacity-70`}
+                  className={inputClass}
                 />
                 <button
                   type="submit"

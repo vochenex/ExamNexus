@@ -2664,6 +2664,42 @@ export async function toggleAdminAnnouncementHeart(announcementId) {
   return data;
 }
 
+export async function updateAdminAnnouncementComment(commentId, body) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("update_admin_announcement_comment", {
+    p_comment_id: commentId,
+    p_body: body,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAdminAnnouncementComment(commentId) {
+  await requireSession();
+  const { error } = await supabase.rpc("delete_admin_announcement_comment", {
+    p_comment_id: commentId,
+  });
+  if (error) throw error;
+}
+
+export async function updateAnnouncementComment(commentId, body) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("update_announcement_comment", {
+    p_comment_id: commentId,
+    p_body: body,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAnnouncementComment(commentId) {
+  await requireSession();
+  const { error } = await supabase.rpc("delete_announcement_comment", {
+    p_comment_id: commentId,
+  });
+  if (error) throw error;
+}
+
 function normalizeJsonList(data) {
   if (Array.isArray(data)) return data;
   if (typeof data === "string") {

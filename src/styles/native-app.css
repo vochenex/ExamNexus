@@ -494,9 +494,19 @@ html.en-native-app .en-auth-shell {
 :is(html.en-native-app, html.en-mobile-shell) select,
 :is(html.en-native-app, html.en-mobile-shell) textarea,
 :is(html.en-native-app, html.en-mobile-shell) .en-select-trigger {
-  font-size: 0.8125rem;
-  padding-top: 0.45rem;
-  padding-bottom: 0.45rem;
+  /* 16px minimum — iOS Safari auto-zooms and can stay stuck below this size */
+  font-size: 16px !important;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page input,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page select,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page textarea,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page .en-select-trigger {
+  font-size: 16px !important;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-profile-page .rounded-2xl,
@@ -504,13 +514,13 @@ html.en-native-app .en-auth-shell {
   border-radius: 0.9rem;
 }
 
-:is(html.en-native-app, html.en-mobile-shell) .en-profile-page input,
-:is(html.en-native-app, html.en-mobile-shell) .en-profile-page select,
-:is(html.en-native-app, html.en-mobile-shell) .en-profile-page textarea,
-:is(html.en-native-app, html.en-mobile-shell) .en-profile-page .en-select-trigger {
-  font-size: 0.78rem;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
+/* iPhone/iPad Safari: never use sub-16px form text (causes stuck zoom) */
+html.en-ios input,
+html.en-ios textarea,
+html.en-ios select,
+html.en-ios .en-select-trigger,
+html.en-ios .examnexus-auth-input {
+  font-size: 16px !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-page-header-icon {
