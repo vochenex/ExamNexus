@@ -1,4 +1,4 @@
-import { Monitor, Smartphone } from "lucide-react";
+import { Monitor, Smartphone, TabletSmartphone } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import ModalPortal from "../ui/ModalPortal";
@@ -9,14 +9,16 @@ export const ANDROID_APK_URL = "/downloads/ExamNexus-Android.apk";
 export const ANDROID_APK_FILENAME = "ExamNexus-Android.apk";
 
 /**
- * Choose desktop (PWA) install vs Android APK download.
+ * Choose Desktop (PWA), iPhone/iPad (Safari Add to Home Screen), or Android APK.
  */
 export default function InstallAppChooser({
   open,
   onClose,
   onDesktop,
+  onIos,
   onAndroid,
   busy = false,
+  preferIos = false,
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -28,6 +30,110 @@ export default function InstallAppChooser({
   const cardClass = isDark
     ? "border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-emerald-400/30"
     : "border-emerald-100 bg-white hover:border-teal-300 hover:bg-teal-50/60";
+
+  const iosCard = (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onIos}
+      className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition disabled:opacity-60 ${cardClass}`}
+    >
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+          isDark ? "bg-violet-500/15 text-violet-300" : "bg-violet-50 text-violet-700"
+        }`}
+        aria-hidden="true"
+      >
+        <TabletSmartphone size={26} strokeWidth={2} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block text-sm font-semibold ${
+            isDark ? "text-white" : "text-gray-900"
+          }`}
+        >
+          iPhone / iPad
+        </span>
+        <span
+          className={`mt-0.5 block text-xs ${
+            isDark ? "text-gray-400" : "text-gray-500"
+          }`}
+        >
+          Safari → Share → Add to Home Screen
+        </span>
+      </span>
+    </button>
+  );
+
+  const desktopCard = (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onDesktop}
+      className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition disabled:opacity-60 ${cardClass}`}
+    >
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+          isDark ? "bg-sky-500/15 text-sky-300" : "bg-sky-50 text-sky-700"
+        }`}
+        aria-hidden="true"
+      >
+        <Monitor size={26} strokeWidth={2} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block text-sm font-semibold ${
+            isDark ? "text-white" : "text-gray-900"
+          }`}
+        >
+          Desktop / laptop
+        </span>
+        <span
+          className={`mt-0.5 block text-xs ${
+            isDark ? "text-gray-400" : "text-gray-500"
+          }`}
+        >
+          Install the website as an app on this computer
+        </span>
+      </span>
+    </button>
+  );
+
+  const androidCard = (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onAndroid}
+      className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition disabled:opacity-60 ${cardClass}`}
+    >
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+          isDark
+            ? "bg-emerald-500/15 text-emerald-300"
+            : "bg-emerald-50 text-emerald-700"
+        }`}
+        aria-hidden="true"
+      >
+        <Smartphone size={26} strokeWidth={2} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block text-sm font-semibold ${
+            isDark ? "text-white" : "text-gray-900"
+          }`}
+        >
+          Android phone
+        </span>
+        <span
+          className={`mt-0.5 block text-xs ${
+            isDark ? "text-gray-400" : "text-gray-500"
+          }`}
+        >
+          Download the APK to install on your Android device
+        </span>
+      </span>
+    </button>
+  );
 
   return (
     <ModalPortal>
@@ -62,77 +168,24 @@ export default function InstallAppChooser({
               isDark ? "text-gray-300" : "text-gray-600"
             }`}
           >
-            Choose desktop or Android so you get the right app for your device.
+            Pick your device. On iPhone/iPad you must use{" "}
+            <strong>Safari</strong> → Share → Add to Home Screen.
           </p>
 
           <div className="mt-5 grid gap-3">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onDesktop}
-              className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition disabled:opacity-60 ${cardClass}`}
-            >
-              <span
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                  isDark
-                    ? "bg-sky-500/15 text-sky-300"
-                    : "bg-sky-50 text-sky-700"
-                }`}
-                aria-hidden="true"
-              >
-                <Monitor size={26} strokeWidth={2} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span
-                  className={`block text-sm font-semibold ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Desktop / laptop
-                </span>
-                <span
-                  className={`mt-0.5 block text-xs ${
-                    isDark ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  Install the website as an app on this computer
-                </span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onAndroid}
-              className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition disabled:opacity-60 ${cardClass}`}
-            >
-              <span
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                  isDark
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : "bg-emerald-50 text-emerald-700"
-                }`}
-                aria-hidden="true"
-              >
-                <Smartphone size={26} strokeWidth={2} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span
-                  className={`block text-sm font-semibold ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Android phone
-                </span>
-                <span
-                  className={`mt-0.5 block text-xs ${
-                    isDark ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  Download the APK to install on your Android device
-                </span>
-              </span>
-            </button>
+            {preferIos ? (
+              <>
+                {iosCard}
+                {androidCard}
+                {desktopCard}
+              </>
+            ) : (
+              <>
+                {desktopCard}
+                {iosCard}
+                {androidCard}
+              </>
+            )}
           </div>
 
           <button

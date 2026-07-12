@@ -7,11 +7,12 @@ import InstallAppChooser, {
   ANDROID_APK_FILENAME,
   ANDROID_APK_URL,
 } from "./InstallAppChooser";
+import IosInstallSheet from "./IosInstallSheet";
 
 const AUTO_OFFER_KEY = "examnexus_install_offer_seen";
 
 /**
- * Header install button: choose Desktop (PWA) or Android APK download.
+ * Header install button: Desktop PWA, iPhone/iPad (Safari), or Android APK.
  */
 export default function InstallIconButton({ inverted = false, compact = false }) {
   const { theme } = useTheme();
@@ -22,6 +23,7 @@ export default function InstallIconButton({ inverted = false, compact = false })
   const offeringRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [iosSheetOpen, setIosSheetOpen] = useState(false);
   const iconSize = compact ? 18 : 22;
 
   const closeChooser = useCallback(() => {
@@ -29,7 +31,16 @@ export default function InstallIconButton({ inverted = false, compact = false })
     setChooserOpen(false);
   }, [busy]);
 
+  const showIosHelp = useCallback(() => {
+    setChooserOpen(false);
+    setIosSheetOpen(true);
+  }, []);
+
   const installDesktop = useCallback(async () => {
+    if (isIOS) {
+      showIosHelp();
+      return;
+    }
     if (offeringRef.current) return;
     offeringRef.current = true;
     setBusy(true);
@@ -39,13 +50,7 @@ export default function InstallIconButton({ inverted = false, compact = false })
       if (result === "accepted" || result === "dismissed") return;
 
       if (result === "ios") {
-        await alert({
-          title: "Add to Home Screen",
-          message:
-            "On iPhone/iPad: tap Share in Safari, then Add to Home Screen.",
-          confirmLabel: "OK",
-          tone: "info",
-        });
+        setIosSheetOpen(true);
         return;
       }
 
@@ -60,7 +65,7 @@ export default function InstallIconButton({ inverted = false, compact = false })
       setBusy(false);
       offeringRef.current = false;
     }
-  }, [alert, promptInstall]);
+  }, [alert, isIOS, promptInstall, showIosHelp]);
 
   const downloadAndroid = useCallback(async () => {
     setBusy(true);
@@ -77,7 +82,7 @@ export default function InstallIconButton({ inverted = false, compact = false })
       await alert({
         title: "Android download started",
         message:
-          "Open the downloaded APK on your Android phone. You may need to allow installs from this browser or Files. Desktop PWA install is separate — use Desktop / laptop for computers.",
+          "Open the downloaded APK on your Android phone. You may need to allow installs from this browser or Files.",
         confirmLabel: "OK",
         tone: "success",
       });
@@ -88,12 +93,17 @@ export default function InstallIconButton({ inverted = false, compact = false })
 
   const openChooser = useCallback(() => {
     if (busy || offeringRef.current) return;
+    // On iPhone/iPad jump straight to Safari Add-to-Home-Screen help.
+    if (isIOS) {
+      setIosSheetOpen(true);
+      return;
+    }
     setChooserOpen(true);
-  }, [busy]);
+  }, [busy, isIOS]);
 
-  // When Chrome exposes the install prompt, ask once automatically.
+  // Auto-offer once: iOS → Safari sheet; desktop → chooser when Chrome is ready.
   useEffect(() => {
-    if (!supported || !hasNativePrompt) return;
+    if (!supported) return;
     try {
       if (sessionStorage.getItem(AUTO_OFFER_KEY) === "1") return;
       sessionStorage.setItem(AUTO_OFFER_KEY, "1");
@@ -101,10 +111,14 @@ export default function InstallIconButton({ inverted = false, compact = false })
       // ignore
     }
     const timer = window.setTimeout(() => {
-      openChooser();
+      if (isIOS) {
+        setIosSheetOpen(true);
+      } else if (hasNativePrompt) {
+        setChooserOpen(true);
+      }
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [supported, hasNativePrompt, openChooser]);
+  }, [supported, hasNativePrompt, isIOS]);
 
   if (!supported) return null;
 
@@ -129,7 +143,7 @@ export default function InstallIconButton({ inverted = false, compact = false })
 
         <span role="tooltip" className="en-install-tip">
           <strong>Install ExamNexus</strong>
-          <span>Desktop or Android</span>
+          <span>{isIOS ? "Add to Home Screen" : "Desktop, iPhone, or Android"}</span>
         </span>
       </div>
 
@@ -137,8 +151,16 @@ export default function InstallIconButton({ inverted = false, compact = false })
         open={chooserOpen}
         onClose={closeChooser}
         onDesktop={installDesktop}
+        onIos={showIosHelp}
         onAndroid={downloadAndroid}
         busy={busy}
+        preferIos={isIOS}
+      />
+
+      <IosInstallSheet
+        open={iosSheetOpen}
+        onClose={() => setIosSheetOpen(false)}
+        isDark={isDark}
       />
     </>
   );

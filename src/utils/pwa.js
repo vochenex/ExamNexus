@@ -136,3 +136,21 @@ export function isIOS() {
   const iPadOS = ua.includes("Macintosh") && "ontouchend" in document;
   return iOSDevice || iPadOS;
 }
+
+/** True in Chrome / Edge / Firefox on iOS (Add to Home Screen is Safari-only). */
+export function isIOSNonSafari() {
+  return isIOS() && !isIOSSafari();
+}
+
+/**
+ * Safari on iOS (the only browser that reliably shows Share → Add to Home Screen).
+ * Chrome for iOS does not expose that menu item.
+ */
+export function isIOSSafari() {
+  if (!isIOS() || typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  // Chrome/Firefox/Edge on iOS still include "Safari" in the UA — exclude them.
+  if (/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)) return false;
+  if (/Chrome|Firefox|Edg\//.test(ua) && !/Safari\//.test(ua)) return false;
+  return /Safari\//.test(ua);
+}
