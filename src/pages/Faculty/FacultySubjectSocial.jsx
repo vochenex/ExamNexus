@@ -228,7 +228,7 @@ export default function FacultySubjectSocial() {
                         openComments && highlightId === String(announcement.id)
                       }
                       onDeleted={handleDeleteLocal}
-                      onUpdated={loadPage}
+                      onUpdated={() => loadPage(true)}
                     />
                   ))}
                 </div>

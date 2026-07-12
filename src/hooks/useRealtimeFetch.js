@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const REALTIME_POLL_MS = 2500;
-export const REALTIME_POLL_HIDDEN_MS = 15000;
+export const REALTIME_POLL_MS = 5000;
+export const REALTIME_POLL_HIDDEN_MS = 20000;
 
 /**
  * Keep polls responsive while the tab is focused. Chrome heavily throttles

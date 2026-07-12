@@ -4,7 +4,6 @@ import { useTheme } from "../layouts/ThemeContext";
 import ProfileAvatar from "./ProfileAvatar";
 import { useAppModal } from "../contexts/AppModalContext";
 import { formatTargetSectionsLabel } from "../utils/sections";
-import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
 import {
   fetchAnnouncementComments,
   postAnnouncementComment,
@@ -62,9 +61,19 @@ export default function AnnouncementCard({
     try {
       if (!silent) setLoadingComments(true);
       const rows = await fetchComments(announcement.id);
-      setComments(rows);
-      setCommentCount(rows.length);
-      lastCountRef.current = rows.length;
+      setComments((prev) => {
+        // Prefer server order; keep optimistic rows that haven't landed yet.
+        const byId = new Map((rows || []).map((row) => [row.id, row]));
+        for (const row of prev) {
+          if (row?.id && !byId.has(row.id)) byId.set(row.id, row);
+        }
+        return [...byId.values()].sort(
+          (a, b) =>
+            new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        );
+      });
+      setCommentCount((rows || []).length);
+      lastCountRef.current = (rows || []).length;
     } catch (err) {
       console.error(err);
     } finally {
@@ -76,7 +85,7 @@ export default function AnnouncementCard({
     if (!autoExpandComments) return;
     setShowComments(true);
     commentsOpenRef.current = true;
-    loadComments();
+    loadComments({ silent: comments.length > 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExpandComments, announcement.id]);
 
@@ -94,7 +103,7 @@ export default function AnnouncementCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [announcement.comment_count, showComments, announcement.id]);
 
-  // While comments are open and the tab is visible, refresh the thread.
+  // Invisible refresh every 5s while the thread is open.
   useEffect(() => {
     if (!showComments) return undefined;
 
@@ -105,15 +114,18 @@ export default function AnnouncementCard({
       await loadComments({ silent: true });
     };
 
-    const timer = window.setInterval(tick, REALTIME_POLL_MS);
+    const timer = window.setInterval(tick, 5000);
     const onVisible = () => {
       if (document.visibilityState === "visible") tick();
     };
     document.addEventListener("visibilitychange", onVisible);
+    // First silent sync shortly after open so peers appear without toggling.
+    const kick = window.setTimeout(tick, 400);
 
     return () => {
       stopped = true;
       clearInterval(timer);
+      clearTimeout(kick);
       document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,8 +136,13 @@ export default function AnnouncementCard({
     setShowComments(next);
     commentsOpenRef.current = next;
     if (next) {
-      await loadComments();
+      await loadComments({ silent: comments.length > 0 });
     }
+  };
+
+  const notifyParentQuietly = () => {
+    // Parents must refresh silently — never remount with a skeleton.
+    if (typeof onUpdated === "function") onUpdated(true);
   };
 
   const handleHeart = async () => {
@@ -135,7 +152,7 @@ export default function AnnouncementCard({
       const result = await toggleHeart(announcement.id);
       setUserReacted(result.user_reacted);
       setHeartCount(result.heart_count);
-      onUpdated?.();
+      notifyParentQuietly();
     } catch (err) {
       error(err.message || "Could not update reaction.");
     }
@@ -143,17 +160,23 @@ export default function AnnouncementCard({
 
   const handleComment = async (event) => {
     event.preventDefault();
-    if (!allowInteract || !commentText.trim()) return;
+    if (!allowInteract || !commentText.trim() || submitting) return;
 
+    const body = commentText.trim();
     try {
       setSubmitting(true);
-      const row = await postComment(announcement.id, commentText.trim());
-      setComments((prev) => [...prev, row]);
+      const row = await postComment(announcement.id, body);
+      setComments((prev) => {
+        if (prev.some((c) => c.id === row?.id)) return prev;
+        return [...prev, row];
+      });
       setCommentText("");
       setCommentCount((prev) => prev + 1);
       lastCountRef.current += 1;
       setShowComments(true);
-      onUpdated?.();
+      notifyParentQuietly();
+      // Pull peers' comments without UI flash.
+      window.setTimeout(() => loadComments({ silent: true }), 600);
     } catch (err) {
       error(err.message || "Could not post comment.");
     } finally {
@@ -362,22 +385,23 @@ export default function AnnouncementCard({
                   type="text"
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Write a comment..."
+                  placeholder={submitting ? "Posting…" : "Write a comment..."}
+                  disabled={submitting}
                   className={`min-w-0 flex-1 bg-transparent p-2.5 text-sm outline-none ${
                     theme === "dark" ? "text-white placeholder:text-gray-500" : "text-gray-900"
-                  }`}
+                  } disabled:opacity-70`}
                 />
                 <button
                   type="submit"
                   disabled={submitting || !commentText.trim()}
-                  className={`shrink-0 rounded-lg p-2 ${
+                  className={`shrink-0 rounded-lg px-2.5 py-2 text-xs font-semibold ${
                     theme === "dark"
                       ? "bg-emerald-500 text-black"
                       : "bg-emerald-500 text-white"
                   } disabled:opacity-50`}
-                  aria-label="Post comment"
+                  aria-label={submitting ? "Posting comment" : "Post comment"}
                 >
-                  <Send size={16} />
+                  {submitting ? "Posting…" : <Send size={16} />}
                 </button>
               </div>
             </form>

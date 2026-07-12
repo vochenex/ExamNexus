@@ -117,7 +117,7 @@ export default function StudentSubjectSocial() {
                     autoExpandComments={
                       openComments && highlightId === String(announcement.id)
                     }
-                    onUpdated={loadPage}
+                    onUpdated={() => loadPage(true)}
                   />
                 ))}
               </div>

@@ -90,7 +90,7 @@ export default function PlatformAnnouncements() {
                   autoExpandComments={
                     openComments && highlightId === String(announcement.id)
                   }
-                  onUpdated={loadPage}
+                  onUpdated={() => loadPage(true)}
                   fetchComments={fetchAdminAnnouncementComments}
                   postComment={postAdminAnnouncementComment}
                   toggleHeart={toggleAdminAnnouncementHeart}
