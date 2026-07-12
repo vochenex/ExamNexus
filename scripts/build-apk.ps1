@@ -20,11 +20,13 @@ Write-Host "Using JAVA_HOME=$env:JAVA_HOME"
 $rootDir = Join-Path $PSScriptRoot ".."
 $androidDir = Join-Path $rootDir "android"
 $releasesDir = Join-Path $rootDir "releases"
+$publicDownloadsDir = Join-Path $rootDir "public\downloads"
 $namedApk = Join-Path $releasesDir "ExamNexus Android App.apk"
+$webApk = Join-Path $publicDownloadsDir "ExamNexus-Android.apk"
 
 Push-Location $androidDir
 try {
-  & .\gradlew.bat assembleDebug
+  & .\gradlew.bat assembleDebug --no-daemon
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   $apk = Join-Path $androidDir "app\build\outputs\apk\debug\app-debug.apk"
@@ -33,7 +35,9 @@ try {
   }
 
   New-Item -ItemType Directory -Force -Path $releasesDir | Out-Null
+  New-Item -ItemType Directory -Force -Path $publicDownloadsDir | Out-Null
   Copy-Item -Path $apk -Destination $namedApk -Force
+  Copy-Item -Path $apk -Destination $webApk -Force
 
   Write-Host ""
   Write-Host "APK built:" -ForegroundColor Green
@@ -41,6 +45,9 @@ try {
   Write-Host ""
   Write-Host "Named copy for install:" -ForegroundColor Green
   Write-Host $namedApk
+  Write-Host ""
+  Write-Host "Website download copy:" -ForegroundColor Green
+  Write-Host $webApk
 } finally {
   Pop-Location
 }

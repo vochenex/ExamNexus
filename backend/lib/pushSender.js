@@ -103,7 +103,8 @@ function kindLabel(kind) {
 }
 
 /**
- * Build a themed, scannable notification: category title + who/where + content.
+ * Build a themed, scannable notification: content first, then who/where.
+ * Avatar stays in data only — do not attach as FCM BigPicture (oversized on Android).
  */
 function buildRichPushPayload({
   kind = "announcement",
@@ -124,28 +125,32 @@ function buildRichPushPayload({
   const contentTitle = String(title || "").trim();
   const contentBody = String(body || "").trim();
 
-  const displayTitle = subject
-    ? truncate(`${category} · ${subject}`, 65)
-    : truncate(category, 65);
+  // Lead with announcement content so the banner emphasizes the message.
+  const headline =
+    contentTitle ||
+    (subject ? `${category} · ${subject}` : category);
 
   const lines = [];
+  if (contentBody) {
+    lines.push(contentBody);
+  } else if (contentTitle && contentTitle !== headline) {
+    lines.push(contentTitle);
+  }
   if (actor) {
     lines.push(role ? `From ${actor} · ${role}` : `From ${actor}`);
   }
-  if (contentTitle && contentTitle.toLowerCase() !== category.toLowerCase()) {
-    lines.push(contentTitle);
-  }
-  if (contentBody) {
-    lines.push(contentBody);
+  if (subject && !String(headline).includes(subject)) {
+    lines.push(subject);
   }
   if (!lines.length) {
     lines.push("Open ExamNexus to view details.");
   }
 
   return {
-    title: displayTitle,
+    title: truncate(headline, 65),
     body: truncate(lines.join("\n"), 240),
-    imageUrl: String(actorAvatar || "").trim(),
+    // Intentionally empty: large notification.image triggers Android BigPicture.
+    imageUrl: "",
     tag: tag || undefined,
     data: {
       kind: String(kind || "announcement"),
@@ -228,9 +233,9 @@ async function sendViaFcmV1(tokens, { title, body, data = {}, imageUrl = "", tag
     title,
     body,
   };
-  if (imageUrl && /^https?:\/\//i.test(imageUrl)) {
-    notification.image = imageUrl;
-  }
+  // Do not attach notification.image — Android expands it as BigPicture and
+  // dwarfs the announcement text. Avatar stays in data for in-app use only.
+  void imageUrl;
 
   const androidNotification = {
     channel_id: ALERTS_CHANNEL_ID,
@@ -242,9 +247,6 @@ async function sendViaFcmV1(tokens, { title, body, data = {}, imageUrl = "", tag
     color: BRAND_COLOR,
     ticker: title,
   };
-  if (notification.image) {
-    androidNotification.image = notification.image;
-  }
   if (tag) {
     androidNotification.tag = String(tag).slice(0, 64);
   }
@@ -290,9 +292,6 @@ async function sendViaFcmV1(tokens, { title, body, data = {}, imageUrl = "", tag
                         "interruption-level": "time-sensitive",
                       },
                     },
-                    fcm_options: notification.image
-                      ? { image: notification.image }
-                      : undefined,
                   },
                 },
               }),
@@ -346,9 +345,7 @@ async function sendViaFcmLegacy(tokens, { title, body, data = {}, imageUrl = "" 
       color: BRAND_COLOR,
       priority: "high",
     };
-    if (imageUrl && /^https?:\/\//i.test(imageUrl)) {
-      notification.image = imageUrl;
-    }
+    void imageUrl;
 
     const response = await fetch("https://fcm.googleapis.com/fcm/send", {
       method: "POST",

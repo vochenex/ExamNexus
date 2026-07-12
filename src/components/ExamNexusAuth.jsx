@@ -7,6 +7,8 @@ import {
   ChevronUp,
   UserRound,
   X,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { primaryButtonFull } from "../utils/themeButtons";
@@ -45,6 +47,7 @@ import ExamNexusBrand from "./ExamNexusBrand";
 import HomeSiteHeader from "./home/HomeSiteHeader";
 import NativeAuthHeader from "./NativeAuthHeader";
 import LogoSplashScreen from "./LogoSplashScreen";
+import { useAppModal } from "../contexts/AppModalContext";
 import { isNativeApp } from "../utils/platform";
 import {
   getRememberedPassword,
@@ -59,13 +62,16 @@ export default function ExamNexusAuth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  const { alert: showAlert } = useAppModal();
   const lastNoticeKeyRef = useRef(null);
   const formPanelRef = useRef(null);
-const [showPassword, setShowPassword] = useState(false);
-const [successMessage, setSuccessMessage] = useState("");
-const [isLogin, setIsLogin] = useState(true);
-const [authView, setAuthView] = useState("login");
-const [loading, setLoading] = useState(false);
+  const authBodyRef = useRef(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isLogin, setIsLogin] = useState(true);
+  const [authView, setAuthView] = useState("login");
+  const [loading, setLoading] = useState(false);
   const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
@@ -130,6 +136,53 @@ const [loading, setLoading] = useState(false);
     if (authView !== "signup" || !formPanelRef.current) return;
     formPanelRef.current.scrollTop = 0;
   }, [authView]);
+
+  // Keep the focused field visible above the on-screen keyboard (especially signup).
+  useEffect(() => {
+    const root = authBodyRef.current || formPanelRef.current;
+    if (!root) return undefined;
+
+    const onFocusIn = (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+
+      const scrollFocused = () => {
+        try {
+          target.scrollIntoView({
+            block: "center",
+            inline: "nearest",
+            behavior: "smooth",
+          });
+        } catch {
+          target.scrollIntoView(true);
+        }
+      };
+
+      window.setTimeout(scrollFocused, 50);
+      window.setTimeout(scrollFocused, 320);
+    };
+
+    root.addEventListener("focusin", onFocusIn);
+    return () => root.removeEventListener("focusin", onFocusIn);
+  }, [authView]);
+
+  const copySignupEmail = async () => {
+    const value = String(form.email || "").trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setEmailCopied(true);
+      window.setTimeout(() => setEmailCopied(false), 2000);
+    } catch {
+      await showAlert({
+        title: "Copy email",
+        message: value,
+        tone: "info",
+        confirmLabel: "OK",
+      });
+    }
+  };
 
   useEffect(() => {
     const notice = location.state?.authNotice || peekAuthNotice();
@@ -503,8 +556,12 @@ function getAuthInputProps(theme) {
 
   {isNativeApp() ? <NativeAuthHeader /> : <HomeSiteHeader />}
 
-  <div className="en-auth-body en-page-enter">
-  {/* Background Orb 1 */}
+  <div
+    ref={authBodyRef}
+    className={`en-auth-body en-page-enter ${
+      authView === "login" || authView === "forgot" ? "en-auth-body--login" : ""
+    }`}
+  >  {/* Background Orb 1 */}
 <div
   className="
     pointer-events-none
@@ -814,20 +871,56 @@ function getAuthInputProps(theme) {
                     >
                       Email
                     </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      autoComplete="email"
-                      placeholder={CRMCC_EMAIL_PLACEHOLDER}
-                      {...authInputProps}
-                    />
+                    <div className="relative">
+                      <input
+                        type="email"
+                        name="email"
+                        value={form.email}
+                        onChange={handleChange}
+                        autoComplete="email"
+                        placeholder={CRMCC_EMAIL_PLACEHOLDER}
+                        {...authInputProps}
+                        className={`${authInputProps.className} ${
+                          authView === "signup" ? "pr-12" : ""
+                        }`}
+                      />
+                      {authView === "signup" && form.email ? (
+                        <button
+                          type="button"
+                          onClick={copySignupEmail}
+                          title={emailCopied ? "Copied!" : "Copy email"}
+                          aria-label={emailCopied ? "Email copied" : "Copy email"}
+                          className={`absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border transition ${
+                            emailCopied
+                              ? theme === "dark"
+                                ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
+                                : "border-emerald-400 bg-emerald-50 text-emerald-700"
+                              : theme === "dark"
+                                ? "border-white/15 bg-white/5 text-emerald-400 hover:bg-white/10"
+                                : "border-emerald-200 bg-white text-teal-700 hover:border-teal-400"
+                          }`}
+                        >
+                          {emailCopied ? (
+                            <Check size={16} strokeWidth={2.5} />
+                          ) : (
+                            <Copy size={16} strokeWidth={2.25} />
+                          )}
+                        </button>
+                      ) : null}
+                    </div>
+                    {authView === "signup" && (
+                      <p
+                        className={`mt-1.5 text-xs ${
+                          theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}
+                      >
+                        Auto-filled from your name — tap copy to paste elsewhere, or edit if needed.
+                      </p>
+                    )}
                     {errors.email && (
                       <p className="text-red-500 text-xs mt-1">{errors.email}</p>
                     )}
                   </div>
-
                   <div>
                     <label
                       className={`mb-1.5 block text-sm font-medium ${

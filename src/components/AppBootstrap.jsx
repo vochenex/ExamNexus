@@ -1,5 +1,6 @@
 import App from "../App";
 import UpdatePrompt from "./pwa/UpdatePrompt";
+import NativeBackBridge from "./NativeBackBridge";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { syncPushTokenForCurrentUser } from "../utils/pushNotifications";
@@ -49,6 +50,7 @@ export default function AppBootstrap() {
       <UpdatePrompt />
       <NativeEntryRedirect />
       <PushNavigationBridge />
+      <NativeBackBridge />
     </>
   );
 }

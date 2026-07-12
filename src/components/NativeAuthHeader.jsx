@@ -5,8 +5,8 @@ import ExamNexusBrand from "./ExamNexusBrand";
 export default function NativeAuthHeader() {
   return (
     <header className="en-native-auth-header">
-      <ExamNexusBrand variant="compact" showTagline={false} panelTone="dark" />
-      <ThemeToggle inverted compact />
+      <ExamNexusBrand variant="compact" showTagline={false} />
+      <ThemeToggle compact />
     </header>
   );
 }

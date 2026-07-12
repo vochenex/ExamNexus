@@ -22,6 +22,7 @@ import NotificationBell from "../components/NotificationBell";
 import ThemeToggle from "../components/ThemeToggle";
 import InstallIconButton from "../components/pwa/InstallIconButton";
 import ExamNexusLogo from "../components/ExamNexusLogo";
+import ExamNexusBrand from "../components/ExamNexusBrand";
 import RequiredSchoolIdGate from "../components/RequiredSchoolIdGate";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
 import AnimatedPage from "../components/ui/AnimatedPage";
@@ -264,10 +265,15 @@ export default function DashboardLayout() {
           <>
             {mobileNav ? (
               <header className="en-native-topbar shrink-0">
-                <ExamNexusLogo size={28} idSuffix="mobile-top" />
+                <ExamNexusBrand
+                  variant="compact"
+                  logoSize={28}
+                  showTagline={false}
+                  idSuffix="mobile-top"
+                />
                 <div className="en-native-topbar-actions">
                   {!nativeApp && <InstallIconButton compact />}
-                  <ThemeToggle inverted compact />
+                  <ThemeToggle compact />
                   <NotificationBell compact />
                 </div>
               </header>

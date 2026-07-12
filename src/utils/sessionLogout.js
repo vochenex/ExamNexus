@@ -1,4 +1,6 @@
 import { supabase } from "../supabaseClient";
+import { isNativeApp } from "./platform";
+import { sealAuthNavigation } from "./nativeBack";
 
 /**
  * Clear session and optionally keep push bindings for Saved Accounts
@@ -26,7 +28,12 @@ export async function clearLocalSessionAndLogout({
 
   localStorage.removeItem("examnexus_user");
 
+  const useReplace = replace || isNativeApp();
   if (typeof navigate === "function") {
-    navigate(navigateTo, replace ? { replace: true } : undefined);
+    navigate(navigateTo, useReplace ? { replace: true } : undefined);
+  }
+
+  if (isNativeApp()) {
+    sealAuthNavigation(navigateTo);
   }
 }

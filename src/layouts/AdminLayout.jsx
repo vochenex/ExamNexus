@@ -19,6 +19,7 @@ import { useTheme } from "./ThemeContext";
 import { supabase } from "../supabaseClient";
 import ProfileAvatar from "../components/ProfileAvatar";
 import ExamNexusLogo from "../components/ExamNexusLogo";
+import ExamNexusBrand from "../components/ExamNexusBrand";
 import ThemeToggle from "../components/ThemeToggle";
 import InstallIconButton from "../components/pwa/InstallIconButton";
 import NotificationBell from "../components/NotificationBell";
@@ -171,10 +172,15 @@ export default function AdminLayout() {
       >
         {mobileNav ? (
           <header className="en-native-topbar shrink-0">
-            <ExamNexusLogo size={28} idSuffix="admin-mobile-top" />
+            <ExamNexusBrand
+              variant="compact"
+              logoSize={28}
+              showTagline={false}
+              idSuffix="admin-mobile-top"
+            />
             <div className="en-native-topbar-actions">
               {!nativeApp && <InstallIconButton compact />}
-              <ThemeToggle inverted compact />
+              <ThemeToggle compact />
               <NotificationBell compact />
             </div>
           </header>

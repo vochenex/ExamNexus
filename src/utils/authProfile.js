@@ -259,15 +259,21 @@ async function repairSchoolIdFromMetadata(supabase, authUser, profile) {
 
 export function navigateForRole(navigate, role, options = {}) {
   const normalized = String(role || "").toLowerCase();
+  let path = "/student/dashboard";
   if (normalized === "faculty") {
-    navigate("/faculty/dashboard", options);
+    path = "/faculty/dashboard";
   } else if (normalized === "admin") {
-    navigate("/admin/dashboard", options);
-  } else {
-    navigate(
-      isNativeApp() ? nativeLandingPathForRole(role) : "/student/dashboard",
-      options
-    );
+    path = "/admin/dashboard";
+  } else if (isNativeApp()) {
+    path = nativeLandingPathForRole(role);
+  }
+
+  navigate(path, options);
+
+  if (isNativeApp()) {
+    import("./nativeBack")
+      .then(({ sealAuthNavigation }) => sealAuthNavigation(path))
+      .catch(() => {});
   }
 }
 

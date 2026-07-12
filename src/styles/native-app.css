@@ -53,12 +53,17 @@ html.en-native-app .en-auth-shell {
   flex: 1 1 auto;
   display: flex !important;
   padding: 0.75rem var(--en-native-px) 1.25rem;
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  align-items: center !important;
+  align-items: flex-start !important;
   justify-content: center !important;
   min-height: calc(100dvh - 3.75rem - var(--en-safe-top));
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-body--login {
+  align-items: center !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {
@@ -66,7 +71,7 @@ html.en-native-app .en-auth-shell {
   width: 100%;
   margin-top: 0;
   margin-bottom: 0;
-  border-radius: 1.25rem !important;
+  border-radius: 1.75rem !important;
   height: auto !important;
   min-height: 0 !important;
   overflow: visible !important;
@@ -105,6 +110,10 @@ html.en-native-app .en-auth-shell {
     align-items: center !important;
     justify-content: center !important;
     min-height: calc(100dvh - var(--en-native-topbar-height) - var(--en-safe-top) - 1rem);
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-body:not(.en-auth-body--login) {
+    align-items: flex-start !important;
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {
@@ -198,6 +207,33 @@ html.en-native-app .en-auth-shell {
   background: #f8fafc;
   border-bottom-color: rgba(15, 23, 42, 0.1);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+/* Brand wordmark readable on both header themes */
+:is(html.en-native-app, html.en-mobile-shell) .en-native-topbar p.font-bold,
+:is(html.en-native-app, html.en-mobile-shell) .en-native-auth-header p.font-bold {
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  background: none !important;
+}
+
+:is(html.light.en-native-app, html.light.en-mobile-shell) .en-native-topbar p.font-bold,
+:is(html.light.en-native-app, html.light.en-mobile-shell) .en-native-auth-header p.font-bold {
+  color: #030712 !important;
+  -webkit-text-fill-color: #030712 !important;
+}
+
+/* Extra room so keyboard focus can scroll fields into view */
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-body {
+  scroll-padding-bottom: 40vh;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner {
+  padding-bottom: 2.5rem;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-form-inner {
+  padding-bottom: 6rem;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-native-topbar-actions {

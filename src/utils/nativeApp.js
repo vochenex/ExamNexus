@@ -1,5 +1,6 @@
 import { isNativeApp, getPlatform } from "./platform";
 import { initPushNotifications } from "./pushNotifications";
+import { dispatchAndroidBack } from "./nativeBack";
 
 /**
  * One-time native (Capacitor) setup: status bar styling, Android hardware
@@ -17,7 +18,9 @@ export async function initNativeApp() {
     await StatusBar.setOverlaysWebView({ overlay: true });
     await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
     if (getPlatform() === "android") {
-      await StatusBar.setBackgroundColor({ color: "#031d1f" });
+      await StatusBar.setBackgroundColor({
+        color: isDark ? "#031d1f" : "#f8fafc",
+      });
     }
   } catch (err) {
     console.warn("StatusBar init skipped:", err);
@@ -25,12 +28,10 @@ export async function initNativeApp() {
 
   try {
     const { App } = await import("@capacitor/app");
-    App.addListener("backButton", ({ canGoBack }) => {
-      if (canGoBack) {
-        window.history.back();
-      } else {
-        App.exitApp();
-      }
+    // Do NOT call history.back() here — that walks into previous accounts.
+    // React NativeBackBridge decides a safe in-role destination or exit confirm.
+    App.addListener("backButton", () => {
+      dispatchAndroidBack();
     });
   } catch (err) {
     console.warn("App back-button init skipped:", err);
@@ -44,7 +45,6 @@ export async function initNativeApp() {
     console.warn("Keyboard init skipped:", err);
   }
 
-  // Register for push after a short delay so auth/session can settle.
   setTimeout(() => {
     initPushNotifications().catch((err) => {
       console.warn("Push init deferred error:", err);
