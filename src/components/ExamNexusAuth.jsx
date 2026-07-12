@@ -45,9 +45,11 @@ import SignupFormFields from "./auth/SignupFormFields";
 import PendingApprovalModal from "./auth/PendingApprovalModal";
 import ExamNexusBrand from "./ExamNexusBrand";
 import HomeSiteHeader from "./home/HomeSiteHeader";
+import HomeBottomBar from "./home/HomeBottomBar";
 import NativeAuthHeader from "./NativeAuthHeader";
 import LogoSplashScreen from "./LogoSplashScreen";
 import { useAppModal } from "../contexts/AppModalContext";
+import useMobileNav from "../hooks/useMobileNav";
 import { isNativeApp } from "../utils/platform";
 import {
   getRememberedPassword,
@@ -62,6 +64,8 @@ export default function ExamNexusAuth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  const mobileNav = useMobileNav();
+  const useCompactAuthHeader = isNativeApp() || mobileNav;
   const { alert: showAlert } = useAppModal();
   const lastNoticeKeyRef = useRef(null);
   const formPanelRef = useRef(null);
@@ -554,7 +558,14 @@ function getAuthInputProps(theme) {
   />
   {loading && <LogoSplashScreen theme={theme} />}
 
-  {isNativeApp() ? <NativeAuthHeader /> : <HomeSiteHeader />}
+  {useCompactAuthHeader ? (
+    <>
+      <NativeAuthHeader />
+      {!isNativeApp() && <HomeBottomBar />}
+    </>
+  ) : (
+    <HomeSiteHeader />
+  )}
 
   <div
     ref={authBodyRef}
