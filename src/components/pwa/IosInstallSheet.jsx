@@ -8,9 +8,19 @@ import { motion } from "../../utils/motion";
 
 const SITE_URL = "https://exam-nexus-eta.vercel.app";
 
+function Step({ icon, children }) {
+  return (
+    <li className="en-install-step">
+      <span className="en-install-step-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <p className="en-install-step-text">{children}</p>
+    </li>
+  );
+}
+
 /**
  * Centered install help for iPhone / iPad (Safari Add to Home Screen).
- * Chrome on iOS cannot show that menu — we detect and guide users to Safari.
  */
 export default function IosInstallSheet({ open, onClose, isDark }) {
   const [copied, setCopied] = useState(false);
@@ -77,68 +87,55 @@ export default function IosInstallSheet({ open, onClose, isDark }) {
 
           {!inSafari && (
             <div
-              className={`mb-3 rounded-2xl border px-3 py-2.5 text-sm ${
+              className={`en-install-warning ${
                 isDark
                   ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
                   : "border-amber-200 bg-amber-50 text-amber-900"
               }`}
             >
-              You are not in Safari right now (Chrome / another browser on iPhone
-              does not show <strong>Add to Home Screen</strong>).
-              <br />
-              Open ExamNexus in <strong>Safari</strong> first, then use Share.
+              <p>
+                You’re not in Safari. Chrome and other iPhone browsers don’t show{" "}
+                <strong>Add to Home Screen</strong>.
+              </p>
+              <p className="mt-1.5">
+                Open this site in <strong>Safari</strong> first, then use Share.
+              </p>
             </div>
           )}
 
           <p className="en-install-sheet-text">
             {inSafari
-              ? "Use Safari’s Share menu — Add to Home Screen is not under the ⋯ page menu."
-              : "After you open this site in Safari:"}
+              ? "Use Safari’s Share button — not the ⋯ page menu."
+              : "After you open ExamNexus in Safari:"}
           </p>
 
           <ol className="en-install-steps">
             {!inSafari && (
-              <li>
-                <span className="en-install-step-icon">
-                  <ExternalLink size={16} />
-                </span>
+              <Step icon={<ExternalLink size={16} />}>
                 Open the <strong>Safari</strong> app and go to ExamNexus (copy the
                 link below).
-              </li>
+              </Step>
             )}
-            <li>
-              <span className="en-install-step-icon">
-                <Share size={16} />
-              </span>
-              Tap the <strong>Share</strong> button
+            <Step icon={<Share size={16} />}>
+              Tap <strong>Share</strong>
               {inSafari ? " at the bottom of Safari" : " in Safari’s toolbar"} (box
               with an upward arrow).
-            </li>
-            <li>
-              <span className="en-install-step-icon">
-                <SquarePlus size={16} />
-              </span>
-              Scroll the share sheet and tap <strong>Add to Home Screen</strong>.
-            </li>
-            <li>
-              <span className="en-install-step-num">✓</span>
-              Tap <strong>Add</strong> — ExamNexus appears on your home screen like
-              an app.
-            </li>
-            <li>
-              <span className="en-install-step-icon">
-                <Bell size={16} />
-              </span>
-              Open the Home Screen app and allow <strong>Notifications</strong> so
-              you get announcement alerts (same as Android).
-            </li>
+            </Step>
+            <Step icon={<SquarePlus size={16} />}>
+              Scroll and tap <strong>Add to Home Screen</strong>, then tap{" "}
+              <strong>Add</strong>.
+            </Step>
+            <Step icon={<Bell size={16} />}>
+              Open the Home Screen app and allow <strong>Notifications</strong> for
+              announcement alerts.
+            </Step>
           </ol>
 
           {!inSafari && (
             <button
               type="button"
               onClick={copyLink}
-              className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
+              className={`en-install-secondary ${
                 isDark
                   ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
                   : "border-emerald-200 bg-emerald-50 text-teal-800"
@@ -154,7 +151,7 @@ export default function IosInstallSheet({ open, onClose, isDark }) {
               type="button"
               onClick={enablePush}
               disabled={pushBusy}
-              className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold disabled:opacity-60 ${
+              className={`en-install-secondary disabled:opacity-60 ${
                 isDark
                   ? "border-sky-400/30 bg-sky-500/15 text-sky-100"
                   : "border-sky-200 bg-sky-50 text-sky-900"
@@ -165,15 +162,15 @@ export default function IosInstallSheet({ open, onClose, isDark }) {
             </button>
           )}
 
-          {pushNote && (
+          {pushNote ? (
             <p
-              className={`mb-2 text-center text-xs ${
+              className={`mb-2 text-center text-xs leading-snug ${
                 isDark ? "text-emerald-200/90" : "text-teal-800"
               }`}
             >
               {pushNote}
             </p>
-          )}
+          ) : null}
 
           <button type="button" onClick={handleDone} className="en-install-sheet-done">
             Got it
