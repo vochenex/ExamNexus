@@ -22,8 +22,8 @@ export default function UpdatePrompt() {
     return subscribeServiceWorkerUpdate(() => {
       setVisible(true);
       setUpdating(true);
-      // Safety net if auto-apply in pwa.js was blocked.
-      window.setTimeout(() => applyServiceWorkerUpdate(), 400);
+      // Instant apply — do not leave the user staring at a spinner.
+      applyServiceWorkerUpdate();
     });
   }, []);
 
@@ -44,7 +44,7 @@ export default function UpdatePrompt() {
 
         <h3 className="en-update-title">Updating ExamNexus…</h3>
         <p className="en-update-text">
-          A newer version was found. The desktop app is refreshing automatically.
+          Refreshing to the latest version now.
         </p>
 
         <div className="en-update-actions">
@@ -55,7 +55,7 @@ export default function UpdatePrompt() {
             disabled={updating}
           >
             <RefreshCw size={16} className={updating ? "en-update-spin" : ""} />
-            {updating ? "Updating…" : "Reload now"}
+            {updating ? "Refreshing…" : "Reload now"}
           </button>
         </div>
       </div>

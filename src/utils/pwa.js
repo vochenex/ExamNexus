@@ -4,18 +4,17 @@ const UPDATE_EVENT = "en:sw-update-ready";
 const UPDATE_CHECK_INTERVAL_MS = 60 * 1000;
 
 let waitingWorker = null;
-let reloadOnControllerChange = false;
 let registrationPromise = null;
+let applyingUpdate = false;
 
 function emitUpdateReady(worker) {
   waitingWorker = worker || null;
   window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
-  // Desktop / installed PWA: activate the new build automatically.
-  // (Users can still see a brief update UI; they don't have to click.)
+  // Auto-apply quickly — no multi-second wait.
   try {
     window.setTimeout(() => {
       if (waitingWorker) applyServiceWorkerUpdate();
-    }, 1200);
+    }, 250);
   } catch {
     // ignore
   }
@@ -33,13 +32,30 @@ export function subscribeServiceWorkerUpdate(callback) {
   return () => window.removeEventListener(UPDATE_EVENT, callback);
 }
 
+/**
+ * Activate the waiting worker (if any) and hard-reload immediately.
+ * Previously we only posted SKIP_WAITING and waited for controllerchange,
+ * which could hang while the SW finished precache / cache cleanup.
+ */
 export function applyServiceWorkerUpdate() {
-  reloadOnControllerChange = true;
-  if (waitingWorker) {
-    waitingWorker.postMessage("SKIP_WAITING");
-  } else {
-    window.location.reload();
+  if (applyingUpdate) return;
+  applyingUpdate = true;
+
+  try {
+    if (waitingWorker) {
+      waitingWorker.postMessage("SKIP_WAITING");
+      waitingWorker.postMessage("CLAIM_CLIENTS");
+    }
+  } catch {
+    // ignore
   }
+
+  // Force a fresh document load right away so the UI never sits on "Updating…".
+  const url = new URL(window.location.href);
+  url.searchParams.set("en_updated", String(Date.now()));
+  window.setTimeout(() => {
+    window.location.replace(url.toString());
+  }, 50);
 }
 
 /**
@@ -86,20 +102,6 @@ export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   if (!import.meta.env.PROD) return;
   if (registrationPromise) return;
-
-  let hadControllerAtStart = Boolean(navigator.serviceWorker.controller);
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // First time a worker takes control: don't bounce the page.
-    if (!hadControllerAtStart) {
-      hadControllerAtStart = true;
-      return;
-    }
-    if (refreshing) return;
-    refreshing = true;
-    reloadOnControllerChange = false;
-    window.location.reload();
-  });
 
   registrationPromise = navigator.serviceWorker
     .register("/sw.js", { scope: "/" })

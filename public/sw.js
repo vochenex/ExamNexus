@@ -1,12 +1,9 @@
 /* ExamNexus service worker — makes the app installable and resilient.
  * Strategy:
  *   - App shell (navigations): network-first, fall back to cached index.html
- *     so the installed app still opens when briefly offline.
- *   - Static build assets (/assets/*, icons, fonts): stale-while-revalidate.
- *   - Everything cross-origin (Supabase, APIs) and non-GET: never touched.
- * CACHE_VERSION is stamped with a unique build ID at build time (see
- * serviceWorkerBuildStamp in vite.config.js), so every deploy ships a new
- * service worker that the browser detects as an update.
+ *   - Static build assets: stale-while-revalidate
+ *   - Cross-origin / non-GET: never touched
+ * CACHE_VERSION is stamped at build time so each deploy is a new worker.
  */
 const CACHE_VERSION = "__BUILD_ID__";
 const SHELL_CACHE = `examnexus-shell-${CACHE_VERSION}`;
@@ -24,39 +21,38 @@ const PRECACHE_URLS = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    (async () => {
-      try {
-        const cache = await caches.open(SHELL_CACHE);
-        await cache.addAll(PRECACHE_URLS);
-      } catch {
-        // Precache best-effort — missing one asset must not block installability.
-      }
-      // Activate immediately so desktop/installed PWAs pick up deploys without
-      // waiting for a manual "Update now" click.
-      await self.skipWaiting();
-    })()
-  );
+  // Activate ASAP — do not block on precache (that made "Update now" feel stuck).
+  event.waitUntil(self.skipWaiting());
+
+  // Warm shell cache in the background (best-effort).
+  caches
+    .open(SHELL_CACHE)
+    .then((cache) => cache.addAll(PRECACHE_URLS))
+    .catch(() => {});
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key !== SHELL_CACHE && key !== ASSET_CACHE)
-            .map((key) => caches.delete(key))
-        )
-      )
-      .then(() => self.clients.claim())
+    (async () => {
+      await self.clients.claim();
+      // Clean old caches after claiming so the page can reload immediately.
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key !== SHELL_CACHE && key !== ASSET_CACHE)
+          .map((key) => caches.delete(key))
+      );
+    })()
   );
 });
 
-// Let the page trigger an immediate update (used by the update toast, if any).
 self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") self.skipWaiting();
+  if (event.data === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+  if (event.data === "CLAIM_CLIENTS") {
+    self.clients.claim();
+  }
 });
 
 function isBuildAsset(url) {
@@ -70,15 +66,11 @@ function isBuildAsset(url) {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-
-  // Only handle same-origin GET requests. Supabase/API/auth calls pass through
-  // untouched so live data and sessions are never served from cache.
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // App shell / SPA navigations: network-first with offline fallback.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -96,7 +88,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static build assets: stale-while-revalidate.
   if (isBuildAsset(url)) {
     event.respondWith(
       caches.open(ASSET_CACHE).then((cache) =>
