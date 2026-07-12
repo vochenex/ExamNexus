@@ -179,7 +179,7 @@ export default function AssessmentDetails() {
     }
   };
 
-  if (loading) {
+  if (loading && !exam) {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 

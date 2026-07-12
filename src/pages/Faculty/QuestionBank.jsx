@@ -9,6 +9,7 @@ import { useAppModal } from "../../contexts/AppModalContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { secondaryButton } from "../../utils/themeButtons";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
   deleteQuestionBankEntry,
   fetchQuestionBank,
@@ -43,16 +44,16 @@ export default function QuestionBank() {
 
   const facultyCanManage = canFacultyManageSubjects(cachedUser);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
       const rows = await fetchQuestionBank();
       setItems(rows);
     } catch (err) {
       setError(err.message || "Failed to load question bank.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -60,10 +61,10 @@ export default function QuestionBank() {
     if (isFacultyRole(cachedUser.role) && !facultyCanManage) {
       showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       navigate("/faculty/profile");
-      return;
     }
-    load();
-  }, [cachedUser.role, facultyCanManage, load, navigate, showWarning]);
+  }, [cachedUser.role, facultyCanManage, navigate, showWarning]);
+
+  usePolling(load, [facultyCanManage]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -114,7 +115,7 @@ export default function QuestionBank() {
     }
   };
 
-  if (loading) {
+  if (loading && items.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 

@@ -58,7 +58,7 @@ export default function PlatformAnnouncements() {
     return () => clearTimeout(timer);
   }, [highlightId, loading, announcements.length]);
 
-  if (loading) {
+  if (loading && announcements.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 

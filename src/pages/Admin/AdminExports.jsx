@@ -149,7 +149,7 @@ export default function AdminExports() {
     }
   };
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="cards" />;
+  if (loading && assessments.length === 0) return <PageLoadingSkeleton theme={theme} variant="cards" />;
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-4xl")}>

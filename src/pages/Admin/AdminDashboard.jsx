@@ -164,7 +164,7 @@ export default function AdminDashboard() {
 
   usePolling(load, []);
 
-  if (loading) {
+  if (loading && !stats) {
     return <PageLoadingSkeleton theme={theme} variant="dashboard" />;
   }
 

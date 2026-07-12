@@ -67,7 +67,7 @@ export default function AdminExamLogs() {
   const expandAll = () => setOpenKeys(new Set(groups.map((g) => g.key)));
   const collapseAll = () => setOpenKeys(new Set());
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
+  if (loading && rows.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   const muted = theme === "dark" ? "text-gray-400" : "text-gray-600";
 

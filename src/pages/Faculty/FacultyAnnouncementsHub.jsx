@@ -161,7 +161,7 @@ export default function FacultyAnnouncementsHub() {
     }
   };
 
-  if (loading) {
+  if (loading && subjects.length === 0 && posted.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 

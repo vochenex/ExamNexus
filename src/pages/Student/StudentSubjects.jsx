@@ -285,7 +285,7 @@ export default function StudentSubjects() {
     }
   };
 
-  if (loading) {
+  if (loading && subjects.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="cards" />;
   }
 

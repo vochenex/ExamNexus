@@ -147,7 +147,7 @@ export default function AdminCatalog() {
     }
   };
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
+  if (loading && catalog.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   const singular = TABS.find((t) => t.id === tab)?.label.slice(0, -1) || "Item";
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useTheme } from "../layouts/ThemeContext";
 import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../hooks/useRealtimeFetch";
@@ -26,7 +26,7 @@ export default function TeacherAnalytics({ examId }) {
 
   usePolling(load, [examId]);
 
-  if (loading) {
+  if (loading && data.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 

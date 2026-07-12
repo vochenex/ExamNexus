@@ -64,7 +64,7 @@ export default function AdminAnnouncements() {
     }
   };
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="detail" />;
+  if (loading && rows.length === 0) return <PageLoadingSkeleton theme={theme} variant="detail" />;
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-5xl")}>

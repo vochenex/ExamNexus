@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ChevronRight, ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import {
@@ -7,6 +7,7 @@ import {
 } from "../utils/supabaseData";
 import StudentIntegrityAlertsModal from "./StudentIntegrityAlertsModal";
 import { PageLoadingSkeleton } from "./ui/PageLoadingSkeleton";
+import { usePolling } from "../hooks/useRealtimeFetch";
 
 const tierStyles = {
   blue: {
@@ -38,26 +39,21 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
   const [detailAlerts, setDetailAlerts] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async (silent = false) => {
     if (!examId) return;
-
-    const load = async (silent = false) => {
-      try {
-        if (!silent) setLoading(true);
-        setError("");
-        const rows = await fetchExamSubmissionAlerts(examId);
-        setSubmissions(rows);
-      } catch (err) {
-        setError(err.message || "Failed to load submission alerts.");
-      } finally {
-        if (!silent) setLoading(false);
-      }
-    };
-
-    load(false);
-    const timer = setInterval(() => load(true), 5000);
-    return () => clearInterval(timer);
+    try {
+      if (!silent) setLoading(true);
+      setError("");
+      const rows = await fetchExamSubmissionAlerts(examId);
+      setSubmissions(rows);
+    } catch (err) {
+      setError(err.message || "Failed to load submission alerts.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [examId]);
+
+  usePolling(load, [examId]);
 
   const openAlertsDetail = async (student) => {
     setSelectedStudent(student);
@@ -79,7 +75,7 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
     setDetailAlerts([]);
   };
 
-  if (loading) {
+  if (loading && submissions.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="list" className="!min-h-0 p-0" />;
   }
 

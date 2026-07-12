@@ -66,7 +66,7 @@ export default function StudentDashboard() {
 
   const greetingName = user.first_name || user.full_name?.split(" ")[0] || "Student";
 
-  if (loading) {
+  if (loading && !analytics) {
     return <PageLoadingSkeleton theme={theme} variant="dashboard" />;
   }
 

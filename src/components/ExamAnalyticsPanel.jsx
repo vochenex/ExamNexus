@@ -482,7 +482,7 @@ export default function ExamAnalyticsPanel({
     />
   );
 
-  if (loading) {
+  if (loading && !analytics) {
     return (
       <>
         <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>

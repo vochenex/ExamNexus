@@ -134,7 +134,7 @@ export default function AdminPasswordResets() {
     }
   };
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
+  if (loading && rows.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   const pendingCount = rows.filter((r) => r.status === "pending").length;
 

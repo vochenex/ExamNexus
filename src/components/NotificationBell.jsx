@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Bell,
@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { fetchUserNotifications } from "../utils/supabaseData";
-import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
+import { usePolling } from "../hooks/useRealtimeFetch";
 import { formatTargetSectionsLabel } from "../utils/sections";
 import { getNotificationDestination } from "../utils/notificationRoutes";
 import { canTakeAssessmentOnThisDevice } from "../utils/platform";
@@ -141,7 +141,7 @@ export default function NotificationBell({ compact = false }) {
     setShowClearConfirm(false);
   };
 
-  const loadNotifications = async (silent = false) => {
+  const loadNotifications = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
       const data = await fetchUserNotifications();
@@ -151,13 +151,9 @@ export default function NotificationBell({ compact = false }) {
     } finally {
       if (!silent) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadNotifications(false);
-    const interval = setInterval(() => loadNotifications(true), REALTIME_POLL_MS);
-    return () => clearInterval(interval);
   }, []);
+
+  usePolling(loadNotifications, []);
 
   // Tab / route changes must dismiss the panel — otherwise it keeps eating touches.
   useEffect(() => {

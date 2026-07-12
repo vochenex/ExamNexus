@@ -37,7 +37,7 @@ export default function AdminAssignedSubjects() {
 
   usePolling(load, []);
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
+  if (loading && subjects.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-7xl")}>

@@ -37,7 +37,7 @@ export default function AdminAssessments() {
 
   usePolling(load, []);
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
+  if (loading && rows.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-7xl")}>

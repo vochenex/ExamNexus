@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { AlertOctagon } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import CollapsiblePanel from "./ui/CollapsiblePanel";
@@ -8,6 +8,7 @@ import {
   fetchExamAutoSubmittedStudents,
   fetchStudentIntegrityAlerts,
 } from "../utils/supabaseData";
+import { usePolling } from "../hooks/useRealtimeFetch";
 
 function formatSubmittedAt(value) {
   if (!value) return "Submitted";
@@ -26,26 +27,21 @@ export default function ExamAutoSubmittedPanel({ examId }) {
   const [detailAlerts, setDetailAlerts] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async (silent = false) => {
     if (!examId) return;
-
-    const load = async (silent = false) => {
-      try {
-        if (!silent) setLoading(true);
-        setError("");
-        const rows = await fetchExamAutoSubmittedStudents(examId);
-        setStudents(rows);
-      } catch (err) {
-        setError(err.message || "Failed to load auto-submitted students.");
-      } finally {
-        if (!silent) setLoading(false);
-      }
-    };
-
-    load(false);
-    const timer = setInterval(() => load(true), 5000);
-    return () => clearInterval(timer);
+    try {
+      if (!silent) setLoading(true);
+      setError("");
+      const rows = await fetchExamAutoSubmittedStudents(examId);
+      setStudents(rows);
+    } catch (err) {
+      setError(err.message || "Failed to load auto-submitted students.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [examId]);
+
+  usePolling(load, [examId]);
 
   const openAlertsDetail = async (student) => {
     setSelectedStudent(student);
@@ -67,7 +63,7 @@ export default function ExamAutoSubmittedPanel({ examId }) {
     setDetailAlerts([]);
   };
 
-  if (loading) {
+  if (loading && students.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="list" className="!min-h-0 p-0" />;
   }
 

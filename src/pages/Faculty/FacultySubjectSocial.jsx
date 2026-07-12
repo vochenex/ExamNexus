@@ -132,7 +132,7 @@ export default function FacultySubjectSocial() {
     setAnnouncements((prev) => prev.filter((item) => item.id !== announcementId));
   };
 
-  if (loading) {
+  if (loading && !subject) {
     return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 

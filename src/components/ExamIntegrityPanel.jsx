@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { fetchExamIntegrityEvents } from "../utils/supabaseData";
 import { formatIntegrityEventLabel } from "../utils/examIntegrity";
-import { REALTIME_POLL_MS } from "../hooks/useRealtimeFetch";
+import { usePolling } from "../hooks/useRealtimeFetch";
 
 function studentName(row) {
   const user = row.users;
@@ -32,13 +32,9 @@ export default function ExamIntegrityPanel({ examId }) {
     }
   }, [examId]);
 
-  useEffect(() => {
-    loadEvents(false);
-    const timer = setInterval(() => loadEvents(true), REALTIME_POLL_MS);
-    return () => clearInterval(timer);
-  }, [loadEvents]);
+  usePolling(loadEvents, [examId]);
 
-  if (loading) {
+  if (loading && events.length === 0) {
     return (
       <div className={`animate-pulse space-y-3 rounded-2xl border p-5 ${
         theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200/80 en-bg-elevated"

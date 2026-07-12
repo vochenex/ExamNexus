@@ -75,7 +75,7 @@ export default function StudentResultsList() {
 
   usePolling(loadResults, []);
 
-  if (loading) {
+  if (loading && results.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="cards" />;
   }
 

@@ -55,6 +55,13 @@ function schedulePoll(callback, visibleMs, hiddenMs) {
   };
 }
 
+/**
+ * Page/query loader with silent live refresh.
+ *
+ * - First mount → non-silent (skeleton OK while navigating in)
+ * - Polls + later dependency changes → silent (no skeleton flash)
+ * - Unmount (leave page) resets so the next visit shows skeleton again
+ */
 export default function useRealtimeFetch(
   fetchFn,
   deps = [],
@@ -65,6 +72,7 @@ export default function useRealtimeFetch(
   const [error, setError] = useState("");
   const fetchRef = useRef(fetchFn);
   fetchRef.current = fetchFn;
+  const hasPaintedRef = useRef(false);
 
   const reload = useCallback(async (silent = false) => {
     try {
@@ -72,6 +80,7 @@ export default function useRealtimeFetch(
       setError("");
       const result = await fetchRef.current();
       setData(result);
+      hasPaintedRef.current = true;
       return result;
     } catch (err) {
       setError(err.message || "Failed to load data.");
@@ -89,7 +98,10 @@ export default function useRealtimeFetch(
         if (!silent) setLoading(true);
         setError("");
         const result = await fetchRef.current();
-        if (!cancelled) setData(result);
+        if (!cancelled) {
+          setData(result);
+          hasPaintedRef.current = true;
+        }
       } catch (err) {
         if (!cancelled) setError(err.message || "Failed to load data.");
       } finally {
@@ -97,7 +109,8 @@ export default function useRealtimeFetch(
       }
     };
 
-    run(false);
+    const silent = hasPaintedRef.current;
+    run(silent);
     const stop = schedulePoll(() => run(true), intervalMs, REALTIME_POLL_HIDDEN_MS);
 
     return () => {
@@ -107,23 +120,37 @@ export default function useRealtimeFetch(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, intervalMs]);
 
+  useEffect(
+    () => () => {
+      hasPaintedRef.current = false;
+    },
+    []
+  );
+
   return { data, setData, loading, error, setError, reload };
 }
 
+/**
+ * Call `loadFn(silent)` on an interval.
+ * First paint of a page visit is non-silent; everything after is silent
+ * so live updates never remount the page skeleton.
+ */
 export function usePolling(loadFn, deps = [], intervalMs = REALTIME_POLL_MS) {
   const loadRef = useRef(loadFn);
   loadRef.current = loadFn;
+  const hasPaintedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async (silent) => {
-      if (!cancelled) {
-        await loadRef.current(silent);
-      }
+      if (cancelled) return;
+      await loadRef.current(silent);
+      if (!cancelled) hasPaintedRef.current = true;
     };
 
-    run(false);
+    const silent = hasPaintedRef.current;
+    run(silent);
     const stop = schedulePoll(() => run(true), intervalMs, REALTIME_POLL_HIDDEN_MS);
 
     return () => {
@@ -132,4 +159,11 @@ export function usePolling(loadFn, deps = [], intervalMs = REALTIME_POLL_MS) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, intervalMs]);
+
+  useEffect(
+    () => () => {
+      hasPaintedRef.current = false;
+    },
+    []
+  );
 }

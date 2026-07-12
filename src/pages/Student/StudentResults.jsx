@@ -186,7 +186,7 @@ export default function StudentResults() {
     return parsed;
   };
 
-  if (loading) {
+  if (loading && !exam && !result) {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 

@@ -166,7 +166,7 @@ export default function AdminAccounts() {
     }
   };
 
-  if (loading) return <PageLoadingSkeleton theme={theme} variant="list" />;
+  if (loading && users.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-[100rem]")}>

@@ -72,7 +72,7 @@ export default function StudentSubjectDetails() {
     [classmates]
   );
 
-  if (loading) {
+  if (loading && !subject) {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 

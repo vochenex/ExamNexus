@@ -11,7 +11,7 @@ export default function SubjectClassAnalyticsPanel({ analytics, loading }) {
       : "en-bg-surface border-emerald-200/80 shadow-sm"
   }`;
 
-  if (loading) {
+  if (loading && !analytics) {
     return (
       <div className={panelClass}>
         <div className="animate-pulse space-y-4">

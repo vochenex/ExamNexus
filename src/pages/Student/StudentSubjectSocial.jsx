@@ -78,7 +78,7 @@ export default function StudentSubjectSocial() {
     return () => clearTimeout(timer);
   }, [highlightId, loading, announcements.length]);
 
-  if (loading) {
+  if (loading && !subject) {
     return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 

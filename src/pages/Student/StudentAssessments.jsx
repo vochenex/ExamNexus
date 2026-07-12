@@ -172,7 +172,7 @@ export default function StudentAssessments() {
     return () => clearTimeout(timer);
   }, [focusId, loading, assessments.length]);
 
-  if (loading) {
+  if (loading && assessments.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="cards" />;
   }
 

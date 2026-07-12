@@ -45,6 +45,7 @@ import ProfileAvatar from "../components/ProfileAvatar";
 import AvatarLightbox from "../components/AvatarLightbox";
 import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
 import useMobileNav from "../hooks/useMobileNav";
+import { usePolling } from "../hooks/useRealtimeFetch";
 
 function inputStyle(theme) {
   return inputClass(theme);
@@ -236,20 +237,6 @@ export default function Profile() {
     }
   }, []);
 
-  const refreshStats = useCallback(
-    async (silent = true) => {
-      const studentId = await resolveStudentId();
-      if (!studentId) return;
-
-      if (isStudentRole(profile.role)) {
-        await loadStudentStats(studentId, profile.role, silent);
-      } else if (isFacultyRole(profile.role)) {
-        await loadFacultyStats(profile.school_id, profile.role, silent);
-      }
-    },
-    [loadFacultyStats, loadStudentStats, profile.role, profile.school_id]
-  );
-
   const loadProfile = useCallback(async (silent = false) => {
     const studentId = await resolveStudentId();
     if (!studentId) {
@@ -289,17 +276,7 @@ export default function Profile() {
     if (!silent) setProfileLoading(false);
   }, [loadFacultyStats, loadStudentStats]);
 
-  useEffect(() => {
-    loadProfile(false);
-  }, [loadProfile]);
-
-  useEffect(() => {
-    if (profileLoading) return undefined;
-
-    refreshStats(true);
-    const timer = setInterval(() => refreshStats(true), 5000);
-    return () => clearInterval(timer);
-  }, [profileLoading, refreshStats]);
+  usePolling(loadProfile, []);
 
   useEffect(() => {
     if (!editing) {

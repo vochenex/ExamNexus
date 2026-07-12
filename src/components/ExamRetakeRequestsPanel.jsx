@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, RotateCcw, XCircle } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { panelClass } from "../utils/themeInputs";
@@ -10,6 +10,7 @@ import {
 } from "../utils/supabaseData";
 import { formatSectionLabel } from "../utils/sections";
 import { useAppModal } from "../contexts/AppModalContext";
+import { usePolling } from "../hooks/useRealtimeFetch";
 
 const STATUS_STYLES = {
   pending: {
@@ -50,7 +51,8 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
   const [facultyNote, setFacultyNote] = useState("");
   const [processing, setProcessing] = useState(false);
 
-  const loadRequests = async (silent = false) => {
+  const loadRequests = useCallback(async (silent = false) => {
+    if (!examId) return;
     try {
       if (!silent) setLoading(true);
       setError("");
@@ -62,15 +64,9 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
     } finally {
       if (!silent) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (!examId) return undefined;
-
-    loadRequests(false);
-    const timer = setInterval(() => loadRequests(true), 5000);
-    return () => clearInterval(timer);
   }, [examId]);
+
+  usePolling(loadRequests, [examId]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return requests;
@@ -157,7 +153,7 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
     [requests]
   );
 
-  if (loading) {
+  if (loading && requests.length === 0) {
     return (
       <div className={`animate-pulse space-y-3 ${panelClass(theme)}`}>
         <div className={`h-5 w-40 rounded-lg ${theme === "dark" ? "bg-white/10" : "en-bg-skeleton"}`} />
