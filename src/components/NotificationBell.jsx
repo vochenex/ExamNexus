@@ -329,14 +329,15 @@ export default function NotificationBell({ compact = false }) {
                     <button
                       type="button"
                       onClick={() => setShowClearConfirm(true)}
-                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                      className={`inline-flex items-center justify-center rounded-lg p-2 transition ${
                         theme === "dark"
                           ? "text-gray-400 hover:bg-white/10 hover:text-red-300"
                           : "text-gray-600 en-hover hover:text-red-600"
                       }`}
+                      aria-label="Clear all notifications"
+                      title="Clear all"
                     >
-                      <Trash2 size={14} />
-                      Clear
+                      <Trash2 size={16} />
                     </button>
                   )}
                   <button

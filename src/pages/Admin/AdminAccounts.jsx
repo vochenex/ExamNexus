@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Users, Pencil, Trash2, Check, CheckCheck } from "lucide-react";
+import { Users, Pencil, Trash2, Check, CheckCheck, X } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -24,7 +24,7 @@ import {
   updateAdminUser,
 } from "../../utils/adminData";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
+import { iconButton, primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
 
@@ -76,6 +76,7 @@ export default function AdminAccounts() {
   const [saving, setSaving] = useState(false);
   const [reviewingId, setReviewingId] = useState(null);
   const [bulkApproving, setBulkApproving] = useState(false);
+  const [bulkRejecting, setBulkRejecting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
   const pendingUsers = useMemo(
@@ -182,6 +183,36 @@ export default function AdminAccounts() {
     }
   };
 
+  const handleRejectAll = async () => {
+    if (!pendingUsers.length) {
+      error("No pending accounts to reject.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: "Reject all pending accounts?",
+      message: `Reject ${pendingUsers.length} account${pendingUsers.length === 1 ? "" : "s"}? Those users will not be able to use the platform.`,
+      tone: "danger",
+      confirmLabel: "Reject all",
+    });
+    if (!ok) return;
+
+    try {
+      setBulkRejecting(true);
+      for (const user of pendingUsers) {
+        await reviewAdminAccount(user.id, "reject");
+      }
+      await success(
+        `Rejected ${pendingUsers.length} account${pendingUsers.length === 1 ? "" : "s"}.`
+      );
+      await load(true);
+    } catch (err) {
+      error(err.message || "Failed to reject all accounts.");
+    } finally {
+      setBulkRejecting(false);
+    }
+  };
+
   const handleDelete = async (user) => {
     const currentUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
     if (user.id === currentUser.id) {
@@ -261,17 +292,34 @@ export default function AdminAccounts() {
           ))}
         </Select>
         {statusFilter === "pending" && pendingCount > 0 && (
-          <ProgressButton
-            type="button"
-            onClick={handleApproveAll}
-            loading={bulkApproving}
-            loadingLabel="Approving..."
-            disabled={reviewingId !== null}
-            className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
-          >
-            <CheckCheck size={14} />
-            Approve all
-          </ProgressButton>
+          <>
+            <ProgressButton
+              type="button"
+              onClick={handleApproveAll}
+              loading={bulkApproving}
+              loadingLabel="Approving all"
+              iconOnly
+              disabled={bulkRejecting || reviewingId !== null}
+              className={iconButton(theme, "primary")}
+              aria-label="Approve all pending accounts"
+              title="Approve all"
+            >
+              <CheckCheck size={16} />
+            </ProgressButton>
+            <ProgressButton
+              type="button"
+              onClick={handleRejectAll}
+              loading={bulkRejecting}
+              loadingLabel="Rejecting all"
+              iconOnly
+              disabled={bulkApproving || reviewingId !== null}
+              className={iconButton(theme, "danger")}
+              aria-label="Reject all pending accounts"
+              title="Reject all"
+            >
+              <X size={16} />
+            </ProgressButton>
+          </>
         )}
       </div>
 
@@ -334,34 +382,39 @@ export default function AdminAccounts() {
                             <ProgressButton
                               type="button"
                               loading={reviewingId === user.id}
-                              loadingLabel="Approving..."
-                              disabled={bulkApproving || (reviewingId !== null && reviewingId !== user.id)}
+                              loadingLabel="Approving account"
+                              iconOnly
+                              disabled={bulkApproving || bulkRejecting || (reviewingId !== null && reviewingId !== user.id)}
                               onClick={() => handleReview(user, "approve")}
-                              className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+                              className={iconButton(theme, "primary")}
+                              aria-label={`Approve ${user.email}`}
+                              title="Approve"
                             >
-                              <Check size={14} />
-                              Approve
+                              <Check size={16} />
                             </ProgressButton>
                           )}
                           <button
                             type="button"
                             onClick={() => setEditing({ ...user })}
-                            className={secondaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+                            className={iconButton(theme, "secondary")}
+                            aria-label={`Edit ${user.email}`}
+                            title="Edit"
                           >
-                            <Pencil size={14} />
-                            Edit
+                            <Pencil size={16} />
                           </button>
                           {!isAdmin && (
                             <ProgressButton
                               type="button"
                               loading={deletingId === user.id}
-                              loadingLabel="Deleting..."
-                              disabled={bulkApproving || reviewingId !== null || saving || (deletingId !== null && deletingId !== user.id)}
+                              loadingLabel="Deleting account"
+                              iconOnly
+                              disabled={bulkApproving || bulkRejecting || reviewingId !== null || saving || (deletingId !== null && deletingId !== user.id)}
                               onClick={() => handleDelete(user)}
-                              className={dangerButton(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+                              className={iconButton(theme, "danger")}
+                              aria-label={`Delete ${user.email}`}
+                              title="Delete"
                             >
-                              <Trash2 size={14} />
-                              Delete
+                              <Trash2 size={16} />
                             </ProgressButton>
                           )}
                         </div>

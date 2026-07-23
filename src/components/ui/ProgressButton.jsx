@@ -6,10 +6,12 @@ import { Loader2 } from "lucide-react";
 export default function ProgressButton({
   loading = false,
   loadingLabel = "Please wait…",
+  iconOnly = false,
   children,
   className = "",
   disabled,
   type = "button",
+  "aria-label": ariaLabel,
   ...rest
 }) {
   return (
@@ -17,14 +19,19 @@ export default function ProgressButton({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
+      aria-label={iconOnly && loading ? loadingLabel : ariaLabel}
       className={className}
       {...rest}
     >
       {loading ? (
-        <>
+        iconOnly ? (
           <Loader2 className="animate-spin shrink-0" size={16} aria-hidden="true" />
-          <span>{loadingLabel}</span>
-        </>
+        ) : (
+          <>
+            <Loader2 className="animate-spin shrink-0" size={16} aria-hidden="true" />
+            <span>{loadingLabel}</span>
+          </>
+        )
       ) : (
         children
       )}

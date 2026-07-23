@@ -67,6 +67,16 @@
   align-items: center !important;
 }
 
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-body.en-auth-body--saved-open {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-form.en-auth-panel-form--saved-open {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {
   max-width: 100%;
   width: 100%;
@@ -155,10 +165,14 @@
     height: auto !important;
     transform: translateX(100%) !important;
     padding: 1.25rem 1.5rem !important;
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     display: flex !important;
     flex-direction: column;
     justify-content: center;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-panel-form {
+    overflow-y: auto !important;
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-panel-brand {

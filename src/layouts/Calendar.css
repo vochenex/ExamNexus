@@ -1,138 +1,209 @@
-.en-rdp-root,
-.en-assessment-calendar .rdp-root {
-  --rdp-accent-color: #10b981;
-  --rdp-accent-background-color: rgba(16, 185, 129, 0.25);
-  --rdp-day-height: 2rem;
-  --rdp-day-width: 2rem;
+/* Custom assessment availability calendar */
+
+.en-assessment-calendar {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
 }
 
-.en-assessment-calendar .rdp-root,
-.en-assessment-calendar .rdp-months,
-.en-assessment-calendar .rdp-month {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
+.en-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
 }
 
-.en-assessment-calendar .rdp-month_caption {
-  padding-inline: 0.15rem;
-}
-
-.en-assessment-calendar .en-rdp-month-grid {
-  table-layout: fixed;
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.en-assessment-calendar .en-rdp-weekdays,
-.en-assessment-calendar .en-rdp-week {
-  display: table-row;
-}
-
-.en-assessment-calendar .en-rdp-weekday,
-.en-assessment-calendar .en-rdp-day {
-  width: 14.2857%;
-  min-width: 0;
-  box-sizing: border-box;
+.en-cal-title {
+  flex: 1;
   text-align: center;
-  vertical-align: middle;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
-.en-assessment-calendar .rdp-weekday {
-  padding: 0.25rem 0;
-  overflow: visible;
-  white-space: nowrap;
+.en-assessment-calendar--dark .en-cal-title {
+  color: #ffffff;
+}
+
+.en-assessment-calendar--light .en-cal-title {
+  color: #0f172a;
+}
+
+.en-cal-weekdays,
+.en-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.en-cal-weekdays {
+  margin-bottom: 0.35rem;
+}
+
+.en-cal-weekday {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.en-assessment-calendar--dark .en-cal-weekday {
+  color: rgba(52, 211, 153, 0.85);
+}
+
+.en-assessment-calendar--light .en-cal-weekday {
+  color: #0f766e;
+}
+
+.en-cal-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.125rem 0;
+}
+
+.en-cal-day {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+    transform 0.18s ease;
+  cursor: pointer;
+}
+
+.en-assessment-calendar--dark .en-cal-day {
+  color: #e5e7eb;
+}
+
+.en-assessment-calendar--light .en-cal-day {
+  color: #1f2937;
+}
+
+.en-cal-cell.is-outside .en-cal-day {
+  opacity: 0.35;
+}
+
+.en-cal-day:hover {
+  transform: translateY(-1px);
+}
+
+.en-assessment-calendar--dark .en-cal-day:hover {
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.en-assessment-calendar--light .en-cal-day:hover {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.en-cal-day.is-today {
+  border-color: rgba(16, 185, 129, 0.65);
+}
+
+.en-cal-day.is-selected {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.35);
+}
+
+.en-cal-cell.is-start::before,
+.en-cal-cell.is-end::before,
+.en-cal-cell.is-middle::before,
+.en-cal-cell.is-single::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  height: 2.25rem;
+  transform: translateY(-50%);
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.en-assessment-calendar--light .en-cal-cell.is-start::before,
+.en-assessment-calendar--light .en-cal-cell.is-end::before,
+.en-assessment-calendar--light .en-cal-cell.is-middle::before,
+.en-assessment-calendar--light .en-cal-cell.is-single::before {
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.en-cal-cell.is-start::before {
+  left: 50%;
+  border-top-left-radius: 0.75rem;
+  border-bottom-left-radius: 0.75rem;
+}
+
+.en-cal-cell.is-end::before {
+  right: 50%;
+  border-top-right-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+}
+
+.en-cal-cell.is-single::before {
+  display: none;
+}
+
+.en-cal-cell.is-middle .en-cal-day {
+  border-radius: 0.5rem;
+  color: #ecfdf5;
+}
+
+.en-assessment-calendar--light .en-cal-cell.is-middle .en-cal-day {
+  color: #065f46;
 }
 
 @media (max-width: 480px) {
-  .en-assessment-calendar .rdp-root {
-    --rdp-day-height: 1.85rem;
-    --rdp-day-width: 1.85rem;
-    font-size: 0.8125rem;
+  .en-cal-cell {
+    min-height: 2.15rem;
   }
 
-  .en-assessment-calendar .en-rdp-weekday {
-    font-size: 0.625rem;
-    letter-spacing: -0.02em;
+  .en-cal-day {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.8125rem;
+    border-radius: 0.625rem;
+  }
+
+  .en-cal-cell.is-start::before,
+  .en-cal-cell.is-end::before,
+  .en-cal-cell.is-middle::before {
+    height: 2rem;
   }
 }
 
 @media (min-width: 640px) {
-  .en-assessment-calendar .rdp-root {
-    --rdp-day-height: 2.25rem;
-    --rdp-day-width: 2.25rem;
+  .en-cal-grid,
+  .en-cal-weekdays {
+    gap: 0.35rem;
   }
-}
 
-/* Month title */
-.rdp-caption_label {
-  color: #10b981 !important;
-  font-weight: 700 !important;
-}
+  .en-cal-day {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 
-/* Weekdays */
-.rdp-weekday {
-  color: #34d399 !important;
-}
-
-/* Navigation arrows */
-.rdp-chevron {
-  fill: #10b981 !important;
-}
-
-.rdp-button_previous,
-.rdp-button_next {
-  border-radius: 12px !important;
-}
-
-.rdp-button_previous:hover,
-.rdp-button_next:hover {
-  background: rgba(16, 185, 129, 0.15) !important;
-}
-
-/* Day buttons */
-.rdp-day_button {
-  border-radius: 12px !important;
-  transition: all 0.25s ease !important;
-}
-
-.rdp-day_button:hover {
-  background: rgba(16, 185, 129, 0.15) !important;
-}
-
-/* TODAY */
-.rdp-today .rdp-day_button {
-  border: 1px solid #10b981 !important;
-}
-
-/* SELECTED DAYS */
-.rdp-selected .rdp-day_button {
-  background: #10b981 !important;
-  color: white !important;
-}
-
-/* RANGE START */
-.rdp-range_start .rdp-day_button {
-  background: #10b981 !important;
-  color: white !important;
-}
-
-/* RANGE END */
-.rdp-range_end .rdp-day_button {
-  background: #10b981 !important;
-  color: white !important;
-}
-
-/* RANGE MIDDLE */
-.rdp-range_middle .rdp-day_button {
-  background: rgba(16, 185, 129, 0.25) !important;
-  color: white !important;
-}
-
-/* Dark mode text */
-.rdp-root {
-  color: white;
+  .en-cal-cell.is-start::before,
+  .en-cal-cell.is-end::before,
+  .en-cal-cell.is-middle::before {
+    height: 2.5rem;
+  }
 }

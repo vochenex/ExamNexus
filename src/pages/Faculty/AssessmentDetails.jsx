@@ -197,7 +197,7 @@ export default function AssessmentDetails() {
   const submissionCount = analytics?.submissionCount;
 
   const actionButtonBase =
-    "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0";
+    "inline-flex items-center justify-center rounded-xl p-2 text-xs font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0";
 
   return (
     <div className={pageShellWithBellClass(theme)}>
@@ -285,9 +285,10 @@ export default function AssessmentDetails() {
                       ? "border border-cyan-400/35 bg-cyan-500/15 text-cyan-200"
                       : "border border-cyan-600/25 bg-cyan-50 text-cyan-900"
                   }`}
+                  aria-label="Edit assessment"
+                  title="Edit"
                 >
-                  <Pencil size={14} />
-                  Edit
+                  <Pencil size={16} />
                 </button>
 
                 <button
@@ -299,25 +300,27 @@ export default function AssessmentDetails() {
                       ? "border border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
                       : "border border-emerald-600/25 bg-emerald-50 text-teal-900"
                   }`}
-                  title="Save questions to question bank"
+                  aria-label="Save questions to question bank"
+                  title="Save to bank"
                 >
-                  <Archive size={14} />
-                  Bank
+                  <Archive size={16} />
                 </button>
 
                 <ProgressButton
                   type="button"
                   onClick={handleDelete}
                   loading={deleting}
-                  loadingLabel="Deleting..."
+                  loadingLabel="Deleting assessment"
+                  iconOnly
                   className={`${actionButtonBase} ${
                     theme === "dark"
                       ? "border border-red-400/35 bg-red-500/15 text-red-200"
                       : "border border-red-400/40 bg-red-50 text-red-800"
                   }`}
+                  aria-label="Delete assessment"
+                  title="Delete"
                 >
-                  <Trash2 size={14} />
-                  Delete
+                  <Trash2 size={16} />
                 </ProgressButton>
               </div>
             </div>

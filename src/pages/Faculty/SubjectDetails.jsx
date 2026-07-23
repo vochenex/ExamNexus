@@ -4,7 +4,7 @@ import BackButton from "../../components/BackButton";
 import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
-import { primaryButton, secondaryButtonSm } from "../../utils/themeButtons";
+import { iconButton, primaryButton, secondaryButtonSm } from "../../utils/themeButtons";
 import {
   fetchSubject,
   fetchSubjectAssessments,
@@ -231,10 +231,11 @@ export default function SubjectDetails() {
             setShowEditSubjectModal(true);
           }}
           disabled={!facultyCanManage}
-          className={secondaryButtonSm(theme, "inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed")}
+          className={iconButton(theme, "secondary", "disabled:opacity-50 disabled:cursor-not-allowed")}
+          aria-label="Edit subject"
+          title="Edit subject"
         >
           <Pencil size={16} />
-          Edit Subject
         </button>
         </div>
         <p
@@ -299,19 +300,21 @@ export default function SubjectDetails() {
         <button
           onClick={() => navigate(`/faculty/subject/${subjectId}/social`)}
           disabled={!facultyCanManage}
-          className={primaryButton(theme, "rounded-lg px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2")}
+          className={iconButton(theme, "primary", "disabled:opacity-50 disabled:cursor-not-allowed")}
+          aria-label="Social and announcements"
+          title="Social / Announcements"
         >
           <Megaphone size={18} />
-          Social / Announcements
         </button>
 
         <button
           type="button"
           onClick={() => setRatingsOpen(true)}
-          className={primaryButton(theme, "rounded-lg px-5 py-3 flex items-center gap-2")}
+          className={iconButton(theme, "primary")}
+          aria-label="Student ratings"
+          title="Student ratings"
         >
           <BarChart3 size={18} />
-          Student ratings
         </button>
       </div>
 

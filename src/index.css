@@ -581,7 +581,8 @@ html:not(.light) .overflow-auto::-webkit-scrollbar-thumb {
 :is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll,
 :is(html.en-native-app, html.en-mobile-shell) .en-table-scroll,
 :is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll-area,
-:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded {
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded,
+:is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-list {
   scrollbar-width: thin !important;
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-x: contain;
@@ -593,7 +594,8 @@ html:not(.light) .overflow-auto::-webkit-scrollbar-thumb {
 :is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll *,
 :is(html.en-native-app, html.en-mobile-shell) .en-table-scroll *,
 :is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll-area *,
-:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded * {
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded *,
+:is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-list * {
   touch-action: pan-x pan-y;
 }
 
@@ -602,7 +604,8 @@ html:not(.light) .overflow-auto::-webkit-scrollbar-thumb {
 :is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll::-webkit-scrollbar,
 :is(html.en-native-app, html.en-mobile-shell) .en-table-scroll::-webkit-scrollbar,
 :is(html.en-native-app, html.en-mobile-shell) .en-chart-scroll-area::-webkit-scrollbar,
-:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded::-webkit-scrollbar {
+:is(html.en-native-app, html.en-mobile-shell) .en-chart-expanded::-webkit-scrollbar,
+:is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-list::-webkit-scrollbar {
   width: 6px !important;
   height: 6px !important;
   display: block !important;

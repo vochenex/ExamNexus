@@ -57,7 +57,6 @@
     display: flex !important;
     flex-direction: column;
     overflow-x: hidden;
-    overflow-y: auto;
     scrollbar-gutter: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
@@ -74,12 +73,27 @@
 
   .en-auth-panel-brand {
     justify-content: center;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .en-auth-panel-form {
     justify-content: center;
     padding-top: 1.5rem;
     padding-bottom: 1.5rem;
+    overflow-y: hidden;
+    overscroll-behavior: none;
+  }
+
+  .en-auth-card--signup .en-auth-panel-form {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .en-auth-card--saved-open .en-auth-panel-brand,
+  .en-auth-card--saved-open .en-auth-panel-form {
+    overflow-y: hidden !important;
+    overscroll-behavior: none;
   }
 
   /* Login: logo left, form right */
@@ -115,12 +129,31 @@
   margin-right: auto;
 }
 
+.en-auth-body--saved-open {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.en-auth-panel-form--saved-open {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.en-saved-accounts-wrap {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
 .en-saved-accounts-list {
   max-height: min(12rem, 42vh);
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  isolation: isolate;
 }
 
 .en-saved-accounts-list::-webkit-scrollbar {

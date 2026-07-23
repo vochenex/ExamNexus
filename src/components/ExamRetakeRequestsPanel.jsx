@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, RotateCcw, XCircle } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { panelClass } from "../utils/themeInputs";
-import { secondaryButtonSm, primaryButtonSm } from "../utils/themeButtons";
+import { iconButton } from "../utils/themeButtons";
 import ProfileAvatar from "./ProfileAvatar";
 import {
   fetchExamRetakeRequests,
@@ -250,22 +250,21 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
                 type="button"
                 disabled={processing || selectedIds.size === 0}
                 onClick={() => handleReview("approve")}
-                className={primaryButtonSm(theme, "disabled:opacity-50")}
+                className={iconButton(theme, "primary", "disabled:opacity-50")}
+                aria-label="Approve selected retake requests"
+                title="Approve selected"
               >
                 <CheckCircle2 size={16} />
-                Approve selected
               </button>
               <button
                 type="button"
                 disabled={processing || selectedIds.size === 0}
                 onClick={() => handleReview("deny")}
-                className={secondaryButtonSm(
-                  theme,
-                  "disabled:opacity-50 !border-red-500/30 !text-red-500"
-                )}
+                className={iconButton(theme, "danger", "disabled:opacity-50")}
+                aria-label="Deny selected retake requests"
+                title="Deny selected"
               >
                 <XCircle size={16} />
-                Deny selected
               </button>
             </div>
           </div>

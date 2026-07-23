@@ -20,9 +20,9 @@ import {
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import {
+  iconButton,
   primaryButtonSm,
   secondaryButtonSm,
-  dangerButton,
   primaryButton,
 } from "../../utils/themeButtons";
 
@@ -189,10 +189,11 @@ export default function AdminCatalog() {
             <button
               type="button"
               onClick={clearCurrentForm}
-              className={secondaryButtonSm(theme, "text-xs")}
+              className={iconButton(theme, "secondary")}
+              aria-label="Cancel edit"
+              title="Cancel edit"
             >
-              <X size={14} />
-              Cancel edit
+              <X size={16} />
             </button>
           )}
         </div>
@@ -275,18 +276,20 @@ export default function AdminCatalog() {
                         <button
                           type="button"
                           onClick={() => startEdit(item)}
-                          className={secondaryButtonSm(theme, "text-xs px-2 py-1")}
+                          className={iconButton(theme, "secondary")}
+                          aria-label={`Edit ${item.label}`}
+                          title="Edit"
                         >
-                          <Pencil size={14} />
-                          Edit
+                          <Pencil size={16} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(item)}
-                          className={dangerButton(theme, "text-xs px-2 py-1")}
+                          className={iconButton(theme, "danger")}
+                          aria-label={`Remove ${item.label}`}
+                          title="Remove"
                         >
-                          <Trash2 size={14} />
-                          Remove
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>

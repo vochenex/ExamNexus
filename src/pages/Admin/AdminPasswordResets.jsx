@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { KeyRound, Check, X, CheckCheck } from "lucide-react";
+import { KeyRound, X, CheckCheck } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -22,7 +22,7 @@ import {
   rejectAdminPasswordResetRequest,
 } from "../../utils/passwordReset";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
+import { iconButton, primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
 
 const STATUSES = [
   { value: "pending", label: "Pending" },
@@ -80,6 +80,7 @@ export default function AdminPasswordResets() {
   const [adminNotes, setAdminNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bulkCompleting, setBulkCompleting] = useState(false);
+  const [bulkRejecting, setBulkRejecting] = useState(false);
   const [bulkResults, setBulkResults] = useState(null);
 
   const pendingRows = useMemo(
@@ -195,6 +196,36 @@ export default function AdminPasswordResets() {
     }
   };
 
+  const handleRejectAll = async () => {
+    if (!pendingRows.length) {
+      error("No pending password reset requests.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: "Reject all pending resets?",
+      message: `Reject ${pendingRows.length} password reset request${pendingRows.length === 1 ? "" : "s"}? Users will need to submit a new request if they still need help.`,
+      tone: "danger",
+      confirmLabel: "Reject all",
+    });
+    if (!ok) return;
+
+    try {
+      setBulkRejecting(true);
+      for (const row of pendingRows) {
+        await rejectAdminPasswordResetRequest(row.id, "Bulk rejection by administrator.");
+      }
+      await success(
+        `Rejected ${pendingRows.length} password reset request${pendingRows.length === 1 ? "" : "s"}.`
+      );
+      await load(true);
+    } catch (err) {
+      error(err.message || "Failed to reject all password reset requests.");
+    } finally {
+      setBulkRejecting(false);
+    }
+  };
+
   if (loading && rows.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
   const pendingCount = pendingRows.length;
@@ -238,17 +269,34 @@ export default function AdminPasswordResets() {
           ))}
         </Select>
         {statusFilter === "pending" && pendingCount > 0 && (
-          <ProgressButton
-            type="button"
-            onClick={handleApproveAll}
-            loading={bulkCompleting}
-            loadingLabel="Approving..."
-            disabled={actingId !== null || submitting}
-            className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
-          >
-            <CheckCheck size={14} />
-            Approve all
-          </ProgressButton>
+          <>
+            <ProgressButton
+              type="button"
+              onClick={handleApproveAll}
+              loading={bulkCompleting}
+              loadingLabel="Approving all"
+              iconOnly
+              disabled={bulkRejecting || actingId !== null || submitting}
+              className={iconButton(theme, "primary")}
+              aria-label="Approve all pending resets"
+              title="Approve all"
+            >
+              <CheckCheck size={16} />
+            </ProgressButton>
+            <ProgressButton
+              type="button"
+              onClick={handleRejectAll}
+              loading={bulkRejecting}
+              loadingLabel="Rejecting all"
+              iconOnly
+              disabled={bulkCompleting || actingId !== null || submitting}
+              className={iconButton(theme, "danger")}
+              aria-label="Reject all pending resets"
+              title="Reject all"
+            >
+              <X size={16} />
+            </ProgressButton>
+          </>
         )}
       </div>
 
@@ -289,27 +337,30 @@ export default function AdminPasswordResets() {
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
-                            disabled={bulkCompleting || submitting || actingId === row.id}
+                            disabled={bulkCompleting || bulkRejecting || submitting || actingId === row.id}
                             onClick={() => {
                               setResetTarget(row);
                               setNewPassword("");
                               setAdminNotes("");
                             }}
-                            className={primaryButtonSm(theme, "text-xs px-2 py-1")}
+                            className={iconButton(theme, "primary")}
+                            aria-label={`Reset password for ${row.email}`}
+                            title="Reset password"
                           >
-                            <Check size={14} />
-                            Reset password
+                            <KeyRound size={16} />
                           </button>
                           <ProgressButton
                             type="button"
                             loading={actingId === row.id}
-                            loadingLabel="Rejecting..."
-                            disabled={bulkCompleting || submitting || (actingId !== null && actingId !== row.id)}
+                            loadingLabel="Rejecting request"
+                            iconOnly
+                            disabled={bulkCompleting || bulkRejecting || submitting || (actingId !== null && actingId !== row.id)}
                             onClick={() => handleReject(row)}
-                            className={dangerButton(theme, "text-xs px-2 py-1")}
+                            className={iconButton(theme, "danger")}
+                            aria-label={`Reject reset for ${row.email}`}
+                            title="Reject"
                           >
-                            <X size={14} />
-                            Reject
+                            <X size={16} />
                           </ProgressButton>
                         </div>
                       ) : (

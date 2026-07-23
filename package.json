@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-import-casing.mjs && vite build",
+    "build": "node scripts/check-import-casing.mjs && node scripts/audit-page-imports.mjs && node scripts/audit-page-eslint.mjs && vite build",
     "lint": "eslint .",
     "check:imports": "node scripts/check-import-casing.mjs",
+    "check:pages": "node scripts/audit-page-imports.mjs && node scripts/audit-page-eslint.mjs",
     "preview": "vite preview",
     "start:backend": "npm start --prefix backend",
     "backend": "npm start --prefix backend",

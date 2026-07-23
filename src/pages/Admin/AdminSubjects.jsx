@@ -23,7 +23,7 @@ import {
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { primaryButtonSm, dangerButton, primaryButton } from "../../utils/themeButtons";
+import { iconButton, primaryButtonSm, primaryButton } from "../../utils/themeButtons";
 import { DEFAULT_SECTION_COUNT } from "../../utils/sections";
 import { DEFAULT_YEAR_LEVEL } from "../../utils/yearLevels";
 
@@ -320,10 +320,11 @@ export default function AdminSubjects() {
                     <button
                       type="button"
                       onClick={() => handleDelete(subject)}
-                      className={dangerButton(theme, "text-xs px-2 py-1")}
+                      className={iconButton(theme, "danger")}
+                      aria-label={`Delete ${subject.name}`}
+                      title="Delete"
                     >
-                      <Trash2 size={14} />
-                      Delete
+                      <Trash2 size={16} />
                     </button>
                   </td>
                 </tr>

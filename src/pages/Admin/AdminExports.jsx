@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, FileSpreadsheet } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -20,7 +20,7 @@ import {
 } from "../../utils/assessmentReport";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
-import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { iconButton, primaryButton, secondaryButton } from "../../utils/themeButtons";
 
 async function finishExport(result, success, warning, sharedMsg, downloadMsg) {
   if (!result?.ok) {
@@ -174,12 +174,14 @@ export default function AdminExports() {
           type="button"
           onClick={exportAssessments}
           loading={exporting === "assessments"}
-          loadingLabel="Exporting..."
+          loadingLabel="Exporting assessments"
+          iconOnly
           disabled={Boolean(exporting) && exporting !== "assessments"}
-          className={primaryButton(theme, "disabled:opacity-60")}
+          className={iconButton(theme, "primary")}
+          aria-label="Export assessments CSV"
+          title="Export assessments CSV"
         >
           <Download size={18} />
-          Export assessments CSV
         </ProgressButton>
       </div>
 
@@ -202,32 +204,40 @@ export default function AdminExports() {
             type="button"
             onClick={() => exportAssessmentReport(selectedExamId)}
             loading={exporting === `report-${selectedExamId}`}
-            loadingLabel="Exporting..."
+            loadingLabel="Exporting report"
+            iconOnly
             disabled={!selectedExamId || (Boolean(exporting) && exporting !== `report-${selectedExamId}`)}
-            className={primaryButton(theme, "disabled:opacity-60")}
+            className={iconButton(theme, "primary")}
+            aria-label="Export full HTML report"
+            title="Export full report"
           >
             <Download size={18} />
-            Export full report
           </ProgressButton>
           <ProgressButton
             type="button"
             onClick={() => exportResultsCsv(selectedExamId || null)}
             loading={exporting === selectedExamId}
-            loadingLabel="Exporting..."
+            loadingLabel="Exporting results"
+            iconOnly
             disabled={!selectedExamId || (Boolean(exporting) && exporting !== selectedExamId)}
-            className={secondaryButton(theme, "disabled:opacity-60")}
+            className={iconButton(theme, "secondary")}
+            aria-label="Export selected results CSV"
+            title="Export selected results CSV"
           >
-            Export selected results CSV
+            <FileSpreadsheet size={18} />
           </ProgressButton>
           <ProgressButton
             type="button"
             onClick={() => exportResultsCsv(null)}
             loading={exporting === "all-results"}
-            loadingLabel="Exporting..."
+            loadingLabel="Exporting all results"
+            iconOnly
             disabled={Boolean(exporting) && exporting !== "all-results"}
-            className={secondaryButton(theme, "disabled:opacity-60")}
+            className={iconButton(theme, "secondary")}
+            aria-label="Export all results CSV"
+            title="Export all results CSV"
           >
-            Export all results CSV
+            <FileSpreadsheet size={18} />
           </ProgressButton>
         </div>
       </div>

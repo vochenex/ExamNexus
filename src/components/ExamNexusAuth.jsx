@@ -71,6 +71,8 @@ export default function ExamNexusAuth() {
   const formPanelRef = useRef(null);
   const authBodyRef = useRef(null);
   const savedListRef = useRef(null);
+  const savedAccountsWrapRef = useRef(null);
+  const savedAccountsBlockRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -160,20 +162,104 @@ export default function ExamNexusAuth() {
   };
 
   useEffect(() => {
-    if (!savedOpen) return undefined;
+    if (!savedOpen || authView !== "login") return undefined;
 
     updateSavedScrollState();
     const list = savedListRef.current;
-    if (!list) return undefined;
+    const wrap = savedAccountsWrapRef.current;
+    if (!list || !wrap) return undefined;
+
+    let lastTouchY = 0;
+
+    const listCanScroll = () => list.scrollHeight > list.clientHeight + 2;
+
+    const onWheel = (event) => {
+      if (!listCanScroll()) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = list;
+      const atTop = scrollTop <= 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+      const scrollingUp = event.deltaY < 0;
+      const scrollingDown = event.deltaY > 0;
+
+      if ((scrollingUp && !atTop) || (scrollingDown && !atBottom)) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+    };
+
+    const onTouchStart = (event) => {
+      lastTouchY = event.touches[0]?.clientY ?? 0;
+    };
+
+    const onTouchMove = (event) => {
+      if (!listCanScroll()) return;
+
+      const touchY = event.touches[0]?.clientY ?? lastTouchY;
+      const delta = lastTouchY - touchY;
+      lastTouchY = touchY;
+
+      const { scrollTop, scrollHeight, clientHeight } = list;
+      const atTop = scrollTop <= 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+      if ((delta < 0 && atTop) || (delta > 0 && atBottom)) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+    };
+
+    const trapOptions = { capture: true, passive: false };
 
     list.addEventListener("scroll", updateSavedScrollState, { passive: true });
+    wrap.addEventListener("wheel", onWheel, trapOptions);
+    wrap.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
+    wrap.addEventListener("touchmove", onTouchMove, trapOptions);
     window.addEventListener("resize", updateSavedScrollState);
 
     return () => {
       list.removeEventListener("scroll", updateSavedScrollState);
+      wrap.removeEventListener("wheel", onWheel, trapOptions);
+      wrap.removeEventListener("touchstart", onTouchStart, { capture: true });
+      wrap.removeEventListener("touchmove", onTouchMove, trapOptions);
       window.removeEventListener("resize", updateSavedScrollState);
     };
-  }, [savedOpen, savedAccounts.length]);
+  }, [savedOpen, savedAccounts.length, authView]);
+
+  useEffect(() => {
+    if (!savedOpen || authView !== "login") return undefined;
+
+    const authBody = authBodyRef.current;
+    const formPanel = formPanelRef.current;
+    const previousBodyOverflow = document.body.style.overflow;
+
+    authBody?.classList.add("en-auth-body--saved-open");
+    formPanel?.classList.add("en-auth-panel-form--saved-open");
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      authBody?.classList.remove("en-auth-body--saved-open");
+      formPanel?.classList.remove("en-auth-panel-form--saved-open");
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [savedOpen, authView]);
+
+  useEffect(() => {
+    if (!savedOpen || authView !== "login") return undefined;
+
+    const root = formPanelRef.current;
+    if (!root) return undefined;
+
+    const onFocusIn = (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (savedAccountsBlockRef.current?.contains(target)) return;
+      setSavedOpen(false);
+    };
+
+    root.addEventListener("focusin", onFocusIn);
+    return () => root.removeEventListener("focusin", onFocusIn);
+  }, [savedOpen, authView]);
 
   const scrollSavedAccounts = (direction) => {
     savedListRef.current?.scrollBy({
@@ -667,6 +753,7 @@ function getAuthInputProps(theme) {
     backdrop-blur-2xl
     border
     ${swapPanels ? "en-auth-card--signup" : ""}
+    ${savedOpen && authView === "login" ? "en-auth-card--saved-open" : ""}
     ${
       theme === "dark"
         ? "bg-[#0b1114]/90 border-white/10"
@@ -835,6 +922,7 @@ function getAuthInputProps(theme) {
                 <div className="space-y-4">
                   {authView === "login" && savedAccounts.length > 0 && (
                     <div
+                      ref={savedAccountsBlockRef}
                       className={`overflow-hidden rounded-xl border ${
                         theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200 bg-emerald-50/40"
                       }`}
@@ -848,7 +936,10 @@ function getAuthInputProps(theme) {
                         {savedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </button>
                       {savedOpen && (
-                        <div className="border-t border-inherit">
+                        <div
+                          ref={savedAccountsWrapRef}
+                          className="en-saved-accounts-wrap border-t border-inherit"
+                        >
                           {savedScrollUp && (
                             <div className="flex justify-center px-2 pt-1">
                               <button
@@ -893,6 +984,7 @@ function getAuthInputProps(theme) {
                                     setEmailManuallyEdited(true);
                                     setErrors({});
                                     setServerError("");
+                                    setSavedOpen(false);
                                   }}
                                 >
                                   <span
