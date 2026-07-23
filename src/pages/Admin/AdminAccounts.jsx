@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
-import { Users, Pencil, Trash2, Check } from "lucide-react";
+import { Users, Pencil, Trash2, Check, CheckCheck } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
 import Select from "../../components/ui/Select";
 import ModalPortal from "../../components/ui/ModalPortal";
+import ProgressButton from "../../components/ui/ProgressButton";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
@@ -74,11 +75,20 @@ export default function AdminAccounts() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [reviewingId, setReviewingId] = useState(null);
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
-  const pendingCount = useMemo(
-    () => users.filter((user) => getAccountStatus(user) === "pending").length,
+  const pendingUsers = useMemo(
+    () =>
+      users.filter(
+        (user) =>
+          getAccountStatus(user) === "pending" &&
+          String(user.role || "").toLowerCase() !== "admin"
+      ),
     [users]
   );
+
+  const pendingCount = pendingUsers.length;
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -142,6 +152,36 @@ export default function AdminAccounts() {
     }
   };
 
+  const handleApproveAll = async () => {
+    if (!pendingUsers.length) {
+      error("No pending accounts to approve.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: "Approve all pending accounts?",
+      message: `Approve ${pendingUsers.length} account${pendingUsers.length === 1 ? "" : "s"}? Each user will be able to log in.`,
+      tone: "success",
+      confirmLabel: "Approve all",
+    });
+    if (!ok) return;
+
+    try {
+      setBulkApproving(true);
+      for (const user of pendingUsers) {
+        await reviewAdminAccount(user.id, "approve");
+      }
+      await success(
+        `Approved ${pendingUsers.length} account${pendingUsers.length === 1 ? "" : "s"}.`
+      );
+      await load(true);
+    } catch (err) {
+      error(err.message || "Failed to approve all accounts.");
+    } finally {
+      setBulkApproving(false);
+    }
+  };
+
   const handleDelete = async (user) => {
     const currentUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
     if (user.id === currentUser.id) {
@@ -158,11 +198,14 @@ export default function AdminAccounts() {
     if (!ok) return;
 
     try {
+      setDeletingId(user.id);
       await deleteAdminUser(user.id);
       await success("Account deleted.");
       await load(true);
     } catch (err) {
       error(err.message || "Failed to delete account.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -193,7 +236,7 @@ export default function AdminAccounts() {
         </div>
       )}
 
-      <div className={`${adminToolbarClass(theme)} flex flex-wrap gap-3`}>
+      <div className={`${adminToolbarClass(theme)} flex flex-wrap items-center gap-3`}>
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -217,6 +260,19 @@ export default function AdminAccounts() {
             </option>
           ))}
         </Select>
+        {statusFilter === "pending" && pendingCount > 0 && (
+          <ProgressButton
+            type="button"
+            onClick={handleApproveAll}
+            loading={bulkApproving}
+            loadingLabel="Approving..."
+            disabled={reviewingId !== null}
+            className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+          >
+            <CheckCheck size={14} />
+            Approve all
+          </ProgressButton>
+        )}
       </div>
 
       <div className={`${adminTableWrapClass(theme)} min-w-0`}>
@@ -275,15 +331,17 @@ export default function AdminAccounts() {
                       <td className={`${adminTdClass(theme)} min-w-[11rem]`}>
                         <div className="flex flex-wrap gap-2">
                           {isPending && !isAdmin && (
-                            <button
+                            <ProgressButton
                               type="button"
-                              disabled={reviewingId === user.id}
+                              loading={reviewingId === user.id}
+                              loadingLabel="Approving..."
+                              disabled={bulkApproving || (reviewingId !== null && reviewingId !== user.id)}
                               onClick={() => handleReview(user, "approve")}
                               className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
                             >
                               <Check size={14} />
                               Approve
-                            </button>
+                            </ProgressButton>
                           )}
                           <button
                             type="button"
@@ -294,14 +352,17 @@ export default function AdminAccounts() {
                             Edit
                           </button>
                           {!isAdmin && (
-                            <button
+                            <ProgressButton
                               type="button"
+                              loading={deletingId === user.id}
+                              loadingLabel="Deleting..."
+                              disabled={bulkApproving || reviewingId !== null || saving || (deletingId !== null && deletingId !== user.id)}
                               onClick={() => handleDelete(user)}
                               className={dangerButton(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
                             >
                               <Trash2 size={14} />
                               Delete
-                            </button>
+                            </ProgressButton>
                           )}
                         </div>
                       </td>
@@ -393,9 +454,16 @@ export default function AdminAccounts() {
               <button type="button" onClick={() => setEditing(null)} className={secondaryButtonSm(theme)}>
                 Cancel
               </button>
-              <button type="button" onClick={handleSave} disabled={saving} className={primaryButtonSm(theme)}>
-                {saving ? "Saving..." : "Save changes"}
-              </button>
+              <ProgressButton
+                type="button"
+                onClick={handleSave}
+                loading={saving}
+                loadingLabel="Saving..."
+                disabled={deletingId !== null}
+                className={primaryButtonSm(theme)}
+              >
+                Save changes
+              </ProgressButton>
             </div>
           </div>
         </div>

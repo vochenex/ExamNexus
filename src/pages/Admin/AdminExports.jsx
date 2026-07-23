@@ -5,6 +5,7 @@ import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
 import Select from "../../components/ui/Select";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import ProgressButton from "../../components/ui/ProgressButton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
   fetchAdminAssessments,
@@ -94,7 +95,7 @@ export default function AdminExports() {
       return;
     }
     try {
-      setExporting(examId);
+      setExporting(`report-${examId}`);
       const report = await fetchAdminAssessmentReport(examId);
       const html = buildAssessmentReportHtml(report);
       const filename = `examnexus-${slugifyFilename(report.title)}-report.html`;
@@ -169,15 +170,17 @@ export default function AdminExports() {
         <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
           Download a CSV of all assessments across subjects.
         </p>
-        <button
+        <ProgressButton
           type="button"
           onClick={exportAssessments}
-          disabled={Boolean(exporting)}
+          loading={exporting === "assessments"}
+          loadingLabel="Exporting..."
+          disabled={Boolean(exporting) && exporting !== "assessments"}
           className={primaryButton(theme, "disabled:opacity-60")}
         >
           <Download size={18} />
-          {exporting === "assessments" ? "Exporting..." : "Export assessments CSV"}
-        </button>
+          Export assessments CSV
+        </ProgressButton>
       </div>
 
       <div className={`${panelClass(theme)} space-y-4`}>
@@ -195,33 +198,37 @@ export default function AdminExports() {
           ))}
         </Select>
         <div className="flex flex-wrap gap-3">
-          <button
+          <ProgressButton
             type="button"
             onClick={() => exportAssessmentReport(selectedExamId)}
-            disabled={Boolean(exporting) || !selectedExamId}
+            loading={exporting === `report-${selectedExamId}`}
+            loadingLabel="Exporting..."
+            disabled={!selectedExamId || (Boolean(exporting) && exporting !== `report-${selectedExamId}`)}
             className={primaryButton(theme, "disabled:opacity-60")}
           >
             <Download size={18} />
-            {exporting && exporting === selectedExamId
-              ? "Exporting..."
-              : "Export full report"}
-          </button>
-          <button
+            Export full report
+          </ProgressButton>
+          <ProgressButton
             type="button"
             onClick={() => exportResultsCsv(selectedExamId || null)}
-            disabled={Boolean(exporting) || !selectedExamId}
+            loading={exporting === selectedExamId}
+            loadingLabel="Exporting..."
+            disabled={!selectedExamId || (Boolean(exporting) && exporting !== selectedExamId)}
             className={secondaryButton(theme, "disabled:opacity-60")}
           >
             Export selected results CSV
-          </button>
-          <button
+          </ProgressButton>
+          <ProgressButton
             type="button"
             onClick={() => exportResultsCsv(null)}
-            disabled={Boolean(exporting)}
+            loading={exporting === "all-results"}
+            loadingLabel="Exporting..."
+            disabled={Boolean(exporting) && exporting !== "all-results"}
             className={secondaryButton(theme, "disabled:opacity-60")}
           >
-            {exporting === "all-results" ? "Exporting..." : "Export all results CSV"}
-          </button>
+            Export all results CSV
+          </ProgressButton>
         </div>
       </div>
     </div>

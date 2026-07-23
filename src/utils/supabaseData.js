@@ -24,7 +24,7 @@ import {
   mergeSectionStandings,
 } from "./studentAnalytics";
 import { getAssessmentStatus } from "./assessmentStatus";
-import { buildSubjectClassAnalytics } from "./subjectClassAnalytics";
+import { buildSubjectClassAnalytics, buildPerStudentSubjectAnalytics } from "./subjectClassAnalytics";
 import { normalizeYearLevelForStorage } from "./yearLevels";
 import { durationFieldsForDb } from "./assessmentDuration";
 import { dedupeExamQuestions } from "./assessmentTake";
@@ -148,11 +148,38 @@ function normalizeClassmatesList(data, currentUserId) {
     ...row,
     id: row.id || row.student_id,
     section: String(row.section || "A").toUpperCase(),
+    department: row.department || "",
+    course: row.course || "",
+    year_level: row.year_level || "",
     is_you:
       row.id === currentUserId ||
       row.student_id === currentUserId ||
       row.is_you === true,
   }));
+}
+
+async function enrichClassmatesWithProfiles(classmates = []) {
+  const ids = [...new Set(classmates.map((row) => row.id).filter(Boolean))];
+  if (!ids.length) return classmates;
+
+  const { data: users, error } = await supabase
+    .from("users")
+    .select("id, department, course, year_level, email")
+    .in("id", ids);
+
+  if (error || !users?.length) return classmates;
+
+  const byId = new Map(users.map((user) => [user.id, user]));
+  return classmates.map((row) => {
+    const profile = byId.get(row.id);
+    if (!profile) return row;
+    return {
+      ...row,
+      department: row.department || profile.department || "",
+      course: row.course || profile.course || "",
+      year_level: row.year_level || profile.year_level || "",
+    };
+  });
 }
 
 async function fetchSubjectClassmatesDirect(
@@ -184,7 +211,7 @@ async function fetchSubjectClassmatesDirect(
 
   const { data: users, error: usersError } = await supabase
     .from("users")
-    .select("id, first_name, last_name, avatar_url, school_id")
+    .select("id, first_name, last_name, avatar_url, school_id, department, course, year_level")
     .in("id", studentIds);
 
   if (usersError) throw usersError;
@@ -362,7 +389,8 @@ export async function fetchSubjectClassmates(subjectId, { sectionFilter = null }
   if (!error && data) {
     const classmates = normalizeClassmatesList(data, currentUserId);
     if (classmates.length > 0) {
-      return filterClassmatesBySection(classmates, sectionFilter);
+      const enriched = await enrichClassmatesWithProfiles(classmates);
+      return filterClassmatesBySection(enriched, sectionFilter);
     }
   }
 
@@ -379,11 +407,12 @@ export async function fetchSubjectClassmates(subjectId, { sectionFilter = null }
     sectionFilter ||
     (await fetchStudentEnrollmentSection(currentUserId, subjectId));
 
-  return fetchSubjectClassmatesDirect(
+  const direct = await fetchSubjectClassmatesDirect(
     subjectId,
     currentUserId,
     resolvedSection
   );
+  return enrichClassmatesWithProfiles(direct);
 }
 
 function filterClassmatesBySection(classmates, section) {
@@ -464,6 +493,173 @@ export async function fetchSubjectClassAnalytics(subjectId) {
   if (error) throw error;
 
   return buildSubjectClassAnalytics(exams, results || []);
+}
+
+export async function fetchSubjectStudentAnalytics(subjectId) {
+  await requireSession();
+
+  const [subject, exams, classmates] = await Promise.all([
+    fetchSubject(subjectId),
+    fetchSubjectAssessments(subjectId),
+    fetchSubjectClassmates(subjectId),
+  ]);
+
+  const examIds = exams.map((exam) => exam.id);
+  if (!examIds.length) {
+    return buildPerStudentSubjectAnalytics([], [], classmates, subject);
+  }
+
+  const { data: results, error } = await supabase
+    .from("exam_results")
+    .select("exam_id, score, total, student_id")
+    .in("exam_id", examIds);
+
+  if (error) throw error;
+
+  return buildPerStudentSubjectAnalytics(exams, results || [], classmates, subject);
+}
+
+async function assertFacultyOwnsExam(examId, teacherSchoolId) {
+  const { data: exam, error } = await supabase
+    .from("exams")
+    .select("id, title, subject_id, subjects(name, teacher_school_id)")
+    .eq("id", examId)
+    .single();
+
+  if (error || !exam) throw new Error("Assessment not found.");
+
+  const ownerId = String(exam.subjects?.teacher_school_id || "").trim();
+  if (ownerId !== String(teacherSchoolId || "").trim()) {
+    throw new Error("You can only export assessments from your own subjects.");
+  }
+
+  return exam;
+}
+
+export async function fetchFacultyExportAssessments(teacherSchoolId) {
+  await requireSession();
+  const subjects = await fetchTeacherSubjects(teacherSchoolId);
+  const subjectIds = subjects.map((subject) => subject.id);
+  if (!subjectIds.length) return [];
+
+  const { data: exams, error } = await supabase
+    .from("exams")
+    .select("id, title, exam_type, subject_id, start_datetime, end_datetime, created_at, subjects(name)")
+    .in("subject_id", subjectIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  const examIds = (exams || []).map((exam) => exam.id);
+  let submissionCounts = new Map();
+
+  if (examIds.length) {
+    const { data: results } = await supabase
+      .from("exam_results")
+      .select("exam_id")
+      .in("exam_id", examIds);
+
+    for (const row of results || []) {
+      submissionCounts.set(row.exam_id, (submissionCounts.get(row.exam_id) || 0) + 1);
+    }
+  }
+
+  return (exams || []).map((exam) => ({
+    assessment_id: exam.id,
+    title: exam.title,
+    type: exam.exam_type,
+    subject: exam.subjects?.name || "",
+    start: exam.start_datetime,
+    end: exam.end_datetime,
+    submissions: submissionCounts.get(exam.id) || 0,
+  }));
+}
+
+export async function fetchFacultyExportResults(teacherSchoolId, examId = null) {
+  await requireSession();
+  const assessments = await fetchFacultyExportAssessments(teacherSchoolId);
+  let examIds = assessments.map((row) => row.assessment_id);
+
+  if (examId) {
+    await assertFacultyOwnsExam(examId, teacherSchoolId);
+    examIds = [examId];
+  }
+
+  if (!examIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("exam_results")
+    .select(`
+      exam_id,
+      score,
+      total,
+      created_at,
+      exams(title, subjects(name)),
+      users(first_name, last_name, email, school_id)
+    `)
+    .in("exam_id", examIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((row) => {
+    const total = Number(row.total) || 0;
+    const score = Number(row.score) || 0;
+    const pct = total > 0 ? Math.round((score / total) * 1000) / 10 : 0;
+    const student = row.users || {};
+
+    return {
+      exam_title: row.exams?.title || "",
+      subject: row.exams?.subjects?.name || "",
+      student_name: [student.first_name, student.last_name].filter(Boolean).join(" ") || "Student",
+      student_email: student.email || "",
+      school_id: student.school_id || "",
+      score,
+      total,
+      percentage: pct,
+      submitted_at: row.created_at,
+    };
+  });
+}
+
+export async function fetchFacultyAssessmentReport(teacherSchoolId, examId) {
+  await requireSession();
+  if (!examId) throw new Error("Assessment id is required.");
+
+  const exam = await assertFacultyOwnsExam(examId, teacherSchoolId);
+  const [analytics, questionsBundle, results] = await Promise.all([
+    fetchExamFacultyAnalytics(examId),
+    fetchExamWithQuestions(examId),
+    fetchFacultyExportResults(teacherSchoolId, examId),
+  ]);
+
+  const facultySession = await requireSession();
+  const { data: facultyProfile } = await supabase
+    .from("users")
+    .select("first_name, last_name, school_id, email")
+    .eq("id", facultySession.user.id)
+    .maybeSingle();
+
+  return {
+    title: questionsBundle?.exam?.title || exam.title,
+    description: questionsBundle?.exam?.description || "",
+    subject: exam.subjects?.name || "",
+    faculty: facultyProfile || {},
+    questions: (questionsBundle?.questions || []).map((row) => ({
+      question_text: row.question,
+      question_type: row.question_type,
+      options: [row.option_a, row.option_b, row.option_c, row.option_d].filter(Boolean),
+      points: Number(row.grading_options?.points) || 1,
+    })),
+    students: (analytics?.studentPerformance || []).map((student) => ({
+      name: student.name,
+      score: student.score,
+      total: student.total,
+      percentage: student.scorePct,
+      pending_review: student.pendingReview,
+    })),
+    results,
+  };
 }
 
 function profileFieldsFromSession(session, fields = {}) {

@@ -48,11 +48,11 @@ import HomeSiteHeader from "./home/HomeSiteHeader";
 import HomeBottomBar from "./home/HomeBottomBar";
 import NativeAuthHeader from "./NativeAuthHeader";
 import LogoSplashScreen from "./LogoSplashScreen";
+import ProgressButton from "./ui/ProgressButton";
 import { useAppModal } from "../contexts/AppModalContext";
 import useMobileNav from "../hooks/useMobileNav";
 import { isNativeApp } from "../utils/platform";
 import {
-  getRememberedPassword,
   getSavedAccounts,
   removeSavedAccount,
   setRememberedPassword,
@@ -70,6 +70,7 @@ export default function ExamNexusAuth() {
   const lastNoticeKeyRef = useRef(null);
   const formPanelRef = useRef(null);
   const authBodyRef = useRef(null);
+  const savedListRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -83,6 +84,8 @@ export default function ExamNexusAuth() {
   const [rememberMe, setRememberMe] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState(() => getSavedAccounts());
   const [savedOpen, setSavedOpen] = useState(false);
+  const [savedScrollUp, setSavedScrollUp] = useState(false);
+  const [savedScrollDown, setSavedScrollDown] = useState(false);
 
   const [form, setForm] = useState({
   firstName: "",
@@ -140,6 +143,44 @@ export default function ExamNexusAuth() {
     if (authView !== "signup" || !formPanelRef.current) return;
     formPanelRef.current.scrollTop = 0;
   }, [authView]);
+
+  const updateSavedScrollState = () => {
+    const list = savedListRef.current;
+    if (!list) {
+      setSavedScrollUp(false);
+      setSavedScrollDown(false);
+      return;
+    }
+
+    const overflow = list.scrollHeight > list.clientHeight + 2;
+    setSavedScrollUp(overflow && list.scrollTop > 4);
+    setSavedScrollDown(
+      overflow && list.scrollTop + list.clientHeight < list.scrollHeight - 4
+    );
+  };
+
+  useEffect(() => {
+    if (!savedOpen) return undefined;
+
+    updateSavedScrollState();
+    const list = savedListRef.current;
+    if (!list) return undefined;
+
+    list.addEventListener("scroll", updateSavedScrollState, { passive: true });
+    window.addEventListener("resize", updateSavedScrollState);
+
+    return () => {
+      list.removeEventListener("scroll", updateSavedScrollState);
+      window.removeEventListener("resize", updateSavedScrollState);
+    };
+  }, [savedOpen, savedAccounts.length]);
+
+  const scrollSavedAccounts = (direction) => {
+    savedListRef.current?.scrollBy({
+      top: direction * 88,
+      behavior: "smooth",
+    });
+  };
 
   // Keep the focused field visible above the on-screen keyboard (especially signup).
   useEffect(() => {
@@ -406,15 +447,19 @@ function getAuthInputProps(theme) {
         JSON.stringify(profile)
       );
 
-      upsertSavedAccount({
-        email: form.email,
-        role: profile.role,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        avatar_url: profile.avatar_url,
-        user_id: profile.id || data.user.id,
-      });
-      setRememberedPassword(form.email, form.password, rememberMe);
+      if (rememberMe) {
+        upsertSavedAccount({
+          email: form.email,
+          role: profile.role,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          avatar_url: profile.avatar_url,
+          user_id: profile.id || data.user.id,
+        });
+        setRememberedPassword(form.email, form.password, true);
+      } else {
+        setRememberedPassword(form.email, form.password, false);
+      }
       setSavedAccounts(getSavedAccounts());
 
       // Bind this device's push token to the signed-in account (keeps other saved accounts too).
@@ -670,10 +715,10 @@ function getAuthInputProps(theme) {
           }`}
         >
           <div className="en-auth-form-inner">
-  <div className={`mb-6 flex flex-col items-center gap-4 ${isNativeApp() ? "hidden" : "md:hidden"}`}>
+  <div className="mb-6 flex flex-col items-center gap-4 md:hidden">
     <ExamNexusBrand
       variant="panel"
-      idSuffix="auth-mobile"
+      idSuffix={isNativeApp() ? "auth-native" : "auth-mobile"}
       panelTone={theme === "light" ? "light" : "dark"}
     />
   </div>
@@ -803,7 +848,27 @@ function getAuthInputProps(theme) {
                         {savedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </button>
                       {savedOpen && (
-                        <div className="space-y-1 border-t border-inherit px-2 pb-2 pt-1">
+                        <div className="border-t border-inherit">
+                          {savedScrollUp && (
+                            <div className="flex justify-center px-2 pt-1">
+                              <button
+                                type="button"
+                                aria-label="Scroll saved accounts up"
+                                onClick={() => scrollSavedAccounts(-1)}
+                                className={`rounded-md p-1 ${
+                                  theme === "dark"
+                                    ? "text-emerald-300 hover:bg-white/10"
+                                    : "text-teal-700 hover:bg-white/80"
+                                }`}
+                              >
+                                <ChevronUp size={16} />
+                              </button>
+                            </div>
+                          )}
+                          <div
+                            ref={savedListRef}
+                            className="en-saved-accounts-list space-y-1 px-2 pb-2 pt-1"
+                          >
                           {savedAccounts.map((account) => {
                             const label =
                               [account.first_name, account.last_name].filter(Boolean).join(" ") ||
@@ -819,13 +884,12 @@ function getAuthInputProps(theme) {
                                   type="button"
                                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                   onClick={() => {
-                                    const remembered = getRememberedPassword(account.email);
                                     setForm((current) => ({
                                       ...current,
                                       email: account.email,
-                                      password: remembered || "",
+                                      password: "",
                                     }));
-                                    setRememberMe(Boolean(remembered));
+                                    setRememberMe(false);
                                     setEmailManuallyEdited(true);
                                     setErrors({});
                                     setServerError("");
@@ -838,10 +902,10 @@ function getAuthInputProps(theme) {
                                   >
                                     <UserRound size={14} />
                                   </span>
-                                  <span className="min-w-0">
-                                    <span className="block truncate text-sm font-medium">{label}</span>
-                                    <span className={`block truncate text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                                      Continue as {account.email} · password still required
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block break-words text-sm font-medium leading-snug">{label}</span>
+                                    <span className={`block break-words text-[11px] leading-snug ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                                      Continue as {account.email}
                                     </span>
                                   </span>
                                 </button>
@@ -869,6 +933,23 @@ function getAuthInputProps(theme) {
                               </div>
                             );
                           })}
+                          </div>
+                          {savedScrollDown && (
+                            <div className="flex justify-center px-2 pb-2">
+                              <button
+                                type="button"
+                                aria-label="Scroll saved accounts down"
+                                onClick={() => scrollSavedAccounts(1)}
+                                className={`rounded-md p-1 ${
+                                  theme === "dark"
+                                    ? "text-emerald-300 hover:bg-white/10"
+                                    : "text-teal-700 hover:bg-white/80"
+                                }`}
+                              >
+                                <ChevronDown size={16} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -971,10 +1052,16 @@ function getAuthInputProps(theme) {
                         <input
                           type="checkbox"
                           checked={rememberMe}
-                          onChange={(e) => setRememberMe(e.target.checked)}
-                          className="h-3.5 w-3.5 rounded border-emerald-400 text-emerald-500 focus:ring-emerald-500"
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setRememberMe(checked);
+                            if (!checked) {
+                              setRememberedPassword(form.email, "", false);
+                            }
+                          }}
+                          className="h-3.5 w-3.5 shrink-0 rounded border-emerald-400 text-emerald-500 focus:ring-emerald-500"
                         />
-                        <span className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
+                        <span className={`break-words leading-snug ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
                           Remember me on this device
                         </span>
                       </label>
@@ -1037,19 +1124,18 @@ function getAuthInputProps(theme) {
   </div>
 )}
 
-            <button
+            <ProgressButton
   type="submit"
-  disabled={loading}
+  loading={loading}
+  loadingLabel="Please wait..."
   className={`${primaryButtonFull(theme)} mt-6`}
 >
-  {loading
-    ? "Please wait..."
-    : authView === "forgot"
-      ? "Send reset request"
-      : isLogin
-        ? "Login"
-        : "Sign Up"}
-</button>
+  {authView === "forgot"
+    ? "Send reset request"
+    : isLogin
+      ? "Login"
+      : "Sign Up"}
+</ProgressButton>
           </form>
 
           <p

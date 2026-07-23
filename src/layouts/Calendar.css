@@ -1,4 +1,5 @@
-.rdp-root {
+.en-rdp-root,
+.en-assessment-calendar .rdp-root {
   --rdp-accent-color: #10b981;
   --rdp-accent-background-color: rgba(16, 185, 129, 0.25);
   --rdp-day-height: 2rem;
@@ -8,7 +9,6 @@
   box-sizing: border-box;
 }
 
-.en-assessment-calendar .rdp,
 .en-assessment-calendar .rdp-root,
 .en-assessment-calendar .rdp-months,
 .en-assessment-calendar .rdp-month {
@@ -17,9 +17,34 @@
   box-sizing: border-box;
 }
 
-.en-assessment-calendar .rdp-month_caption,
-.en-assessment-calendar .rdp-caption {
+.en-assessment-calendar .rdp-month_caption {
   padding-inline: 0.15rem;
+}
+
+.en-assessment-calendar .en-rdp-month-grid {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.en-assessment-calendar .en-rdp-weekdays,
+.en-assessment-calendar .en-rdp-week {
+  display: table-row;
+}
+
+.en-assessment-calendar .en-rdp-weekday,
+.en-assessment-calendar .en-rdp-day {
+  width: 14.2857%;
+  min-width: 0;
+  box-sizing: border-box;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.en-assessment-calendar .rdp-weekday {
+  padding: 0.25rem 0;
+  overflow: visible;
+  white-space: nowrap;
 }
 
 @media (max-width: 480px) {
@@ -27,6 +52,18 @@
     --rdp-day-height: 1.85rem;
     --rdp-day-width: 1.85rem;
     font-size: 0.8125rem;
+  }
+
+  .en-assessment-calendar .en-rdp-weekday {
+    font-size: 0.625rem;
+    letter-spacing: -0.02em;
+  }
+}
+
+@media (min-width: 640px) {
+  .en-assessment-calendar .rdp-root {
+    --rdp-day-height: 2.25rem;
+    --rdp-day-width: 2.25rem;
   }
 }
 

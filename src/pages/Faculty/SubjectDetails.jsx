@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
-import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil} from "lucide-react";
+import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { primaryButton, secondaryButtonSm } from "../../utils/themeButtons";
@@ -11,6 +11,7 @@ import {
   fetchSubjectClassAnalytics,
   fetchSubjectClassmates,
   fetchSubjectFaculty,
+  fetchSubjectStudentAnalytics,
 } from "../../utils/supabaseData";
 import { supabase } from "../../supabaseClient";
 import {
@@ -19,7 +20,8 @@ import {
   isFacultyRole,
 } from "../../utils/avatar";
 import FacultyAvatarRequiredBanner from "../../components/FacultyAvatarRequiredBanner";
-import ClassmateCard from "../../components/ClassmateCard";
+import FacultyStudentCard from "../../components/FacultyStudentCard";
+import SubjectStudentRatingsSidebar from "../../components/SubjectStudentRatingsSidebar";
 import SectionTabs from "../../components/SectionTabs";
 import SubjectFacultyCard from "../../components/SubjectFacultyCard";
 import ModalPortal from "../../components/ui/ModalPortal";
@@ -37,6 +39,8 @@ import { pageShellWithBellClass } from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
+import { inputClass } from "../../utils/themeInputs";
+import { matchesStudentSearch } from "../../utils/studentSearch";
 
 function getAssessmentStatus(assessment) {
   const now = new Date();
@@ -70,8 +74,12 @@ export default function SubjectDetails() {
   const [classAnalytics, setClassAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [classmates, setClassmates] = useState([]);
+  const [studentRatings, setStudentRatings] = useState([]);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+  const [ratingsOpen, setRatingsOpen] = useState(false);
   const [faculty, setFaculty] = useState(null);
   const [activeSection, setActiveSection] = useState("All");
+  const [studentSearch, setStudentSearch] = useState("");
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
   const [facultyProfile, setFacultyProfile] = useState(cachedUser);
   const [loading, setLoading] = useState(true);
@@ -134,6 +142,21 @@ export default function SubjectDetails() {
   usePolling(loadSubjectPage, [subjectId]);
   usePolling(loadAnalytics, [subjectId]);
 
+  const loadStudentRatings = useCallback(async (silent = false) => {
+    if (!silent) setRatingsLoading(true);
+    try {
+      const rows = await fetchSubjectStudentAnalytics(subjectId);
+      setStudentRatings(rows);
+    } catch (err) {
+      console.error(err);
+      if (!silent) setStudentRatings([]);
+    } finally {
+      if (!silent) setRatingsLoading(false);
+    }
+  }, [subjectId]);
+
+  usePolling(loadStudentRatings, [subjectId]);
+
   useEffect(() => {
     const loadFacultyProfile = async () => {
       if (!cachedUser.id || !isFacultyRole(cachedUser.role)) return;
@@ -174,6 +197,10 @@ export default function SubjectDetails() {
       : classmates.filter(
           (c) => String(c.section || "A").toUpperCase() === activeSection
         );
+
+  const visibleClassmates = filteredClassmates.filter((student) =>
+    matchesStudentSearch(student, studentSearch)
+  );
 
   return (
  <div className={pageShellWithBellClass(theme)}>
@@ -257,7 +284,7 @@ export default function SubjectDetails() {
       </div>
 
       {/* CREATE ASSESSMENT + SOCIAL */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="mb-6 flex flex-wrap gap-3 min-w-0">
         <button
         onClick={() => {
           if (!requireFacultyAvatar()) return;
@@ -277,6 +304,15 @@ export default function SubjectDetails() {
           <Megaphone size={18} />
           Social / Announcements
         </button>
+
+        <button
+          type="button"
+          onClick={() => setRatingsOpen(true)}
+          className={primaryButton(theme, "rounded-lg px-5 py-3 flex items-center gap-2")}
+        >
+          <BarChart3 size={18} />
+          Student ratings
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -284,6 +320,7 @@ export default function SubjectDetails() {
         {/* STUDENTS */}
        <div
   className={`
+    min-w-0 overflow-hidden
     p-5
     rounded-2xl
     lg:col-span-1
@@ -309,6 +346,23 @@ export default function SubjectDetails() {
             Enrolled students by section
           </p>
 
+          <div className="relative mb-4 min-w-0">
+            <Search
+              size={16}
+              className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+                theme === "dark" ? "text-gray-500" : "text-gray-400"
+              }`}
+            />
+            <input
+              type="search"
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              placeholder="Search by name or school ID…"
+              className={inputClass(theme, "w-full min-w-0 py-2.5 pl-9 pr-3")}
+              aria-label="Search students by name or school ID"
+            />
+          </div>
+
           <SectionTabs
             active={activeSection}
             onChange={setActiveSection}
@@ -316,14 +370,22 @@ export default function SubjectDetails() {
             sections={subjectSections}
           />
 
-          <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
-            {filteredClassmates.length === 0 ? (
+          <div
+            className={`mt-4 min-w-0 space-y-2 ${
+              visibleClassmates.length > 8
+                ? "max-h-[min(28rem,60vh)] overflow-y-auto overscroll-contain pr-1"
+                : ""
+            }`}
+          >
+            {visibleClassmates.length === 0 ? (
               <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
-                No students in this section.
+                {studentSearch.trim()
+                  ? "No students match your search."
+                  : "No students in this section."}
               </p>
             ) : (
-              filteredClassmates.map((student) => (
-                <ClassmateCard key={student.id} classmate={student} />
+              visibleClassmates.map((student) => (
+                <FacultyStudentCard key={student.id} student={student} />
               ))
             )}
           </div>
@@ -673,6 +735,13 @@ export default function SubjectDetails() {
   </div>
   </ModalPortal>
 )}
+      <SubjectStudentRatingsSidebar
+        open={ratingsOpen}
+        onClose={() => setRatingsOpen(false)}
+        subject={subject}
+        students={studentRatings}
+        loading={ratingsLoading}
+      />
       <EditSubjectModal
         subject={subject}
         classmates={classmates}

@@ -115,6 +115,23 @@
   margin-right: auto;
 }
 
+.en-saved-accounts-list {
+  max-height: min(12rem, 42vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.en-saved-accounts-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.en-saved-accounts-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.35);
+}
+
 @media (min-width: 768px) {
   .en-auth-form-inner {
     max-width: 22rem;

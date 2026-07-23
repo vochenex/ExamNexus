@@ -8,7 +8,7 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { secondaryButton } from "../../utils/themeButtons";
-import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import ProgressButton from "../../components/ui/ProgressButton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
   deleteQuestionBankEntry,
@@ -41,6 +41,7 @@ export default function QuestionBank() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const facultyCanManage = canFacultyManageSubjects(cachedUser);
 
@@ -104,6 +105,7 @@ export default function QuestionBank() {
     if (!ok) return;
 
     try {
+      setDeletingId(item.id);
       await deleteQuestionBankEntry(item.id);
       setItems((prev) => prev.filter((row) => row.id !== item.id));
       if (expandedId === item.id) {
@@ -112,6 +114,8 @@ export default function QuestionBank() {
       showSuccess("Question removed from your bank.");
     } catch (err) {
       showError(err.message || "Could not delete question.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -245,14 +249,17 @@ export default function QuestionBank() {
                         </p>
                       </div>
                     </button>
-                    <button
+                    <ProgressButton
                       type="button"
                       onClick={() => handleDelete(item)}
+                      loading={deletingId === item.id}
+                      loadingLabel="Removing..."
+                      disabled={deletingId !== null && deletingId !== item.id}
                       className="shrink-0 rounded-lg p-1.5 text-red-400 transition hover:bg-red-500/10"
                       aria-label="Remove from bank"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </ProgressButton>
                   </div>
 
                   {expanded && (

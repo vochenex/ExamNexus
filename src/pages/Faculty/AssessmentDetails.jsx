@@ -28,6 +28,7 @@ import {
 } from "../../utils/supabaseData";
 import { getAssessmentStatus } from "../../utils/assessmentStatus";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import ProgressButton from "../../components/ui/ProgressButton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 
 const TABS = [
@@ -304,10 +305,11 @@ export default function AssessmentDetails() {
                   Bank
                 </button>
 
-                <button
+                <ProgressButton
                   type="button"
                   onClick={handleDelete}
-                  disabled={deleting}
+                  loading={deleting}
+                  loadingLabel="Deleting..."
                   className={`${actionButtonBase} ${
                     theme === "dark"
                       ? "border border-red-400/35 bg-red-500/15 text-red-200"
@@ -315,8 +317,8 @@ export default function AssessmentDetails() {
                   }`}
                 >
                   <Trash2 size={14} />
-                  {deleting ? "…" : "Delete"}
-                </button>
+                  Delete
+                </ProgressButton>
               </div>
             </div>
           </div>

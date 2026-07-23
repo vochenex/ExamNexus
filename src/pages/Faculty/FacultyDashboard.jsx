@@ -51,7 +51,9 @@ import { useAppModal } from "../../contexts/AppModalContext";
 import { staggerGridClass } from "../../utils/themeInputs";
 import FacultyDashboardAnalyticsPanel from "../../components/FacultyDashboardAnalyticsPanel";
 import FacultyCreateSubjectPanel from "../../components/FacultyCreateSubjectPanel";
+import FacultyExportPanel from "../../components/FacultyExportPanel";
 import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
+import ProgressButton from "../../components/ui/ProgressButton";
 import ModalPortal from "../../components/ui/ModalPortal";
 
 function panelClass(theme) {
@@ -98,7 +100,8 @@ export default function FacultyDashboard() {
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const navigate = useNavigate();
-  const [deletingSubject, setDeletingSubject] = useState(false);
+  const [deletingSubjectId, setDeletingSubjectId] = useState(null);
+  const [savingSubjectId, setSavingSubjectId] = useState(null);
   const [dashAnalytics, setDashAnalytics] = useState(null);
   const [editingSubjectId, setEditingSubjectId] = useState(null);
   const [editingSubjectName, setEditingSubjectName] = useState("");
@@ -173,7 +176,7 @@ export default function FacultyDashboard() {
     if (!ok) return;
 
     try {
-      setDeletingSubject(true);
+      setDeletingSubjectId(subject.id);
       await deleteSubjectById(subject.id);
       await success("Subject deleted.");
       await fetchSubjects(true);
@@ -181,7 +184,7 @@ export default function FacultyDashboard() {
       console.error("Delete Subject Error:", err);
       showError(err.message);
     } finally {
-      setDeletingSubject(false);
+      setDeletingSubjectId(null);
     }
   };
 
@@ -245,12 +248,15 @@ export default function FacultyDashboard() {
     }
 
     try {
+      setSavingSubjectId(subjectId);
       await updateSubject(subjectId, { name: trimmed });
       setEditingSubjectId(null);
-      await fetchSubjects();
+      await fetchSubjects(true);
     } catch (err) {
       console.error("Error updating subject:", err);
       showError(err.message);
+    } finally {
+      setSavingSubjectId(null);
     }
   };
 
@@ -358,6 +364,10 @@ export default function FacultyDashboard() {
       </div>
 
       <div className="mb-6">
+        <FacultyExportPanel teacherSchoolId={teacherId} />
+      </div>
+
+      <div className="mb-6">
         <div className="mb-3 flex items-center gap-2">
           <LayoutDashboard
             size={16}
@@ -415,10 +425,12 @@ export default function FacultyDashboard() {
             >
               <CopyInviteCodeButton inviteCode={subject.invite_code} side="right" />
 
-              <button
+              <ProgressButton
                 type="button"
                 onClick={() => deleteSubject(subject)}
-                disabled={deletingSubject}
+                loading={deletingSubjectId === subject.id}
+                loadingLabel="Deleting..."
+                disabled={savingSubjectId !== null || (deletingSubjectId !== null && deletingSubjectId !== subject.id)}
                 className={`absolute top-3 right-3 rounded-lg p-2 opacity-0 transition-all duration-300 group-hover:opacity-100 hover:scale-110 disabled:opacity-40 ${
                   theme === "dark"
                     ? "text-red-400 hover:bg-red-500/10"
@@ -427,7 +439,7 @@ export default function FacultyDashboard() {
                 aria-label="Delete subject"
               >
                 <Trash2 size={16} />
-              </button>
+              </ProgressButton>
 
               {editingSubjectId === subject.id ? (
                 <input
@@ -439,6 +451,7 @@ export default function FacultyDashboard() {
                     if (e.key === "Enter") saveSubjectName(subject.id);
                     if (e.key === "Escape") setEditingSubjectId(null);
                   }}
+                  disabled={savingSubjectId === subject.id}
                   className={`mb-3 w-full rounded-lg border px-2 py-1 text-lg font-bold outline-none ${
                     theme === "dark"
                       ? "border-emerald-500/30 bg-black/30 text-emerald-400"

@@ -1,10 +1,11 @@
-import { useCallback, useState } from "react";
-import { KeyRound, Check, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { KeyRound, Check, X, CheckCheck } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
 import Select from "../../components/ui/Select";
 import ModalPortal from "../../components/ui/ModalPortal";
+import ProgressButton from "../../components/ui/ProgressButton";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
@@ -29,6 +30,15 @@ const STATUSES = [
   { value: "rejected", label: "Rejected" },
   { value: "", label: "All" },
 ];
+
+function generateTempPassword(length = 10) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let value = "";
+  for (let index = 0; index < length; index += 1) {
+    value += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return value;
+}
 
 function statusBadge(theme, status) {
   const styles = {
@@ -69,6 +79,13 @@ export default function AdminPasswordResets() {
   const [newPassword, setNewPassword] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [bulkCompleting, setBulkCompleting] = useState(false);
+  const [bulkResults, setBulkResults] = useState(null);
+
+  const pendingRows = useMemo(
+    () => rows.filter((row) => row.status === "pending"),
+    [rows]
+  );
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -134,9 +151,53 @@ export default function AdminPasswordResets() {
     }
   };
 
+  const handleApproveAll = async () => {
+    if (!pendingRows.length) {
+      error("No pending password reset requests.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: "Approve all pending resets?",
+      message: `Complete ${pendingRows.length} password reset request${pendingRows.length === 1 ? "" : "s"} with auto-generated temporary passwords? Share each password securely with the user.`,
+      tone: "warning",
+      confirmLabel: "Approve all",
+    });
+    if (!ok) return;
+
+    try {
+      setBulkCompleting(true);
+      const completed = [];
+
+      for (const row of pendingRows) {
+        const tempPassword = generateTempPassword();
+        await completeAdminPasswordResetRequest({
+          requestId: row.id,
+          newPassword: tempPassword,
+          adminNotes: "Bulk reset by administrator.",
+        });
+        completed.push({
+          email: row.email,
+          schoolId: row.school_id,
+          password: tempPassword,
+        });
+      }
+
+      setBulkResults(completed);
+      await success(
+        `Completed ${completed.length} password reset${completed.length === 1 ? "" : "s"}.`
+      );
+      await load(true);
+    } catch (err) {
+      error(err.message || "Failed to complete all password resets.");
+    } finally {
+      setBulkCompleting(false);
+    }
+  };
+
   if (loading && rows.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
 
-  const pendingCount = rows.filter((r) => r.status === "pending").length;
+  const pendingCount = pendingRows.length;
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-7xl")}>
@@ -164,7 +225,7 @@ export default function AdminPasswordResets() {
         </div>
       )}
 
-      <div className={adminToolbarClass(theme)}>
+      <div className={`${adminToolbarClass(theme)} flex flex-wrap items-center gap-3`}>
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -176,6 +237,19 @@ export default function AdminPasswordResets() {
             </option>
           ))}
         </Select>
+        {statusFilter === "pending" && pendingCount > 0 && (
+          <ProgressButton
+            type="button"
+            onClick={handleApproveAll}
+            loading={bulkCompleting}
+            loadingLabel="Approving..."
+            disabled={actingId !== null || submitting}
+            className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+          >
+            <CheckCheck size={14} />
+            Approve all
+          </ProgressButton>
+        )}
       </div>
 
       <div className={adminTableWrapClass(theme)}>
@@ -215,7 +289,7 @@ export default function AdminPasswordResets() {
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
-                            disabled={actingId === row.id}
+                            disabled={bulkCompleting || submitting || actingId === row.id}
                             onClick={() => {
                               setResetTarget(row);
                               setNewPassword("");
@@ -226,15 +300,17 @@ export default function AdminPasswordResets() {
                             <Check size={14} />
                             Reset password
                           </button>
-                          <button
+                          <ProgressButton
                             type="button"
-                            disabled={actingId === row.id}
+                            loading={actingId === row.id}
+                            loadingLabel="Rejecting..."
+                            disabled={bulkCompleting || submitting || (actingId !== null && actingId !== row.id)}
                             onClick={() => handleReject(row)}
                             className={dangerButton(theme, "text-xs px-2 py-1")}
                           >
                             <X size={14} />
                             Reject
-                          </button>
+                          </ProgressButton>
                         </div>
                       ) : (
                         <span className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
@@ -294,19 +370,74 @@ export default function AdminPasswordResets() {
               >
                 Cancel
               </button>
-              <button
+              <ProgressButton
                 type="button"
                 onClick={handleComplete}
-                disabled={submitting}
+                loading={submitting}
+                loadingLabel="Saving..."
                 className={primaryButtonSm(theme)}
               >
-                {submitting ? "Saving..." : "Apply reset"}
-              </button>
+                Apply reset
+              </ProgressButton>
             </div>
           </div>
         </div>
         </ModalPortal>
       )}
+
+      {bulkResults?.length ? (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4" role="presentation">
+            <div
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              onClick={() => setBulkResults(null)}
+              aria-hidden="true"
+            />
+            <div
+              className={`${panelClass(theme)} relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col`}
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <h2 className="text-lg font-bold">Temporary passwords</h2>
+              <p className={`mt-2 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                Share each temporary password securely with the user. They should change it after logging in.
+              </p>
+              <div className="en-inner-scroll mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
+                {bulkResults.map((item) => (
+                  <div
+                    key={item.email}
+                    className={`rounded-xl border px-3 py-2 text-sm ${
+                      theme === "dark"
+                        ? "border-white/10 bg-white/[0.03]"
+                        : "border-emerald-200 bg-emerald-50/60"
+                    }`}
+                  >
+                    <p className="break-all font-semibold">{item.email}</p>
+                    {item.schoolId ? (
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
+                        School ID: {item.schoolId}
+                      </p>
+                    ) : null}
+                    <p className={`mt-1 font-mono text-sm ${theme === "dark" ? "text-emerald-300" : "text-teal-800"}`}>
+                      {item.password}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setBulkResults(null)}
+                  className={primaryButtonSm(theme)}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      ) : null}
     </div>
   );
 }

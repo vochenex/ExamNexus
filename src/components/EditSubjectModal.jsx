@@ -14,6 +14,7 @@ import {
 } from "../utils/sections";
 import { DEFAULT_YEAR_LEVEL, normalizeYearLevel } from "../utils/yearLevels";
 import ModalPortal from "./ui/ModalPortal";
+import ProgressButton from "./ui/ProgressButton";
 
 export default function EditSubjectModal({
   subject,
@@ -182,14 +183,15 @@ export default function EditSubjectModal({
           <button type="button" onClick={onClose} className={secondaryButton(theme)}>
             Cancel
           </button>
-          <button
+          <ProgressButton
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            loading={saving}
+            loadingLabel="Saving..."
             className={primaryButton(theme, "disabled:opacity-50")}
           >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
+            Save Changes
+          </ProgressButton>
         </div>
       </div>
     </div>

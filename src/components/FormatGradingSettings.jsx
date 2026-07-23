@@ -1,42 +1,9 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
+import ToggleOptionRow from "./ui/ToggleOptionRow";
 import { normalizeGradingOptions, supportsGradingOptions } from "../utils/questionGrading";
 import { getFormatLabel } from "../utils/questionSections";
-
-function ToggleRow({ theme, label, hint, checked, onChange, disabled = false }) {
-  return (
-    <label
-      className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
-        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-      } ${
-        theme === "dark"
-          ? "border-white/10 bg-white/[0.03]"
-          : "border-emerald-100 bg-emerald-50/40"
-      }`}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5"
-      />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{label}</span>
-        {hint && (
-          <span
-            className={`mt-0.5 block text-xs ${
-              theme === "dark" ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
-            {hint}
-          </span>
-        )}
-      </span>
-    </label>
-  );
-}
 
 export default function FormatGradingSettings({
   sectionType,
@@ -60,7 +27,7 @@ export default function FormatGradingSettings({
 
   const body = (
     <>
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Case sensitive"
         hint="Answer must match the expected text exactly, including capitalization."
@@ -69,7 +36,7 @@ export default function FormatGradingSettings({
         onChange={(checked) => patch({ case_sensitive: checked })}
       />
 
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Trim extra spaces"
         hint="Ignore leading and trailing spaces."
@@ -78,7 +45,7 @@ export default function FormatGradingSettings({
       />
 
       {sectionType === "enumeration" && (
-        <ToggleRow
+        <ToggleOptionRow
           theme={theme}
           label="Accept any order"
           hint="Correct if all answers are present in any order."
@@ -88,7 +55,7 @@ export default function FormatGradingSettings({
       )}
 
       {(sectionType === "identification" || sectionType === "enumeration") && (
-        <ToggleRow
+        <ToggleOptionRow
           theme={theme}
           label="Accept alternative answers"
           hint={
@@ -106,29 +73,28 @@ export default function FormatGradingSettings({
           }
         />
       )}
-
     </>
   );
 
   if (compact) {
     return (
       <div
-        className={`space-y-3 rounded-xl border p-4 ${
+        className={`min-w-0 space-y-3 rounded-xl border p-4 ${
           theme === "dark"
             ? "border-white/10 bg-white/[0.02]"
             : "border-emerald-700/15 en-bg-elevated-soft"
         }`}
       >
-        <div>
+        <div className="min-w-0">
           <p
-            className={`text-sm font-bold ${
+            className={`break-words text-sm font-bold leading-snug ${
               theme === "dark" ? "text-emerald-300" : "text-teal-800"
             }`}
           >
             {getFormatLabel(sectionType)}
           </p>
           <p
-            className={`mt-0.5 text-xs ${
+            className={`mt-0.5 break-words text-xs leading-snug ${
               theme === "dark" ? "text-gray-500" : "text-[#5a7a72]"
             }`}
           >
@@ -142,7 +108,7 @@ export default function FormatGradingSettings({
 
   return (
     <div
-      className={`rounded-xl border ${
+      className={`min-w-0 rounded-xl border ${
         theme === "dark"
           ? "border-white/10 bg-white/[0.03]"
           : "border-emerald-100 bg-emerald-50/30"
@@ -151,25 +117,25 @@ export default function FormatGradingSettings({
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${
+        className={`flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left ${
           theme === "dark" ? "text-emerald-300" : "text-teal-800"
         }`}
       >
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold">
+        <span className="min-w-0 flex-1 overflow-hidden">
+          <span className="block break-words text-sm font-semibold leading-snug">
             {getFormatLabel(sectionType)} grading
           </span>
           <span
-            className={`mt-0.5 block text-xs ${
+            className={`mt-0.5 block break-words text-xs leading-snug ${
               theme === "dark" ? "text-gray-500" : "text-gray-500"
             }`}
           >
             Applied to all {getFormatLabel(sectionType).toLowerCase()} questions
           </span>
         </span>
-        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        {open ? <ChevronUp size={16} className="shrink-0" /> : <ChevronDown size={16} className="shrink-0" />}
       </button>
-      {open && <div className="space-y-3 border-t border-inherit px-4 py-4">{body}</div>}
+      {open && <div className="min-w-0 space-y-3 border-t border-inherit px-4 py-4">{body}</div>}
     </div>
   );
 }

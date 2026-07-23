@@ -1,40 +1,8 @@
+import ProgressButton from "./ui/ProgressButton";
+import ToggleOptionRow from "./ui/ToggleOptionRow";
 import { primaryButton } from "../utils/themeButtons";
 import { DEFAULT_DURATION_VALUE, parseDurationValue } from "../utils/assessmentDuration";
 import Select from "./ui/Select";
-
-function ToggleRow({ theme, label, hint, checked, onChange, disabled = false }) {
-  return (
-    <label
-      className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
-        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-      } ${
-        theme === "dark"
-          ? "border-white/10 bg-white/[0.03]"
-          : "border-emerald-100 bg-emerald-50/40"
-      }`}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5"
-      />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{label}</span>
-        {hint && (
-          <span
-            className={`mt-0.5 block text-xs ${
-              theme === "dark" ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
-            {hint}
-          </span>
-        )}
-      </span>
-    </label>
-  );
-}
 
 export default function AssessmentSettingsPanel({
   exam,
@@ -109,7 +77,7 @@ export default function AssessmentSettingsPanel({
         </div>
       </div>
 
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Shuffle questions"
         hint="Randomize question order for each student. Also locks finished sections so students cannot jump back after moving on."
@@ -122,7 +90,7 @@ export default function AssessmentSettingsPanel({
         }
       />
 
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Lock finished sections"
         hint="When a student finishes a section (e.g. Multiple Choice) and moves to the next (e.g. Enumeration), they cannot go back to change earlier answers."
@@ -133,7 +101,7 @@ export default function AssessmentSettingsPanel({
         onChange={(checked) => onChange({ lock_completed_sections: checked })}
       />
 
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Allow answer review"
         hint="Let students revisit questions before submitting (within unlocked sections)."
@@ -141,7 +109,7 @@ export default function AssessmentSettingsPanel({
         onChange={(checked) => onChange({ allow_review: checked })}
       />
 
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Show score to students"
         hint="Students can see their score after submission on the Results page."
@@ -154,7 +122,7 @@ export default function AssessmentSettingsPanel({
         }
       />
 
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Allow question review after submission"
         hint="When enabled, students can review each question and their answers. When off, only the score is shown."
@@ -168,7 +136,7 @@ export default function AssessmentSettingsPanel({
         }
       />
 
-      <ToggleRow
+      <ToggleOptionRow
         theme={theme}
         label="Show correct answers after submission"
         hint="When enabled, students see the correct answer for each question during review. When off, they only see their own response."
@@ -177,14 +145,15 @@ export default function AssessmentSettingsPanel({
         onChange={(checked) => onChange({ show_correct_answers: checked })}
       />
 
-      <button
+      <ProgressButton
         type="button"
         onClick={onPublish}
-        disabled={loading}
+        loading={loading}
+        loadingLabel="Saving..."
         className={`${primaryButton(theme, "w-full justify-center px-4 py-3")} disabled:opacity-60`}
       >
-        {loading ? "Saving..." : publishLabel}
-      </button>
+        {publishLabel}
+      </ProgressButton>
     </div>
   );
 }

@@ -57,6 +57,10 @@
       "destination": { "service": "backend", "path": "/$1" }
     },
     {
+      "source": "/:path((?!.*\\..*).*)",
+      "destination": { "service": "frontend", "path": "/index.html" }
+    },
+    {
       "source": "/(.*)",
       "destination": { "service": "frontend" }
     }

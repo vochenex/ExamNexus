@@ -30,9 +30,9 @@ export default function AssessmentPointsPanel({ sections, onChange }) {
                 : "border-emerald-700/15 en-bg-elevated-soft"
             }`}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p
-                className={`truncate text-sm font-semibold ${
+                className={`break-words text-sm font-semibold leading-snug ${
                   theme === "dark" ? "text-emerald-300" : "text-teal-800"
                 }`}
               >

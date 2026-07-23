@@ -1,4 +1,4 @@
-import { DayPicker } from "react-day-picker";
+import { DayPicker, getDefaultClassNames } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import "../layouts/Calendar.css";
 import { Clock2 } from "lucide-react";
@@ -13,6 +13,22 @@ export default function AssessmentSchedule({
   setDateRange,
 }) {
   const { theme } = useTheme();
+  const defaultClassNames = getDefaultClassNames();
+  const isDark = theme === "dark";
+
+  const dayButtonClass = `
+    mx-auto flex h-8 w-8 max-w-full items-center justify-center rounded-lg text-sm
+    transition-all hover:bg-emerald-500/20 sm:h-9 sm:w-9
+  `;
+
+  const navButtonClass = `
+    inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all
+    ${
+      isDark
+        ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+        : "en-bg-skeleton text-teal-700 hover:bg-emerald-200"
+    }
+  `;
 
   return (
     <div
@@ -22,7 +38,7 @@ export default function AssessmentSchedule({
         p-4 sm:p-6
 
         ${
-          theme === "dark"
+          isDark
             ? "bg-[#052629] border border-white/10"
             : "en-bg-elevated border border-emerald-200 shadow-md"
         }
@@ -31,7 +47,7 @@ export default function AssessmentSchedule({
       <div className="mb-4 sm:mb-5">
         <h3
           className={`text-lg font-semibold ${
-            theme === "dark" ? "text-emerald-400" : "text-teal-700"
+            isDark ? "text-emerald-400" : "text-teal-700"
           }`}
         >
           Assessment Availability
@@ -39,58 +55,43 @@ export default function AssessmentSchedule({
 
         <p
           className={`text-sm mt-1 ${
-            theme === "dark" ? "text-gray-400" : "text-gray-700"
+            isDark ? "text-gray-400" : "text-gray-700"
           }`}
         >
           Choose when students can access this assessment.
         </p>
       </div>
 
-      <div className="en-assessment-calendar flex w-full min-w-0 justify-center overflow-hidden">
+      <div className="en-assessment-calendar flex w-full min-w-0 justify-center">
         <DayPicker
           mode="range"
           selected={dateRange}
           onSelect={setDateRange}
           showOutsideDays
           classNames={{
-            months:
-              theme === "dark"
-                ? "flex w-full max-w-full justify-center text-white"
-                : "flex w-full max-w-full justify-center text-gray-900",
-            month: "w-full max-w-full space-y-3",
-            caption: "mb-2 flex items-center justify-between gap-1 px-0.5",
-            caption_label:
-              theme === "dark"
-                ? "text-sm font-semibold text-white sm:text-base"
-                : "text-sm font-semibold text-gray-900 sm:text-base",
-            nav_button: `
-              h-8 w-8 shrink-0 rounded-lg
-              ${
-                theme === "dark"
-                  ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                  : "en-bg-skeleton text-teal-700 hover:bg-emerald-200"
-              }
-              transition-all
-            `,
-            table: "w-full max-w-full border-collapse",
-            head_row: "mb-1 flex w-full justify-between",
-            head_cell:
-              theme === "dark"
-                ? "w-[12.5%] max-w-[2.25rem] flex-1 text-center text-[0.65rem] font-medium text-emerald-400 sm:text-xs"
-                : "w-[12.5%] max-w-[2.25rem] flex-1 text-center text-[0.65rem] font-medium text-teal-700 sm:text-xs",
-            row: "mt-0.5 flex w-full justify-between",
-            cell: "relative flex flex-1 justify-center p-0 text-center",
-            day: `
-              mx-auto h-8 w-8 max-w-full rounded-lg text-sm
-              hover:bg-emerald-500/20
-              transition-all
-              sm:h-9 sm:w-9
-            `,
-            day_today:
-              theme === "dark"
-                ? "border border-emerald-500"
-                : "border border-teal-600",
-            day_outside: "opacity-30",
+            ...defaultClassNames,
+            root: `${defaultClassNames.root} en-rdp-root w-full max-w-full`,
+            months: `${defaultClassNames.months} w-full max-w-full`,
+            month: `${defaultClassNames.month} w-full max-w-full space-y-3`,
+            month_caption: `${defaultClassNames.month_caption} mb-2 flex items-center justify-between gap-2 px-0.5`,
+            caption_label: `${
+              isDark ? "text-sm font-semibold text-white sm:text-base" : "text-sm font-semibold text-gray-900 sm:text-base"
+            }`,
+            button_previous: navButtonClass,
+            button_next: navButtonClass,
+            month_grid: `${defaultClassNames.month_grid} en-rdp-month-grid w-full max-w-full`,
+            weekdays: `${defaultClassNames.weekdays} en-rdp-weekdays`,
+            weekday: `${
+              isDark
+                ? "en-rdp-weekday text-[0.65rem] font-medium text-emerald-400 sm:text-xs"
+                : "en-rdp-weekday text-[0.65rem] font-medium text-teal-700 sm:text-xs"
+            }`,
+            weeks: `${defaultClassNames.weeks} w-full`,
+            week: `${defaultClassNames.week} en-rdp-week`,
+            day: `${defaultClassNames.day} en-rdp-day p-0 text-center`,
+            day_button: dayButtonClass,
+            today: isDark ? "border border-emerald-500" : "border border-teal-600",
+            outside: "opacity-30",
           }}
         />
       </div>
@@ -103,7 +104,7 @@ export default function AssessmentSchedule({
           text-sm space-y-1
 
           ${
-            theme === "dark"
+            isDark
               ? "bg-black/20 text-emerald-400"
               : "bg-emerald-50 text-teal-700 border border-emerald-200"
           }
@@ -117,7 +118,7 @@ export default function AssessmentSchedule({
         <div className="min-w-0">
           <label
             className={`mb-2 block text-sm font-medium ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
+              isDark ? "text-gray-300" : "text-gray-700"
             }`}
           >
             Available From
@@ -127,7 +128,7 @@ export default function AssessmentSchedule({
             className={`
               flex min-w-0 items-center rounded-xl px-3
               ${
-                theme === "dark"
+                isDark
                   ? "bg-black/20 border border-white/10"
                   : "en-bg-elevated border border-emerald-200"
               }
@@ -138,7 +139,7 @@ export default function AssessmentSchedule({
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
               className={`min-w-0 flex-1 bg-transparent py-3 outline-none ${
-                theme === "dark" ? "text-white" : "text-gray-900"
+                isDark ? "text-white" : "text-gray-900"
               }`}
             />
             <Clock2 size={18} className="shrink-0 text-emerald-400" />
@@ -148,7 +149,7 @@ export default function AssessmentSchedule({
         <div className="min-w-0">
           <label
             className={`mb-2 block text-sm font-medium ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
+              isDark ? "text-gray-300" : "text-gray-700"
             }`}
           >
             Available Until
@@ -158,7 +159,7 @@ export default function AssessmentSchedule({
             className={`
               flex min-w-0 items-center rounded-xl px-3
               ${
-                theme === "dark"
+                isDark
                   ? "bg-black/20 border border-white/10"
                   : "en-bg-elevated border border-emerald-200"
               }
@@ -169,7 +170,7 @@ export default function AssessmentSchedule({
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
               className={`min-w-0 flex-1 bg-transparent py-3 outline-none ${
-                theme === "dark" ? "text-white" : "text-gray-900"
+                isDark ? "text-white" : "text-gray-900"
               }`}
             />
             <Clock2 size={18} className="shrink-0 text-emerald-400" />

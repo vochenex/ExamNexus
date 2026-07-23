@@ -1645,3 +1645,51 @@ html:not(.light) .en-auth-shell .hover\:border-white\/10:hover,
 html:not(.light) .en-auth-shell .hover\:border-white\/20:hover {
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
+
+.en-faculty-student-card {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.en-faculty-student-preview {
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  overflow: hidden;
+}
+
+.en-faculty-student-preview-avatar {
+  animation: en-faculty-preview-avatar-zoom 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes en-faculty-preview-avatar-zoom {
+  from {
+    transform: scale(0.65);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.en-student-ratings-sidebar {
+  animation: en-sidebar-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes en-sidebar-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .en-student-ratings-sidebar {
+    max-width: 100% !important;
+  }
+}

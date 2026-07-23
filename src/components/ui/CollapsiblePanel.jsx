@@ -27,11 +27,11 @@ export default function CollapsiblePanel({
           theme === "dark" ? "text-emerald-300" : "text-teal-800"
         }`}
       >
-        <span className="min-w-0 overflow-hidden">
-          <span className="block truncate text-sm font-semibold">{title}</span>
+        <span className="min-w-0 flex-1 overflow-hidden">
+          <span className="block break-words text-sm font-semibold leading-snug">{title}</span>
           {subtitle && (
             <span
-              className={`mt-0.5 block truncate text-xs ${
+              className={`mt-0.5 block break-words text-xs leading-snug ${
                 theme === "dark" ? "text-gray-400" : "text-gray-600"
               }`}
             >

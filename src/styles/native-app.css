@@ -106,6 +106,10 @@
   margin-top: 0.15rem;
 }
 
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner > .mb-6.flex.flex-col.items-center {
+  margin-bottom: 1rem !important;
+}
+
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-brand {
   display: none !important;
 }
