@@ -1,10 +1,14 @@
 const { Agent, fetch: undiciFetch } = require("undici");
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_CHAT_TIMEOUT_MS = 300000;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;
 const GEMINI_RETRY_DELAYS_MS = [0, 3000, 6000];
+const GROQ_RETRY_DELAYS_MS = [0, 2000, 4000];
 const GEMINI_QUOTA_MAX_ATTEMPTS = 10;
+const GROQ_QUOTA_MAX_ATTEMPTS = 6;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -148,11 +152,55 @@ function formatGeminiConfigError() {
   return "Gemini is not configured. Add GEMINI_API_KEY to backend/.env (not the root .env file), then restart the backend from the backend folder.";
 }
 
+function formatGroqConfigError() {
+  return "Groq is not configured. Add GROQ_API_KEY to backend/.env (get a free key at https://console.groq.com), then restart the backend.";
+}
+
+function formatGroqQuotaError(retryMs) {
+  const seconds = Math.max(1, Math.ceil(retryMs / 1000));
+  return `Groq rate limit reached. Wait about ${seconds} seconds and try again, or generate fewer questions at once.`;
+}
+
+function formatGroqNetworkError() {
+  return "Cannot reach Groq right now. Check your internet connection and try again in a moment.";
+}
+
+function formatGroqProcessingTimeoutError() {
+  return "Groq took too long to respond. Try fewer questions or a shorter prompt.";
+}
+
 function validateGeminiApiKey(apiKey) {
   const key = String(apiKey || "").trim();
   if (!key) return false;
   // Google AI Studio keys usually start with AIza; warn in status if unusual.
   return key.length >= 20;
+}
+
+function getGroqModel() {
+  return String(process.env.GROQ_MODEL || process.env.GROQ_ASSESSMENT_MODEL || DEFAULT_GROQ_MODEL).trim();
+}
+
+function getGroqApiKey() {
+  return String(process.env.GROQ_API_KEY || "").trim();
+}
+
+function validateGroqApiKey(apiKey) {
+  const key = String(apiKey || "").trim();
+  if (!key) return false;
+  return key.length >= 20;
+}
+
+function getGroqRuntimeConfig() {
+  const apiKey = getGroqApiKey();
+  if (!validateGroqApiKey(apiKey)) {
+    return null;
+  }
+
+  return {
+    provider: "groq",
+    model: getGroqModel(),
+    apiKey,
+  };
 }
 
 function assertGeminiConfigured() {
@@ -163,6 +211,14 @@ function assertGeminiConfigured() {
     throw error;
   }
   return config;
+}
+
+function assertPromptAiConfigured() {
+  const groq = getGroqRuntimeConfig();
+  if (groq) {
+    return groq;
+  }
+  return assertGeminiConfigured();
 }
 
 async function postJsonWithTimeout(urlString, body, timeoutMs, headers = {}) {
@@ -344,6 +400,86 @@ async function requestGeminiChatCompletion(
   throw error;
 }
 
+async function requestGroqChatCompletion(
+  config,
+  { messages, temperature, jsonMode, timeoutMs }
+) {
+  const effectiveTimeout = timeoutMs || getChatTimeoutMs();
+  const body = {
+    model: config.model,
+    messages,
+    temperature,
+    ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+  };
+
+  let lastError = null;
+
+  for (let attempt = 0; attempt < GROQ_QUOTA_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 0 && !isQuotaError(lastError)) {
+      const delayMs =
+        GROQ_RETRY_DELAYS_MS[Math.min(attempt, GROQ_RETRY_DELAYS_MS.length - 1)] || 0;
+      if (delayMs > 0) {
+        await sleep(delayMs);
+      }
+    }
+
+    try {
+      const data = await postJsonWithTimeout(
+        GROQ_API_URL,
+        body,
+        effectiveTimeout,
+        { Authorization: `Bearer ${config.apiKey}` }
+      );
+      const text = String(data?.choices?.[0]?.message?.content || "");
+
+      if (!text.trim()) {
+        throw new Error("Groq returned an empty response.");
+      }
+
+      return text;
+    } catch (error) {
+      lastError = error;
+
+      if (isQuotaError(error)) {
+        const waitMs = parseQuotaRetryMs(error);
+        if (attempt < GROQ_QUOTA_MAX_ATTEMPTS - 1) {
+          await sleep(waitMs);
+          continue;
+        }
+        const wrapped = new Error(formatGroqQuotaError(waitMs));
+        wrapped.statusCode = 429;
+        wrapped.cause = error;
+        throw wrapped;
+      }
+
+      if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+        throw error;
+      }
+
+      if (!isTransientGeminiError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  const error = lastError || new Error("Groq request failed");
+  if (isConnectionError(error)) {
+    const wrapped = new Error(formatGroqNetworkError());
+    wrapped.statusCode = 503;
+    wrapped.cause = error;
+    throw wrapped;
+  }
+
+  if (isTimeoutError(error)) {
+    const wrapped = new Error(formatGroqProcessingTimeoutError());
+    wrapped.statusCode = 504;
+    wrapped.cause = error;
+    throw wrapped;
+  }
+
+  throw error;
+}
+
 async function requestChatCompletion({
   messages,
   temperature = 0.4,
@@ -368,6 +504,16 @@ async function requestChatCompletion({
 }
 
 async function requestPromptChatCompletion(options) {
+  const groq = getGroqRuntimeConfig();
+  if (groq) {
+    const content = await requestGroqChatCompletion(groq, options);
+    return {
+      content,
+      provider: groq.provider,
+      model: groq.model,
+    };
+  }
+
   return requestChatCompletion(options);
 }
 
@@ -380,36 +526,58 @@ async function requestDocumentChatCompletion(options) {
 }
 
 async function getAiServiceStatus() {
-  const rawKey = getGeminiApiKey();
+  const rawGeminiKey = getGeminiApiKey();
+  const rawGroqKey = getGroqApiKey();
   const gemini = getGeminiRuntimeConfig();
-  const configured = Boolean(gemini);
+  const groq = getGroqRuntimeConfig();
+  const documentConfigured = Boolean(gemini);
+  const promptConfigured = Boolean(groq || gemini);
+  const configured = documentConfigured && promptConfigured;
+
+  const promptProvider = groq ? "groq" : gemini ? "gemini" : "gemini";
+  const promptModel = groq?.model || gemini?.model || getGroqModel();
+  const documentModel = gemini?.model || getGeminiModel();
 
   let error = null;
   if (!configured) {
-    if (!rawKey) {
+    if (!documentConfigured) {
+      if (!rawGeminiKey) {
+        error =
+          "Gemini API key is missing (required for document analysis). Add GEMINI_API_KEY to backend/.env, then restart the backend.";
+      } else if (!rawGeminiKey.startsWith("AIza") && rawGeminiKey.length < 20) {
+        error =
+          'Gemini API key format looks unusual. Create a key at https://aistudio.google.com/apikey — it should start with "AIza".';
+      } else {
+        error = formatGeminiConfigError();
+      }
+    } else if (!promptConfigured) {
       error =
-        "Gemini API key is missing. Add GEMINI_API_KEY to backend/.env (not the project root .env), then restart the backend.";
-    } else if (!rawKey.startsWith("AIza")) {
-      error =
-        'Gemini API key format looks unusual. Create a key at https://aistudio.google.com/apikey — it should start with "AIza".';
-    } else {
-      error = formatGeminiConfigError();
+        "No prompt AI configured. Add GROQ_API_KEY or GEMINI_API_KEY to backend/.env, then restart the backend.";
     }
   }
 
   return {
     ok: configured,
     configured,
-    provider: "gemini",
-    model: gemini?.model || getGeminiModel(),
-    promptProvider: "gemini",
-    documentProvider: "gemini",
-    promptModel: gemini?.model || getGeminiModel(),
-    documentModel: gemini?.model || getGeminiModel(),
+    provider: promptProvider,
+    model: promptModel,
+    promptProvider,
+    documentProvider: documentConfigured ? "gemini" : "gemini",
+    promptModel,
+    documentModel,
     gemini: {
-      configured,
-      model: gemini?.model || getGeminiModel(),
-      error: configured ? null : formatGeminiConfigError(),
+      configured: documentConfigured,
+      model: documentModel,
+      error: documentConfigured ? null : formatGeminiConfigError(),
+    },
+    groq: {
+      configured: Boolean(groq),
+      model: groq?.model || getGroqModel(),
+      error: groq
+        ? null
+        : rawGroqKey
+          ? "Groq API key looks invalid."
+          : "Groq not configured (prompts will use Gemini).",
     },
     error: configured ? null : error,
   };
@@ -417,11 +585,15 @@ async function getAiServiceStatus() {
 
 module.exports = {
   getGeminiModel,
+  getGroqModel,
   getGeminiRuntimeConfig,
+  getGroqRuntimeConfig,
   assertGeminiConfigured,
+  assertPromptAiConfigured,
   requestChatCompletion,
   requestPromptChatCompletion,
   requestDocumentChatCompletion,
   getAiServiceStatus,
   formatGeminiConfigError,
+  formatGroqConfigError,
 };

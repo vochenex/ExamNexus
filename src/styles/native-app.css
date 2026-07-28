@@ -69,12 +69,20 @@
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-body.en-auth-body--saved-open {
   overflow: hidden !important;
-  overscroll-behavior: none;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-form.en-auth-panel-form--saved-open {
   overflow: hidden !important;
-  overscroll-behavior: none;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-wrap,
+:is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-list {
+  touch-action: none !important;
+  overscroll-behavior: none !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {

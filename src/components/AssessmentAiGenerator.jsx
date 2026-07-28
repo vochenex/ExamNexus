@@ -228,7 +228,7 @@ export default function AssessmentAiGenerator({
           }`}
         >
           {aiReady.error ||
-            "AI is not ready. Add GEMINI_API_KEY to backend/.env, then restart the backend."}
+            "AI is not ready. Add GEMINI_API_KEY (documents) and GROQ_API_KEY (prompts) to backend/.env, then restart the backend."}
         </div>
       )}
 
@@ -246,7 +246,10 @@ export default function AssessmentAiGenerator({
 
       {aiReady?.configured && !aiReady.error && (
         <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-          Using Gemini · {aiReady.documentModel || aiReady.model || "gemini-2.5-flash"}
+          Prompts: {aiReady.promptProvider || "gemini"} · {aiReady.promptModel || aiReady.model || "—"}
+          {" · "}
+          Documents: {aiReady.documentProvider || "gemini"} ·{" "}
+          {aiReady.documentModel || aiReady.model || "gemini-2.5-flash"}
         </p>
       )}
 

@@ -46,8 +46,6 @@ const PREFERRED_PORT = Number(process.env.PORT) || 5000;
 const MAX_PORT_TRIES = 10;
 
 function syncFrontendApiUrl(port) {
-  if (port === 5000) return;
-
   const apiUrl = `http://localhost:${port}`;
   const envPath = path.join(__dirname, "..", ".env");
   let content = "";
@@ -67,7 +65,7 @@ function syncFrontendApiUrl(port) {
 
   fs.writeFileSync(envPath, content);
   console.log(`   Updated root .env → ${line}`);
-  console.log("   Vite will restart automatically to use the new backend URL.");
+  console.log("   Restart Vite (or let it reload) so the frontend uses this backend URL.");
 }
 
 function listenOnAvailablePort(port, attempt = 0) {
@@ -80,8 +78,8 @@ function listenOnAvailablePort(port, attempt = 0) {
       console.warn(
         `⚠️  Port ${PREFERRED_PORT} was busy — using http://localhost:${actualPort} instead.`
       );
-      syncFrontendApiUrl(actualPort);
     }
+    syncFrontendApiUrl(actualPort);
 
     console.log(`🚀 Backend running on http://localhost:${actualPort}`);
     console.log(`   LAN access: http://<your-ip>:${actualPort} (needed for the Android APK)`);
@@ -104,7 +102,9 @@ function listenOnAvailablePort(port, attempt = 0) {
     try {
       const aiStatus = await getAiServiceStatus();
       if (aiStatus.configured) {
-        console.log(`✅ Assessment AI ready (Gemini: ${aiStatus.model})`);
+        console.log(
+          `✅ Assessment AI ready (prompts: ${aiStatus.promptProvider}/${aiStatus.promptModel}, documents: ${aiStatus.documentProvider}/${aiStatus.documentModel})`
+        );
       } else {
         console.log(`⚠️  Assessment AI unavailable — ${aiStatus.error}`);
       }

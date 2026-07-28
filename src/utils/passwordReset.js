@@ -128,7 +128,12 @@ export async function completeAdminPasswordResetRequest({
     const message = payload.error || "Failed to reset password";
     if (res.status === 503 && isServiceRoleConfigError(message)) {
       throw new Error(
-        "Password reset is not configured on the server. In Supabase go to Project Settings → API, copy the service_role key, add SUPABASE_SERVICE_ROLE_KEY=... to backend/.env, then restart the backend (npm start in the backend folder)."
+        "Password reset is not configured on the server. In Vercel → Project Settings → Environment Variables, add SUPABASE_SERVICE_ROLE_KEY (from Supabase → Project Settings → API → service_role), then Redeploy. Locally, put the same key in backend/.env and restart the backend."
+      );
+    }
+    if (/Could not find|schema cache|does not exist|PGRST/i.test(message)) {
+      throw new Error(
+        "Supabase password-reset SQL is missing or out of date. Run database/password_reset_requests.sql (or database/admin_platform_fixes.sql) in the Supabase SQL Editor, then reload the API schema."
       );
     }
     throw new Error(message);

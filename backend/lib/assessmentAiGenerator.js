@@ -1,5 +1,6 @@
 const {
   assertGeminiConfigured,
+  assertPromptAiConfigured,
   requestPromptChatCompletion,
   requestDocumentChatCompletion,
   getAiServiceStatus,
@@ -432,7 +433,7 @@ async function requestSingleAiQuestion({
   totalSteps = 1,
   mode = "prompt",
 }) {
-  assertGeminiConfigured();
+  assertPromptAiConfigured();
 
   const allowedFormats = parseFormats([format]);
   const targetFormat = pickFormatForStep(allowedFormats, 0);
@@ -874,7 +875,7 @@ async function requestAiQuestions({
   difficulty = "medium",
   mode = "document",
 }) {
-  assertGeminiConfigured();
+  assertPromptAiConfigured();
 
   const allowedFormats = parseFormats(formats);
   const count = clampQuestionCount(questionCount);

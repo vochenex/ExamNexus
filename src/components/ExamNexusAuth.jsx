@@ -171,21 +171,18 @@ export default function ExamNexusAuth() {
 
     let lastTouchY = 0;
 
-    const listCanScroll = () => list.scrollHeight > list.clientHeight + 2;
+    const applyListScroll = (deltaY) => {
+      if (!deltaY) return;
+      const max = Math.max(0, list.scrollHeight - list.clientHeight);
+      list.scrollTop = Math.min(max, Math.max(0, list.scrollTop + deltaY));
+      updateSavedScrollState();
+    };
 
+    // Own the gesture entirely so email/password (and page) never move.
     const onWheel = (event) => {
-      if (!listCanScroll()) return;
-
-      const { scrollTop, scrollHeight, clientHeight } = list;
-      const atTop = scrollTop <= 0;
-      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
-      const scrollingUp = event.deltaY < 0;
-      const scrollingDown = event.deltaY > 0;
-
-      if ((scrollingUp && !atTop) || (scrollingDown && !atBottom)) {
-        event.preventDefault();
-      }
-      event.stopPropagation();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      applyListScroll(event.deltaY);
     };
 
     const onTouchStart = (event) => {
@@ -193,20 +190,30 @@ export default function ExamNexusAuth() {
     };
 
     const onTouchMove = (event) => {
-      if (!listCanScroll()) return;
-
       const touchY = event.touches[0]?.clientY ?? lastTouchY;
       const delta = lastTouchY - touchY;
       lastTouchY = touchY;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      applyListScroll(delta);
+    };
 
-      const { scrollTop, scrollHeight, clientHeight } = list;
-      const atTop = scrollTop <= 0;
-      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+    const authBody = authBodyRef.current;
+    const formPanel = formPanelRef.current;
+    const lockedBodyScroll = authBody?.scrollTop ?? 0;
+    const lockedPanelScroll = formPanel?.scrollTop ?? 0;
+    const lockedWindowScroll = window.scrollY || window.pageYOffset || 0;
 
-      if ((delta < 0 && atTop) || (delta > 0 && atBottom)) {
-        event.preventDefault();
+    const freezeParents = () => {
+      if (authBody && authBody.scrollTop !== lockedBodyScroll) {
+        authBody.scrollTop = lockedBodyScroll;
       }
-      event.stopPropagation();
+      if (formPanel && formPanel.scrollTop !== lockedPanelScroll) {
+        formPanel.scrollTop = lockedPanelScroll;
+      }
+      if ((window.scrollY || window.pageYOffset || 0) !== lockedWindowScroll) {
+        window.scrollTo(0, lockedWindowScroll);
+      }
     };
 
     const trapOptions = { capture: true, passive: false };
@@ -215,6 +222,9 @@ export default function ExamNexusAuth() {
     wrap.addEventListener("wheel", onWheel, trapOptions);
     wrap.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
     wrap.addEventListener("touchmove", onTouchMove, trapOptions);
+    authBody?.addEventListener("scroll", freezeParents, { passive: true });
+    formPanel?.addEventListener("scroll", freezeParents, { passive: true });
+    window.addEventListener("scroll", freezeParents, { passive: true });
     window.addEventListener("resize", updateSavedScrollState);
 
     return () => {
@@ -222,6 +232,9 @@ export default function ExamNexusAuth() {
       wrap.removeEventListener("wheel", onWheel, trapOptions);
       wrap.removeEventListener("touchstart", onTouchStart, { capture: true });
       wrap.removeEventListener("touchmove", onTouchMove, trapOptions);
+      authBody?.removeEventListener("scroll", freezeParents);
+      formPanel?.removeEventListener("scroll", freezeParents);
+      window.removeEventListener("scroll", freezeParents);
       window.removeEventListener("resize", updateSavedScrollState);
     };
   }, [savedOpen, savedAccounts.length, authView]);
@@ -232,15 +245,18 @@ export default function ExamNexusAuth() {
     const authBody = authBodyRef.current;
     const formPanel = formPanelRef.current;
     const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
 
     authBody?.classList.add("en-auth-body--saved-open");
     formPanel?.classList.add("en-auth-panel-form--saved-open");
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
 
     return () => {
       authBody?.classList.remove("en-auth-body--saved-open");
       formPanel?.classList.remove("en-auth-panel-form--saved-open");
       document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
     };
   }, [savedOpen, authView]);
 
@@ -1047,6 +1063,7 @@ function getAuthInputProps(theme) {
                     </div>
                   )}
 
+                  <div className="en-auth-login-fields space-y-4">
                   <div>
                     <label
                       className={`mb-1.5 block text-sm font-medium ${
@@ -1169,6 +1186,7 @@ function getAuthInputProps(theme) {
                         Forgot password?
                       </button>
                     )}
+                  </div>
                   </div>
                 </div>
               </>

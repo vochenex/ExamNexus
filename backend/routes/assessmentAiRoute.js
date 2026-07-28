@@ -48,6 +48,7 @@ router.get("/status", requireFaculty, async (req, res) => {
       promptModel: status.promptModel,
       documentModel: status.documentModel,
       gemini: status.gemini,
+      groq: status.groq,
       error: status.error,
     });
   }
@@ -60,6 +61,7 @@ router.get("/status", requireFaculty, async (req, res) => {
     promptModel: status.promptModel,
     documentModel: status.documentModel,
     gemini: status.gemini,
+    groq: status.groq,
   });
 });
 
@@ -74,6 +76,7 @@ router.get("/public-config", async (req, res) => {
     promptModel: status.promptModel,
     documentModel: status.documentModel,
     gemini: status.gemini,
+    groq: status.groq,
     error: status.error || null,
   });
 });

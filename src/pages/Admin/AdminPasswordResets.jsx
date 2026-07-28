@@ -22,7 +22,7 @@ import {
   rejectAdminPasswordResetRequest,
 } from "../../utils/passwordReset";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { iconButton, primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
+import { iconButton, primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
 
 const STATUSES = [
   { value: "pending", label: "Pending" },
@@ -274,27 +274,27 @@ export default function AdminPasswordResets() {
               type="button"
               onClick={handleApproveAll}
               loading={bulkCompleting}
-              loadingLabel="Approving all"
-              iconOnly
+              loadingLabel="Approving..."
               disabled={bulkRejecting || actingId !== null || submitting}
-              className={iconButton(theme, "primary")}
+              className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
               aria-label="Approve all pending resets"
-              title="Approve all"
+              title="Approve all pending resets"
             >
-              <CheckCheck size={16} />
+              <CheckCheck size={14} />
+              Approve all
             </ProgressButton>
             <ProgressButton
               type="button"
               onClick={handleRejectAll}
               loading={bulkRejecting}
-              loadingLabel="Rejecting all"
-              iconOnly
+              loadingLabel="Rejecting..."
               disabled={bulkCompleting || actingId !== null || submitting}
-              className={iconButton(theme, "danger")}
+              className={dangerButton(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
               aria-label="Reject all pending resets"
-              title="Reject all"
+              title="Reject all pending resets"
             >
-              <X size={16} />
+              <X size={14} />
+              Reject all
             </ProgressButton>
           </>
         )}

@@ -24,7 +24,7 @@ import {
   updateAdminUser,
 } from "../../utils/adminData";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { iconButton, primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
+import { iconButton, primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
 
@@ -297,27 +297,27 @@ export default function AdminAccounts() {
               type="button"
               onClick={handleApproveAll}
               loading={bulkApproving}
-              loadingLabel="Approving all"
-              iconOnly
+              loadingLabel="Approving..."
               disabled={bulkRejecting || reviewingId !== null}
-              className={iconButton(theme, "primary")}
+              className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
               aria-label="Approve all pending accounts"
-              title="Approve all"
+              title="Approve all pending accounts"
             >
-              <CheckCheck size={16} />
+              <CheckCheck size={14} />
+              Approve all
             </ProgressButton>
             <ProgressButton
               type="button"
               onClick={handleRejectAll}
               loading={bulkRejecting}
-              loadingLabel="Rejecting all"
-              iconOnly
+              loadingLabel="Rejecting..."
               disabled={bulkApproving || reviewingId !== null}
-              className={iconButton(theme, "danger")}
+              className={dangerButton(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
               aria-label="Reject all pending accounts"
-              title="Reject all"
+              title="Reject all pending accounts"
             >
-              <X size={16} />
+              <X size={14} />
+              Reject all
             </ProgressButton>
           </>
         )}

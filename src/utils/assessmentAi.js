@@ -211,7 +211,7 @@ export async function fetchAssessmentAiStatus() {
         ...status,
         error:
           status.error ||
-          "AI is not ready. Add GEMINI_API_KEY to backend/.env, then restart the backend.",
+          "AI is not ready. Add GEMINI_API_KEY (documents) and GROQ_API_KEY (prompts) to backend/.env, then restart the backend.",
       };
     }
 

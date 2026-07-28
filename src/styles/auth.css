@@ -131,29 +131,43 @@
 
 .en-auth-body--saved-open {
   overflow: hidden !important;
-  overscroll-behavior: none;
+  overscroll-behavior: none !important;
+  touch-action: none;
 }
 
 .en-auth-panel-form--saved-open {
   overflow: hidden !important;
-  overscroll-behavior: none;
+  overscroll-behavior: none !important;
+  touch-action: none;
 }
 
 .en-saved-accounts-wrap {
-  overscroll-behavior: contain;
-  touch-action: pan-y;
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .en-saved-accounts-list {
   max-height: min(12rem, 42vh);
   overflow-y: auto;
   overflow-x: hidden;
-  overscroll-behavior: contain;
-  overscroll-behavior-y: contain;
-  touch-action: pan-y;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  touch-action: none;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   isolation: isolate;
+  position: relative;
+  z-index: 1;
+}
+
+/* Keep credentials visually parked while the list owns all scroll gestures. */
+.en-auth-panel-form--saved-open .en-auth-login-fields {
+  position: relative;
+  z-index: 0;
+  pointer-events: auto;
 }
 
 .en-saved-accounts-list::-webkit-scrollbar {

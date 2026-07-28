@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import ProfileAvatar from "./ProfileAvatar";
 import ModalPortal from "./ui/ModalPortal";
 import { useTheme } from "../layouts/ThemeContext";
 import { formatSectionLabel } from "../utils/sections";
 import { getCourseLabel, getDepartmentLabel } from "../utils/academicOptions";
+
+/** Only one student hover preview may be open app-wide. */
+let activePreviewId = null;
+const previewListeners = new Set();
+
+function notifyPreviewChange(nextId) {
+  activePreviewId = nextId;
+  previewListeners.forEach((listener) => listener(nextId));
+}
 
 function computePreviewPosition(rect) {
   const width = Math.min(220, window.innerWidth - 16);
@@ -30,7 +39,7 @@ function StudentPreviewPopover({ preview, theme, name, student }) {
   };
 
   return (
-    <ModalPortal>
+    <ModalPortal lockScroll={false}>
       <div
         className={`
           en-faculty-student-preview pointer-events-none rounded-2xl border px-4 py-5 backdrop-blur-xl en-fade-in
@@ -75,8 +84,10 @@ function StudentPreviewPopover({ preview, theme, name, student }) {
 export default function FacultyStudentCard({ student }) {
   const { theme } = useTheme();
   const cardRef = useRef(null);
+  const previewId = useId();
   const [preview, setPreview] = useState(null);
   const [pinned, setPinned] = useState(false);
+  const pinnedRef = useRef(false);
 
   const name =
     `${student.first_name || ""} ${student.last_name || ""}`.trim() || "Student";
@@ -84,42 +95,71 @@ export default function FacultyStudentCard({ student }) {
   const courseLabel = getCourseLabel(student.department, student.course);
   const courseShort = student.course || courseLabel;
 
-  const openPreview = useCallback(() => {
-    const el = cardRef.current;
-    if (!el) return;
-    setPreview(computePreviewPosition(el.getBoundingClientRect()));
-  }, []);
-
-  const closePreview = useCallback(() => {
-    if (!pinned) setPreview(null);
+  useEffect(() => {
+    pinnedRef.current = pinned;
   }, [pinned]);
 
+  const hidePreview = useCallback(() => {
+    setPreview(null);
+    if (activePreviewId === previewId) {
+      notifyPreviewChange(null);
+    }
+  }, [previewId]);
+
+  const showPreview = useCallback(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    notifyPreviewChange(previewId);
+    setPreview(computePreviewPosition(el.getBoundingClientRect()));
+  }, [previewId]);
+
+  const closePreview = useCallback(() => {
+    if (!pinnedRef.current) hidePreview();
+  }, [hidePreview]);
+
   const togglePinned = useCallback(() => {
-    if (pinned) {
+    if (pinnedRef.current) {
       setPinned(false);
-      setPreview(null);
+      hidePreview();
       return;
     }
-    openPreview();
+    showPreview();
     setPinned(true);
-  }, [pinned, openPreview]);
+  }, [hidePreview, showPreview]);
 
+  // Close this card's preview when another card becomes active.
+  useEffect(() => {
+    const onChange = (nextId) => {
+      if (nextId !== previewId) {
+        setPinned(false);
+        setPreview(null);
+      }
+    };
+    previewListeners.add(onChange);
+    return () => {
+      previewListeners.delete(onChange);
+      if (activePreviewId === previewId) {
+        activePreviewId = null;
+      }
+    };
+  }, [previewId]);
+
+  // Close on scroll/resize — never leave frozen stacked tooltips.
   useEffect(() => {
     if (!preview) return undefined;
 
-    const reposition = () => {
-      const el = cardRef.current;
-      if (!el) return;
-      setPreview(computePreviewPosition(el.getBoundingClientRect()));
+    const dismiss = () => {
+      setPinned(false);
+      hidePreview();
     };
 
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
     };
-  }, [preview]);
+  }, [preview, hidePreview]);
 
   useEffect(() => {
     if (!pinned) return undefined;
@@ -127,12 +167,23 @@ export default function FacultyStudentCard({ student }) {
     const onPointerDown = (event) => {
       if (cardRef.current?.contains(event.target)) return;
       setPinned(false);
-      setPreview(null);
+      hidePreview();
+    };
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setPinned(false);
+        hidePreview();
+      }
     };
 
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [pinned]);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [pinned, hidePreview]);
 
   const isActive = Boolean(preview);
 
@@ -154,9 +205,9 @@ export default function FacultyStudentCard({ student }) {
                 : "en-bg-elevated border-emerald-200 hover:border-emerald-300"
           }
         `}
-        onMouseEnter={openPreview}
+        onMouseEnter={showPreview}
         onMouseLeave={closePreview}
-        onFocus={openPreview}
+        onFocus={showPreview}
         onBlur={closePreview}
         onClick={togglePinned}
         aria-expanded={isActive}

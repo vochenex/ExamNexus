@@ -41,6 +41,8 @@ Add **all** of these (Production). Copy values from your local `.env` and `backe
 | `SUPABASE_JWT_SECRET` | `backend/.env` |
 | `GEMINI_API_KEY` | `backend/.env` |
 | `GEMINI_MODEL` | `gemini-2.5-flash` (optional) |
+| `GROQ_API_KEY` | `backend/.env` (prompt generation) |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` (optional) |
 
 Optional push:
 

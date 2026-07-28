@@ -100,24 +100,48 @@ router.post("/complete", requireAdmin, async (req, res) => {
     );
 
     if (updateError) {
-      return res.status(500).json({ error: updateError.message });
+      const msg = updateError.message || "Failed to update password";
+      if (/user not found|not found/i.test(msg)) {
+        return res.status(404).json({
+          error:
+            "Auth user not found for this request. The account may have been deleted — reject the request instead.",
+        });
+      }
+      return res.status(500).json({ error: msg });
     }
 
-    const userClient = getUserClient(req.adminAccessToken);
-    const { error: completeError } = await userClient.rpc(
-      "admin_complete_password_reset_request",
-      {
-        p_request_id: requestId,
-        p_admin_notes: adminNotes || null,
-      }
-    );
+    // Prefer service-role update so completion does not depend on RPC/RLS quirks.
+    const { data: completedRow, error: completeError } = await admin
+      .from("password_reset_requests")
+      .update({
+        status: "completed",
+        admin_notes: adminNotes || null,
+        resolved_by: req.adminUserId,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", requestId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
 
-    if (completeError) {
-      console.error("Failed to mark request completed:", completeError);
-      return res.status(500).json({
-        error:
-          "Password was updated but the request could not be marked completed. Check Supabase RPC admin_complete_password_reset_request.",
-      });
+    if (completeError || !completedRow) {
+      // Fallback to authenticated RPC if direct update is blocked by schema/policies.
+      const userClient = getUserClient(req.adminAccessToken);
+      const { error: rpcError } = await userClient.rpc(
+        "admin_complete_password_reset_request",
+        {
+          p_request_id: requestId,
+          p_admin_notes: adminNotes || null,
+        }
+      );
+
+      if (rpcError) {
+        console.error("Failed to mark request completed:", completeError || rpcError);
+        return res.status(500).json({
+          error:
+            "Password was updated but the request could not be marked completed. Re-run database/password_reset_requests.sql in Supabase, then try again.",
+        });
+      }
     }
 
     res.json({
