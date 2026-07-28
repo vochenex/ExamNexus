@@ -823,7 +823,6 @@ function getAuthInputProps(theme) {
     en-auth-card
     relative
     w-full
-    max-w-5xl
     mx-auto
     rounded-[2rem]
     overflow-hidden
@@ -888,7 +887,7 @@ function getAuthInputProps(theme) {
   </div>
 
   <h2
-    className={`text-2xl font-bold ${
+    className={`text-xl font-bold md:text-2xl ${
       theme === "dark" ? "text-emerald-400" : "text-slate-900"
     }`}
   >
@@ -901,7 +900,7 @@ function getAuthInputProps(theme) {
         : "Create your account"}
   </h2>
   <p
-    className={`mt-1 mb-6 text-sm ${
+    className={`mt-1 mb-5 text-sm leading-relaxed ${
       theme === "dark" ? "text-gray-400" : "text-gray-600"
     }`}
   >
