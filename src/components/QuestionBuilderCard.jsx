@@ -4,6 +4,7 @@ import { EXAM_TYPE_LABELS } from "../utils/assessmentQuestions";
 import { choiceLabel, stripChoicePrefix, formatChoiceOptionLabel } from "../utils/choiceLabels";
 import { getQuestionType, normalizeGradingOptions, ensureEnumAlternativesForAnswers } from "../utils/questionGrading";
 import Select from "./ui/Select";
+import ProgressButton from "./ui/ProgressButton";
 
 const inputClass = (theme) =>
   `w-full p-3 rounded-xl text-sm transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
@@ -61,6 +62,7 @@ export default function QuestionBuilderCard({
   onRemoveEnumSlotAlternative,
   onDelete,
   onSaveToBank,
+  savingToBank = false,
 }) {
   const { theme } = useTheme();
   const type = getQuestionType(question, examType);
@@ -93,9 +95,12 @@ export default function QuestionBuilderCard({
 
         <div className="flex items-center gap-1">
           {onSaveToBank && (
-            <button
+            <ProgressButton
               type="button"
               onClick={onSaveToBank}
+              loading={savingToBank}
+              loadingLabel="Saving…"
+              iconOnly
               className={`rounded-lg p-2 transition ${
                 theme === "dark"
                   ? "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
@@ -105,12 +110,13 @@ export default function QuestionBuilderCard({
               title="Save to question bank"
             >
               <Archive size={16} />
-            </button>
+            </ProgressButton>
           )}
           <button
             type="button"
             onClick={onDelete}
-            className="rounded-lg p-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+            disabled={savingToBank}
+            className="rounded-lg p-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
             aria-label={`Delete question ${index + 1}`}
           >
             <Trash2 size={16} />

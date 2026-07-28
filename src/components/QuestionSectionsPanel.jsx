@@ -30,6 +30,7 @@ export default function QuestionSectionsPanel({
   onDeleteQuestion,
   onSelectSection,
   onSaveQuestionToBank,
+  savingToBankId = null,
   onImportFromBank,
 }) {
   const { theme } = useTheme();
@@ -393,6 +394,14 @@ export default function QuestionSectionsPanel({
                                   onSaveQuestionToBank
                                     ? () => onSaveQuestionToBank(question)
                                     : undefined
+                                }
+                                savingToBank={
+                                  Boolean(
+                                    savingToBankId &&
+                                      (savingToBankId === question.id ||
+                                        savingToBankId === question._clientId ||
+                                        savingToBankId === globalIndex)
+                                  )
                                 }
                               />
                             </div>

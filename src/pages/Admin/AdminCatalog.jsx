@@ -25,6 +25,7 @@ import {
   secondaryButtonSm,
   primaryButton,
 } from "../../utils/themeButtons";
+import ProgressButton from "../../components/ui/ProgressButton";
 
 const TABS = [
   { id: "department", label: "Departments" },
@@ -48,6 +49,8 @@ export default function AdminCatalog() {
     section: { ...EMPTY_FORM },
   });
   const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const form = forms[tab] || EMPTY_FORM;
 
@@ -105,6 +108,7 @@ export default function AdminCatalog() {
   };
 
   const handleSave = async () => {
+    if (saving || deletingId) return;
     if (!form.code.trim() || !form.label.trim()) {
       error("Code and label are required.");
       return;
@@ -114,6 +118,7 @@ export default function AdminCatalog() {
       return;
     }
     try {
+      setSaving(true);
       await upsertAdminCatalogItem({
         id: editingId || null,
         item_type: tab,
@@ -126,10 +131,13 @@ export default function AdminCatalog() {
       await load(true);
     } catch (err) {
       error(err.message || "Failed to save catalog item.");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (item) => {
+    if (saving || deletingId) return;
     const ok = await confirm({
       title: "Remove item?",
       message: `Remove ${item.label}?`,
@@ -138,12 +146,15 @@ export default function AdminCatalog() {
     });
     if (!ok) return;
     try {
+      setDeletingId(item.id);
       await deleteAdminCatalogItem(item.id);
       if (editingId === item.id) clearCurrentForm();
       await success("Item removed.");
       await load(true);
     } catch (err) {
       error(err.message || "Failed to remove item.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -228,10 +239,17 @@ export default function AdminCatalog() {
             </Select>
           )}
         </div>
-        <button type="button" onClick={handleSave} className={`${primaryButton(theme)} mt-3`}>
+        <ProgressButton
+          type="button"
+          onClick={handleSave}
+          loading={saving}
+          loadingLabel="Saving…"
+          disabled={Boolean(deletingId)}
+          className={`${primaryButton(theme)} mt-3`}
+        >
           <Plus size={18} />
           {editingId ? "Update item" : "Save item"}
-        </button>
+        </ProgressButton>
       </div>
 
       <div className={adminTableWrapClass(theme)}>
@@ -276,21 +294,26 @@ export default function AdminCatalog() {
                         <button
                           type="button"
                           onClick={() => startEdit(item)}
+                          disabled={saving || Boolean(deletingId)}
                           className={iconButton(theme, "secondary")}
                           aria-label={`Edit ${item.label}`}
                           title="Edit"
                         >
                           <Pencil size={16} />
                         </button>
-                        <button
+                        <ProgressButton
                           type="button"
                           onClick={() => handleDelete(item)}
+                          loading={deletingId === item.id}
+                          loadingLabel="Removing…"
+                          iconOnly
+                          disabled={saving || Boolean(deletingId)}
                           className={iconButton(theme, "danger")}
                           aria-label={`Remove ${item.label}`}
                           title="Remove"
                         >
                           <Trash2 size={16} />
-                        </button>
+                        </ProgressButton>
                       </div>
                     </td>
                   </tr>

@@ -28,6 +28,7 @@ import {
   authEmailError,
   CRMCC_EMAIL_PLACEHOLDER,
 } from "../utils/schoolEmail";
+import { useNavigationProgress } from "../contexts/NavigationProgressContext";
 import { checkSignupCredentials } from "../utils/authSignup";
 import { formatSupabaseError } from "../utils/supabaseErrors";
 import {
@@ -64,6 +65,7 @@ export default function ExamNexusAuth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  const { beginNavigation } = useNavigationProgress();
   const mobileNav = useMobileNav();
   const useCompactAuthHeader = isNativeApp() || mobileNav;
   const { alert: showAlert } = useAppModal();
@@ -573,7 +575,10 @@ function getAuthInputProps(theme) {
       // dashboard load. Clearing `loading` here would re-reveal the login form
       // for a beat before navigation commits — which looked like the page
       // "bouncing back to login and then auto-logging in after a delay".
-      navigateForRole(navigate, profile.role, { replace: true });
+      navigateForRole((to, options) => {
+        beginNavigation(to);
+        navigate(to, options);
+      }, profile.role, { replace: true });
       return;
     }
 

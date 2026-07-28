@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { LogOut, MoreHorizontal, X } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import ProfileAvatar from "../ProfileAvatar";
+import { ProgressNavLink } from "../ProgressLink";
 import { getMobileNav } from "./mobileNav";
 import { forceUnlockBodyScroll } from "../ui/ModalPortal";
 
@@ -14,7 +15,7 @@ function isPathActive(pathname, to, end) {
 function TabButton({ item, active, theme, onClick }) {
   const Icon = item.icon;
   return (
-    <NavLink
+    <ProgressNavLink
       to={item.to}
       end={item.end}
       onClick={onClick}
@@ -35,7 +36,7 @@ function TabButton({ item, active, theme, onClick }) {
       <span className={`en-tabbar-label ${active ? "en-tabbar-label--active" : ""}`}>
         {item.label}
       </span>
-    </NavLink>
+    </ProgressNavLink>
   );
 }
 
@@ -136,7 +137,7 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
                 const Icon = item.icon;
                 const active = isPathActive(location.pathname, item.to, item.end);
                 return (
-                  <NavLink
+                  <ProgressNavLink
                     key={item.to}
                     to={item.to}
                     end={item.end}
@@ -145,7 +146,7 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
                   >
                     <Icon size={22} strokeWidth={2.1} />
                     <span>{item.label}</span>
-                  </NavLink>
+                  </ProgressNavLink>
                 );
               })}
             </div>

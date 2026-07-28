@@ -1,16 +1,6 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { ProgressNavLink } from "./ProgressLink";
 import { useTheme } from "../layouts/ThemeContext";
 import { motion } from "../utils/motion";
-
-function navigateWithTransition(navigate, to) {
-  if (typeof document !== "undefined" && document.startViewTransition) {
-    document.startViewTransition(() => {
-      navigate(to);
-    });
-    return;
-  }
-  navigate(to);
-}
 
 function navLinkClass(theme, isActive) {
   if (isActive) {
@@ -40,7 +30,7 @@ export default function SidebarNavLink({ to, icon: Icon, label, end = false }) {
   const { theme } = useTheme();
 
   return (
-    <NavLink
+    <ProgressNavLink
       to={to}
       end={end}
       className={({ isActive }) =>
@@ -63,7 +53,7 @@ export default function SidebarNavLink({ to, icon: Icon, label, end = false }) {
           <span className="truncate">{label}</span>
         </>
       )}
-    </NavLink>
+    </ProgressNavLink>
   );
 }
 

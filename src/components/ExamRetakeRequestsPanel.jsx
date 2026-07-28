@@ -3,6 +3,7 @@ import { CheckCircle2, RotateCcw, XCircle } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { panelClass } from "../utils/themeInputs";
 import { iconButton } from "../utils/themeButtons";
+import ProgressButton from "./ui/ProgressButton";
 import ProfileAvatar from "./ProfileAvatar";
 import {
   fetchExamRetakeRequests,
@@ -246,26 +247,32 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
+              <ProgressButton
                 type="button"
-                disabled={processing || selectedIds.size === 0}
+                loading={processing}
+                loadingLabel="Working…"
+                iconOnly
+                disabled={selectedIds.size === 0}
                 onClick={() => handleReview("approve")}
                 className={iconButton(theme, "primary", "disabled:opacity-50")}
                 aria-label="Approve selected retake requests"
                 title="Approve selected"
               >
                 <CheckCircle2 size={16} />
-              </button>
-              <button
+              </ProgressButton>
+              <ProgressButton
                 type="button"
-                disabled={processing || selectedIds.size === 0}
+                loading={processing}
+                loadingLabel="Working…"
+                iconOnly
+                disabled={selectedIds.size === 0}
                 onClick={() => handleReview("deny")}
                 className={iconButton(theme, "danger", "disabled:opacity-50")}
                 aria-label="Deny selected retake requests"
                 title="Deny selected"
               >
                 <XCircle size={16} />
-              </button>
+              </ProgressButton>
             </div>
           </div>
         </div>

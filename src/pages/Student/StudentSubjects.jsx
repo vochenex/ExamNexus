@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
 import { CheckCircle2, XCircle, BookOpen, ChevronRight, Plus, LogOut } from "lucide-react";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import ProgressButton from "../../components/ui/ProgressButton";
 import { resolveStudentId } from "../../utils/authUser";
 import {
   getStudentEnrolledSubjects,
@@ -203,6 +204,7 @@ export default function StudentSubjects() {
   };
 
   const handleEnroll = async () => {
+    if (enrolling) return;
     const normalizedCode = inviteCode.trim().toLowerCase();
 
     if (!normalizedCode) {
@@ -565,16 +567,24 @@ export default function StudentSubjects() {
             )}
 
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={closeModal} className={secondaryButton(theme)}>
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={enrolling}
+                className={secondaryButton(theme, "disabled:opacity-60")}
+              >
                 Cancel
               </button>
-              <button
+              <ProgressButton
+                type="button"
                 onClick={handleEnroll}
-                disabled={enrolling || !inviteCode.trim()}
+                loading={enrolling}
+                loadingLabel="Joining…"
+                disabled={!inviteCode.trim()}
                 className={primaryButton(theme)}
               >
-                {enrolling ? "Joining..." : "Join Subject"}
-              </button>
+                Join Subject
+              </ProgressButton>
             </div>
           </div>
         </div>

@@ -504,7 +504,12 @@ export default function AdminAccounts() {
               </Select>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setEditing(null)} className={secondaryButtonSm(theme)}>
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                disabled={saving}
+                className={secondaryButtonSm(theme, "disabled:opacity-60")}
+              >
                 Cancel
               </button>
               <ProgressButton

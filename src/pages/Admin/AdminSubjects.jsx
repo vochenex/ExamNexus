@@ -24,6 +24,7 @@ import {
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
 import { iconButton, primaryButtonSm, primaryButton } from "../../utils/themeButtons";
+import ProgressButton from "../../components/ui/ProgressButton";
 import { DEFAULT_SECTION_COUNT } from "../../utils/sections";
 import { DEFAULT_YEAR_LEVEL } from "../../utils/yearLevels";
 
@@ -48,6 +49,8 @@ export default function AdminSubjects() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [busySubjectId, setBusySubjectId] = useState(null);
   const [form, setForm] = useState({
     name: "",
     teacherSchoolId: "",
@@ -78,6 +81,7 @@ export default function AdminSubjects() {
   usePolling(load, []);
 
   const handleCreate = async () => {
+    if (creating) return;
     if (!form.name.trim() || !form.teacherSchoolId) {
       error("Subject name and assigned faculty are required.");
       return;
@@ -106,7 +110,9 @@ export default function AdminSubjects() {
   };
 
   const handleAssign = async (subjectId, facultySchoolId) => {
+    if (busySubjectId || deletingId) return;
     try {
+      setBusySubjectId(subjectId);
       await adminAssignSubjectFaculty(subjectId, facultySchoolId);
       await success(
         facultySchoolId ? "Faculty assignment updated." : "Faculty unassigned."
@@ -115,19 +121,26 @@ export default function AdminSubjects() {
     } catch (err) {
       error(err.message || "Failed to assign faculty.");
       await load(true);
+    } finally {
+      setBusySubjectId(null);
     }
   };
 
   const handleSectionCount = async (subjectId, sectionCount) => {
+    if (busySubjectId || deletingId) return;
     try {
+      setBusySubjectId(subjectId);
       await adminUpdateSubject(subjectId, { section_count: sectionCount });
       await load(true);
     } catch (err) {
       error(err.message || "Failed to update sections.");
+    } finally {
+      setBusySubjectId(null);
     }
   };
 
   const handleDelete = async (subject) => {
+    if (deletingId || creating || busySubjectId) return;
     const ok = await confirm({
       title: "Delete subject?",
       message: `Delete "${subject.name}"? Enrollments and assessments may be affected.`,
@@ -136,11 +149,14 @@ export default function AdminSubjects() {
     });
     if (!ok) return;
     try {
+      setDeletingId(subject.id);
       await adminDeleteSubject(subject.id);
       await success("Subject deleted.");
       await load(true);
     } catch (err) {
       error(err.message || "Failed to delete subject.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -240,15 +256,17 @@ export default function AdminSubjects() {
               theme === "dark" ? "border-white/10" : "border-emerald-100"
             }`}
           >
-            <button
+            <ProgressButton
               type="button"
               onClick={handleCreate}
-              disabled={creating || !form.name.trim() || !form.teacherSchoolId}
+              loading={creating}
+              loadingLabel="Creating…"
+              disabled={!form.name.trim() || !form.teacherSchoolId || Boolean(deletingId)}
               className={`${primaryButton(theme)} disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <Plus size={18} />
-              {creating ? "Creating..." : "Create subject"}
-            </button>
+              Create subject
+            </ProgressButton>
           </div>
         </div>
       </div>
@@ -289,6 +307,7 @@ export default function AdminSubjects() {
                     <Select
                       value={subject.teacher_school_id || ""}
                       onChange={(e) => handleAssign(subject.id, e.target.value)}
+                      disabled={busySubjectId === subject.id || deletingId === subject.id}
                       className="min-w-[15rem] w-full"
                     >
                       <option value="">Unassigned</option>
@@ -305,6 +324,7 @@ export default function AdminSubjects() {
                       onChange={(e) =>
                         handleSectionCount(subject.id, Number(e.target.value))
                       }
+                      disabled={busySubjectId === subject.id || deletingId === subject.id}
                       className="min-w-[8rem] w-full"
                     >
                       {[1, 2, 3, 4, 5, 6].map((n) => (
@@ -317,15 +337,19 @@ export default function AdminSubjects() {
                   <td className={adminTdClass(theme)}>{subject.enrolled_count ?? 0}</td>
                   <td className={adminTdClass(theme)}>{subject.assessment_count ?? 0}</td>
                   <td className={adminTdClass(theme)}>
-                    <button
+                    <ProgressButton
                       type="button"
                       onClick={() => handleDelete(subject)}
+                      loading={deletingId === subject.id}
+                      loadingLabel="Deleting…"
+                      iconOnly
+                      disabled={Boolean(deletingId) || Boolean(busySubjectId) || creating}
                       className={iconButton(theme, "danger")}
                       aria-label={`Delete ${subject.name}`}
                       title="Delete"
                     >
                       <Trash2 size={16} />
-                    </button>
+                    </ProgressButton>
                   </td>
                 </tr>
               ))

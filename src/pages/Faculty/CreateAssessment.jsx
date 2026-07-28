@@ -67,6 +67,7 @@ export default function CreateAssessment() {
   const [targetSections, setTargetSections] = useState(() => [...subjectSections]);
   const [exam, setExam] = useState(defaultAssessment);
   const [loading, setLoading] = useState(false);
+  const [savingToBankId, setSavingToBankId] = useState(null);
   const [error, setError] = useState("");
   const [creationMode, setCreationMode] = useState("manual");
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -142,11 +143,16 @@ export default function CreateAssessment() {
   const clearError = () => setError("");
 
   const handleSaveQuestionToBank = async (question) => {
+    if (savingToBankId != null) return;
+    const key = question.id || question._clientId || question.question || Date.now();
     try {
+      setSavingToBankId(key);
       await saveQuestionToBank(question);
       showSuccess("Question saved to your bank.");
     } catch (err) {
       showError(err.message || "Could not save question to bank.");
+    } finally {
+      setSavingToBankId(null);
     }
   };
 
@@ -520,6 +526,7 @@ export default function CreateAssessment() {
                   onDeleteQuestion={deleteQuestion}
                   onSelectSection={setActiveSectionId}
                   onSaveQuestionToBank={handleSaveQuestionToBank}
+                  savingToBankId={savingToBankId}
                   onImportFromBank={() => setBankPickerOpen(true)}
               />
             )}

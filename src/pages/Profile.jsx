@@ -34,6 +34,7 @@ import { loadProfileForUser, resolveSchoolId } from "../utils/authProfile";
 import { isFacultyRole, hasCustomProfilePhoto } from "../utils/avatar";
 import { isAdminUser } from "../utils/adminData";
 import { primaryButton, secondaryButton, dangerButton } from "../utils/themeButtons";
+import ProgressButton from "../components/ui/ProgressButton";
 import {
   DEPARTMENTS,
   getCoursesForDepartment,
@@ -352,6 +353,7 @@ export default function Profile() {
   };
 
   const handleSave = async (updatedProfile) => {
+    if (saveStatus === "saving") return;
     try {
       setSaveStatus("saving");
 
@@ -984,13 +986,15 @@ export default function Profile() {
 
           {editing && (
             <div className="mt-6 flex justify-end">
-              <button
+              <ProgressButton
                 type="button"
                 onClick={() => handleSave(editProfile)}
+                loading={saveStatus === "saving"}
+                loadingLabel="Saving…"
                 className={primaryButton(theme)}
               >
                 Save changes
-              </button>
+              </ProgressButton>
             </div>
           )}
         </div>

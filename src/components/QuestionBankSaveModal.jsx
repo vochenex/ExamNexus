@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Archive, Check, X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ModalShell from "./ui/ModalShell";
+import ProgressButton from "./ui/ProgressButton";
 import { primaryButton, secondaryButton } from "../utils/themeButtons";
 import { deserializeQuestion } from "../utils/assessmentQuestions";
 import { getQuestionBankTypeLabel, saveQuestionToBank } from "../utils/questionBank";
@@ -49,11 +50,13 @@ export default function QuestionBankSaveModal({
   };
 
   const handleClose = () => {
+    if (saving) return;
     reset();
     onClose();
   };
 
   const toggleSelected = (id) => {
+    if (saving) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -66,6 +69,7 @@ export default function QuestionBankSaveModal({
   };
 
   const handleSave = async () => {
+    if (saving) return;
     const selected = questions.filter((row) => selectedIds.has(row.id));
     if (!selected.length) return;
 
@@ -90,7 +94,11 @@ export default function QuestionBankSaveModal({
   if (!open) return null;
 
   return (
-    <ModalShell open={open} onClose={handleClose} overlayClassName="bg-black/60 backdrop-blur-sm">
+    <ModalShell
+      open={open}
+      onClose={saving ? undefined : handleClose}
+      overlayClassName="bg-black/60 backdrop-blur-sm"
+    >
         <div
           role="dialog"
           aria-modal="true"
@@ -220,20 +228,24 @@ export default function QuestionBankSaveModal({
               {selectedIds.size} selected
             </p>
             <div className="flex gap-3">
-              <button type="button" onClick={handleClose} className={secondaryButton(theme)}>
-                Cancel
-              </button>
               <button
                 type="button"
-                onClick={handleSave}
-                disabled={selectedIds.size === 0 || saving}
-                className={primaryButton(
-                  theme,
-                  selectedIds.size === 0 || saving ? "opacity-50" : ""
-                )}
+                onClick={handleClose}
+                disabled={saving}
+                className={secondaryButton(theme, "disabled:opacity-60")}
               >
-                {saving ? "Saving…" : "Save selected"}
+                Cancel
               </button>
+              <ProgressButton
+                type="button"
+                onClick={handleSave}
+                loading={saving}
+                loadingLabel="Saving…"
+                disabled={selectedIds.size === 0}
+                className={primaryButton(theme, "disabled:opacity-50")}
+              >
+                Save selected
+              </ProgressButton>
             </div>
           </div>
         </div>

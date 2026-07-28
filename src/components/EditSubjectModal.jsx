@@ -32,7 +32,7 @@ export default function EditSubjectModal({
 
   const minSectionCount = getMaxEnrolledSectionIndex(classmates);
 
-  useModalDismiss(onClose, { enabled: open });
+  useModalDismiss(onClose, { enabled: open && !saving });
 
   useEffect(() => {
     if (!open || !subject) return;
@@ -85,7 +85,7 @@ export default function EditSubjectModal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={saving ? undefined : onClose}
         aria-hidden="true"
       />
       <div
@@ -180,7 +180,12 @@ export default function EditSubjectModal({
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <button type="button" onClick={onClose} className={secondaryButton(theme)}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className={secondaryButton(theme, "disabled:opacity-60")}
+          >
             Cancel
           </button>
           <ProgressButton

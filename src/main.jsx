@@ -1,5 +1,6 @@
 import "./styles/motion.css";
 import "./styles/splash.css";
+import "./styles/nav-progress.css";
 import "./index.css";
 import "./styles/native-app.css";
 import "./styles/auth.css";
@@ -11,6 +12,8 @@ import AppBootstrap from "./components/AppBootstrap.jsx";
 import { ThemeProvider } from "./layouts/ThemeContext";
 import { AssessmentLockdownProvider } from "./contexts/AssessmentLockdownContext";
 import { AppModalProvider } from "./contexts/AppModalContext";
+import { AppSplashProvider } from "./contexts/AppSplashContext";
+import { NavigationProgressProvider } from "./contexts/NavigationProgressContext";
 import { clearStaleAccountCacheOnLoad } from "./utils/sessionReset";
 import { initNativeApp } from "./utils/nativeApp";
 import { initMobileShell } from "./utils/mobileShell";
@@ -31,11 +34,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ThemeProvider>
       <BrowserRouter>
-        <AppModalProvider>
-          <AssessmentLockdownProvider>
-            <AppBootstrap />
-          </AssessmentLockdownProvider>
-        </AppModalProvider>
+        <AppSplashProvider>
+          <NavigationProgressProvider>
+            <AppModalProvider>
+              <AssessmentLockdownProvider>
+                <AppBootstrap />
+              </AssessmentLockdownProvider>
+            </AppModalProvider>
+          </NavigationProgressProvider>
+        </AppSplashProvider>
       </BrowserRouter>
     </ThemeProvider>
   </React.StrictMode>

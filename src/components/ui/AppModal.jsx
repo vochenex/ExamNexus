@@ -9,6 +9,7 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
 import { motion } from "../../utils/motion";
 import ModalPortal from "./ModalPortal";
+import ProgressButton from "./ProgressButton";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 import AnimatedSuccessCheck from "./AnimatedSuccessCheck";
@@ -226,9 +227,10 @@ export default function AppModal({
               {cancelLabel}
             </button>
           )}
-          <button
+          <ProgressButton
             type="button"
-            disabled={loading}
+            loading={loading}
+            loadingLabel="Please wait…"
             onClick={onConfirm}
             className={
               tone === "danger" || tone === "error"
@@ -236,8 +238,8 @@ export default function AppModal({
                 : primaryButton(theme, "disabled:opacity-60")
             }
           >
-            {loading ? "Please wait..." : confirmLabel}
-          </button>
+            {confirmLabel}
+          </ProgressButton>
         </div>
         )}
       </div>

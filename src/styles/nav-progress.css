@@ -1,0 +1,48 @@
+@keyframes en-nav-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.en-nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.en-nav-progress__bar {
+  height: 100%;
+  width: 40%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #10b981, #14b8a6, #06b6d4);
+  animation: en-nav-progress-slide 1s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.55);
+}
+
+.en-nav-blocker {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  cursor: wait;
+  background: transparent;
+  touch-action: none;
+}
+
+html.en-nav-pending,
+html.en-nav-pending body {
+  cursor: wait !important;
+}
+
+html.en-nav-pending a,
+html.en-nav-pending button {
+  pointer-events: none !important;
+}

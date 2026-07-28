@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import ThemeToggle from "../ThemeToggle";
 import InstallIconButton from "../pwa/InstallIconButton";
 import ExamNexusBrand from "../ExamNexusBrand";
 import HomeBottomBar from "./HomeBottomBar";
+import { ProgressLink } from "../ProgressLink";
 import useMobileNav from "../../hooks/useMobileNav";
 import { isNativeApp } from "../../utils/platform";
 import { getCachedExamNexusUser } from "../../utils/authUser";
@@ -206,14 +207,14 @@ export default function HomeSiteHeader() {
     <>
       <header className="en-home-site-header">
         <div className="en-home-header-inner en-home-wrap">
-          <Link
+          <ProgressLink
             to="/#home"
             className="min-w-0 shrink rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
             onClick={handleLogoClick}
             aria-label="ExamNexus home — go to main content"
           >
             <ExamNexusBrand variant="compact" showTagline={false} panelTone="dark" />
-          </Link>
+          </ProgressLink>
 
           <nav ref={navRef} className="en-home-header-nav" aria-label="Primary navigation">
             <span
@@ -238,18 +239,18 @@ export default function HomeSiteHeader() {
               </a>
             ))}
             {dashboardTo ? (
-              <Link to={dashboardTo} className="en-home-nav-link ml-1">
+              <ProgressLink to={dashboardTo} className="en-home-nav-link ml-1">
                 Dashboard
-              </Link>
+              </ProgressLink>
             ) : (
-              <Link
+              <ProgressLink
                 ref={setLinkRef("login")}
                 to="/auth"
                 className={`en-home-nav-link ml-1${location.pathname === "/auth" ? " en-home-nav-link--active" : ""}`}
                 aria-current={location.pathname === "/auth" ? "page" : undefined}
               >
                 Login
-              </Link>
+              </ProgressLink>
             )}
           </nav>
 
@@ -324,30 +325,30 @@ export default function HomeSiteHeader() {
                 </a>
               ))}
               {dashboardTo ? (
-                <Link
+                <ProgressLink
                   to={dashboardTo}
                   className="en-home-mobile-nav-link"
                   onClick={handleMobileNavClick}
                 >
                   Dashboard
-                </Link>
+                </ProgressLink>
               ) : (
-                <Link
+                <ProgressLink
                   ref={setMobileLinkRef("login")}
                   to="/auth"
                   className={`en-home-mobile-nav-link${location.pathname === "/auth" ? " en-home-mobile-nav-link--active" : ""}`}
                   onClick={handleMobileNavClick}
                 >
                   Login
-                </Link>
+                </ProgressLink>
               )}
-              <Link
+              <ProgressLink
                 to={dashboardTo || "/auth"}
                 className={primaryButton(theme, "en-home-mobile-nav-cta w-full justify-center text-sm py-2.5")}
                 onClick={handleMobileNavClick}
               >
                 {dashboardTo ? "Open dashboard" : "Sign in to ExamNexus"}
-              </Link>
+              </ProgressLink>
             </div>
           </nav>
         </div>

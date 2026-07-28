@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
 import ExamNexusBrand from "../ExamNexusBrand";
+import { ProgressLink } from "../ProgressLink";
 import { useTheme } from "../../layouts/ThemeContext";
 
 const FOOTER_LINKS = [
@@ -36,9 +36,9 @@ export default function HomeSiteFooter() {
             {FOOTER_LINKS.map((link) => (
               <li key={link.label}>
                 {link.to ? (
-                  <Link to={link.to} className="transition hover:text-emerald-400">
+                  <ProgressLink to={link.to} className="transition hover:text-emerald-400">
                     {link.label}
-                  </Link>
+                  </ProgressLink>
                 ) : (
                   <a href={link.href} className="transition hover:text-emerald-400">
                     {link.label}

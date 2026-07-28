@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   ArrowRight,
   BarChart3,
@@ -18,6 +18,7 @@ import HomeSiteFooter from "../components/home/HomeSiteFooter";
 import HomeDecorativeBanner from "../components/home/HomeDecorativeBanner";
 import HomeTeamSection from "../components/home/HomeTeamSection";
 import ScrollReveal from "../components/home/ScrollReveal";
+import { ProgressLink } from "../components/ProgressLink";
 import {
   AdminIllustration,
   FacultyIllustration,
@@ -169,10 +170,10 @@ export default function HomePage() {
                   exam integrity.
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  <Link to={dashboardTo || "/auth"} className={primaryButton(theme)}>
+                  <ProgressLink to={dashboardTo || "/auth"} className={primaryButton(theme)}>
                     {dashboardTo ? "Go to dashboard" : "Start for free"}
                     <ArrowRight size={18} />
-                  </Link>
+                  </ProgressLink>
                   <a href="#about" className={secondaryButton(theme)}>
                     Learn more
                   </a>
@@ -366,9 +367,9 @@ export default function HomePage() {
                   <p className={`mb-4 text-sm lg:text-base ${mutedText}`}>
                     Students and faculty need an approved account to use the platform.
                   </p>
-                  <Link to="/auth" className={primaryButton(theme, "text-sm px-4 py-2")}>
+                  <ProgressLink to="/auth" className={primaryButton(theme, "text-sm px-4 py-2")}>
                     Login / Register
-                  </Link>
+                  </ProgressLink>
                 </div>
               </ScrollReveal>
             </div>
@@ -392,12 +393,12 @@ export default function HomePage() {
                   platform built for your campus.
                 </p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
-                  <Link to={dashboardTo || "/auth"} className={primaryButton(theme)}>
+                  <ProgressLink to={dashboardTo || "/auth"} className={primaryButton(theme)}>
                     {dashboardTo ? "Open dashboard" : "Create account"}
-                  </Link>
-                  <Link to="/auth" className={secondaryButton(theme)}>
+                  </ProgressLink>
+                  <ProgressLink to="/auth" className={secondaryButton(theme)}>
                     Login
-                  </Link>
+                  </ProgressLink>
                 </div>
               </div>
             </ScrollReveal>

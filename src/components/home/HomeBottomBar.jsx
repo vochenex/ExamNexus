@@ -1,6 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { Home, Info, Users, Mail, LogIn, LayoutDashboard } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
+import { ProgressLink } from "../ProgressLink";
 import { getCachedExamNexusUser } from "../../utils/authUser";
 import { homeNavSectionFromHref, useHomeActiveSection } from "../../hooks/useHomeActiveSection";
 
@@ -65,7 +66,7 @@ export default function HomeBottomBar() {
           );
         })}
 
-        <Link
+        <ProgressLink
           to={dashboardTo || "/auth"}
           className="en-tabbar-item"
           aria-current={onAuthPage ? "page" : undefined}
@@ -80,7 +81,7 @@ export default function HomeBottomBar() {
           <span className={`en-tabbar-label ${onAuthPage ? "en-tabbar-label--active" : ""}`}>
             {dashboardTo ? "Dashboard" : "Login"}
           </span>
-        </Link>
+        </ProgressLink>
       </div>
     </nav>
   );

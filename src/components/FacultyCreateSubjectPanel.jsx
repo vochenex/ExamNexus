@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { primaryButtonSm } from "../utils/themeButtons";
+import ProgressButton from "./ui/ProgressButton";
 import { YearLevelSelect } from "./YearLevelBadge";
 import SectionCountSelect from "./SectionCountSelect";
 import CollapsiblePanel from "./ui/CollapsiblePanel";
@@ -58,15 +59,17 @@ export default function FacultyCreateSubjectPanel({
 
           <YearLevelSelect value={yearLevel} onChange={onYearLevelChange} disabled={disabled} />
 
-          <button
+          <ProgressButton
             type="button"
             onClick={onSubmit}
-            disabled={disabled || creating || !name.trim()}
+            loading={creating}
+            loadingLabel="Creating…"
+            disabled={disabled || !name.trim()}
             className={primaryButtonSm(theme, "w-full justify-center disabled:cursor-not-allowed disabled:opacity-50")}
           >
             <Plus size={16} />
-            {creating ? "Creating…" : "Create subject"}
-          </button>
+            Create subject
+          </ProgressButton>
         </div>
 
         <SectionCountSelect
