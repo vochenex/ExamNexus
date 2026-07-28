@@ -25,9 +25,11 @@ import ExamNexusLogo from "../components/ExamNexusLogo";
 import ExamNexusBrand from "../components/ExamNexusBrand";
 import RequiredSchoolIdGate from "../components/RequiredSchoolIdGate";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
+import SidebarCollapseToggle from "../components/SidebarCollapseToggle";
 import AnimatedPage from "../components/ui/AnimatedPage";
 import MobileTabBar from "../components/mobile/MobileTabBar";
 import useMobileNav from "../hooks/useMobileNav";
+import useSidebarCollapsed from "../hooks/useSidebarCollapsed";
 import { isNativeApp } from "../utils/platform";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
 import { motion } from "../utils/motion";
@@ -37,6 +39,7 @@ export default function DashboardLayout() {
   const { isLockdownActive, lockdown } = useAssessmentLockdown();
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
+  const { collapsed, toggleCollapsed } = useSidebarCollapsed();
   const nativeApp = isNativeApp();
   const cachedUser = getCachedExamNexusUser();
   const [accessState, setAccessState] = useState(cachedUser ? "allowed" : "checking");
@@ -112,7 +115,9 @@ export default function DashboardLayout() {
     >
       {!isLockdownActive && !mobileNav && (
         <aside
-          className={`${motion.slideInLeft} sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r p-4 backdrop-blur-xl ${
+          className={`${motion.slideInLeft} sticky top-0 flex h-screen shrink-0 flex-col border-r backdrop-blur-xl transition-[width,padding] duration-300 ease-out ${
+            collapsed ? "w-[4.75rem] p-2.5" : "w-72 p-4"
+          } ${
             theme === "dark"
               ? "border-[#10B981]/10 bg-[#0b1114]/95"
               : "en-bg-surface border-slate-200/80 shadow-[4px_0_32px_rgba(15,23,42,0.08)]"
@@ -120,76 +125,99 @@ export default function DashboardLayout() {
         >
           {/* Brand */}
           <div
-            className={`rounded-2xl border px-3 py-3 ${
+            className={`rounded-2xl border ${
+              collapsed ? "px-1.5 py-2" : "px-3 py-3"
+            } ${
               theme === "dark"
                 ? "border-white/10 bg-white/[0.03]"
                 : "border-slate-200/80 en-bg-surface"
             }`}
           >
-            <div className="flex items-center gap-3">
-              <ExamNexusLogo size={42} idSuffix="sidebar" />
-              <div className="min-w-0">
-                <h1 className="truncate text-xl font-black leading-tight bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-                  ExamNexus
-                </h1>
-                <p
-                  className={`truncate text-[11px] ${
-                    theme === "dark" ? "text-gray-500" : "text-slate-500"
-                  }`}
-                >
-                  Intelligent Assessment
-                </p>
-              </div>
+            <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
+              <ExamNexusLogo size={collapsed ? 36 : 42} idSuffix="sidebar" />
+              {!collapsed && (
+                <div className="min-w-0">
+                  <h1 className="truncate text-xl font-black leading-tight bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
+                    ExamNexus
+                  </h1>
+                  <p
+                    className={`truncate text-[11px] ${
+                      theme === "dark" ? "text-gray-500" : "text-slate-500"
+                    }`}
+                  >
+                    Intelligent Assessment
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
+          <div className={`mt-3 ${collapsed ? "flex justify-center" : ""}`}>
+            <SidebarCollapseToggle
+              collapsed={collapsed}
+              onToggle={toggleCollapsed}
+              theme={theme}
+            />
+          </div>
+
           {/* Navigation */}
-          <nav className="mt-5 flex-1 space-y-5 overflow-y-auto en-scroll-region pr-1">
-            <SidebarSection title="Main" theme={theme}>
+          <nav
+            className={`mt-4 flex-1 space-y-5 overflow-y-auto en-scroll-region ${
+              collapsed ? "px-0" : "pr-1"
+            }`}
+          >
+            <SidebarSection title="Main" theme={theme} collapsed={collapsed}>
               <SidebarNavLink
                 to={isStudent ? "/student/dashboard" : "/faculty/dashboard"}
                 icon={LayoutDashboard}
                 label={isStudent ? "Student Dashboard" : "Faculty Dashboard"}
                 end
+                collapsed={collapsed}
               />
               <SidebarNavLink
                 to={isStudent ? "/student/profile" : "/faculty/profile"}
                 icon={UserCircle}
                 label="Profile"
+                collapsed={collapsed}
               />
             </SidebarSection>
 
             {!isStudent && (
-              <SidebarSection title="Teaching" theme={theme}>
+              <SidebarSection title="Teaching" theme={theme} collapsed={collapsed}>
                 <SidebarNavLink
                   to="/faculty/question-bank"
                   icon={Archive}
                   label="Question Bank"
+                  collapsed={collapsed}
                 />
                 <SidebarNavLink
                   to="/faculty/announcements"
                   icon={Megaphone}
                   label="Announcements"
+                  collapsed={collapsed}
                 />
               </SidebarSection>
             )}
 
             {isStudent && (
-              <SidebarSection title="Academics" theme={theme}>
+              <SidebarSection title="Academics" theme={theme} collapsed={collapsed}>
                 <SidebarNavLink
                   to="/student/subjects"
                   icon={BookOpen}
                   label="My Subjects"
+                  collapsed={collapsed}
                 />
                 <SidebarNavLink
                   to="/student/assessments"
                   icon={ClipboardCheck}
                   label="Assessments"
+                  collapsed={collapsed}
                 />
                 <SidebarNavLink
                   to="/student/results"
                   icon={Trophy}
                   label="Results"
+                  collapsed={collapsed}
                 />
               </SidebarSection>
             )}
@@ -198,44 +226,57 @@ export default function DashboardLayout() {
           {/* Footer */}
           <div className="mt-4 space-y-3">
             <div
-              className={`rounded-2xl border p-3 ${
+              className={`rounded-2xl border ${
+                collapsed ? "p-2" : "p-3"
+              } ${
                 theme === "dark"
                   ? "border-white/10 bg-white/[0.03]"
                   : "border-slate-200/80 en-bg-surface"
               }`}
             >
-              <div className="mb-3 flex items-center gap-3">
+              <div
+                className={`mb-3 flex items-center ${
+                  collapsed ? "justify-center" : "gap-3"
+                }`}
+                title={collapsed ? `${displayName} · ${user.role || "User"}` : undefined}
+              >
                 <ProfileAvatar src={user.avatar_url} alt={displayName} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`truncate text-sm font-semibold capitalize ${
-                      theme === "dark" ? "text-emerald-400" : "text-gray-900"
-                    }`}
-                  >
-                    {displayName}
-                  </p>
-                  <p
-                    className={`flex items-center gap-1 truncate text-xs capitalize ${
-                      theme === "dark" ? "text-gray-500" : "text-gray-600"
-                    }`}
-                  >
-                    <GraduationCap size={12} className="shrink-0 opacity-70" />
-                    {user.role || "User"}
-                  </p>
-                </div>
+                {!collapsed && (
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`truncate text-sm font-semibold capitalize ${
+                        theme === "dark" ? "text-emerald-400" : "text-gray-900"
+                      }`}
+                    >
+                      {displayName}
+                    </p>
+                    <p
+                      className={`flex items-center gap-1 truncate text-xs capitalize ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-600"
+                      }`}
+                    >
+                      <GraduationCap size={12} className="shrink-0 opacity-70" />
+                      {user.role || "User"}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <button
                 type="button"
                 onClick={handleLogout}
-                className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-300 ${
+                title="Logout"
+                aria-label="Logout"
+                className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all duration-300 ${
+                  collapsed ? "h-9 w-full" : "w-full px-4 py-2.5"
+                } ${
                   theme === "dark"
                     ? "border border-red-500/20 bg-red-500/10 text-red-400 hover:border-red-400 hover:bg-red-500/20 hover:text-red-300"
                     : "en-bg-elevated border border-red-200/80 text-red-600 hover:border-red-400 hover:bg-red-50/80"
                 }`}
               >
                 <LogOut size={17} />
-                Logout
+                {!collapsed && "Logout"}
               </button>
             </div>
           </div>
