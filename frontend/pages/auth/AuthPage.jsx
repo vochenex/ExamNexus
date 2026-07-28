@@ -24,6 +24,7 @@ import {
 import { isAccountApproved, isAdminUser, fetchAccountAccess } from "../../utils/adminData";
 import {
   checkPasswordResetRequest,
+  clearPasswordResetTemporaryPassword,
   submitPasswordResetRequest,
   updatePasswordResetRequest,
 } from "../../utils/passwordReset";
@@ -599,6 +600,9 @@ function getAuthInputProps(theme) {
         JSON.stringify(profile)
       );
 
+      // Hide temporary password on forgot-password "check/update" after a successful login.
+      clearPasswordResetTemporaryPassword().catch(() => {});
+
       if (rememberMe) {
         upsertSavedAccount({
           email: form.email,
@@ -829,6 +833,7 @@ function getAuthInputProps(theme) {
     backdrop-blur-2xl
     border
     ${swapPanels ? "en-auth-card--signup" : ""}
+    ${authView === "forgot" ? "en-auth-card--forgot" : ""}
     ${savedOpen && authView === "login" ? "en-auth-card--saved-open" : ""}
     ${
       theme === "dark"
@@ -873,7 +878,7 @@ function getAuthInputProps(theme) {
         {/* Form Panel */}
         <div
           ref={formPanelRef}
-          className={`en-auth-panel-form p-8 md:p-10 ${
+          className={`en-auth-panel-form px-6 py-5 md:px-8 md:py-6 ${
             theme === "dark" ? "bg-[#101827] text-white" : "bg-white text-slate-900"
           }`}
         >
@@ -1031,8 +1036,19 @@ function getAuthInputProps(theme) {
                         theme === "dark" ? "text-emerald-300" : "text-teal-900"
                       }`}
                     >
-                      Password reset complete
+                      {resetStatusResult.temporary_password
+                        ? "Password reset complete"
+                        : "Password reset already used"}
                     </p>
+                    {resetStatusResult.message ? (
+                      <p
+                        className={`mt-2 text-sm ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
+                      >
+                        {resetStatusResult.message}
+                      </p>
+                    ) : null}
                     {resetStatusResult.admin_message ? (
                       <p
                         className={`mt-2 text-sm ${
@@ -1096,13 +1112,15 @@ function getAuthInputProps(theme) {
                         </div>
                       </div>
                     ) : null}
-                    <p
-                      className={`mt-3 text-sm font-medium ${
-                        theme === "dark" ? "text-amber-300" : "text-amber-800"
-                      }`}
-                    >
-                      Warning: this is only a temporary password. Sign in and change it as soon as possible.
-                    </p>
+                    {resetStatusResult.temporary_password ? (
+                      <p
+                        className={`mt-3 text-sm font-medium ${
+                          theme === "dark" ? "text-amber-300" : "text-amber-800"
+                        }`}
+                      >
+                        Warning: this is only a temporary password. Sign in and change it as soon as possible.
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 

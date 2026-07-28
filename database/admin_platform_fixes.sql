@@ -856,6 +856,18 @@ BEGIN
       );
     END IF;
 
+    IF coalesce(trim(v_request.temporary_password), '') = '' THEN
+      RETURN jsonb_build_object(
+        'success', true,
+        'status', 'completed',
+        'request_id', v_request.id,
+        'admin_message', coalesce(v_request.admin_notes, ''),
+        'temporary_password', NULL,
+        'consumed', true,
+        'message', 'Your temporary password was already used to sign in and is no longer shown here. Use your current password, or send a new reset request if you forgot it again.'
+      );
+    END IF;
+
     RETURN jsonb_build_object(
       'success', true,
       'status', 'completed',
@@ -878,5 +890,27 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.check_password_reset_request(text, text) TO anon;
 GRANT EXECUTE ON FUNCTION public.check_password_reset_request(text, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.clear_password_reset_temporary_password()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  UPDATE public.password_reset_requests
+  SET temporary_password = NULL
+  WHERE user_id = auth.uid()
+    AND temporary_password IS NOT NULL;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.clear_password_reset_temporary_password() TO authenticated;
 
 NOTIFY pgrst, 'reload schema';

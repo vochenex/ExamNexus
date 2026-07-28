@@ -33,18 +33,25 @@
   }
 }
 
-/* Tablet + desktop: two halves (logo | fields), vertically centered */
+/* Tablet + desktop: two halves (logo | fields) */
 @media (min-width: 768px) {
   .en-auth-card {
     position: relative;
-    /* Leave clear space under the site header and above the viewport edge */
-    height: min(70vh, 540px);
-    min-height: 400px;
-    max-height: calc(100dvh - 10rem);
+    /* Leave margin under header and above viewport bottom */
+    height: min(74vh, 560px);
+    min-height: 420px;
+    max-height: calc(100dvh - 9.5rem);
     max-width: min(56rem, 92vw);
     margin-inline: auto;
     overflow: hidden;
     isolation: isolate;
+  }
+
+  /* Forgot has more fields — taller card + guaranteed form scroll */
+  .en-auth-card--forgot {
+    height: min(84vh, 680px);
+    min-height: 480px;
+    max-height: calc(100dvh - 8.5rem);
   }
 
   .en-auth-panel-brand,
@@ -56,26 +63,14 @@
     width: 50% !important;
     max-width: 50% !important;
     min-width: 0;
+    min-height: 0;
     display: flex !important;
     flex-direction: column;
     overflow-x: hidden;
-    scrollbar-gutter: stable;
-    scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
     transform: translateX(0);
     transition: transform 0.9s cubic-bezier(0.33, 1, 0.68, 1);
     will-change: transform;
-  }
-
-  .en-auth-panel-brand::-webkit-scrollbar,
-  .en-auth-panel-form::-webkit-scrollbar {
-    width: 6px;
-    height: 0;
-  }
-
-  .en-auth-panel-form::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(16, 185, 129, 0.35);
   }
 
   .en-auth-panel-brand {
@@ -83,41 +78,49 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: none;
+    z-index: 1;
   }
 
   .en-auth-panel-brand::-webkit-scrollbar {
     width: 0;
+    height: 0;
   }
 
   .en-auth-panel-form {
-    justify-content: flex-start;
-    padding-top: 1.75rem;
-    padding-bottom: 1.75rem;
-    overflow-y: auto;
+    justify-content: flex-start !important;
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    z-index: 2;
+    transform: translateX(100%);
+  }
+
+  .en-auth-panel-form::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .en-auth-panel-form::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.4);
   }
 
   .en-auth-card--saved-open .en-auth-panel-brand,
   .en-auth-card--saved-open .en-auth-panel-form {
     overflow-y: hidden !important;
     overscroll-behavior: none;
+    touch-action: none;
   }
 
-  /* Login: logo left, form right */
-  .en-auth-panel-brand {
-    z-index: 1;
-  }
-
-  .en-auth-panel-form {
-    transform: translateX(100%);
-    z-index: 2;
-  }
-
-  /* Sign up — swap sides; slightly taller for the longer form */
+  /* Sign up — swap sides */
   .en-auth-card--signup {
-    height: min(78vh, 620px);
-    min-height: 460px;
-    max-height: calc(100dvh - 10rem);
+    height: min(80vh, 640px);
+    min-height: 480px;
+    max-height: calc(100dvh - 9rem);
   }
 
   .en-auth-card--signup .en-auth-panel-brand {
@@ -126,7 +129,6 @@
 
   .en-auth-card--signup .en-auth-panel-form {
     transform: translateX(0);
-    justify-content: flex-start;
   }
 }
 
@@ -135,9 +137,10 @@
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
-  /* Center short forms; scroll naturally when content is taller than the panel */
-  margin-top: auto;
-  margin-bottom: auto;
+  /* Do NOT use vertical auto margins — they break overflow scrolling in flex panels */
+  margin-top: 0;
+  margin-bottom: 0;
+  flex: 0 0 auto;
 }
 
 .en-auth-body--saved-open {

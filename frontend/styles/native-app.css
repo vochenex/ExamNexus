@@ -196,8 +196,8 @@
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner {
     max-width: 22rem;
-    margin-top: auto;
-    margin-bottom: auto;
+    margin-top: 0;
+    margin-bottom: 0;
   }
 }
 

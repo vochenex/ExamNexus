@@ -92,6 +92,14 @@ export async function checkPasswordResetRequest({ email, schoolId }) {
   return data || {};
 }
 
+/** Clears stored temporary passwords after a successful sign-in. */
+export async function clearPasswordResetTemporaryPassword() {
+  const { error } = await supabase.rpc("clear_password_reset_temporary_password");
+  if (error && !isMissingRpcError(error)) {
+    console.warn("Could not clear temporary password reveal:", error.message);
+  }
+}
+
 export async function fetchAdminPasswordResetRequests(status = "pending") {
   await requireSession();
 
