@@ -3,7 +3,7 @@ import ScrollReveal from "./ScrollReveal";
 
 const TEAM = [
   {
-    name: "Dirk James Lepon",
+    name: "James Palma",
     role: "Fullstack Developer & UI/UX Designer",
     bio: "Built the entire ExamNexus system end to end — from database and APIs to every screen, interaction, and visual design across the platform.",
     photo: "/team/dirk-lepon.png",
