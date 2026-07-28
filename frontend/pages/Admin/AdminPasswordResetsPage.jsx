@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { KeyRound, X, CheckCheck } from "lucide-react";
+import { KeyRound, X, CheckCheck, Eye, EyeOff, Sparkles } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -77,6 +77,7 @@ export default function AdminPasswordResets() {
   const [actingId, setActingId] = useState(null);
   const [resetTarget, setResetTarget] = useState(null);
   const [newPassword, setNewPassword] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bulkCompleting, setBulkCompleting] = useState(false);
@@ -140,10 +141,11 @@ export default function AdminPasswordResets() {
         newPassword: newPassword.trim(),
         adminNotes: adminNotes.trim() || null,
       });
-      await success("Password reset completed.");
+      await success("Password reset completed. The user can view the temporary password on the forgot-password page.");
       setResetTarget(null);
       setNewPassword("");
       setAdminNotes("");
+      setShowResetPassword(false);
       await load(true);
     } catch (err) {
       error(err.message || "Failed to reset password.");
@@ -342,6 +344,7 @@ export default function AdminPasswordResets() {
                               setResetTarget(row);
                               setNewPassword("");
                               setAdminNotes("");
+                              setShowResetPassword(false);
                             }}
                             className={iconButton(theme, "primary")}
                             aria-label={`Reset password for ${row.email}`}
@@ -391,31 +394,79 @@ export default function AdminPasswordResets() {
             role="dialog"
             aria-modal="true"
           >
-            <h2 className="text-lg font-bold">Set new password</h2>
+            <h2 className="text-lg font-bold">Set temporary password</h2>
             <p className={`mt-2 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              Create a temporary password for <strong>{resetTarget.email}</strong>. Share it with the user securely.
+              Create a temporary password for <strong>{resetTarget.email}</strong>. The user can also view it on the forgot-password page after verifying their email and school ID.
             </p>
             <div className="mt-4 space-y-3">
-              <input
-                type="password"
-                className={inputClass(theme)}
-                placeholder="New temporary password (min. 6 characters)"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-              <input
-                type="text"
-                className={inputClass(theme)}
-                placeholder="Admin note (optional)"
-                value={adminNotes}
-                onChange={(e) => setAdminNotes(e.target.value)}
-              />
+              <div>
+                <label
+                  className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  Temporary password
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative min-w-0 flex-1">
+                    <input
+                      type={showResetPassword ? "text" : "password"}
+                      className={`${inputClass(theme)} pr-11`}
+                      placeholder="New temporary password (min. 6 characters)"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword((current) => !current)}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${
+                        theme === "dark" ? "text-gray-400 hover:text-emerald-300" : "text-gray-500 hover:text-teal-700"
+                      }`}
+                      aria-label={showResetPassword ? "Hide password" : "Show password"}
+                    >
+                      {showResetPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewPassword(generateTempPassword());
+                      setShowResetPassword(true);
+                    }}
+                    className={iconButton(theme, "secondary")}
+                    title="Generate temporary password"
+                    aria-label="Generate temporary password"
+                  >
+                    <Sparkles size={16} />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label
+                  className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  Message to user (optional)
+                </label>
+                <textarea
+                  className={`${inputClass(theme)} resize-none`}
+                  rows={3}
+                  placeholder="Shown to the user when they check their reset request"
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                />
+              </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setResetTarget(null)}
+                onClick={() => {
+                  if (submitting) return;
+                  setResetTarget(null);
+                  setShowResetPassword(false);
+                }}
                 className={secondaryButtonSm(theme)}
                 disabled={submitting}
               >

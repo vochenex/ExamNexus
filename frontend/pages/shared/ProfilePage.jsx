@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTheme } from "../layouts/ThemeContext";
-import { useAppModal } from "../contexts/AppModalContext";
+import { useTheme } from "../../layouts/ThemeContext";
+import { useAppModal } from "../../contexts/AppModalContext";
 import {
   Pencil,
   Lock,
@@ -20,33 +20,33 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { cardClass, inputClass } from "../utils/themeInputs";
-import Select from "../components/ui/Select";
-import { supabase } from "../supabaseClient";
+import { cardClass, inputClass } from "../../utils/themeInputs";
+import Select from "../../components/ui/Select";
+import { supabase } from "../../supabaseClient";
 import {
   updateUserProfile,
   updateUserAvatar,
   getStudentDashboardStats,
   getFacultyDashboardStats,
-} from "../utils/supabaseData";
-import { isStudentRole, resolveStudentId } from "../utils/authUser";
-import { loadProfileForUser, resolveSchoolId } from "../utils/authProfile";
-import { isFacultyRole, hasCustomProfilePhoto } from "../utils/avatar";
-import { isAdminUser } from "../utils/adminData";
-import { primaryButton, secondaryButton, dangerButton } from "../utils/themeButtons";
-import ProgressButton from "../components/ui/ProgressButton";
+} from "../../utils/supabaseData";
+import { isStudentRole, resolveStudentId } from "../../utils/authUser";
+import { loadProfileForUser, resolveSchoolId } from "../../utils/authProfile";
+import { isFacultyRole, hasCustomProfilePhoto } from "../../utils/avatar";
+import { isAdminUser } from "../../utils/adminData";
+import { primaryButton, secondaryButton, dangerButton } from "../../utils/themeButtons";
+import ProgressButton from "../../components/ui/ProgressButton";
 import {
   DEPARTMENTS,
   getCoursesForDepartment,
   getDepartmentLabel,
   getCourseLabel,
-} from "../utils/academicOptions";
-import { YEAR_LEVELS, normalizeYearLevel, getYearLevelLabel } from "../utils/yearLevels";
-import ProfileAvatar from "../components/ProfileAvatar";
-import AvatarLightbox from "../components/AvatarLightbox";
-import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
-import useMobileNav from "../hooks/useMobileNav";
-import { usePolling } from "../hooks/useRealtimeFetch";
+} from "../../utils/academicOptions";
+import { YEAR_LEVELS, normalizeYearLevel, getYearLevelLabel } from "../../utils/yearLevels";
+import ProfileAvatar from "../../components/ProfileAvatar";
+import AvatarLightbox from "../../components/AvatarLightbox";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import useMobileNav from "../../hooks/useMobileNav";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 
 function inputStyle(theme) {
   return inputClass(theme);
@@ -342,7 +342,7 @@ export default function Profile() {
     });
     if (!confirmed) return;
 
-    const { clearLocalSessionAndLogout } = await import("../utils/sessionLogout");
+    const { clearLocalSessionAndLogout } = await import("../../utils/sessionLogout");
     await clearLocalSessionAndLogout({
       email: profile?.email || user?.email,
       userId: profile?.id || user?.id,

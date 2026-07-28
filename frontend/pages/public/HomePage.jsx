@@ -12,24 +12,24 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { useTheme } from "../layouts/ThemeContext";
-import HomeSiteHeader from "../components/home/HomeSiteHeader";
-import HomeSiteFooter from "../components/home/HomeSiteFooter";
-import HomeDecorativeBanner from "../components/home/HomeDecorativeBanner";
-import HomeTeamSection from "../components/home/HomeTeamSection";
-import ScrollReveal from "../components/home/ScrollReveal";
-import { ProgressLink } from "../components/ProgressLink";
+import { useTheme } from "../../layouts/ThemeContext";
+import HomeSiteHeader from "../../components/home/HomeSiteHeader";
+import HomeSiteFooter from "../../components/home/HomeSiteFooter";
+import HomeDecorativeBanner from "../../components/home/HomeDecorativeBanner";
+import HomeTeamSection from "../../components/home/HomeTeamSection";
+import ScrollReveal from "../../components/home/ScrollReveal";
+import { ProgressLink } from "../../components/ProgressLink";
 import {
   AdminIllustration,
   FacultyIllustration,
   HeroIllustration,
   StudentIllustration,
-} from "../components/home/HomeIllustrations";
-import { getCachedExamNexusUser } from "../utils/authUser";
-import { DEFAULT_SITE_META } from "../utils/pageMeta";
-import usePageMeta from "../hooks/usePageMeta";
-import { primaryButton, secondaryButton } from "../utils/themeButtons";
-import "../styles/home.css";
+} from "../../components/home/HomeIllustrations";
+import { getCachedExamNexusUser } from "../../utils/authUser";
+import { DEFAULT_SITE_META } from "../../utils/pageMeta";
+import usePageMeta from "../../hooks/usePageMeta";
+import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import "../../styles/home.css";
 
 const ROLES = [
   {

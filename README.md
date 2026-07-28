@@ -28,10 +28,11 @@ New student and faculty accounts use school email signup (`lastname.firstname@cr
 
 ```
 ExamNexus/
-├── src/                 # React frontend (pages, components, guards, utils)
-├── backend/             # Express API (password reset, analytics, enrollment helpers)
-├── database/            # Supabase SQL migrations and one-off fixes (run in SQL Editor)
+├── frontend/            # React UI (pages, layouts, components, styles)
+├── backend/             # Express API (routes, AI, password reset)
+├── database/            # Supabase SQL (run in SQL Editor)
 ├── public/              # Static assets
+├── CODEBASE_MAP.md      # Ordered debug map of folders + page files
 ├── .env.example         # Frontend environment template
 └── backend/.env.example # Backend environment template
 ```

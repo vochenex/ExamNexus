@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Eye,
@@ -10,9 +10,9 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { useTheme } from "../layouts/ThemeContext";
-import { primaryButtonFull } from "../utils/themeButtons";
-import { supabase } from "../supabaseClient";
+import { useTheme } from "../../layouts/ThemeContext";
+import { primaryButtonFull } from "../../utils/themeButtons";
+import { supabase } from "../../supabaseClient";
 import {
   buildSignupMetadata,
   buildUserProfileRow,
@@ -20,46 +20,51 @@ import {
   navigateForRole,
   saveSignupProfile,
   saveSignupSchoolIdCache,
-} from "../utils/authProfile";
-import { isAccountApproved, isAdminUser, fetchAccountAccess } from "../utils/adminData";
-import { submitPasswordResetRequest } from "../utils/passwordReset";
+} from "../../utils/authProfile";
+import { isAccountApproved, isAdminUser, fetchAccountAccess } from "../../utils/adminData";
+import {
+  checkPasswordResetRequest,
+  submitPasswordResetRequest,
+  updatePasswordResetRequest,
+} from "../../utils/passwordReset";
 import {
   buildCrmcEmail,
   authEmailError,
   CRMCC_EMAIL_PLACEHOLDER,
-} from "../utils/schoolEmail";
-import { useNavigationProgress } from "../contexts/NavigationProgressContext";
-import { checkSignupCredentials } from "../utils/authSignup";
-import { formatSupabaseError } from "../utils/supabaseErrors";
+} from "../../utils/schoolEmail";
+import { useNavigationProgress } from "../../contexts/NavigationProgressContext";
+import { checkSignupCredentials } from "../../utils/authSignup";
+import { formatSupabaseError } from "../../utils/supabaseErrors";
 import {
   normalizeSchoolId,
   validateSchoolIdAnyRole,
   validateSchoolIdForRole,
-} from "../utils/schoolIdRules";
+} from "../../utils/schoolIdRules";
 import {
   buildPendingAuthNotice,
   clearAuthNotice,
   peekAuthNotice,
   stashAuthNotice,
-} from "../utils/authNotice";
-import SignupFormFields from "./auth/SignupFormFields";
-import PendingApprovalModal from "./auth/PendingApprovalModal";
-import ExamNexusBrand from "./ExamNexusBrand";
-import HomeSiteHeader from "./home/HomeSiteHeader";
-import HomeBottomBar from "./home/HomeBottomBar";
-import NativeAuthHeader from "./NativeAuthHeader";
-import LogoSplashScreen from "./LogoSplashScreen";
-import ProgressButton from "./ui/ProgressButton";
-import { useAppModal } from "../contexts/AppModalContext";
-import useMobileNav from "../hooks/useMobileNav";
-import { isNativeApp } from "../utils/platform";
+} from "../../utils/authNotice";
+import SignupFormFields from "../../components/auth/SignupFormFields";
+import PendingApprovalModal from "../../components/auth/PendingApprovalModal";
+import ExamNexusBrand from "../../components/ExamNexusBrand";
+import HomeSiteHeader from "../../components/home/HomeSiteHeader";
+import HomeBottomBar from "../../components/home/HomeBottomBar";
+import NativeAuthHeader from "../../components/NativeAuthHeader";
+import LogoSplashScreen from "../../components/LogoSplashScreen";
+import ProgressButton from "../../components/ui/ProgressButton";
+import { useAppModal } from "../../contexts/AppModalContext";
+import useMobileNav from "../../hooks/useMobileNav";
+import { isNativeApp } from "../../utils/platform";
 import {
+  getRememberedPassword,
   getSavedAccounts,
   removeSavedAccount,
   setRememberedPassword,
   upsertSavedAccount,
-} from "../utils/savedAccounts";
-import "../styles/home.css";
+} from "../../utils/savedAccounts";
+import "../../styles/home.css";
 
 export default function ExamNexusAuth() {
   const navigate = useNavigate();
@@ -90,6 +95,9 @@ export default function ExamNexusAuth() {
   const [savedOpen, setSavedOpen] = useState(false);
   const [savedScrollUp, setSavedScrollUp] = useState(false);
   const [savedScrollDown, setSavedScrollDown] = useState(false);
+  const [forgotMode, setForgotMode] = useState("send");
+  const [resetStatusResult, setResetStatusResult] = useState(null);
+  const [showTempPassword, setShowTempPassword] = useState(false);
 
   const [form, setForm] = useState({
   firstName: "",
@@ -431,11 +439,43 @@ function getAuthInputProps(theme) {
       setLoading(true);
       setServerError("");
       setSuccessMessage("");
+      setResetStatusResult(null);
+      setShowTempPassword(false);
+
+      const email = form.email.trim();
+      const schoolId = form.schoolId.trim();
+      const message = form.resetMessage.trim();
+
+      if (forgotMode === "update") {
+        // Update pending message when provided, then always check status for reveal.
+        if (message) {
+          const updateResult = await updatePasswordResetRequest({
+            email,
+            schoolId,
+            message,
+          });
+          if (updateResult?.success === false && updateResult?.status === "none") {
+            setServerError(
+              updateResult.message ||
+                "No pending request found. Switch to “Send new request” instead."
+            );
+            return;
+          }
+        }
+
+        const result = await checkPasswordResetRequest({ email, schoolId });
+        setResetStatusResult(result || null);
+        setSuccessMessage(result?.message || "Request status checked.");
+        if (result?.status === "completed" && result?.temporary_password) {
+          setShowTempPassword(false);
+        }
+        return;
+      }
 
       const result = await submitPasswordResetRequest({
-        email: form.email.trim(),
-        schoolId: form.schoolId.trim(),
-        message: form.resetMessage.trim(),
+        email,
+        schoolId,
+        message,
       });
 
       setSuccessMessage(
@@ -466,6 +506,9 @@ function getAuthInputProps(theme) {
     setErrors({});
     setServerError("");
     setSuccessMessage("");
+    setForgotMode("send");
+    setResetStatusResult(null);
+    setShowTempPassword(false);
   };
 
   const switchToSignup = () => {
@@ -475,6 +518,8 @@ function getAuthInputProps(theme) {
     setErrors({});
     setServerError("");
     setSuccessMessage("");
+    setForgotMode("send");
+    setResetStatusResult(null);
   };
 
   const switchToForgot = () => {
@@ -484,6 +529,9 @@ function getAuthInputProps(theme) {
     setErrors({});
     setServerError("");
     setSuccessMessage("");
+    setForgotMode("send");
+    setResetStatusResult(null);
+    setShowTempPassword(false);
   };
 
   const handleSubmit = async (e) => {
@@ -562,12 +610,20 @@ function getAuthInputProps(theme) {
         });
         setRememberedPassword(form.email, form.password, true);
       } else {
+        const { removed } = removeSavedAccount(form.email);
         setRememberedPassword(form.email, form.password, false);
+        if (removed?.user_id) {
+          import("../../utils/pushNotifications")
+            .then(({ removePushBindingForSavedAccount }) =>
+              removePushBindingForSavedAccount(removed.user_id)
+            )
+            .catch(() => {});
+        }
       }
       setSavedAccounts(getSavedAccounts());
 
       // Bind this device's push token to the signed-in account (keeps other saved accounts too).
-      import("../utils/pushNotifications")
+      import("../../utils/pushNotifications")
         .then(({ syncPushTokenForCurrentUser }) => syncPushTokenForCurrentUser())
         .catch(() => {});
 
@@ -837,7 +893,9 @@ function getAuthInputProps(theme) {
     }`}
   >
     {authView === "forgot"
-      ? "Forgot password?"
+      ? forgotMode === "update"
+        ? "Update or check your reset request"
+        : "Forgot password?"
       : isLogin
         ? "Welcome back"
         : "Create your account"}
@@ -848,7 +906,9 @@ function getAuthInputProps(theme) {
     }`}
   >
     {authView === "forgot"
-      ? "Submit a request and an administrator will reset your password."
+      ? forgotMode === "update"
+        ? "Verify your email and school ID to update a pending request or view your temporary password after an admin reset."
+        : "Submit a request and an administrator will reset your password."
       : isLogin
         ? "Sign in to continue to ExamNexus."
         : "Join ExamNexus as a student or faculty member."}
@@ -857,6 +917,42 @@ function getAuthInputProps(theme) {
           <form onSubmit={handleSubmit}>
             {authView === "forgot" ? (
               <div className="space-y-4">
+                <div
+                  className={`grid grid-cols-2 gap-2 rounded-xl border p-1 ${
+                    theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200 bg-emerald-50/40"
+                  }`}
+                >
+                  {[
+                    { id: "send", label: "Send request" },
+                    { id: "update", label: "Update request" },
+                  ].map((option) => {
+                    const active = forgotMode === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => {
+                          setForgotMode(option.id);
+                          setSuccessMessage("");
+                          setServerError("");
+                          setResetStatusResult(null);
+                          setShowTempPassword(false);
+                        }}
+                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                          active
+                            ? theme === "dark"
+                              ? "bg-emerald-500/20 text-emerald-300"
+                              : "bg-white text-teal-800 shadow-sm"
+                            : theme === "dark"
+                              ? "text-gray-400 hover:text-emerald-300"
+                              : "text-gray-600 hover:text-teal-800"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div>
                   <label
                     className={`mb-1.5 block text-sm font-medium ${
@@ -904,18 +1000,129 @@ function getAuthInputProps(theme) {
                       theme === "dark" ? "text-gray-300" : "text-gray-700"
                     }`}
                   >
-                    Message (optional)
+                    {forgotMode === "update"
+                      ? "Updated message (optional)"
+                      : "Message (optional)"}
                   </label>
                   <textarea
                     name="resetMessage"
                     value={form.resetMessage}
                     onChange={handleChange}
                     rows={3}
-                    placeholder="Any details that help the admin verify your request"
+                    placeholder={
+                      forgotMode === "update"
+                        ? "Leave a new note for the admin, or leave blank to only check status"
+                        : "Any details that help the admin verify your request"
+                    }
                     {...authInputProps}
                     className={`${authInputProps.className} resize-none`}
                   />
                 </div>
+
+                {resetStatusResult?.status === "completed" ? (
+                  <div
+                    className={`rounded-xl border p-3 ${
+                      theme === "dark"
+                        ? "border-emerald-500/30 bg-emerald-500/10"
+                        : "border-teal-200 bg-teal-50"
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${
+                        theme === "dark" ? "text-emerald-300" : "text-teal-900"
+                      }`}
+                    >
+                      Password reset complete
+                    </p>
+                    {resetStatusResult.admin_message ? (
+                      <p
+                        className={`mt-2 text-sm ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
+                      >
+                        <span className="font-medium">Admin message:</span>{" "}
+                        {resetStatusResult.admin_message}
+                      </p>
+                    ) : null}
+                    {resetStatusResult.temporary_password ? (
+                      <div className="mt-3">
+                        <p
+                          className={`mb-1 text-xs font-semibold uppercase tracking-wide ${
+                            theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          Temporary password
+                        </p>
+                        <div className="relative">
+                          <input
+                            type={showTempPassword ? "text" : "password"}
+                            readOnly
+                            value={resetStatusResult.temporary_password}
+                            className={`${authInputProps.className} pr-20 font-mono`}
+                          />
+                          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowTempPassword((current) => !current)}
+                              className={
+                                theme === "dark"
+                                  ? "rounded p-1 text-gray-400 hover:text-emerald-300"
+                                  : "rounded p-1 text-gray-500 hover:text-teal-700"
+                              }
+                              aria-label={showTempPassword ? "Hide password" : "Show password"}
+                            >
+                              {showTempPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(
+                                    resetStatusResult.temporary_password
+                                  );
+                                } catch {
+                                  // ignore clipboard failures on restricted webviews
+                                }
+                              }}
+                              className={
+                                theme === "dark"
+                                  ? "rounded p-1 text-gray-400 hover:text-emerald-300"
+                                  : "rounded p-1 text-gray-500 hover:text-teal-700"
+                              }
+                              aria-label="Copy temporary password"
+                            >
+                              <Copy size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                    <p
+                      className={`mt-3 text-sm font-medium ${
+                        theme === "dark" ? "text-amber-300" : "text-amber-800"
+                      }`}
+                    >
+                      Warning: this is only a temporary password. Sign in and change it as soon as possible.
+                    </p>
+                  </div>
+                ) : null}
+
+                {resetStatusResult?.status === "pending" ||
+                resetStatusResult?.status === "rejected" ||
+                resetStatusResult?.status === "none" ? (
+                  <div
+                    className={`rounded-xl border px-3 py-2 text-sm ${
+                      theme === "dark"
+                        ? "border-white/10 bg-white/[0.03] text-gray-300"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {resetStatusResult.message}
+                    {resetStatusResult.status === "rejected" && resetStatusResult.admin_message
+                      ? ` Admin note: ${resetStatusResult.admin_message}`
+                      : null}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <>
@@ -996,12 +1203,14 @@ function getAuthInputProps(theme) {
                                   type="button"
                                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                   onClick={() => {
+                                    const rememberedPassword = getRememberedPassword(account.email);
                                     setForm((current) => ({
                                       ...current,
                                       email: account.email,
-                                      password: "",
+                                      password: rememberedPassword || "",
                                     }));
-                                    setRememberMe(false);
+                                    setRememberMe(Boolean(rememberedPassword));
+                                    setShowPassword(false);
                                     setEmailManuallyEdited(true);
                                     setErrors({});
                                     setServerError("");
@@ -1032,7 +1241,7 @@ function getAuthInputProps(theme) {
                                     setSavedAccounts(accounts);
                                     setRememberedPassword(account.email, "", false);
                                     if (removed?.user_id) {
-                                      import("../utils/pushNotifications")
+                                      import("../../utils/pushNotifications")
                                         .then(({ removePushBindingForSavedAccount }) =>
                                           removePushBindingForSavedAccount(removed.user_id)
                                         )
@@ -1169,8 +1378,17 @@ function getAuthInputProps(theme) {
                           onChange={(e) => {
                             const checked = e.target.checked;
                             setRememberMe(checked);
-                            if (!checked) {
+                            if (!checked && form.email) {
+                              const { accounts, removed } = removeSavedAccount(form.email);
+                              setSavedAccounts(accounts);
                               setRememberedPassword(form.email, "", false);
+                              if (removed?.user_id) {
+                                import("../../utils/pushNotifications")
+                                  .then(({ removePushBindingForSavedAccount }) =>
+                                    removePushBindingForSavedAccount(removed.user_id)
+                                  )
+                                  .catch(() => {});
+                              }
                             }
                           }}
                           className="h-3.5 w-3.5 shrink-0 rounded border-emerald-400 text-emerald-500 focus:ring-emerald-500"
@@ -1246,7 +1464,9 @@ function getAuthInputProps(theme) {
   className={`${primaryButtonFull(theme)} mt-6`}
 >
   {authView === "forgot"
-    ? "Send reset request"
+    ? forgotMode === "update"
+      ? "Check / update request"
+      : "Send reset request"
     : isLogin
       ? "Login"
       : "Sign Up"}

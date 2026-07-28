@@ -119,14 +119,14 @@ Website/PWA uses the **same product features** (announcements, lock sections, re
 | File | Purpose |
 |------|---------|
 | `capacitor.config.json` | Native id/name + push plugin options |
-| `src/utils/platform.js` | `isNativeApp()`, `canTakeAssessmentOnThisDevice()` |
-| `src/utils/nativeApp.js` | Status bar, back button, push init |
-| `src/utils/pushNotifications.js` | Capacitor PushNotifications + token upsert |
+| `frontend/utils/platform.js` | `isNativeApp()`, `canTakeAssessmentOnThisDevice()` |
+| `frontend/utils/nativeApp.js` | Status bar, back button, push init |
+| `frontend/utils/pushNotifications.js` | Capacitor PushNotifications + token upsert |
 | `database/push_notification_devices.sql` | `push_devices` table + RPCs |
 | `backend/routes/pushRoute.js` | `/push/announce`, `/push/notify-users` |
 | `backend/lib/pushSender.js` | FCM send helpers |
-| `src/components/mobile/MobileTabBar.jsx` | Bottom tab bar |
-| `src/hooks/useMobileNav.js` | When bottom nav replaces the sidebar |
+| `frontend/components/mobile/MobileTabBar.jsx` | Bottom tab bar |
+| `frontend/hooks/useMobileNav.js` | When bottom nav replaces the sidebar |
 
 ### How assessment blocking works
 
@@ -150,9 +150,9 @@ How users install:
 | `public/manifest.webmanifest` | App name, icons, standalone display |
 | `public/sw.js` | Service worker |
 | `public/icons/*` | App icons |
-| `src/utils/pwa.js` | Registers the service worker (prod web only) |
-| `src/hooks/useInstallPrompt.js` | Shared install state |
-| `src/components/pwa/InstallIconButton.jsx` | Header install icon |
+| `frontend/utils/pwa.js` | Registers the service worker (prod web only) |
+| `frontend/hooks/useInstallPrompt.js` | Shared install state |
+| `frontend/components/pwa/InstallIconButton.jsx` | Header install icon |
 
 Notes:
 - The service worker never caches Supabase/API calls.

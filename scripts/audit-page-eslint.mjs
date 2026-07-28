@@ -2,12 +2,12 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 const targets = [
-  "src/pages",
-  "src/components/ExamNexusAuth.jsx",
-  "src/layouts/DashboardLayout.jsx",
-  "src/layouts/AdminLayout.jsx",
-  "src/guards/ProtectedRoute.jsx",
-  "src/components/AdminRouteGuard.jsx",
+  "frontend/pages",
+  "frontend/pages/auth/AuthPage.jsx",
+  "frontend/layouts/DashboardLayout.jsx",
+  "frontend/layouts/AdminLayout.jsx",
+  "frontend/guards/ProtectedRoute.jsx",
+  "frontend/components/AdminRouteGuard.jsx",
 ];
 
 const eslintCmd = process.platform === "win32" ? "npx.cmd" : "npx";

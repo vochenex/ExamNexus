@@ -7,13 +7,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.join(__dirname, "..", "src");
+const root = path.join(__dirname, "..", "frontend");
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name === "_unused") continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full, out);
-    else out.push(full);
+    else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) out.push(full);
   }
   return out;
 }
@@ -108,4 +109,4 @@ if (issues.length) {
   process.exit(1);
 }
 
-console.log("OK: no case-sensitive import mismatches in src/");
+console.log("OK: no case-sensitive import mismatches in frontend/");

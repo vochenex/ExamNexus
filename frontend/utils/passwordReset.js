@@ -36,6 +36,12 @@ async function fetchPasswordResetRequestsDirect(status) {
   return sortPasswordResetRows(data);
 }
 
+function missingPasswordResetSetupError() {
+  return new Error(
+    "Password reset is not set up yet. Run database/password_reset_user_reveal.sql (or database/password_reset_requests.sql) in Supabase SQL Editor, then reload the API schema."
+  );
+}
+
 export async function submitPasswordResetRequest({ email, schoolId, message }) {
   const { data, error } = await supabase.rpc("submit_password_reset_request", {
     p_email: email,
@@ -45,9 +51,40 @@ export async function submitPasswordResetRequest({ email, schoolId, message }) {
 
   if (error) {
     if (isMissingRpcError(error)) {
-      throw new Error(
-        "Password reset is not set up yet. Run database/admin_platform_fixes.sql in Supabase SQL Editor, then reload the API schema."
-      );
+      throw missingPasswordResetSetupError();
+    }
+    throw error;
+  }
+
+  return data || {};
+}
+
+export async function updatePasswordResetRequest({ email, schoolId, message }) {
+  const { data, error } = await supabase.rpc("update_password_reset_request", {
+    p_email: email,
+    p_school_id: schoolId,
+    p_message: message || null,
+  });
+
+  if (error) {
+    if (isMissingRpcError(error)) {
+      throw missingPasswordResetSetupError();
+    }
+    throw error;
+  }
+
+  return data || {};
+}
+
+export async function checkPasswordResetRequest({ email, schoolId }) {
+  const { data, error } = await supabase.rpc("check_password_reset_request", {
+    p_email: email,
+    p_school_id: schoolId,
+  });
+
+  if (error) {
+    if (isMissingRpcError(error)) {
+      throw missingPasswordResetSetupError();
     }
     throw error;
   }
@@ -73,7 +110,8 @@ export async function fetchAdminPasswordResetRequests(status = "pending") {
     } catch (directError) {
       console.error("Password reset RPC and direct query failed:", error, directError);
       throw new Error(
-        "Password reset functions are not available. Re-run database/admin_platform_fixes.sql, then in Supabase go to Project Settings → API → Reload schema."
+        "Password reset functions are not available. Re-run database/admin_platform_fixes.sql, then in Supabase go to Project Settings → API → Reload schema.",
+        { cause: directError }
       );
     }
   }

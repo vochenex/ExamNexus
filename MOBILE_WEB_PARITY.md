@@ -9,7 +9,7 @@ As of this update, the same compact shell also runs on the **website** when:
 - viewport width ≤ 1023px, **or**
 - the device is detected as phone / tablet / iPad (including large iPad landscape)
 
-via `html.en-mobile-shell` (`src/utils/mobileShell.js`).
+via `html.en-mobile-shell` (`frontend/utils/mobileShell.js`).
 
 ---
 

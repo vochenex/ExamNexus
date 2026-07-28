@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Megaphone } from "lucide-react";
-import BackButton from "../components/BackButton";
-import AnnouncementCard from "../components/AnnouncementCard";
-import PageHeader from "../components/ui/PageHeader";
-import AlertBanner from "../components/ui/AlertBanner";
-import { useTheme } from "../layouts/ThemeContext";
-import { pageShellClass, panelClass } from "../utils/themeInputs";
-import { PageLoadingSkeleton } from "../components/ui/PageLoadingSkeleton";
-import { usePolling } from "../hooks/useRealtimeFetch";
+import BackButton from "../../components/BackButton";
+import AnnouncementCard from "../../components/AnnouncementCard";
+import PageHeader from "../../components/ui/PageHeader";
+import AlertBanner from "../../components/ui/AlertBanner";
+import { useTheme } from "../../layouts/ThemeContext";
+import { pageShellClass, panelClass } from "../../utils/themeInputs";
+import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { usePolling } from "../../hooks/useRealtimeFetch";
 import {
   fetchPlatformAnnouncements,
   fetchAdminAnnouncementComments,
@@ -16,7 +16,7 @@ import {
   toggleAdminAnnouncementHeart,
   updateAdminAnnouncementComment,
   deleteAdminAnnouncementComment,
-} from "../utils/supabaseData";
+} from "../../utils/supabaseData";
 
 /**
  * Shared student/faculty view for admin platform announcements.

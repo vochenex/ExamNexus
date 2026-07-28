@@ -2,6 +2,7 @@ import App from "../App";
 import UpdatePrompt from "./pwa/UpdatePrompt";
 import NativeBackBridge from "./NativeBackBridge";
 import NavigationProgressOverlay from "./NavigationProgressOverlay";
+import DevRouteFileIndicator from "./DevRouteFileIndicator";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { syncPushTokenForCurrentUser } from "../utils/pushNotifications";
@@ -66,6 +67,7 @@ export default function AppBootstrap() {
       <NativeEntryRedirect />
       <PushNavigationBridge />
       <NativeBackBridge />
+      <DevRouteFileIndicator />
     </>
   );
 }

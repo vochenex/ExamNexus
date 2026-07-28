@@ -116,6 +116,7 @@ router.post("/complete", requireAdmin, async (req, res) => {
       .update({
         status: "completed",
         admin_notes: adminNotes || null,
+        temporary_password: password,
         resolved_by: req.adminUserId,
         resolved_at: new Date().toISOString(),
       })
@@ -141,6 +142,18 @@ router.post("/complete", requireAdmin, async (req, res) => {
           error:
             "Password was updated but the request could not be marked completed. Re-run database/password_reset_requests.sql in Supabase, then try again.",
         });
+      }
+
+      // Best-effort: store temp password for user reveal even when RPC path was used.
+      const { error: tempStoreError } = await admin
+        .from("password_reset_requests")
+        .update({ temporary_password: password })
+        .eq("id", requestId);
+      if (tempStoreError) {
+        console.warn(
+          "Password reset completed but temporary_password could not be stored:",
+          tempStoreError.message
+        );
       }
     }
 
