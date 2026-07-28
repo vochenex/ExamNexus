@@ -74,6 +74,7 @@ export default function CreateAssessment() {
   const [aiProgress, setAiProgress] = useState(null);
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
   const applyAiExamDetailsRef = useRef(false);
+  const aiReplaceSnapshotRef = useRef(null);
 
   const {
     questionSections,
@@ -190,6 +191,16 @@ export default function CreateAssessment() {
           "The questions already on this page will be replaced by the AI-generated set. Assessment title and description will refresh from the new AI result. You can still edit everything before publishing.",
       });
       if (!shouldReplace) return false;
+
+      // Keep a snapshot so a failed generation can restore the previous set.
+      aiReplaceSnapshotRef.current = {
+        questions: questions.map((question) => ({ ...question })),
+        examType: getExamTypeForSave() || exam.exam_type || "multiple_choice",
+        title: exam.title,
+        description: exam.description,
+      };
+    } else {
+      aiReplaceSnapshotRef.current = null;
     }
 
     applyAiExamDetailsRef.current = true;
@@ -236,6 +247,19 @@ export default function CreateAssessment() {
     }
   };
 
+  const restoreAiReplaceSnapshot = () => {
+    const snapshot = aiReplaceSnapshotRef.current;
+    if (!snapshot) return;
+
+    initializeFromLoadedQuestions(snapshot.questions, snapshot.examType);
+    setExam((prev) => ({
+      ...prev,
+      title: snapshot.title,
+      description: snapshot.description,
+    }));
+    aiReplaceSnapshotRef.current = null;
+  };
+
   const handleAiGenerationComplete = (payload) => {
     const mappedQuestions = mapAiPayloadToBuilderQuestions(payload);
 
@@ -244,9 +268,12 @@ export default function CreateAssessment() {
     if (!mappedQuestions.length) {
       setAiProgress(null);
       applyAiExamDetailsRef.current = false;
+      restoreAiReplaceSnapshot();
       setError("AI did not return usable questions. Adjust your prompt or file and try again.");
       return;
     }
+
+    aiReplaceSnapshotRef.current = null;
 
     setAiProgress((prev) => ({
       ...(prev || {}),
@@ -273,6 +300,7 @@ export default function CreateAssessment() {
       return;
     }
 
+    restoreAiReplaceSnapshot();
     setError(message);
     setAiGenerating(false);
     setAiProgress(null);

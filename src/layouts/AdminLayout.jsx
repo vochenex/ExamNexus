@@ -64,7 +64,7 @@ export default function AdminLayout() {
     >
       {!mobileNav && (
       <aside
-        className={`${motion.slideInLeft} sticky top-0 flex h-screen shrink-0 flex-col border-r backdrop-blur-xl transition-[width,padding] duration-300 ease-out ${
+        className={`${motion.slideInLeft} en-sidebar-shell sticky top-0 flex h-screen shrink-0 flex-col border-r backdrop-blur-xl ${
           collapsed ? "w-[4.75rem] p-2.5" : "w-72 p-4"
         } ${
           theme === "dark"
@@ -73,7 +73,7 @@ export default function AdminLayout() {
         } shadow-[0_0_80px_rgba(16,185,129,0.06)]`}
       >
         <div
-          className={`rounded-2xl border ${
+          className={`en-sidebar-panel rounded-2xl border ${
             collapsed ? "px-1.5 py-2" : "px-3 py-3"
           } ${
             theme === "dark"
@@ -81,26 +81,32 @@ export default function AdminLayout() {
               : "border-slate-200/80 en-bg-surface"
           }`}
         >
-          <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
+          <div
+            className={`flex items-center transition-[gap,justify-content] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              collapsed ? "justify-center gap-0" : "gap-3"
+            }`}
+          >
             <ExamNexusLogo size={collapsed ? 36 : 42} idSuffix="admin-sidebar" />
-            {!collapsed && (
-              <div className="min-w-0">
-                <h1 className="truncate text-xl font-black leading-tight bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-                  ExamNexus
-                </h1>
-                <p
-                  className={`truncate text-[11px] ${
-                    theme === "dark" ? "text-gray-500" : "text-slate-500"
-                  }`}
-                >
-                  Administration
-                </p>
-              </div>
-            )}
+            <div className={`en-sidebar-label min-w-0 ${collapsed ? "is-collapsed" : ""}`}>
+              <h1 className="truncate text-xl font-black leading-tight bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
+                ExamNexus
+              </h1>
+              <p
+                className={`truncate text-[11px] ${
+                  theme === "dark" ? "text-gray-500" : "text-slate-500"
+                }`}
+              >
+                Administration
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className={`mt-3 ${collapsed ? "flex justify-center" : ""}`}>
+        <div
+          className={`mt-3 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            collapsed ? "flex justify-center" : ""
+          }`}
+        >
           <SidebarCollapseToggle
             collapsed={collapsed}
             onToggle={toggleCollapsed}
@@ -109,7 +115,7 @@ export default function AdminLayout() {
         </div>
 
         <nav
-          className={`mt-4 flex-1 space-y-5 overflow-y-auto en-scroll-region ${
+          className={`mt-4 flex-1 space-y-5 overflow-y-auto en-scroll-region transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
             collapsed ? "px-0" : "pr-1"
           }`}
         >
@@ -142,7 +148,7 @@ export default function AdminLayout() {
 
         <div className="mt-4 space-y-3">
           <div
-            className={`rounded-2xl border ${
+            className={`en-sidebar-panel rounded-2xl border ${
               collapsed ? "p-2" : "p-3"
             } ${
               theme === "dark"
@@ -151,31 +157,31 @@ export default function AdminLayout() {
             }`}
           >
             <div
-              className={`mb-3 flex items-center ${
-                collapsed ? "justify-center" : "gap-3"
+              className={`mb-3 flex items-center transition-[gap,justify-content] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                collapsed ? "justify-center gap-0" : "gap-3"
               }`}
               title={collapsed ? `${displayName} · Admin` : undefined}
             >
               <ProfileAvatar src={user.avatar_url} alt={displayName} size="sm" />
-              {!collapsed && (
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`truncate text-sm font-semibold ${
-                      theme === "dark" ? "text-emerald-400" : "text-gray-900"
-                    }`}
-                  >
-                    {displayName}
-                  </p>
-                  <p
-                    className={`flex items-center gap-1 truncate text-xs ${
-                      theme === "dark" ? "text-gray-500" : "text-gray-600"
-                    }`}
-                  >
-                    <GraduationCap size={12} className="shrink-0 opacity-70" />
-                    Admin
-                  </p>
-                </div>
-              )}
+              <div
+                className={`en-sidebar-label min-w-0 flex-1 ${collapsed ? "is-collapsed" : ""}`}
+              >
+                <p
+                  className={`truncate text-sm font-semibold ${
+                    theme === "dark" ? "text-emerald-400" : "text-gray-900"
+                  }`}
+                >
+                  {displayName}
+                </p>
+                <p
+                  className={`flex items-center gap-1 truncate text-xs ${
+                    theme === "dark" ? "text-gray-500" : "text-gray-600"
+                  }`}
+                >
+                  <GraduationCap size={12} className="shrink-0 opacity-70" />
+                  Admin
+                </p>
+              </div>
             </div>
 
             <button
@@ -183,7 +189,7 @@ export default function AdminLayout() {
               onClick={handleLogout}
               title="Logout"
               aria-label="Logout"
-              className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all duration-300 ${
+              className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                 collapsed ? "h-9 w-full" : "w-full px-4 py-2.5"
               } ${
                 theme === "dark"
@@ -191,8 +197,10 @@ export default function AdminLayout() {
                   : "en-bg-elevated border border-red-200/80 text-red-600 hover:border-red-400 hover:bg-red-50/80"
               }`}
             >
-              <LogOut size={17} />
-              {!collapsed && "Logout"}
+              <LogOut size={17} className="shrink-0" />
+              <span className={`en-sidebar-label ${collapsed ? "is-collapsed" : ""}`}>
+                Logout
+              </span>
             </button>
           </div>
         </div>

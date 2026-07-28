@@ -27,6 +27,29 @@ function isQuotaError(error) {
   );
 }
 
+function isGroqJsonFailure(error) {
+  if (!error) return false;
+  const message = String(error?.message || "").toLowerCase();
+  const code = String(error?.code || error?.errorCode || "").toLowerCase();
+  if (
+    code === "json_validate_failed" ||
+    message.includes("failed to generate json") ||
+    message.includes("json_validate") ||
+    message.includes("failed_generation") ||
+    message.includes("could not return valid question json")
+  ) {
+    return true;
+  }
+  if (error?.cause && error.cause !== error) {
+    return isGroqJsonFailure(error.cause);
+  }
+  return false;
+}
+
+function formatGroqJsonFailureError() {
+  return "The AI could not return valid question JSON. Try a shorter or clearer prompt, generate fewer questions, or try again in a moment.";
+}
+
 function parseQuotaRetryMs(error) {
   const message = String(error?.message || "");
   const match = message.match(/retry in ([\d.]+)s/i);
@@ -242,13 +265,24 @@ async function postJsonWithTimeout(urlString, body, timeoutMs, headers = {}) {
 
     if (response.status >= 400) {
       let detail = raw;
+      let errorCode = null;
+      let failedGeneration = null;
       try {
         const parsed = JSON.parse(raw);
+        const nested = parsed?.error;
         detail =
-          parsed?.error?.message ||
-          parsed?.error ||
+          (typeof nested === "object" && nested?.message) ||
+          (typeof nested === "string" ? nested : null) ||
           parsed?.message ||
           raw;
+        errorCode =
+          (typeof nested === "object" && nested?.code) ||
+          parsed?.code ||
+          null;
+        failedGeneration =
+          (typeof nested === "object" && nested?.failed_generation) ||
+          parsed?.failed_generation ||
+          null;
       } catch {
         // keep raw text
       }
@@ -256,6 +290,8 @@ async function postJsonWithTimeout(urlString, body, timeoutMs, headers = {}) {
         typeof detail === "string" ? detail : "AI request failed"
       );
       error.statusCode = response.status;
+      if (errorCode) error.code = errorCode;
+      if (failedGeneration) error.failedGeneration = failedGeneration;
       throw error;
     }
 
@@ -402,7 +438,7 @@ async function requestGeminiChatCompletion(
 
 async function requestGroqChatCompletion(
   config,
-  { messages, temperature, jsonMode, timeoutMs }
+  { messages, temperature, jsonMode, timeoutMs, allowJsonFallback = true }
 ) {
   const effectiveTimeout = timeoutMs || getChatTimeoutMs();
   const body = {
@@ -452,7 +488,25 @@ async function requestGroqChatCompletion(
         throw wrapped;
       }
 
+      // Groq json_object mode often fails validation; retry without forced JSON.
+      if (jsonMode && allowJsonFallback && isGroqJsonFailure(error)) {
+        return requestGroqChatCompletion(config, {
+          messages,
+          temperature: Math.min(Number(temperature) || 0.4, 0.2),
+          jsonMode: false,
+          timeoutMs: effectiveTimeout,
+          allowJsonFallback: false,
+        });
+      }
+
       if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+        if (isGroqJsonFailure(error)) {
+          const wrapped = new Error(formatGroqJsonFailureError());
+          wrapped.statusCode = 502;
+          wrapped.code = "json_validate_failed";
+          wrapped.cause = error;
+          throw wrapped;
+        }
         throw error;
       }
 
@@ -506,12 +560,23 @@ async function requestChatCompletion({
 async function requestPromptChatCompletion(options) {
   const groq = getGroqRuntimeConfig();
   if (groq) {
-    const content = await requestGroqChatCompletion(groq, options);
-    return {
-      content,
-      provider: groq.provider,
-      model: groq.model,
-    };
+    try {
+      const content = await requestGroqChatCompletion(groq, options);
+      return {
+        content,
+        provider: groq.provider,
+        model: groq.model,
+      };
+    } catch (error) {
+      // If Groq still cannot produce usable JSON, fall back to Gemini when available.
+      if (isGroqJsonFailure(error) && getGeminiRuntimeConfig()) {
+        console.warn(
+          "[assessment-ai] Groq JSON generation failed; falling back to Gemini for prompt."
+        );
+        return requestChatCompletion(options);
+      }
+      throw error;
+    }
   }
 
   return requestChatCompletion(options);

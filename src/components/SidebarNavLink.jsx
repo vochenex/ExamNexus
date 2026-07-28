@@ -60,14 +60,19 @@ export default function SidebarNavLink({
       {({ isActive }) => (
         <>
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${iconWrapClass(
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-[colors,transform] duration-300 ${iconWrapClass(
               theme,
               isActive
             )}`}
           >
             <Icon size={18} strokeWidth={2.1} />
           </span>
-          {!collapsed && <span className="truncate">{label}</span>}
+          <span
+            className={`en-sidebar-label truncate ${collapsed ? "is-collapsed" : ""}`}
+            aria-hidden={collapsed}
+          >
+            {label}
+          </span>
         </>
       )}
     </ProgressNavLink>
@@ -77,22 +82,22 @@ export default function SidebarNavLink({
 export function SidebarSection({ title, theme, collapsed = false, children }) {
   return (
     <div className="space-y-1">
-      {title && !collapsed && (
-        <p
-          className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${
-            theme === "dark" ? "text-gray-500" : "text-slate-500"
-          }`}
-        >
-          {title}
-        </p>
-      )}
-      {collapsed && title ? (
-        <div
-          className={`mx-auto mb-2 h-px w-8 ${
-            theme === "dark" ? "bg-white/10" : "bg-slate-200"
-          }`}
-          aria-hidden="true"
-        />
+      {title ? (
+        <>
+          <p
+            className={`en-sidebar-section-title mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${
+              collapsed ? "is-collapsed" : ""
+            } ${theme === "dark" ? "text-gray-500" : "text-slate-500"}`}
+          >
+            {title}
+          </p>
+          <div
+            className={`mx-auto overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              collapsed ? "mb-2 h-px w-8 opacity-100" : "mb-0 h-0 w-0 opacity-0"
+            } ${theme === "dark" ? "bg-white/10" : "bg-slate-200"}`}
+            aria-hidden="true"
+          />
+        </>
       ) : null}
       {children}
     </div>

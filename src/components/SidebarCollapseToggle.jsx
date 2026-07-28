@@ -19,7 +19,7 @@ export default function SidebarCollapseToggle({
       aria-label={label}
       aria-expanded={!collapsed}
       title={label}
-      className={`flex items-center justify-center rounded-xl border transition ${
+      className={`flex items-center justify-center overflow-hidden rounded-xl border transition-[width,height,padding,background-color,border-color,color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
         collapsed ? "h-9 w-9" : "h-9 w-full gap-2 px-3 text-xs font-semibold"
       } ${
         isDark
@@ -28,11 +28,11 @@ export default function SidebarCollapseToggle({
       } ${className}`}
     >
       {collapsed ? (
-        <PanelLeftOpen size={18} strokeWidth={2.1} />
+        <PanelLeftOpen size={18} strokeWidth={2.1} className="shrink-0" />
       ) : (
         <>
-          <PanelLeftClose size={16} strokeWidth={2.1} />
-          <span>Collapse</span>
+          <PanelLeftClose size={16} strokeWidth={2.1} className="shrink-0" />
+          <span className="en-sidebar-label">Collapse</span>
         </>
       )}
     </button>

@@ -285,7 +285,59 @@ html.light .en-interactive-card:hover {
     background-color 0.2s ease,
     border-color 0.2s ease,
     color 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    padding 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    gap 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    justify-content 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Collapsible desktop sidebar */
+.en-sidebar-shell {
+  transition:
+    width 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width;
+}
+
+.en-sidebar-panel {
+  transition: padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.en-sidebar-label {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 14rem;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.en-sidebar-label.is-collapsed {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+}
+
+.en-sidebar-section-title {
+  overflow: hidden;
+  max-height: 1.5rem;
+  opacity: 1;
+  transition:
+    max-height 0.36s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.24s ease,
+    margin 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.en-sidebar-section-title.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  pointer-events: none;
 }
 
 .en-nav-item:hover {
@@ -392,6 +444,14 @@ html.light .en-interactive-card:hover {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .en-sidebar-shell,
+  .en-sidebar-panel,
+  .en-sidebar-label,
+  .en-sidebar-section-title,
+  .en-nav-item {
+    transition: none !important;
   }
 
   .en-interactive-card:hover,
