@@ -33,6 +33,7 @@ import { serializeQuestionForDb } from "../../utils/assessmentQuestions";
 import { getAssessmentCategoryLabel } from "../../utils/assessmentCategories";
 import useQuestionSections from "../../hooks/useQuestionSections";
 import { saveQuestionToBank } from "../../utils/questionBank";
+import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 
 const defaultAssessment = {
   subject_id: "",
@@ -313,6 +314,11 @@ export default function CreateAssessment() {
     creationMode === "manual" || (!aiGenerating && questions.length > 0);
 
   const showAiProgress = aiGenerating || aiProgress?.status === "done";
+  const errorFeedbackRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
+  const aiResultsRef = useScrollIntoViewWhen(
+    aiProgress?.status === "done" && questions.length > 0,
+    { deps: [aiProgress?.status, questions.length] }
+  );
 
   const handlePublish = async () => {
     try {
@@ -437,6 +443,8 @@ export default function CreateAssessment() {
 
       {error && (
         <div
+          ref={errorFeedbackRef}
+          role="status"
           className={`mb-4 rounded-xl border p-3 text-sm ${
             theme === "dark"
               ? "border-red-500/30 bg-red-500/10 text-red-200"
@@ -512,7 +520,7 @@ export default function CreateAssessment() {
                   onClearError={clearAiError}
                 />
                 {showAiProgress && (
-                  <div className="mt-6">
+                  <div ref={aiResultsRef} className="mt-6">
                     <AiGenerationProgress
                       progress={aiProgress}
                       questionCount={questions.length}

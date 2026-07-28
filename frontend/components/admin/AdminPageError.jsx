@@ -1,4 +1,5 @@
 import { AlertCircle } from "lucide-react";
+import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 import { secondaryButtonSm } from "../../utils/themeButtons";
 
 export function formatAdminError(err) {
@@ -31,8 +32,12 @@ export function formatAdminError(err) {
 }
 
 export default function AdminPageError({ theme, message, onRetry }) {
+  const ref = useScrollIntoViewWhen(Boolean(message), { deps: [message] });
+
   return (
     <div
+      ref={ref}
+      role="status"
       className={`mb-5 flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
         theme === "dark"
           ? "border-red-500/30 bg-red-500/10 text-red-100"

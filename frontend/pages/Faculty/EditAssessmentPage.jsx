@@ -25,6 +25,7 @@ import { parseDurationValue, DEFAULT_DURATION_VALUE } from "../../utils/assessme
 import useQuestionSections from "../../hooks/useQuestionSections";
 import { saveQuestionToBank } from "../../utils/questionBank";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 
 const defaultAssessment = {
   subject_id: "",
@@ -59,6 +60,7 @@ export default function EditAssessment() {
   const [subjectSections, setSubjectSections] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
+  const errorFeedbackRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
 
   const {
     questionSections,
@@ -276,6 +278,8 @@ export default function EditAssessment() {
 
       {error && (
         <div
+          ref={errorFeedbackRef}
+          role="status"
           className={`mb-4 rounded-xl border p-3 text-sm ${
             theme === "dark"
               ? "border-red-500/30 bg-red-500/10 text-red-200"

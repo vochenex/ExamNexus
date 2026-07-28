@@ -22,6 +22,7 @@ import ExamNexusBrand from "../../components/ExamNexusBrand";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { API_BASE } from "../../utils/apiBase.js";
+import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 
 export default function StudentSubjects() {
   const { theme } = useTheme();
@@ -33,6 +34,13 @@ export default function StudentSubjects() {
   const [loadError, setLoadError] = useState("");
   const [enrollError, setEnrollError] = useState("");
   const [enrollSuccess, setEnrollSuccess] = useState("");
+  const loadErrorRef = useScrollIntoViewWhen(Boolean(loadError), { deps: [loadError] });
+  const enrollSuccessRef = useScrollIntoViewWhen(Boolean(enrollSuccess), {
+    deps: [enrollSuccess],
+  });
+  const enrollErrorRef = useScrollIntoViewWhen(Boolean(enrollError), {
+    deps: [enrollError],
+  });
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
@@ -326,7 +334,11 @@ export default function StudentSubjects() {
       </div>
 
       {loadError && (
-        <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-500 text-sm">
+        <div
+          ref={loadErrorRef}
+          role="status"
+          className="mb-6 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-500 text-sm"
+        >
           <XCircle size={18} className="shrink-0 mt-0.5" />
           <span>{loadError}</span>
         </div>
@@ -334,6 +346,8 @@ export default function StudentSubjects() {
 
       {enrollSuccess && (
         <div
+          ref={enrollSuccessRef}
+          role="status"
           className={`mb-6 flex items-center gap-3 rounded-xl px-4 py-3 ${
             theme === "dark"
               ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
@@ -560,7 +574,11 @@ export default function StudentSubjects() {
             </div>
 
             {enrollError && (
-              <div className="mb-4 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/30 px-3 py-2 text-red-500 text-sm">
+              <div
+                ref={enrollErrorRef}
+                role="status"
+                className="mb-4 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/30 px-3 py-2 text-red-500 text-sm"
+              >
                 <XCircle size={18} className="shrink-0 mt-0.5" />
                 <span>{enrollError}</span>
               </div>

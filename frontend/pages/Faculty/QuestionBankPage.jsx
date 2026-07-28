@@ -23,6 +23,7 @@ import {
 } from "../../utils/avatar";
 import { formatQuestionCorrectAnswers } from "../../utils/assessmentQuestions";
 import { EXAM_TYPE_LABELS } from "../../utils/assessmentQuestions";
+import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 
 function questionPreview(row) {
   const text = String(row.title || row.question || "").trim();
@@ -39,6 +40,7 @@ export default function QuestionBank() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const errorRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
@@ -136,6 +138,8 @@ export default function QuestionBank() {
 
       {error && (
         <div
+          ref={errorRef}
+          role="status"
           className={`mb-4 rounded-xl border p-3 text-sm ${
             theme === "dark"
               ? "border-red-500/30 bg-red-500/10 text-red-200"

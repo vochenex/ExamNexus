@@ -9,6 +9,7 @@ import {
   validateSchoolIdForRole,
 } from "../utils/schoolIdRules";
 import ModalPortal from "./ui/ModalPortal";
+import { useScrollIntoViewWhen } from "../hooks/useScrollIntoViewWhen";
 
 function inputClass(theme) {
   return `w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-emerald-400 ${
@@ -26,6 +27,7 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const errorRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
 
   useEffect(() => {
     const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
@@ -213,7 +215,11 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
           {getSchoolIdHelpText(user.role)}
         </p>
 
-        {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+        {error && (
+          <p ref={errorRef} role="status" className="mt-3 text-sm text-red-500">
+            {error}
+          </p>
+        )}
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <button

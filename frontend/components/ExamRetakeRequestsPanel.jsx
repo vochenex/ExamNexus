@@ -12,6 +12,7 @@ import {
 import { formatSectionLabel } from "../utils/sections";
 import { useAppModal } from "../contexts/AppModalContext";
 import { usePolling } from "../hooks/useRealtimeFetch";
+import { useScrollIntoViewWhen } from "../hooks/useScrollIntoViewWhen";
 
 const STATUS_STYLES = {
   pending: {
@@ -51,6 +52,7 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
   const [filter, setFilter] = useState("all");
   const [facultyNote, setFacultyNote] = useState("");
   const [processing, setProcessing] = useState(false);
+  const errorRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
 
   const loadRequests = useCallback(async (silent = false) => {
     if (!examId) return;
@@ -214,7 +216,9 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
       </div>
 
       {error && (
-        <p className="mb-4 text-sm text-red-500">{error}</p>
+        <p ref={errorRef} role="status" className="mb-4 text-sm text-red-500">
+          {error}
+        </p>
       )}
 
       {pendingIds.length > 0 && (

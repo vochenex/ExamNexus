@@ -35,6 +35,7 @@ import { isFacultyRole, hasCustomProfilePhoto } from "../../utils/avatar";
 import { isAdminUser } from "../../utils/adminData";
 import { primaryButton, secondaryButton, dangerButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
+import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 import {
   DEPARTMENTS,
   getCoursesForDepartment,
@@ -199,6 +200,13 @@ export default function Profile() {
   });
   const [passwordStatus, setPasswordStatus] = useState("idle");
   const [passwordMessage, setPasswordMessage] = useState("");
+  const profileFeedbackRef = useScrollIntoViewWhen(
+    Boolean(saveSuccess || saveStatus === "error"),
+    { deps: [saveSuccess, saveStatus] }
+  );
+  const passwordFeedbackRef = useScrollIntoViewWhen(Boolean(passwordMessage), {
+    deps: [passwordMessage, passwordStatus],
+  });
   const [profileLoading, setProfileLoading] = useState(true);
 
   const isStudent = isStudentRole(profile.role);
@@ -958,6 +966,8 @@ export default function Profile() {
 
           {saveSuccess && (
             <div
+              ref={profileFeedbackRef}
+              role="status"
               className={`mt-6 rounded-xl border px-4 py-3 text-sm font-medium ${
                 theme === "dark"
                   ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-400"
@@ -974,6 +984,8 @@ export default function Profile() {
           )}
           {saveStatus === "error" && (
             <div
+              ref={profileFeedbackRef}
+              role="status"
               className={`mt-6 rounded-xl border px-4 py-3 text-sm font-medium ${
                 theme === "dark"
                   ? "border-red-500/30 bg-red-500/20 text-red-400"
@@ -1075,6 +1087,8 @@ export default function Profile() {
 
               {passwordMessage && (
                 <p
+                  ref={passwordFeedbackRef}
+                  role="status"
                   className={`mt-3 text-sm ${
                     passwordStatus === "success"
                       ? theme === "dark"

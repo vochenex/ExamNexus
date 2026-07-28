@@ -99,6 +99,20 @@ export default function ExamNexusAuth() {
   const [forgotMode, setForgotMode] = useState("send");
   const [resetStatusResult, setResetStatusResult] = useState(null);
   const [showTempPassword, setShowTempPassword] = useState(false);
+  const forgotResultRef = useRef(null);
+  const feedbackRef = useRef(null);
+
+  useEffect(() => {
+    if (!resetStatusResult && !successMessage && !serverError) return;
+
+    const timer = window.setTimeout(() => {
+      const target =
+        forgotResultRef.current || feedbackRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+
+    return () => window.clearTimeout(timer);
+  }, [resetStatusResult, successMessage, serverError]);
 
   const [form, setForm] = useState({
   firstName: "",
@@ -1025,6 +1039,7 @@ function getAuthInputProps(theme) {
 
                 {resetStatusResult?.status === "completed" ? (
                   <div
+                    ref={forgotResultRef}
                     className={`rounded-xl border p-3 ${
                       theme === "dark"
                         ? "border-emerald-500/30 bg-emerald-500/10"
@@ -1128,6 +1143,7 @@ function getAuthInputProps(theme) {
                 resetStatusResult?.status === "rejected" ||
                 resetStatusResult?.status === "none" ? (
                   <div
+                    ref={forgotResultRef}
                     className={`rounded-xl border px-3 py-2 text-sm ${
                       theme === "dark"
                         ? "border-white/10 bg-white/[0.03] text-gray-300"
@@ -1434,6 +1450,7 @@ function getAuthInputProps(theme) {
 
             {serverError && (
   <div
+    ref={feedbackRef}
     className="
       mb-4
       p-3
@@ -1454,6 +1471,7 @@ function getAuthInputProps(theme) {
 
 {successMessage && (
   <div
+    ref={feedbackRef}
     className="
       mb-4
       p-3
