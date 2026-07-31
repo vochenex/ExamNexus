@@ -4,9 +4,10 @@ import { supabase } from "../supabaseClient";
 import {
   getSchoolIdHelpText,
   getSchoolIdRule,
-  isSchoolIdValidForRole,
+  isLegacyFacultySchoolId,
   normalizeRole,
   normalizeSchoolId,
+  profileNeedsSchoolIdGate,
   validateSchoolIdForRole,
 } from "../utils/schoolIdRules";
 import ModalPortal from "./ui/ModalPortal";
@@ -18,6 +19,21 @@ function inputClass(theme) {
       ? "border-white/10 bg-white/10 text-white placeholder:text-gray-500"
       : "border-emerald-200 bg-white text-gray-900 placeholder:text-gray-400"
   }`;
+}
+
+async function remapFacultySubjects(oldSchoolId, newSchoolId) {
+  const from = normalizeSchoolId(oldSchoolId);
+  const to = normalizeSchoolId(newSchoolId);
+  if (!from || !to || from === to) return;
+
+  const { error } = await supabase
+    .from("subjects")
+    .update({ teacher_school_id: to })
+    .eq("teacher_school_id", from);
+
+  if (error) {
+    console.warn("Could not remap faculty subjects:", error.message);
+  }
 }
 
 export default function RequiredSchoolIdGate({ theme, onResolved }) {
@@ -64,14 +80,16 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
 
       setUser(profile);
 
-      if (isSchoolIdValidForRole(profile.school_id, profile.role)) {
+      // Faculty with a valid 5-digit ID skips this gate entirely.
+      // Only legacy 3-digit (or missing/invalid) faculty IDs are prompted.
+      if (!profileNeedsSchoolIdGate(profile)) {
         setRequired(false);
         setChecking(false);
         onResolved?.(profile);
         return;
       }
 
-      setValue(normalizeSchoolId(profile.school_id));
+      setValue("");
       setRequired(true);
       setChecking(false);
     };
@@ -97,6 +115,16 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
       return;
     }
 
+    const role = normalizeRole(user.role);
+    const oldSchoolId = normalizeSchoolId(user.school_id);
+
+    // Faculty must not "save" the same 5-digit ID through a mistaken prompt.
+    if (role === "faculty" && oldSchoolId === validation.normalized && oldSchoolId.length === 5) {
+      setRequired(false);
+      onResolved?.(user);
+      return;
+    }
+
     try {
       setSaving(true);
       setError("");
@@ -111,6 +139,8 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
       }
 
       let savedProfile = null;
+
+      // Preferred path: RPC updates school_id and remaps subjects.teacher_school_id.
       const { data: rpcData, error: rpcError } = await supabase.rpc(
         "update_own_school_id",
         { p_school_id: validation.normalized }
@@ -118,6 +148,13 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
 
       if (!rpcError && rpcData) {
         savedProfile = rpcData;
+      } else if (role === "faculty" && oldSchoolId && oldSchoolId !== validation.normalized) {
+        // Faculty ID changes must remap subjects or ownership breaks.
+        // Do not silently change school_id without remapping.
+        throw new Error(
+          rpcError?.message ||
+            "Could not update your School ID while keeping your subjects linked. Ask an admin to run the update_own_school_id database fix, then try again."
+        );
       } else {
         const { data, error: updateError } = await supabase
           .from("users")
@@ -152,6 +189,10 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
           savedProfile = signupData;
         } else {
           savedProfile = data;
+        }
+
+        if (role === "faculty" && oldSchoolId && oldSchoolId !== validation.normalized) {
+          await remapFacultySubjects(oldSchoolId, validation.normalized);
         }
       }
 
@@ -206,8 +247,8 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
   const role = normalizeRole(user.role);
   const roleLabel = role || "student";
   const existingId = normalizeSchoolId(user.school_id);
-  const isFacultyUpdate =
-    role === "faculty" && existingId && existingId.length !== rule.max;
+  const isFacultyLegacyUpgrade =
+    role === "faculty" && isLegacyFacultySchoolId(existingId);
 
   return (
     <ModalPortal>
@@ -231,16 +272,18 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
           </div>
 
           <h2 className="text-xl font-bold">
-            {isFacultyUpdate ? "Update your School ID" : "School ID required"}
+            {isFacultyLegacyUpgrade ? "Update your School ID" : "School ID required"}
           </h2>
           <p
             className={`mt-2 text-sm ${
               theme === "dark" ? "text-gray-300" : "text-gray-600"
             }`}
           >
-            {isFacultyUpdate
-              ? "Faculty School IDs must now be exactly 5 digits. Enter your updated ID to continue. Your subjects will stay linked to your account. If you skip this, you will be logged out."
-              : `Existing ${roleLabel} accounts must enter a valid School ID before continuing. If you do not complete this prompt, you will be logged out.`}
+            {isFacultyLegacyUpgrade
+              ? "Your account still has a 3-digit School ID. Enter your full 5-digit faculty ID to continue. Your subjects will stay linked to your account. If you skip this, you will be logged out."
+              : role === "faculty"
+                ? "Faculty School IDs must be exactly 5 digits. Enter your 5-digit ID to continue. Your subjects will stay linked to your account. If you skip this, you will be logged out."
+                : `Existing ${roleLabel} accounts must enter a valid School ID before continuing. If you do not complete this prompt, you will be logged out.`}
           </p>
 
           {existingId ? (
@@ -252,6 +295,7 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
               }`}
             >
               Current ID on file: <span className="font-semibold">{existingId}</span>
+              {isFacultyLegacyUpgrade ? " (must be upgraded to 5 digits)" : ""}
             </p>
           ) : null}
 
@@ -292,7 +336,11 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-[#031d1f] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Save size={16} />
-              {saving ? "Saving..." : isFacultyUpdate ? "Update School ID" : "Save School ID"}
+              {saving
+                ? "Saving..."
+                : isFacultyLegacyUpgrade
+                  ? "Update School ID"
+                  : "Save School ID"}
             </button>
             <button
               type="button"

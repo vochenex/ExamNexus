@@ -6,6 +6,31 @@ export function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
 }
 
+/** Legacy faculty IDs were 3 digits before the campus-wide 5-digit cutover. */
+export function isLegacyFacultySchoolId(value) {
+  return /^\d{3}$/.test(normalizeSchoolId(value));
+}
+
+/**
+ * Whether the School ID gate must block the dashboard.
+ * Faculty with a valid 5-digit ID must never be prompted again.
+ * Faculty still on a 3-digit (or otherwise invalid) ID must upgrade.
+ */
+export function profileNeedsSchoolIdGate(profile) {
+  const role = normalizeRole(profile?.role);
+  const id = normalizeSchoolId(profile?.school_id);
+
+  if (role === "faculty") {
+    return id.length !== 5;
+  }
+
+  if (role === "admin") {
+    return id.length !== 3;
+  }
+
+  return id.length < 9 || id.length > 13;
+}
+
 export function getSchoolIdRule(role) {
   const normalized = normalizeRole(role);
 
@@ -84,6 +109,11 @@ export function validateSchoolIdForRole(value, role) {
 }
 
 export function isSchoolIdValidForRole(value, role) {
+  // Gate / profile checks use digit length only so whitespace in stored
+  // values does not force faculty with a valid 5-digit ID to re-enter.
+  if (!profileNeedsSchoolIdGate({ school_id: value, role })) {
+    return true;
+  }
   return validateSchoolIdForRole(value, role).valid;
 }
 
