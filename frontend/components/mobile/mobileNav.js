@@ -58,16 +58,16 @@ export function getMobileNav(role) {
     };
   }
 
-  // Student — Announcements must be reachable on iPhone PWA (tab bar / More).
+  // Student — Announcements + Profile live under More so the tab bar stays roomy.
   return {
     primary: [
       { to: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard", end: true },
       { to: "/student/subjects", icon: BookOpen, label: "Subjects" },
       { to: "/student/assessments", icon: ClipboardCheck, label: "Assess" },
       { to: "/student/results", icon: Trophy, label: "Results" },
-      { to: "/student/announcements", icon: Megaphone, label: "Announce" },
     ],
     more: [
+      { to: "/student/announcements", icon: Megaphone, label: "Announcements" },
       { to: "/student/profile", icon: UserCircle, label: "Profile" },
     ],
   };
