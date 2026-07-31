@@ -27,6 +27,11 @@ function PushNavigationBridge() {
       if (data?.type === "en:push-navigate" && typeof data.path === "string") {
         if (data.path.startsWith("/")) navigate(data.path);
       }
+      if (data?.type === "en:push-received") {
+        window.dispatchEvent(
+          new CustomEvent("en:push-received", { detail: data.payload || {} })
+        );
+      }
     };
 
     window.addEventListener("en:push-navigate", onPushNavigate);

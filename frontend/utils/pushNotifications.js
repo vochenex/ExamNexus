@@ -6,9 +6,12 @@ import { getSavedAccounts } from "./savedAccounts";
 import { API_BASE } from "./apiBase.js";
 
 const PENDING_REMOVALS_KEY = "examnexus_push_pending_removals";
+/** Must match backend/lib/pushSender.js ALERTS_CHANNEL_ID */
+export const PUSH_ALERTS_CHANNEL_ID = "examnexus_alerts";
 
 let initialized = false;
 let lastToken = null;
+let listenersBound = false;
 
 function readPendingRemovals() {
   try {
@@ -45,6 +48,14 @@ function urlBase64ToUint8Array(base64String) {
   return output;
 }
 
+function notifyPushEnabled() {
+  window.dispatchEvent(new CustomEvent("en:push-enabled"));
+}
+
+function notifyPushReceived(detail = {}) {
+  window.dispatchEvent(new CustomEvent("en:push-received", { detail }));
+}
+
 async function upsertToken(token, platform = getPlatform()) {
   if (!token) return;
   lastToken = token;
@@ -55,7 +66,9 @@ async function upsertToken(token, platform = getPlatform()) {
     });
     if (error && !error.message?.includes("upsert_push_device")) {
       console.warn("Push token upsert failed:", error.message);
+      return;
     }
+    notifyPushEnabled();
   } catch (err) {
     console.warn("Push token upsert skipped:", err?.message || err);
   }
@@ -100,7 +113,19 @@ export function canUseWebPush() {
 }
 
 /**
- * Register Web Push for installed PWA (desktop + iOS Add to Home Screen).
+ * Whether we should actively request notification permission.
+ * Installed shells (APK via Capacitor path, or A2HS / desktop PWA) should prompt.
+ */
+export function shouldRequestPushPermission() {
+  if (isNativeApp()) return true;
+  if (!canUseWebPush()) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  return isStandalonePWA();
+}
+
+/**
+ * Register Web Push for installed PWA (desktop + iOS/Android Add to Home Screen).
  */
 export async function initWebPushNotifications({ requestPermission = true } = {}) {
   if (!canUseWebPush()) return false;
@@ -134,6 +159,7 @@ export async function initWebPushNotifications({ requestPermission = true } = {}
     await upsertToken(token, "web");
     await flushPendingRemovals();
     initialized = true;
+    notifyPushEnabled();
     return true;
   } catch (err) {
     console.warn("Web push init skipped:", err?.message || err);
@@ -141,16 +167,61 @@ export async function initWebPushNotifications({ requestPermission = true } = {}
   }
 }
 
+async function ensureAndroidAlertsChannel(PushNotifications) {
+  if (getPlatform() !== "android") return;
+  if (typeof PushNotifications.createChannel !== "function") return;
+
+  try {
+    await PushNotifications.createChannel({
+      id: PUSH_ALERTS_CHANNEL_ID,
+      name: "ExamNexus Alerts",
+      description: "Announcements, assessments, and account alerts",
+      importance: 5,
+      visibility: 1,
+      sound: "default",
+      vibration: true,
+      lights: true,
+    });
+  } catch (err) {
+    console.warn("Push channel create skipped:", err?.message || err);
+  }
+}
+
+function showForegroundBanner(notification) {
+  const title = notification?.title || "ExamNexus";
+  const body = notification?.body || "";
+  const data = notification?.data || {};
+
+  try {
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      const n = new Notification(title, {
+        body,
+        tag: data.tag || data.kind || "examnexus",
+        data,
+      });
+      n.onclick = () => {
+        const path = data.path || data.url || "";
+        if (typeof path === "string" && path.startsWith("/")) {
+          window.dispatchEvent(
+            new CustomEvent("en:push-navigate", { detail: { path } })
+          );
+        }
+        n.close();
+      };
+      return;
+    }
+  } catch {
+    // Fall through — in-app bell still refreshes.
+  }
+}
+
 /**
  * Register for native push notifications (Capacitor iOS/Android only).
+ * @returns {Promise<boolean>}
  */
 export async function initPushNotifications() {
   if (!isNativeApp()) {
     return initWebPushNotifications({ requestPermission: true });
-  }
-  if (initialized) {
-    if (lastToken) await upsertToken(lastToken);
-    return;
   }
 
   try {
@@ -162,38 +233,53 @@ export async function initPushNotifications() {
     }
     if (perm.receive !== "granted") {
       console.warn("Push notification permission not granted");
-      return;
+      return false;
+    }
+
+    await ensureAndroidAlertsChannel(PushNotifications);
+
+    if (!listenersBound) {
+      listenersBound = true;
+
+      PushNotifications.addListener("registration", async (token) => {
+        await upsertToken(token?.value);
+        await flushPendingRemovals();
+      });
+
+      PushNotifications.addListener("registrationError", (err) => {
+        console.warn("Push registration error:", err?.error || err);
+      });
+
+      PushNotifications.addListener("pushNotificationReceived", (notification) => {
+        // App is open: refresh in-app bell immediately and show a heads-up when possible.
+        notifyPushReceived(notification);
+        showForegroundBanner(notification);
+      });
+
+      PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+        const data = action?.notification?.data || {};
+        const path = data.path || data.url || "";
+        notifyPushReceived(action?.notification);
+        if (path && typeof path === "string" && path.startsWith("/")) {
+          window.location.hash = "";
+          window.dispatchEvent(
+            new CustomEvent("en:push-navigate", { detail: { path } })
+          );
+        }
+      });
+    }
+
+    if (initialized) {
+      if (lastToken) await upsertToken(lastToken);
+      return Boolean(lastToken);
     }
 
     await PushNotifications.register();
     initialized = true;
-
-    PushNotifications.addListener("registration", async (token) => {
-      await upsertToken(token?.value);
-      await flushPendingRemovals();
-    });
-
-    PushNotifications.addListener("registrationError", (err) => {
-      console.warn("Push registration error:", err?.error || err);
-    });
-
-    PushNotifications.addListener("pushNotificationReceived", () => {
-      // Foreground: OS may still show a heads-up depending on channel;
-      // in-app bell covers the feed while the app is open.
-    });
-
-    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-      const data = action?.notification?.data || {};
-      const path = data.path || data.url || "";
-      if (path && typeof path === "string" && path.startsWith("/")) {
-        window.location.hash = "";
-        window.dispatchEvent(
-          new CustomEvent("en:push-navigate", { detail: { path } })
-        );
-      }
-    });
+    return true;
   } catch (err) {
     console.warn("Push notifications init skipped:", err?.message || err);
+    return false;
   }
 }
 
@@ -203,23 +289,19 @@ export async function syncPushTokenForCurrentUser() {
     if (lastToken) {
       await upsertToken(lastToken, "web");
       await flushPendingRemovals();
-      return;
+      return Boolean(lastToken);
     }
-    await initWebPushNotifications({
-      // Don't spam permission on every page load for desktop browsers;
-      // iOS standalone + already-granted re-sync is fine.
-      requestPermission:
-        Notification.permission === "granted" ||
-        (isIOS() && isStandalonePWA()),
+    return initWebPushNotifications({
+      // Prompt on installed PWA (A2HS / desktop install), not every casual browser tab.
+      requestPermission: shouldRequestPushPermission(),
     });
-    return;
   }
   if (lastToken) {
     await upsertToken(lastToken);
     await flushPendingRemovals();
-    return;
+    return true;
   }
-  await initPushNotifications();
+  return initPushNotifications();
 }
 
 /**
@@ -280,4 +362,20 @@ export function isPushAvailable() {
     return Capacitor.isPluginAvailable("PushNotifications");
   }
   return canUseWebPush();
+}
+
+/** True when this installed shell still needs the user to allow alerts. */
+export async function needsPushPermissionPrompt() {
+  if (isNativeApp()) {
+    try {
+      const { PushNotifications } = await import("@capacitor/push-notifications");
+      const perm = await PushNotifications.checkPermissions();
+      return perm.receive !== "granted";
+    } catch {
+      return false;
+    }
+  }
+
+  if (!canUseWebPush() || !isStandalonePWA()) return false;
+  return Notification.permission !== "granted";
 }

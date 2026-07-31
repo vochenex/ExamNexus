@@ -81,7 +81,18 @@ self.addEventListener("push", (event) => {
     options.image = payload.image;
   }
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, options);
+      const clientList = await clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of clientList) {
+        client.postMessage({ type: "en:push-received", payload });
+      }
+    })()
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

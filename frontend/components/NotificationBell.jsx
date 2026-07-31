@@ -155,6 +155,26 @@ export default function NotificationBell({ compact = false }) {
 
   usePolling(loadNotifications, []);
 
+  // Immediate refresh when a push arrives (APK foreground or SW message).
+  useEffect(() => {
+    const refresh = () => {
+      loadNotifications(true);
+    };
+    window.addEventListener("en:push-received", refresh);
+    const onSwMessage = (event) => {
+      if (event?.data?.type === "en:push-received") refresh();
+    };
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", onSwMessage);
+    }
+    return () => {
+      window.removeEventListener("en:push-received", refresh);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", onSwMessage);
+      }
+    };
+  }, [loadNotifications]);
+
   // Tab / route changes must dismiss the panel — otherwise it keeps eating touches.
   useEffect(() => {
     closePanel();

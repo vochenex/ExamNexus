@@ -17,13 +17,11 @@ import {
 
 /**
  * Bottom-bar navigation per role.
- * `primary` items become tab-bar slots. `more` items (if any) surface behind a
- * "More" slot in an expandable sheet, so the bar stays to ~5 slots max — the
- * pattern iOS and Android users expect.
+ * Shared by Add-to-Home-Screen / mobile web and the Capacitor APK — same shell.
+ * `primary` items become tab-bar slots. `more` items surface behind a "More"
+ * sheet so the bar stays to ~5 slots.
  *
- * Student nav uses a swappable last primary slot (`flexible` + `defaultFlexibleTo`):
- * picking Profile/Announcements from More moves that item into the bar and
- * sends the previous slot item (usually Results) into More.
+ * Student: Announcements is a fixed primary tab on APK and A2HS alike.
  */
 export function getMobileNav(role) {
   const normalized = String(role || "").toLowerCase();
@@ -62,20 +60,18 @@ export function getMobileNav(role) {
     };
   }
 
-  // Student — last primary slot swaps with More picks (Results ↔ Profile/Announcements).
+  // Student — same on APK and A2HS: Announcements always on the bar.
   return {
     primary: [
       { to: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard", end: true },
       { to: "/student/subjects", icon: BookOpen, label: "Subjects" },
       { to: "/student/assessments", icon: ClipboardCheck, label: "Assess" },
+      { to: "/student/announcements", icon: Megaphone, label: "Announce" },
     ],
-    flexible: [
+    more: [
       { to: "/student/results", icon: Trophy, label: "Results" },
-      { to: "/student/announcements", icon: Megaphone, label: "Announcements" },
       { to: "/student/profile", icon: UserCircle, label: "Profile" },
     ],
-    defaultFlexibleTo: "/student/results",
-    more: [],
   };
 }
 
