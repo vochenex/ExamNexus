@@ -524,6 +524,7 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
 export async function generateAssessmentFromDocument({
   file,
   files,
+  fileIndexes,
   questionCount,
   difficulty,
   formats,
@@ -540,6 +541,9 @@ export async function generateAssessmentFromDocument({
   const formData = new FormData();
   appendFilesToFormData(formData, files || file);
   formData.append("isQuestionnaire", isQuestionnaire ? "true" : "false");
+  if (Array.isArray(fileIndexes) && fileIndexes.length) {
+    formData.append("fileIndexes", JSON.stringify(fileIndexes));
+  }
   if (questionCount != null && String(questionCount).trim() !== "" && Number(questionCount) > 0) {
     formData.append("questionCount", String(questionCount));
   }

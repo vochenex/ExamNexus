@@ -163,6 +163,37 @@ async function extractMultipleDocumentsText(files) {
   return normalizeExtractedText(parts.join("\n\n"));
 }
 
+/** Extract each upload separately (for per-file classify / role filtering). */
+async function extractDocumentsSeparately(files) {
+  const list = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (!list.length) {
+    throw new Error("No file uploaded.");
+  }
+
+  const docs = [];
+  for (let index = 0; index < list.length; index += 1) {
+    const file = list[index];
+    const text = await extractDocumentText(file);
+    docs.push({
+      index,
+      name: file.originalname || `document-${index + 1}`,
+      text: normalizeExtractedText(text),
+      file,
+    });
+  }
+  return docs;
+}
+
+function mergeDocumentTexts(docs) {
+  const list = Array.isArray(docs) ? docs.filter((doc) => doc?.text) : [];
+  if (!list.length) return "";
+  return normalizeExtractedText(
+    list
+      .map((doc) => `--- FILE: ${doc.name || "document"} ---\n${doc.text}`)
+      .join("\n\n")
+  );
+}
+
 function cleanupUploadedFiles(files) {
   const list = Array.isArray(files) ? files : files ? [files] : [];
   for (const file of list) {
@@ -176,6 +207,8 @@ module.exports = {
   isSupportedUpload,
   extractDocumentText,
   extractMultipleDocumentsText,
+  extractDocumentsSeparately,
+  mergeDocumentTexts,
   cleanupUploadedFile,
   cleanupUploadedFiles,
 };

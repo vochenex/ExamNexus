@@ -141,7 +141,13 @@ export default function AssessmentAiGenerator({
   const showDocumentOptions =
     mode === "document" &&
     documentAnalysis &&
-    documentAnalysis.isQuestionnaire === false;
+    (documentAnalysis.isQuestionnaire === false ||
+      documentAnalysis.mixed ||
+      documentAnalysis.sourcePending);
+
+  const waitingForSourceGenerate =
+    Boolean(documentAnalysis?.sourcePending) &&
+    Boolean(documentAnalysis?.questionnaireDone);
 
   const countWarning = questionCountWarning(questionCount);
   const resolvedQuestionCount = parseValidQuestionCount(questionCount);
@@ -187,7 +193,7 @@ export default function AssessmentAiGenerator({
     setDocumentAnalysis(null);
   };
 
-  const runGeneration = async (generator) => {
+  const runGeneration = async (generator, startOptions = undefined) => {
     if (disabled || loading || inFlightRef.current) return;
     inFlightRef.current = true;
     setLoading(true);
@@ -209,7 +215,7 @@ export default function AssessmentAiGenerator({
       }
 
       if (onGenerationStart) {
-        const startResult = await onGenerationStart();
+        const startResult = await onGenerationStart(startOptions);
         if (
           startResult === false ||
           startResult?.mode === "cancel" ||
@@ -293,7 +299,8 @@ export default function AssessmentAiGenerator({
       return;
     }
 
-    if (showDocumentOptions) {
+    // Phase 2: generate from source / study material (options apply only here).
+    if (showDocumentOptions && (!documentAnalysis?.mixed || waitingForSourceGenerate)) {
       if (countWarning || !resolvedQuestionCount) {
         onError?.(countWarning || "Enter how many questions to generate (1–150).");
         return;
@@ -303,24 +310,99 @@ export default function AssessmentAiGenerator({
         return;
       }
 
-      runGeneration(({ onProgress, onQuestionGenerated, signal }) =>
-        generateAssessmentFromDocument({
-          files,
-          questionCount: resolvedQuestionCount,
-          difficulty,
-          formats: selectedFormats,
-          isQuestionnaire: false,
-          onProgress,
-          onQuestionGenerated,
-          signal,
-        })
+      const sourceIndexes = Array.isArray(documentAnalysis?.sourceIndexes)
+        ? documentAnalysis.sourceIndexes
+        : null;
+
+      runGeneration(
+        ({ onProgress, onQuestionGenerated, signal }) =>
+          generateAssessmentFromDocument({
+            files,
+            fileIndexes: sourceIndexes,
+            questionCount: resolvedQuestionCount,
+            difficulty,
+            formats: selectedFormats,
+            isQuestionnaire: false,
+            onProgress,
+            onQuestionGenerated,
+            signal,
+          }).then((payload) => {
+            setDocumentAnalysis((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    sourcePending: false,
+                    questionnaireDone: true,
+                  }
+                : prev
+            );
+            return payload;
+          }),
+        waitingForSourceGenerate ? { preferredMode: "append" } : undefined
       );
       return;
     }
 
+    // Phase 1: classify. Mixed → show source options + convert questionnaires now.
     runGeneration(async ({ onProgress, onQuestionGenerated, signal }) => {
       onProgress?.({ phase: "reading", current: 0, total: 1, percent: 8, status: "classifying" });
       const classification = await classifyAssessmentDocument({ files, signal });
+
+      if (classification.mixed) {
+        setDocumentAnalysis({
+          ...classification,
+          isQuestionnaire: false,
+          sourcePending: true,
+          questionnaireDone: false,
+        });
+
+        const qIndexes = Array.isArray(classification.questionnaireIndexes)
+          ? classification.questionnaireIndexes
+          : [];
+
+        onProgress?.({
+          phase: "structuring",
+          current: 0,
+          total: 1,
+          percent: 18,
+          status: "converting",
+        });
+
+        const payload = await generateAssessmentFromDocument({
+          files,
+          fileIndexes: qIndexes,
+          isQuestionnaire: true,
+          onProgress,
+          onQuestionGenerated,
+          signal,
+        });
+
+        setDocumentAnalysis((prev) =>
+          prev
+            ? {
+                ...prev,
+                sourcePending: true,
+                questionnaireDone: true,
+              }
+            : {
+                ...classification,
+                isQuestionnaire: false,
+                sourcePending: true,
+                questionnaireDone: true,
+              }
+        );
+
+        return {
+          ...payload,
+          mixedPhase: "questionnaire_done",
+          sourcePending: true,
+          meta: {
+            ...(payload.meta || {}),
+            warning:
+              "Questionnaire files converted. Options below apply only to source files — set count/difficulty/formats, then generate again.",
+          },
+        };
+      }
 
       if (classification.isQuestionnaire) {
         setDocumentAnalysis(classification);
@@ -333,6 +415,7 @@ export default function AssessmentAiGenerator({
         });
         return generateAssessmentFromDocument({
           files,
+          fileIndexes: classification.questionnaireIndexes,
           isQuestionnaire: true,
           onProgress,
           onQuestionGenerated,
@@ -340,7 +423,11 @@ export default function AssessmentAiGenerator({
         });
       }
 
-      setDocumentAnalysis(classification);
+      setDocumentAnalysis({
+        ...classification,
+        sourcePending: false,
+        questionnaireDone: false,
+      });
       onProgress?.(null);
       return {
         success: true,
@@ -363,7 +450,9 @@ export default function AssessmentAiGenerator({
     !promptHints?.questionCount &&
     (countInvalid || resolvedQuestionCount == null);
   const documentNeedsCount =
-    showDocumentOptions && (countInvalid || resolvedQuestionCount == null);
+    showDocumentOptions &&
+    (!documentAnalysis?.mixed || waitingForSourceGenerate) &&
+    (countInvalid || resolvedQuestionCount == null);
   const generateDisabledByCount =
     (mode === "prompt" && (countInvalid || (promptNeedsCount && !promptHints?.questionCount))) ||
     (showDocumentOptions && documentNeedsCount);
@@ -542,7 +631,7 @@ export default function AssessmentAiGenerator({
           </h2>
           <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
             {mode === "document"
-              ? "Upload one or more PDF, Word, or PowerPoint files. Text is merged in order, then AI classifies and converts or asks for generation options."
+              ? "Upload one or more PDF, Word, or PowerPoint files. Each file is classified separately. Mixed questionnaire + source uploads convert questionnaires first, then let you generate from source files with options."
               : "Describe what you want assessed. If you name formats in the prompt (e.g. essay, MCQ), those override the checkboxes."}
           </p>
         </div>
@@ -603,13 +692,27 @@ export default function AssessmentAiGenerator({
                       {file.name}
                     </p>
                     <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                      {index === 0 && documentAnalysis
-                        ? documentAnalysis.isQuestionnaire
-                          ? "Detected questionnaire — converting questions"
-                          : `Detected ${formatDocumentKind(documentAnalysis.documentKind)} — set options below`
-                        : files.length > 1
-                          ? "Merged in upload order"
-                          : "Ready to analyze"}
+                      {(() => {
+                        const fileMeta = Array.isArray(documentAnalysis?.files)
+                          ? documentAnalysis.files.find((item) => item.index === index)
+                          : null;
+                        if (fileMeta?.isQuestionnaire) {
+                          return "Questionnaire — converts as-is (options do not apply)";
+                        }
+                        if (fileMeta && fileMeta.isQuestionnaire === false) {
+                          return waitingForSourceGenerate
+                            ? "Source material — ready for options below"
+                            : documentAnalysis?.sourcePending && !documentAnalysis?.questionnaireDone
+                              ? "Source material — options below (questionnaire converting…)"
+                              : `Source — ${formatDocumentKind(fileMeta.documentKind)}`;
+                        }
+                        if (documentAnalysis && files.length === 1) {
+                          return documentAnalysis.isQuestionnaire
+                            ? "Detected questionnaire — converting questions"
+                            : `Detected ${formatDocumentKind(documentAnalysis.documentKind)} — set options below`;
+                        }
+                        return files.length > 1 ? "Will be classified on analyze" : "Ready to analyze";
+                      })()}
                     </p>
                   </div>
                   <button
@@ -698,21 +801,27 @@ export default function AssessmentAiGenerator({
           }`}
         >
           <p className="font-semibold">
-            {documentAnalysis.isQuestionnaire
-              ? "Questionnaire detected"
-              : `${formatDocumentKind(documentAnalysis.documentKind)} detected`}
+            {documentAnalysis.mixed
+              ? "Mixed upload detected"
+              : documentAnalysis.isQuestionnaire
+                ? "Questionnaire detected"
+                : `${formatDocumentKind(documentAnalysis.documentKind)} detected`}
           </p>
           {documentAnalysis.summary ? (
             <p className={`mt-1 text-xs ${theme === "dark" ? "text-emerald-100/80" : "text-teal-800/90"}`}>
               {documentAnalysis.summary}
             </p>
           ) : null}
-          {!documentAnalysis.isQuestionnaire ? (
+          {(documentAnalysis.mixed ||
+            (!documentAnalysis.isQuestionnaire && showDocumentOptions)) && (
             <p className={`mt-2 text-xs ${theme === "dark" ? "text-emerald-100/70" : "text-teal-800/80"}`}>
-              Choose item count, difficulty, and formats, then click Analyze document again to
-              generate questions.
+              {documentAnalysis.mixed
+                ? waitingForSourceGenerate
+                  ? "Questionnaire questions are ready. Count, difficulty, and formats below apply only to source/study files — not to questionnaire files. Click Generate from source when ready."
+                  : "Count, difficulty, and formats below apply only to source/study files and do not affect questionnaire files. Questionnaire questions are converting now; Generate will unlock again afterward for the source files."
+                : "Choose item count, difficulty, and formats, then click Analyze document again to generate questions."}
             </p>
-          ) : null}
+          )}
         </div>
       )}
 
@@ -737,10 +846,16 @@ export default function AssessmentAiGenerator({
         >
           <FileSearch size={18} />
           {loading
-            ? showDocumentOptions
-              ? "Generating questions…"
-              : "Analyzing document…"
-            : "Analyze document"}
+            ? documentAnalysis?.mixed && !documentAnalysis?.questionnaireDone
+              ? "Converting questionnaire…"
+              : showDocumentOptions
+                ? "Generating questions…"
+                : "Analyzing document…"
+            : waitingForSourceGenerate
+              ? "Generate from source"
+              : showDocumentOptions
+                ? "Generate questions"
+                : "Analyze document"}
         </button>
       ) : (
         <button

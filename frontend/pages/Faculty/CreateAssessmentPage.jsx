@@ -186,11 +186,13 @@ export default function CreateAssessment() {
     return "mixed";
   };
 
-  const handleAiGenerationStart = async () => {
+  const handleAiGenerationStart = async (options = {}) => {
     const hasExisting = questions.some((question) => questionHasContent(question));
     let mode = "replace";
 
-    if (hasExisting) {
+    if (options?.preferredMode === "append") {
+      mode = "append";
+    } else if (hasExisting) {
       const choice = await choose({
         title: "Questions already on this page",
         message:

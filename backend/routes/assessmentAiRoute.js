@@ -4,6 +4,8 @@ const { requireFaculty } = require("../middleware/requireFaculty");
 const {
   extractDocumentText,
   extractMultipleDocumentsText,
+  extractDocumentsSeparately,
+  mergeDocumentTexts,
   cleanupUploadedFile,
   cleanupUploadedFiles,
   isSupportedUpload,
@@ -54,6 +56,34 @@ function parseFormatsField(formats) {
     }
   }
   return undefined;
+}
+
+function parseIndexList(value) {
+  if (value == null || value === "") return null;
+  let raw = value;
+  if (typeof value === "string") {
+    try {
+      raw = JSON.parse(value);
+    } catch {
+      raw = String(value)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+  if (!Array.isArray(raw)) return null;
+  const indexes = raw
+    .map((item) => Number.parseInt(item, 10))
+    .filter((item) => Number.isFinite(item) && item >= 0);
+  return indexes.length ? indexes : null;
+}
+
+function selectFilesByIndexes(files, indexes) {
+  if (!indexes?.length) return files;
+  const selected = indexes
+    .map((index) => files[index])
+    .filter(Boolean);
+  return selected.length ? selected : files;
 }
 
 function handleMulterUpload(req, res, next) {
@@ -291,14 +321,60 @@ router.post(
         }
       }
 
-      const sourceText = await extractMultipleDocumentsText(files);
-      const classification = await classifyDocumentContent(sourceText);
+      const docs = await extractDocumentsSeparately(files);
+      const fileResults = [];
+
+      for (const doc of docs) {
+        const classification = await classifyDocumentContent(doc.text);
+        fileResults.push({
+          index: doc.index,
+          name: doc.name,
+          documentKind: classification.documentKind,
+          isQuestionnaire: Boolean(classification.isQuestionnaire),
+          summary: classification.summary || "",
+          suggestedTitle: classification.suggestedTitle || "",
+        });
+      }
+
+      const questionnaireFiles = fileResults.filter((item) => item.isQuestionnaire);
+      const sourceFiles = fileResults.filter((item) => !item.isQuestionnaire);
+      const mixed = questionnaireFiles.length > 0 && sourceFiles.length > 0;
+      const allQuestionnaire = questionnaireFiles.length === fileResults.length;
+      const primary =
+        (allQuestionnaire ? questionnaireFiles[0] : null) ||
+        sourceFiles[0] ||
+        fileResults[0];
+
+      const summaryParts = [];
+      if (questionnaireFiles.length) {
+        summaryParts.push(
+          `${questionnaireFiles.length} questionnaire file${questionnaireFiles.length === 1 ? "" : "s"}`
+        );
+      }
+      if (sourceFiles.length) {
+        summaryParts.push(
+          `${sourceFiles.length} source/study file${sourceFiles.length === 1 ? "" : "s"}`
+        );
+      }
 
       res.json({
         success: true,
-        extractedChars: sourceText.length,
+        extractedChars: docs.reduce((sum, doc) => sum + (doc.text?.length || 0), 0),
         fileCount: files.length,
-        ...classification,
+        mixed,
+        hasQuestionnaire: questionnaireFiles.length > 0,
+        hasSource: sourceFiles.length > 0,
+        documentKind: mixed
+          ? "mixed"
+          : primary?.documentKind || "study_material",
+        isQuestionnaire: allQuestionnaire,
+        summary: mixed
+          ? `Mixed upload: ${summaryParts.join(" and ")}. Options apply only to source files; questionnaires convert as-is.`
+          : primary?.summary || "",
+        suggestedTitle: primary?.suggestedTitle || "",
+        files: fileResults,
+        questionnaireIndexes: questionnaireFiles.map((item) => item.index),
+        sourceIndexes: sourceFiles.map((item) => item.index),
       });
     } catch (err) {
       handleRouteError(res, err);
@@ -330,13 +406,21 @@ router.post(
         }
       }
 
-      const sourceText = await extractMultipleDocumentsText(files);
+      const docs = await extractDocumentsSeparately(files);
       const {
         questionCount,
         difficulty,
         formats,
         isQuestionnaire,
+        fileIndexes,
       } = req.body || {};
+
+      const indexes = parseIndexList(fileIndexes);
+      const selectedDocs = indexes
+        ? docs.filter((doc) => indexes.includes(doc.index))
+        : docs;
+      const activeDocs = selectedDocs.length ? selectedDocs : docs;
+      const sourceText = mergeDocumentTexts(activeDocs);
 
       const questionnaire =
         isQuestionnaire === true ||
@@ -355,8 +439,9 @@ router.post(
       res.json({
         success: true,
         extractedChars: sourceText.length,
-        fileCount: files.length,
+        fileCount: activeDocs.length,
         isQuestionnaire: questionnaire,
+        usedIndexes: activeDocs.map((doc) => doc.index),
         ...result,
       });
     } catch (err) {
@@ -389,13 +474,21 @@ router.post(
         }
       }
 
-      const sourceText = await extractMultipleDocumentsText(files);
+      const docs = await extractDocumentsSeparately(files);
       const {
         questionCount,
         difficulty,
         formats,
         isQuestionnaire,
+        fileIndexes,
       } = req.body || {};
+
+      const indexes = parseIndexList(fileIndexes);
+      const selectedDocs = indexes
+        ? docs.filter((doc) => indexes.includes(doc.index))
+        : docs;
+      const activeDocs = selectedDocs.length ? selectedDocs : docs;
+      const sourceText = mergeDocumentTexts(activeDocs);
 
       const questionnaire =
         isQuestionnaire === true ||
@@ -414,8 +507,9 @@ router.post(
       res.json({
         success: true,
         extractedChars: sourceText.length,
-        fileCount: files.length,
+        fileCount: activeDocs.length,
         isQuestionnaire: questionnaire,
+        usedIndexes: activeDocs.map((doc) => doc.index),
         ...result,
       });
     } catch (err) {
