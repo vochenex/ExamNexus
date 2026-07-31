@@ -194,17 +194,15 @@ export default function CreateAssessment() {
           "The questions already on this page will be replaced by the AI-generated set. Assessment title and description will refresh from the new AI result. You can still edit everything before publishing.",
       });
       if (!shouldReplace) return false;
-
-      // Keep a snapshot so a failed generation can restore the previous set.
-      aiReplaceSnapshotRef.current = {
-        questions: questions.map((question) => ({ ...question })),
-        examType: getExamTypeForSave() || exam.exam_type || "multiple_choice",
-        title: exam.title,
-        description: exam.description,
-      };
-    } else {
-      aiReplaceSnapshotRef.current = null;
     }
+
+    // Always snapshot exam fields so classify-only / failed runs can restore them.
+    aiReplaceSnapshotRef.current = {
+      questions: questions.map((question) => ({ ...question })),
+      examType: getExamTypeForSave() || exam.exam_type || "multiple_choice",
+      title: exam.title,
+      description: exam.description,
+    };
 
     applyAiExamDetailsRef.current = true;
     resetForAiGeneration();

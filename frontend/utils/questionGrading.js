@@ -106,6 +106,158 @@ export function normalizeAnswerForGrading(value, grading) {
   return text.toLowerCase();
 }
 
+/**
+ * Detect abbreviation ↔ full-form pairs like:
+ * "RAM-Random Access Memory", "Random Access Memory (RAM)", "CPU / Central Processing Unit"
+ * Avoid splitting ordinary hyphenated words (well-being, TCP/IP, x-ray).
+ */
+function looksLikeAbbreviation(token) {
+  const text = String(token || "").trim();
+  if (!text) return false;
+  // Short token, mostly letters/digits, typically an acronym.
+  if (text.length > 8) return false;
+  if (/\s/.test(text)) return false;
+  return /^[A-Za-z0-9][A-Za-z0-9.+]*$/.test(text);
+}
+
+function looksLikeFullForm(token) {
+  const text = String(token || "").trim();
+  if (!text) return false;
+  // Multi-word phrase, or a longer expanded term.
+  if (/\s/.test(text)) return text.split(/\s+/).filter(Boolean).length >= 2;
+  return text.length >= 10;
+}
+
+function isAbbreviationFullPair(left, right) {
+  return (
+    (looksLikeAbbreviation(left) && looksLikeFullForm(right)) ||
+    (looksLikeAbbreviation(right) && looksLikeFullForm(left))
+  );
+}
+
+/**
+ * Expand compound identification keys into abbreviation, full form, and combined forms.
+ * Only expands clear abbr/full pairs — not every hyphenated or slash-separated phrase.
+ */
+export function expandIdentificationVariants(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+
+  const variants = new Set();
+
+  const add = (text) => {
+    const cleaned = String(text || "")
+      .replace(/\s+/g, " ")
+      .replace(/[.…]+$/g, "")
+      .trim();
+    if (cleaned) variants.add(cleaned);
+  };
+
+  add(raw);
+
+  const parenMatch = raw.match(/^(.+?)\s*[(\[]\s*([^)\]]+)\s*[)\]]\s*$/);
+  if (parenMatch) {
+    const outer = parenMatch[1].trim();
+    const inner = parenMatch[2].trim();
+    if (isAbbreviationFullPair(outer, inner)) {
+      add(outer);
+      add(inner);
+      add(`${outer}-${inner}`);
+      add(`${inner}-${outer}`);
+      add(`${outer} - ${inner}`);
+      add(`${inner} - ${outer}`);
+      add(`${outer} ${inner}`);
+      add(`${inner} ${outer}`);
+      add(`${outer} (${inner})`);
+      add(`${inner} (${outer})`);
+    }
+    return [...variants];
+  }
+
+  const separators = [
+    /\s*[-–—]\s*/,
+    /\s*\/\s*/,
+    /\s*:\s*/,
+    /\s+\bor\b\s+/i,
+  ];
+
+  for (const separator of separators) {
+    const parts = raw
+      .split(separator)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (parts.length !== 2) continue;
+    if (!isAbbreviationFullPair(parts[0], parts[1])) continue;
+
+    add(parts[0]);
+    add(parts[1]);
+    add(`${parts[0]}-${parts[1]}`);
+    add(`${parts[1]}-${parts[0]}`);
+    add(`${parts[0]} - ${parts[1]}`);
+    add(`${parts[1]} - ${parts[0]}`);
+    add(`${parts[0]} ${parts[1]}`);
+    add(`${parts[1]} ${parts[0]}`);
+    add(`${parts[0]}/${parts[1]}`);
+    add(`${parts[0]} (${parts[1]})`);
+    add(`${parts[1]} (${parts[0]})`);
+    break;
+  }
+
+  return [...variants];
+}
+
+function softNormalizeIdentificationToken(value, grading) {
+  const options = normalizeGradingOptions(grading);
+  let text = normalizeAnswerForGrading(value, options);
+  text = text
+    .replace(/[.…]/g, "")
+    .replace(/['’]/g, "")
+    .replace(/\s*[-–—:/]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text;
+}
+
+/**
+ * Match identification answers allowing abbreviation, full wording, or both
+ * (with or without "-", "/", "()", etc.). Exact match only when case_sensitive.
+ */
+export function identificationAnswersMatch(studentValue, expectedValue, grading) {
+  const options = normalizeGradingOptions(grading);
+  const studentRaw = String(studentValue ?? "").trim();
+  const expectedRaw = String(expectedValue ?? "").trim();
+  if (!studentRaw || !expectedRaw) return false;
+
+  // Case-sensitive mode means exact string match only (no abbr/full expansion).
+  if (options.case_sensitive) {
+    return answersMatch(studentRaw, expectedRaw, options);
+  }
+
+  if (answersMatch(studentRaw, expectedRaw, options)) {
+    return true;
+  }
+
+  const studentTokens = new Set(
+    expandIdentificationVariants(studentRaw)
+      .map((token) => softNormalizeIdentificationToken(token, options))
+      .filter(Boolean)
+  );
+  const expectedTokens = new Set(
+    expandIdentificationVariants(expectedRaw)
+      .map((token) => softNormalizeIdentificationToken(token, options))
+      .filter(Boolean)
+  );
+
+  for (const studentToken of studentTokens) {
+    if (expectedTokens.has(studentToken)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function answersMatch(studentValue, expectedValue, grading) {
   const options = normalizeGradingOptions(grading);
   const normalizedStudent = normalizeAnswerForGrading(studentValue, options);

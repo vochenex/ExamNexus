@@ -5,6 +5,7 @@ import {
   getQuestionValidationMessage,
   isQuestionComplete,
   answersMatch,
+  identificationAnswersMatch,
   getAcceptedIdentificationAnswers,
   ensureEnumAlternativesForAnswers,
 } from "./questionGrading";
@@ -377,7 +378,7 @@ export function gradeStudentAnswer(question, examType, rawAnswer) {
     });
 
     const isCorrect = accepted.some((expected) =>
-      answersMatch(rawAnswer, expected, grading)
+      identificationAnswersMatch(rawAnswer, expected, grading)
     );
 
     return { isCorrect, pendingReview: false };

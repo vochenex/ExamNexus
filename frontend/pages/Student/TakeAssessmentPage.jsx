@@ -178,13 +178,14 @@ function TakeAssessmentExperience() {
   const autoSubmittingRef = useRef(false);
   const pendingIntegrityAutoSubmitRef = useRef(false);
   const examRef = useRef(null);
-  const { status: connectionStatus, isOffline } = useConnectionStatus({
+  const { status: connectionStatus, isOffline, isUnstable } = useConnectionStatus({
     enabled: true,
   });
 
   const isActive = phase === "active";
   const interactionLocked =
     submitting || confirmSubmitOpen || Boolean(resultDialog) || autoSubmitting;
+  const connectionDegraded = isOffline || isUnstable;
 
   useEffect(() => {
     examRef.current = exam;
@@ -269,7 +270,7 @@ function TakeAssessmentExperience() {
     examId: id,
     active: isActive,
     isRetakeAttempt,
-    isOffline,
+    isOffline: connectionDegraded,
     onAlert: showIntegrityAlert,
     onFocusViolation: setFocusBlocked,
     onStrikeChange: handleStrikeChange,
@@ -970,10 +971,28 @@ function TakeAssessmentExperience() {
   const setAnswer = (value) => {
     if (!currentQ?.id || !isActive || interactionLocked || !exam) return;
 
-    setAnswers((prev) => ({
-      ...prev,
+    const nextAnswers = {
+      ...answers,
       [currentQ.id]: value,
-    }));
+    };
+    setAnswers(nextAnswers);
+
+    // Sync under-review flag immediately from answered state (no Next required).
+    const answered = isQuestionAnswered(currentQ, exam.exam_type, nextAnswers);
+    setFlaggedIndices((flags) => {
+      const hasFlag = flags.has(currentQuestion);
+      if (answered && hasFlag) {
+        const updated = new Set(flags);
+        updated.delete(currentQuestion);
+        return updated;
+      }
+      if (!answered && !hasFlag) {
+        // Re-flag only if the student already visited/left this item earlier
+        // (auto-flag path). Manual flags cleared by answering stay cleared until leave.
+        return flags;
+      }
+      return flags;
+    });
   };
 
   const toggleFlag = () => {

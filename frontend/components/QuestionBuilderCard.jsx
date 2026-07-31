@@ -296,10 +296,19 @@ export default function QuestionBuilderCard({
               <label className={labelClass(theme)}>Correct answer</label>
               <input
                 className={inputClass(theme)}
-                placeholder="Primary expected answer"
+                placeholder='e.g. RAM-Random Access Memory'
                 value={question.answer || ""}
                 onChange={(e) => onUpdate("answer", e.target.value)}
               />
+              <p
+                className={`mt-1.5 text-xs ${
+                  theme === "dark" ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                Students can answer with the abbreviation, the full wording, or both
+                (hyphen optional). Example: RAM, Random Access Memory, or
+                RAM-Random Access Memory.
+              </p>
             </div>
 
             {showAlternatives && (
@@ -310,7 +319,8 @@ export default function QuestionBuilderCard({
                     theme === "dark" ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  Other accepted answers for this question.
+                  Extra accepted answers. Abbreviation/full-form pairs (with or without “-”)
+                  are matched automatically on every accepted answer.
                 </p>
                 <div className="space-y-2">
                   {grading.alternatives.map((alternative, answerIndex) => (
