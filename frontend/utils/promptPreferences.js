@@ -3,7 +3,10 @@ const FORMAT_KEYWORDS = [
   { value: "enumeration", patterns: [/enumeration/i, /\benumerate\b/i, /\blist\s+all\b/i] },
   { value: "identification", patterns: [/identification/i, /\bidentify\b/i, /\bfill\s+in\b/i] },
   { value: "true_false", patterns: [/true\s*or\s*false/i, /\btrue\/false\b/i, /\bt\/f\b/i] },
-  { value: "essay", patterns: [/essay/i, /\bexplain\b/i, /\bdiscuss\b/i, /\bshort\s+answer\b/i] },
+  {
+    value: "essay",
+    patterns: [/essay/i, /\bshort\s+answer\b/i, /\bexplain\b/i, /\bdiscuss\b/i],
+  },
 ];
 
 export function parsePromptPreferences(prompt) {
@@ -25,6 +28,21 @@ export function parsePromptPreferences(prompt) {
         questionCount = Math.min(150, parsed);
         break;
       }
+    }
+  }
+
+  const perFormatCounts = [
+    ...text.matchAll(
+      /(\d+)\s*(?:multiple\s*choice|mcq|enumeration|identification|true\s*or\s*false|true\/false|t\/f|essay|short\s+answer)s?\b/gi
+    ),
+  ];
+  if (perFormatCounts.length > 1) {
+    const summed = perFormatCounts.reduce(
+      (total, match) => total + (Number.parseInt(match[1], 10) || 0),
+      0
+    );
+    if (summed > 0) {
+      questionCount = Math.min(150, summed);
     }
   }
 
@@ -56,15 +74,12 @@ export function resolvePromptGenerationSettings({
   const parsed = parsePromptPreferences(prompt);
   const uiCount = Number.parseInt(questionCount, 10);
   const hasUiCount = Number.isFinite(uiCount) && uiCount > 0;
+  const uiFormats = Array.isArray(formats) && formats.length > 0 ? formats : [];
+  const promptFormats = parsed.formats.length > 0 ? parsed.formats : [];
 
   return {
     questionCount: parsed.questionCount ?? (hasUiCount ? uiCount : 8),
     difficulty: parsed.difficulty ?? difficulty ?? "medium",
-    formats:
-      Array.isArray(formats) && formats.length > 0
-        ? formats
-        : parsed.formats.length
-          ? parsed.formats
-          : formats,
+    formats: promptFormats.length > 0 ? promptFormats : uiFormats,
   };
 }

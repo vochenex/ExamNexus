@@ -316,6 +316,8 @@ export async function generateAssessmentFromPrompt({
 
 export async function generateAssessmentFromDocument({
   file,
+  questionCount,
+  difficulty,
   onProgress,
   onQuestionGenerated,
 }) {
@@ -330,11 +332,18 @@ export async function generateAssessmentFromDocument({
 
   const formData = new FormData();
   formData.append("file", file);
+  if (questionCount != null && String(questionCount).trim() !== "") {
+    formData.append("questionCount", String(questionCount));
+  }
+  if (difficulty) {
+    formData.append("difficulty", String(difficulty));
+  }
 
   let res;
   const stopWaiting = startWaitingProgress({
     onProgress,
     phase: "reading",
+    total: questionCount || undefined,
   });
 
   try {

@@ -88,10 +88,15 @@ export default function AssessmentAiGenerator({
     if (selectedFormats.length === 0) {
       return "Select at least one question format.";
     }
+    if (promptHints?.formats?.length) {
+      return `Prompt overrides formats to: ${promptHints.formats
+        .map((value) => AI_FORMAT_OPTIONS.find((item) => item.value === value)?.label || value)
+        .join(", ")}`;
+    }
     return `AI may mix: ${selectedFormats
       .map((value) => AI_FORMAT_OPTIONS.find((item) => item.value === value)?.label || value)
       .join(", ")}`;
-  }, [selectedFormats]);
+  }, [selectedFormats, promptHints]);
 
   const toggleFormat = (value) => {
     setSelectedFormats((prev) => {
@@ -179,6 +184,8 @@ export default function AssessmentAiGenerator({
     runGeneration(({ onProgress, onQuestionGenerated }) =>
       generateAssessmentFromDocument({
         file,
+        questionCount: resolvedQuestionCount,
+        difficulty,
         onProgress,
         onQuestionGenerated,
       })
@@ -213,8 +220,8 @@ export default function AssessmentAiGenerator({
           </h2>
           <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
             {mode === "document"
-              ? "Upload a PDF or Word file. Questions and settings are inferred from the document."
-              : "Describe what you want assessed. Questions appear below when generation finishes."}
+              ? "Upload a PDF or Word file. Optional count/difficulty below guide the analysis when the document has no ready-made questions."
+              : "Describe what you want assessed. If you name formats in the prompt (e.g. essay, MCQ), those override the checkboxes."}
           </p>
         </div>
       </div>

@@ -65,16 +65,21 @@ function questionDedupeKey(question) {
 function questionsLookSimilar(a, b) {
   if (!a || !b) return false;
   if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
+  // Near-exact only: one string almost fully contains the other after normalization.
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  if (shorter.length >= 24 && longer.includes(shorter)) return true;
+
   const wordsA = new Set(a.split(" ").filter((w) => w.length > 2));
   const wordsB = new Set(b.split(" ").filter((w) => w.length > 2));
-  if (!wordsA.size || !wordsB.size) return false;
+  if (wordsA.size < 4 || wordsB.size < 4) return false;
   let overlap = 0;
   for (const word of wordsA) {
     if (wordsB.has(word)) overlap += 1;
   }
   const ratio = overlap / Math.min(wordsA.size, wordsB.size);
-  return ratio >= 0.72;
+  // High threshold so related-but-distinct items on the same topic are kept.
+  return ratio >= 0.9;
 }
 
 function isDuplicateQuestion(question, seenKeys, existingKeys = []) {
@@ -95,6 +100,17 @@ function clampQuestionCount(value) {
   if (!Number.isFinite(parsed)) return DEFAULT_QUESTIONS;
   return Math.min(MAX_QUESTIONS, Math.max(MIN_QUESTIONS, parsed));
 }
+
+const FORMAT_KEYWORDS = [
+  { value: "multiple_choice", patterns: [/multiple\s*choice/i, /\bmcq\b/i, /\bmultiple-choice\b/i] },
+  { value: "enumeration", patterns: [/enumeration/i, /\benumerate\b/i, /\blist\s+all\b/i] },
+  { value: "identification", patterns: [/identification/i, /\bidentify\b/i, /\bfill\s+in\b/i] },
+  { value: "true_false", patterns: [/true\s*or\s*false/i, /\btrue\/false\b/i, /\bt\/f\b/i] },
+  {
+    value: "essay",
+    patterns: [/essay/i, /\bshort\s+answer\b/i, /\bexplain\b/i, /\bdiscuss\b/i],
+  },
+];
 
 function parsePromptPreferences(prompt) {
   const text = String(prompt || "");
@@ -118,6 +134,22 @@ function parsePromptPreferences(prompt) {
     }
   }
 
+  // Sum explicit per-format counts when present (e.g. "5 MCQ and 5 essay").
+  const perFormatCounts = [
+    ...text.matchAll(
+      /(\d+)\s*(?:multiple\s*choice|mcq|enumeration|identification|true\s*or\s*false|true\/false|t\/f|essay|short\s+answer)s?\b/gi
+    ),
+  ];
+  if (perFormatCounts.length > 1) {
+    const summed = perFormatCounts.reduce(
+      (total, match) => total + (Number.parseInt(match[1], 10) || 0),
+      0
+    );
+    if (summed > 0) {
+      questionCount = Math.min(MAX_QUESTIONS, summed);
+    }
+  }
+
   let difficulty = null;
   if (/\b(hard|difficult|advanced|challenging)\b/i.test(lower)) {
     difficulty = "hard";
@@ -127,16 +159,8 @@ function parsePromptPreferences(prompt) {
     difficulty = "medium";
   }
 
-  const formatKeywords = [
-    { value: "multiple_choice", patterns: [/multiple\s*choice/i, /\bmcq\b/i] },
-    { value: "enumeration", patterns: [/enumeration/i, /\benumerate\b/i] },
-    { value: "identification", patterns: [/identification/i, /\bidentify\b/i] },
-    { value: "true_false", patterns: [/true\s*or\s*false/i, /\btrue\/false\b/i] },
-    { value: "essay", patterns: [/essay/i, /\bshort\s+answer\b/i] },
-  ];
-
   const formats = [];
-  for (const { value, patterns } of formatKeywords) {
+  for (const { value, patterns } of FORMAT_KEYWORDS) {
     if (patterns.some((pattern) => pattern.test(text))) {
       formats.push(value);
     }
@@ -152,15 +176,25 @@ function resolvePromptGenerationSettings({
   formats,
 }) {
   const parsed = parsePromptPreferences(prompt);
+  const uiFormats =
+    Array.isArray(formats) && formats.length > 0 ? parseFormats(formats) : [];
+  const promptFormats =
+    parsed.formats.length > 0 ? parseFormats(parsed.formats) : [];
+
+  // Prompt-named formats win when present; otherwise use UI chips / defaults.
+  const finalFormats =
+    promptFormats.length > 0
+      ? promptFormats
+      : uiFormats.length > 0
+        ? uiFormats
+        : parseFormats(null);
 
   return {
     questionCount: clampQuestionCount(
       parsed.questionCount ?? questionCount ?? DEFAULT_QUESTIONS
     ),
     difficulty: parsed.difficulty || difficulty || "medium",
-    formats: parseFormats(
-      Array.isArray(formats) && formats.length > 0 ? formats : parsed.formats
-    ),
+    formats: finalFormats,
   };
 }
 
@@ -353,12 +387,22 @@ function normalizeQuestion(raw, allowedFormats) {
 
 function normalizeAiPayload(payload, allowedFormats) {
   let questionsRaw = Array.isArray(payload?.questions) ? payload.questions : [];
-  if (!questionsRaw.length && payload?.question) {
-    questionsRaw = [payload.question];
+
+  if (!questionsRaw.length) {
+    const nested = payload?.question;
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      // Compact shape: { question: { type, question, ... } }
+      questionsRaw = [nested];
+    } else if (payload && typeof payload === "object" && (payload.type || payload.question_type)) {
+      // Flat single-question shape: { type, question, choices, answer }
+      questionsRaw = [payload];
+    }
   }
+
   const questions = [];
 
   for (const item of questionsRaw) {
+    if (!item || typeof item !== "object") continue;
     const normalized = normalizeQuestion(item, allowedFormats);
     if (normalized) {
       questions.push(normalized);
@@ -383,21 +427,22 @@ function pickFormatForStep(formats, stepIndex) {
 function buildCompactSystemPrompt(format, difficulty) {
   const examples = {
     multiple_choice:
-      '{"question":{"type":"multiple_choice","question":"What is photosynthesis?","choices":["Making food using light","Burning glucose","Digesting proteins","Absorbing minerals"],"answer":"A"}}',
+      '{"type":"multiple_choice","question":"What is photosynthesis?","choices":["Making food using light","Burning glucose","Digesting proteins","Absorbing minerals"],"answer":"A"}',
     enumeration:
-      '{"question":{"type":"enumeration","question":"List the stages of mitosis in order","answers":["prophase","metaphase","anaphase","telophase"]}}',
+      '{"type":"enumeration","question":"List the stages of mitosis in order","answers":["prophase","metaphase","anaphase","telophase"]}',
     identification:
-      '{"question":{"type":"identification","question":"What gas do plants release during photosynthesis?","answer":"oxygen"}}',
+      '{"type":"identification","question":"What gas do plants release during photosynthesis?","answer":"oxygen"}',
     true_false:
-      '{"question":{"type":"true_false","question":"Plants need sunlight for photosynthesis.","answer":"true"}}',
+      '{"type":"true_false","question":"Plants need sunlight for photosynthesis.","answer":"true"}',
     essay:
-      '{"question":{"type":"essay","question":"Explain how photosynthesis supports life on Earth."}}',
+      '{"type":"essay","question":"Explain how photosynthesis supports life on Earth."}',
   };
 
   return `Return JSON only. Write one ${format} question. Difficulty: ${difficulty}.
-Required shape example:
+Preferred flat shape example:
 ${examples[format] || examples.multiple_choice}
-Use "question" for the question text (not "text"). Include "answer" for auto-graded types.`;
+You may also wrap it as {"question":{...},"suggestedTitle":"...","suggestedDescription":"..."}.
+Use "question" for the stem text (not "text"). Include "answer" for auto-graded types. Choices must be plain text without A/B/C/D prefixes.`;
 }
 
 function buildCompactUserPrompt({
@@ -439,7 +484,8 @@ async function parseAiResponse(content, allowedFormats) {
       messages: [
         {
           role: "system",
-          content: "Return valid JSON only. Fix the structure for one exam question.",
+          content:
+            'Return valid JSON only. Prefer a flat question object {"type","question",...} or {"questions":[...]} or {"question":{...}}.',
         },
         { role: "user", content: String(content || "") },
       ],
@@ -526,6 +572,7 @@ async function requestAiQuestionsBatched({
 
   const questions = [];
   const seen = new Set();
+  let droppedDuplicates = 0;
   let suggestedTitle = "";
   let suggestedDescription = "";
   let provider = "gemini";
@@ -534,7 +581,11 @@ async function requestAiQuestionsBatched({
   const absorbQuestions = (items) => {
     for (const item of items) {
       const key = questionDedupeKey(item);
-      if (!key || isDuplicateQuestion(item, seen)) continue;
+      if (!key) continue;
+      if (isDuplicateQuestion(item, seen)) {
+        droppedDuplicates += 1;
+        continue;
+      }
       seen.add(key);
       questions.push(item);
       if (questions.length >= count) break;
@@ -553,13 +604,15 @@ async function requestAiQuestionsBatched({
     const need = Math.min(chunkSize, count - questions.length);
     const continuation =
       questions.length > 0
-        ? `\n\nAlready created ${questions.length} of ${count} questions. Add ${need} NEW distinct questions without repeating topics or wording.`
+        ? `Already created ${questions.length} of ${count} questions. Add ${need} NEW distinct questions without repeating topics or wording.`
         : "";
 
     const result = await requestAiQuestions({
       sourceText,
-      topicPrompt: topicPrompt + continuation,
-      additionalInstructions,
+      topicPrompt,
+      additionalInstructions: [additionalInstructions, continuation]
+        .filter(Boolean)
+        .join("\n"),
       formats: allowedFormats,
       questionCount: need,
       difficulty,
@@ -600,9 +653,14 @@ async function requestAiQuestionsBatched({
     const result = await requestSingleAiQuestion({
       sourceText,
       topicPrompt,
-      additionalInstructions: recent
-        ? `${additionalInstructions}\nDo not repeat or paraphrase any of these existing questions: ${recent}`
-        : additionalInstructions,
+      additionalInstructions: [
+        additionalInstructions,
+        recent
+          ? `Do not repeat or paraphrase any of these existing questions: ${recent}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
       format,
       difficulty,
       stepIndex: step,
@@ -620,10 +678,13 @@ async function requestAiQuestionsBatched({
     }
 
     const key = questionDedupeKey(result.question);
-    if (key && !isDuplicateQuestion(result.question, seen)) {
-      seen.add(key);
-      questions.push(result.question);
+    if (!key) continue;
+    if (isDuplicateQuestion(result.question, seen)) {
+      droppedDuplicates += 1;
+      continue;
     }
+    seen.add(key);
+    questions.push(result.question);
   }
 
   if (!questions.length) {
@@ -641,6 +702,7 @@ async function requestAiQuestionsBatched({
     meta: {
       requestedCount: count,
       generatedCount: Math.min(questions.length, count),
+      droppedDuplicates,
       formats: allowedFormats,
       provider,
       model,
@@ -662,14 +724,14 @@ Rules:
 - Use only these question types:\n${formatList}
 - Generate exactly ${questionCount} questions unless the source material is too short; never exceed ${questionCount}.
 - Mix formats naturally when multiple types are allowed.
-- multiple_choice: exactly 4 non-empty choices; answer must be A, B, C, or D.
+- multiple_choice: exactly 4 non-empty choices; answer must be A, B, C, or D. Choice strings must NOT include letter prefixes like "A." or "B)".
 - enumeration: provide an "answers" array with every required item in order.
 - identification: provide a single correct "answer" string.
 - true_false: answer must be "true" or "false".
 - essay: no answer field required.
 - Questions must be clear, classroom-appropriate, and aligned with the ${mode} content.
 - Difficulty target: ${difficulty}.
-- Every question must be unique. Do not repeat the same stem, near-paraphrase, topic angle, or answer set.
+- Every question must be unique. Do not repeat the same stem or near-paraphrase.
 - Prefer distinct concepts across the set; never create copy-paste variations of the same question.
 JSON shape:
 {
@@ -679,7 +741,7 @@ JSON shape:
     {
       "type": "multiple_choice",
       "question": "text",
-      "choices": ["A text", "B text", "C text", "D text"],
+      "choices": ["Making food using light", "Burning glucose", "Digesting proteins", "Absorbing minerals"],
       "answer": "A"
     }
   ]

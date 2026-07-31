@@ -253,8 +253,13 @@ router.post(
       }
 
       const sourceText = await extractDocumentText(file);
+      const { questionCount, difficulty } = req.body || {};
 
-      const result = await requestDocumentQuestions({ sourceText });
+      const result = await requestDocumentQuestions({
+        sourceText,
+        questionCount,
+        difficulty,
+      });
 
       res.json({
         success: true,
@@ -298,8 +303,13 @@ router.post(
       }
 
       const sourceText = await extractDocumentText(file);
+      const { questionCount, difficulty } = req.body || {};
 
-      const result = await requestDocumentQuestions({ sourceText });
+      const result = await requestDocumentQuestions({
+        sourceText,
+        questionCount,
+        difficulty,
+      });
 
       res.json({
         success: true,
