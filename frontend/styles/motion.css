@@ -349,8 +349,19 @@ html.light .en-interactive-card:hover {
 }
 
 .en-dropdown-enter {
-  animation: en-scale-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: en-notif-from-bell 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: top right;
+}
+
+@keyframes en-notif-from-bell {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .en-overlay-enter {

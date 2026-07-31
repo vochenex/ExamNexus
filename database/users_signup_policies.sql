@@ -184,14 +184,17 @@ BEGIN
   UPDATE public.users
   SET
     email = COALESCE(p_auth_user.email, users.email),
-    first_name = COALESCE(meta_first_name, users.first_name),
-    last_name = COALESCE(meta_last_name, users.last_name),
+    -- Prefer existing profile values so editable saves are not overwritten by
+    -- stale signup metadata on ensure_user_profile / poll reloads.
+    first_name = COALESCE(NULLIF(TRIM(users.first_name), ''), meta_first_name),
+    last_name = COALESCE(NULLIF(TRIM(users.last_name), ''), meta_last_name),
     school_id = CASE
       WHEN meta_school_id IS NOT NULL
         AND meta_school_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      THEN meta_school_id
-      WHEN users.school_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-        AND meta_school_id IS NOT NULL
+        AND (
+          NULLIF(TRIM(users.school_id), '') IS NULL
+          OR users.school_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        )
       THEN meta_school_id
       ELSE users.school_id
     END,
@@ -201,11 +204,11 @@ BEGIN
       WHEN meta_role IS NOT NULL AND trim(meta_role) <> '' THEN meta_role
       ELSE COALESCE(users.role, 'Student')
     END,
-    gender = COALESCE(meta_gender, users.gender),
-    department = COALESCE(meta_department, users.department),
-    course = COALESCE(meta_course, users.course),
-    year_level = COALESCE(meta_year_level, users.year_level),
-    age = COALESCE(meta_age, users.age),
+    gender = COALESCE(NULLIF(TRIM(users.gender), ''), meta_gender),
+    department = COALESCE(NULLIF(TRIM(users.department), ''), meta_department),
+    course = COALESCE(NULLIF(TRIM(users.course), ''), meta_course),
+    year_level = COALESCE(NULLIF(TRIM(users.year_level), ''), meta_year_level),
+    age = COALESCE(users.age, meta_age),
     avatar_url = CASE
       WHEN meta_avatar_url IS NOT NULL
         AND (

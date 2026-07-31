@@ -14,9 +14,7 @@ function panelClass(theme) {
 }
 
 function QuestionDifficultyChart({ groups, theme, hasResponses }) {
-  const [expanded, setExpanded] = useState(() =>
-    Object.fromEntries((groups || []).map((group) => [group.type, true]))
-  );
+  const [expanded, setExpanded] = useState({});
 
   if (!hasResponses) {
     return (
@@ -55,7 +53,7 @@ function QuestionDifficultyChart({ groups, theme, hasResponses }) {
   return (
     <div className="space-y-3">
       {groups.map((group) => {
-        const isOpen = expanded[group.type] !== false;
+        const isOpen = expanded[group.type] === true;
         const groupIncorrect = group.items.reduce(
           (sum, item) => sum + item.incorrectCount,
           0
@@ -150,9 +148,7 @@ function QuestionDifficultyChart({ groups, theme, hasResponses }) {
 }
 
 function QuestionTimeChart({ groups, theme, hasTimedData, overallAvgSeconds }) {
-  const [expanded, setExpanded] = useState(() =>
-    Object.fromEntries((groups || []).map((group) => [group.type, true]))
-  );
+  const [expanded, setExpanded] = useState({});
 
   if (!hasTimedData) {
     return (
@@ -247,7 +243,7 @@ function QuestionTimeChart({ groups, theme, hasTimedData, overallAvgSeconds }) {
 
       <div className="space-y-3">
         {groups.map((group) => {
-          const isOpen = expanded[group.type] !== false;
+          const isOpen = expanded[group.type] === true;
 
           return (
             <div
@@ -380,6 +376,9 @@ export default function ExamAnalyticsPanel({
   const { theme } = useTheme();
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [averageMode, setAverageMode] = useState("include_retakes");
+  const [studentsOpen, setStudentsOpen] = useState(false);
+  const [studentSort, setStudentSort] = useState("rank");
+  const [studentSearch, setStudentSearch] = useState("");
 
   const difficultyGroups = useMemo(
     () => analytics?.questionDifficultyGroups || [],
@@ -464,6 +463,31 @@ export default function ExamAnalyticsPanel({
   }, [analytics]);
 
   const displayedAverage = classAverageOptions[averageMode] || classAverageOptions.include_retakes;
+
+  const filteredStudents = useMemo(() => {
+    const rows = [...(analytics?.studentPerformance || [])];
+    const query = studentSearch.trim().toLowerCase();
+    const filtered = query
+      ? rows.filter((student) => String(student.name || "").toLowerCase().includes(query))
+      : rows;
+
+    const sorted = [...filtered];
+    if (studentSort === "name") {
+      sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    } else if (studentSort === "score") {
+      sorted.sort((a, b) => (Number(b.scorePct) || -1) - (Number(a.scorePct) || -1));
+    } else if (studentSort === "first_submit") {
+      sorted.sort((a, b) => {
+        const aTime = a.submittedAt ? new Date(a.submittedAt).getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.submittedAt ? new Date(b.submittedAt).getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      });
+    } else {
+      sorted.sort((a, b) => (a.rank || 0) - (b.rank || 0));
+    }
+
+    return sorted;
+  }, [analytics, studentSearch, studentSort]);
 
   const refreshAnalytics = async () => {
     await onScoresUpdated?.({ silent: true });
@@ -600,57 +624,103 @@ export default function ExamAnalyticsPanel({
         </div>
 
         <div className={panelClass(theme)}>
-          <h3 className={`mb-1 font-semibold ${theme === "dark" ? "text-white" : "text-teal-700"}`}>
-            Student performance
-          </h3>
-          <p className={`mb-4 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-            Click a student to review their answers and score essay questions.
-          </p>
+          <button
+            type="button"
+            onClick={() => setStudentsOpen((current) => !current)}
+            className="mb-1 flex w-full items-center justify-between gap-3 text-left"
+          >
+            <div>
+              <h3 className={`font-semibold ${theme === "dark" ? "text-white" : "text-teal-700"}`}>
+                Student performance
+              </h3>
+              <p className={`mt-1 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                Expand to filter and review student submissions.
+              </p>
+            </div>
+            {studentsOpen ? (
+              <ChevronUp size={18} className="shrink-0 opacity-60" />
+            ) : (
+              <ChevronDown size={18} className="shrink-0 opacity-60" />
+            )}
+          </button>
 
-          {analytics.submissionCount === 0 ? (
-            <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              No submissions yet.
-            </p>
-          ) : analytics.studentPerformance.length === 0 ? (
-            <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              No student submissions to review yet.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {analytics.studentPerformance.map((student, index) => (
-                <button
-                  key={student.studentId}
-                  type="button"
-                  onClick={() => setSelectedStudent(student)}
-                  className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
+          {studentsOpen && (
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="search"
+                  value={studentSearch}
+                  onChange={(event) => setStudentSearch(event.target.value)}
+                  placeholder="Search student name…"
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-400/40 ${
                     theme === "dark"
-                      ? "border-white/10 bg-black/20 hover:border-emerald-500/30 hover:bg-emerald-500/5"
-                      : "border-emerald-100 bg-emerald-50/40 hover:border-teal-300 en-hover"
+                      ? "border-white/10 bg-white/5 text-white placeholder:text-gray-500"
+                      : "border-emerald-200 bg-white text-gray-900 placeholder:text-gray-400"
                   }`}
+                />
+                <select
+                  value={studentSort}
+                  onChange={(event) => setStudentSort(event.target.value)}
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-400/40 sm:max-w-[14rem] ${
+                    theme === "dark"
+                      ? "border-white/10 bg-white/5 text-white"
+                      : "border-emerald-200 bg-white text-gray-900"
+                  }`}
+                  aria-label="Sort students"
                 >
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{student.name}</p>
-                    <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                      Rank #{index + 1} · Tap to view answers
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <div className="text-right">
-                      <p
-                        className={`font-bold ${
-                          theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                        }`}
-                      >
-                        {student.scorePct != null ? `${student.scorePct}%` : "Pending"}
-                      </p>
-                      <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                        {student.score}/{student.total} pts
-                      </p>
-                    </div>
-                    <ChevronRight size={16} className="opacity-50" />
-                  </div>
-                </button>
-              ))}
+                  <option value="rank">Sort by rank</option>
+                  <option value="name">Sort by name</option>
+                  <option value="score">Sort by score %</option>
+                  <option value="first_submit">First to submit</option>
+                </select>
+              </div>
+
+              {analytics.submissionCount === 0 ? (
+                <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                  No submissions yet.
+                </p>
+              ) : filteredStudents.length === 0 ? (
+                <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                  No students match this filter.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredStudents.map((student) => (
+                    <button
+                      key={student.studentId}
+                      type="button"
+                      onClick={() => setSelectedStudent(student)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                        theme === "dark"
+                          ? "border-white/10 bg-black/20 hover:border-emerald-500/30 hover:bg-emerald-500/5"
+                          : "border-emerald-100 bg-emerald-50/40 hover:border-teal-300 en-hover"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{student.name}</p>
+                        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                          Rank #{student.rank} · Tap to view answers
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <div className="text-right">
+                          <p
+                            className={`font-bold ${
+                              theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                            }`}
+                          >
+                            {student.scorePct != null ? `${student.scorePct}%` : "Pending"}
+                          </p>
+                          <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                            {student.score}/{student.total} pts
+                          </p>
+                        </div>
+                        <ChevronRight size={16} className="opacity-50" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

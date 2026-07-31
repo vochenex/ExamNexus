@@ -72,6 +72,17 @@ export default function StudentSubjectDetails() {
     [classmates]
   );
 
+  const sortedClassmates = useMemo(() => {
+    return [...classmates].sort((a, b) => {
+      const aName = `${a.first_name || ""} ${a.last_name || ""}`.trim().toLowerCase();
+      const bName = `${b.first_name || ""} ${b.last_name || ""}`.trim().toLowerCase();
+      return (
+        aName.localeCompare(bName) ||
+        String(a.school_id || "").localeCompare(String(b.school_id || ""))
+      );
+    });
+  }, [classmates]);
+
   if (loading && !subject) {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
@@ -171,7 +182,7 @@ export default function StudentSubjectDetails() {
           </p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {classmates.map((classmate) => (
+            {sortedClassmates.map((classmate) => (
               <ClassmateCard
                 key={classmate.id}
                 classmate={classmate}

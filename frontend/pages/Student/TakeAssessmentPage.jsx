@@ -43,18 +43,20 @@ import {
 import {
   formatAssessmentDurationLabel,
   getAssessmentDurationSeconds,
+  normalizeDurationUnit,
 } from "../../utils/assessmentDuration";
 import { resolveStudentId } from "../../utils/authUser";
 import { canTakeAssessmentOnThisDevice } from "../../utils/platform";
 import {
   clearExamSession,
-  computeRemainingSeconds,
+  computeExamRemainingSeconds,
   enterAssessmentFullscreen,
   exitAssessmentFullscreen,
   loadExamSession,
   loadIntegrityStrikes,
   MAX_INTEGRITY_STRIKES,
   saveExamSession,
+  secondsUntilEndDatetime,
 } from "../../utils/examIntegrity";
 
 function formatDurationLabel(examData) {
@@ -170,10 +172,15 @@ function TakeAssessmentExperience() {
   const alertTimerRef = useRef(null);
   const submitExamRef = useRef(null);
   const autoSubmittingRef = useRef(false);
+  const examRef = useRef(null);
 
   const isActive = phase === "active";
   const interactionLocked =
     submitting || confirmSubmitOpen || Boolean(resultDialog) || autoSubmitting;
+
+  useEffect(() => {
+    examRef.current = exam;
+  }, [exam]);
 
   const {
     flushCurrentQuestionTime,
@@ -298,7 +305,11 @@ function TakeAssessmentExperience() {
             Number.isFinite(sessionTotalSeconds) && sessionTotalSeconds > 0
               ? sessionTotalSeconds
               : durationSeconds;
-          const remaining = computeRemainingSeconds(saved.startedAt, activeTotalSeconds);
+          const remaining = computeExamRemainingSeconds(
+            saved.startedAt,
+            activeTotalSeconds,
+            examData.end_datetime
+          );
 
           if (remaining > 0) {
             orderedQuestions = saved.questionOrder?.length
@@ -328,7 +339,11 @@ function TakeAssessmentExperience() {
           setShowLockdownModal(false);
           startLockdown(id, examData.title);
         } else {
-          setTimeLeft(durationSeconds);
+          const readySeconds = Math.min(
+            durationSeconds,
+            secondsUntilEndDatetime(examData.end_datetime)
+          );
+          setTimeLeft(readySeconds);
           setPhase("ready");
           setShowLockdownModal(true);
         }
@@ -352,7 +367,7 @@ function TakeAssessmentExperience() {
     saveExamSession(id, {
       commenced: true,
       startedAt: existing?.startedAt || new Date().toISOString(),
-      totalSeconds: existing?.totalSeconds || totalSeconds,
+      totalSeconds,
       studentId,
       answers,
       currentQuestion,
@@ -401,8 +416,137 @@ function TakeAssessmentExperience() {
     [answers, currentQuestion, exam, questions]
   );
 
-  const lockCompletedSections =
-    Boolean(exam?.lock_completed_sections) || Boolean(exam?.shuffle_questions);
+  const lockCompletedSections = Boolean(exam?.lock_completed_sections);
+
+  // Keep exam metadata/settings in sync while ready or actively taking
+  // (title, instructions, schedule, duration, and lock/review toggles).
+  useEffect(() => {
+    const syncing = phase === "ready" || phase === "active";
+    if (!syncing || !id) return undefined;
+
+    const SETTINGS_KEYS = [
+      "title",
+      "instructions",
+      "end_datetime",
+      "duration_value",
+      "duration_unit",
+      "lock_completed_sections",
+      "shuffle_questions",
+      "allow_review",
+      "show_result",
+      "show_question_review",
+      "show_correct_answers",
+    ];
+
+    const settingValuesEqual = (key, previous, next) => {
+      if (key === "duration_value") {
+        return Number(previous) === Number(next);
+      }
+      if (key === "duration_unit") {
+        return normalizeDurationUnit(previous) === normalizeDurationUnit(next);
+      }
+      return previous === next;
+    };
+
+    const applySettings = (incoming) => {
+      if (!incoming) return;
+
+      const current = examRef.current;
+      if (!current) return;
+
+      let changed = false;
+      const next = { ...current };
+      for (const key of SETTINGS_KEYS) {
+        if (incoming[key] === undefined) continue;
+        if (!settingValuesEqual(key, current[key], incoming[key])) {
+          next[key] = incoming[key];
+          changed = true;
+        }
+      }
+      if (!changed) return;
+
+      const prevDuration = getAssessmentDurationSeconds(current);
+      const nextDuration = getAssessmentDurationSeconds(next);
+      const durationChanged = prevDuration !== nextDuration;
+      const endChanged = current.end_datetime !== next.end_datetime;
+      const titleChanged = current.title !== next.title;
+
+      examRef.current = next;
+      setExam(next);
+
+      if (titleChanged && phase === "active") {
+        startLockdown(id, next.title || "");
+      }
+
+      if (phase === "ready" && (durationChanged || endChanged)) {
+        const readySeconds = Math.min(
+          nextDuration,
+          secondsUntilEndDatetime(next.end_datetime)
+        );
+        setTotalSeconds(nextDuration);
+        setTimeLeft(readySeconds);
+      }
+
+      if (phase === "active" && (durationChanged || endChanged)) {
+        const session = loadExamSession(id);
+        const startedAt = session?.startedAt;
+        if (!startedAt) return;
+
+        const activeTotal = durationChanged
+          ? nextDuration
+          : Number(session?.totalSeconds) > 0
+            ? Number(session.totalSeconds)
+            : nextDuration;
+
+        if (durationChanged) {
+          setTotalSeconds(activeTotal);
+          saveExamSession(id, {
+            ...session,
+            totalSeconds: activeTotal,
+          });
+        }
+
+        setTimeLeft(
+          computeExamRemainingSeconds(startedAt, activeTotal, next.end_datetime)
+        );
+      }
+    };
+
+    const refreshSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("exams")
+          .select(SETTINGS_KEYS.join(","))
+          .eq("id", id)
+          .maybeSingle();
+        if (!error && data) applySettings(data);
+      } catch {
+        // Ignore transient polling failures during an active exam.
+      }
+    };
+
+    refreshSettings();
+    const intervalId = window.setInterval(refreshSettings, 4000);
+
+    const channel = supabase
+      .channel(`take-exam-settings-${id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "exams",
+          filter: `id=eq.${id}`,
+        },
+        (payload) => applySettings(payload?.new)
+      )
+      .subscribe();
+
+    return () => {
+      window.clearInterval(intervalId);
+      supabase.removeChannel(channel);
+    };
+  }, [phase, id, startLockdown]);
 
   const sectionNavOptions = useMemo(
     () => ({
@@ -527,15 +671,16 @@ function TakeAssessmentExperience() {
     sectionNavOptions,
   ]);
 
-  const clearFlagIfAnswered = useCallback(
+  /** Leaving an unanswered item auto-flags it for review (yellow in the nav). */
+  const flagIfUnansweredOnLeave = useCallback(
     (questionIndex) => {
       const question = questions[questionIndex];
       if (!question || !exam) return;
-      if (!isQuestionAnswered(question, exam.exam_type, answers)) return;
+      if (isQuestionAnswered(question, exam.exam_type, answers)) return;
       setFlaggedIndices((prev) => {
-        if (!prev.has(questionIndex)) return prev;
+        if (prev.has(questionIndex)) return prev;
         const next = new Set(prev);
-        next.delete(questionIndex);
+        next.add(questionIndex);
         return next;
       });
     },
@@ -710,7 +855,9 @@ function TakeAssessmentExperience() {
     });
     setShowLockdownModal(false);
     setPhase("active");
-    setTimeLeft(totalSeconds);
+    setTimeLeft(
+      Math.min(totalSeconds, secondsUntilEndDatetime(exam?.end_datetime))
+    );
     startLockdown(id, exam?.title || "Assessment");
     await enterAssessmentFullscreen();
   };
@@ -739,23 +886,11 @@ function TakeAssessmentExperience() {
       ...prev,
       [currentQ.id]: value,
     }));
-
-    const questionType = getQuestionFormatType(currentQ, exam.exam_type);
-    if (isAnswerProvided(value, questionType)) {
-      setFlaggedIndices((prev) => {
-        if (!prev.has(currentQuestion)) return prev;
-        const next = new Set(prev);
-        next.delete(currentQuestion);
-        return next;
-      });
-    }
   };
 
   const toggleFlag = () => {
     if (!isActive || !exam || !currentQ) return;
 
-    // Answering already marks the item done — flagging an answered item is for review.
-    // Toggling off always works; toggling on is allowed only to mark for later revisit.
     setFlaggedIndices((prev) => {
       const next = new Set(prev);
       if (next.has(currentQuestion)) {
@@ -770,7 +905,7 @@ function TakeAssessmentExperience() {
   const goToQuestion = (index) => {
     if (!isActive || !exam) return;
     if (index >= 0 && index < questions.length && checkNavigable(index)) {
-      clearFlagIfAnswered(currentQuestion);
+      flagIfUnansweredOnLeave(currentQuestion);
       const section = getSectionIndexForQuestion(index, navGroups);
       setFurthestSectionIndex((prev) => Math.max(prev, section));
       setCurrentQuestion(index);
@@ -778,7 +913,7 @@ function TakeAssessmentExperience() {
   };
 
   const goToNextUnanswered = () => {
-    clearFlagIfAnswered(currentQuestion);
+    flagIfUnansweredOnLeave(currentQuestion);
     if (nextUnansweredIndex != null) {
       const section = getSectionIndexForQuestion(nextUnansweredIndex, navGroups);
       setFurthestSectionIndex((prev) => Math.max(prev, section));
@@ -787,7 +922,7 @@ function TakeAssessmentExperience() {
   };
 
   const goToPrevious = () => {
-    clearFlagIfAnswered(currentQuestion);
+    flagIfUnansweredOnLeave(currentQuestion);
     if (previousIndex != null) {
       setCurrentQuestion(previousIndex);
     }

@@ -5,6 +5,7 @@ import {
   getSchoolIdHelpText,
   getSchoolIdRule,
   isSchoolIdValidForRole,
+  normalizeRole,
   normalizeSchoolId,
   validateSchoolIdForRole,
 } from "../utils/schoolIdRules";
@@ -24,28 +25,61 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
     JSON.parse(localStorage.getItem("examnexus_user") || "{}")
   );
   const [required, setRequired] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const errorRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
 
   useEffect(() => {
-    const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
-    setUser(cached);
+    let cancelled = false;
 
-    if (!cached?.id) {
-      setRequired(false);
-      return;
-    }
+    const evaluate = async () => {
+      const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+      if (!cached?.id) {
+        if (!cancelled) {
+          setUser(cached);
+          setRequired(false);
+          setChecking(false);
+        }
+        return;
+      }
 
-    if (isSchoolIdValidForRole(cached.school_id, cached.role)) {
-      setRequired(false);
-      onResolved?.(cached);
-      return;
-    }
+      let profile = cached;
+      try {
+        const { data } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", cached.id)
+          .maybeSingle();
+        if (data) {
+          profile = { ...cached, ...data };
+          localStorage.setItem("examnexus_user", JSON.stringify(profile));
+        }
+      } catch {
+        // Fall back to cached profile if the refresh fails.
+      }
 
-    setValue(normalizeSchoolId(cached.school_id));
-    setRequired(true);
+      if (cancelled) return;
+
+      setUser(profile);
+
+      if (isSchoolIdValidForRole(profile.school_id, profile.role)) {
+        setRequired(false);
+        setChecking(false);
+        onResolved?.(profile);
+        return;
+      }
+
+      setValue(normalizeSchoolId(profile.school_id));
+      setRequired(true);
+      setChecking(false);
+    };
+
+    evaluate();
+    return () => {
+      cancelled = true;
+    };
   }, [onResolved]);
 
   const handleLogout = async () => {
@@ -76,38 +110,49 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
         return;
       }
 
-      const { data, error: updateError } = await supabase
-        .from("users")
-        .update({ school_id: validation.normalized })
-        .eq("id", authUser.id)
-        .select("*")
-        .single();
+      let savedProfile = null;
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "update_own_school_id",
+        { p_school_id: validation.normalized }
+      );
 
-      let savedProfile = data;
-      if (updateError) {
-        const { data: rpcData, error: rpcError } = await supabase.rpc(
-          "upsert_signup_profile",
-          {
-            p_first_name: user.first_name || authUser.user_metadata?.first_name || "User",
-            p_last_name: user.last_name || authUser.user_metadata?.last_name || "",
-            p_email: user.email || authUser.email,
-            p_school_id: validation.normalized,
-            p_role: user.role || authUser.user_metadata?.role || "Student",
-            p_gender: user.gender || null,
-            p_department: user.department || null,
-            p_course: user.course || null,
-            p_year_level: user.year_level || null,
-            p_age:
-              user.age === "" || user.age == null ? null : String(user.age),
-            p_avatar_url: user.avatar_url || null,
-          }
-        );
-
-        if (rpcError) {
-          throw updateError;
-        }
-
+      if (!rpcError && rpcData) {
         savedProfile = rpcData;
+      } else {
+        const { data, error: updateError } = await supabase
+          .from("users")
+          .update({ school_id: validation.normalized })
+          .eq("id", authUser.id)
+          .select("*")
+          .single();
+
+        if (updateError) {
+          const { data: signupData, error: signupError } = await supabase.rpc(
+            "upsert_signup_profile",
+            {
+              p_first_name:
+                user.first_name || authUser.user_metadata?.first_name || "User",
+              p_last_name: user.last_name || authUser.user_metadata?.last_name || "",
+              p_email: user.email || authUser.email,
+              p_school_id: validation.normalized,
+              p_role: user.role || authUser.user_metadata?.role || "Student",
+              p_gender: user.gender || null,
+              p_department: user.department || null,
+              p_course: user.course || null,
+              p_year_level: user.year_level || null,
+              p_age: user.age === "" || user.age == null ? null : String(user.age),
+              p_avatar_url: user.avatar_url || null,
+            }
+          );
+
+          if (signupError) {
+            throw rpcError || updateError;
+          }
+
+          savedProfile = signupData;
+        } else {
+          savedProfile = data;
+        }
       }
 
       await supabase.auth
@@ -155,96 +200,115 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
     }
   };
 
-  if (!required) return null;
+  if (checking || !required) return null;
 
   const rule = getSchoolIdRule(user.role);
-  const roleLabel = String(user.role || "Student").toLowerCase();
+  const role = normalizeRole(user.role);
+  const roleLabel = role || "student";
+  const existingId = normalizeSchoolId(user.school_id);
+  const isFacultyUpdate =
+    role === "faculty" && existingId && existingId.length !== rule.max;
 
   return (
     <ModalPortal>
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-      <form
-        onSubmit={handleSave}
-        className={`w-full max-w-md rounded-3xl border p-6 shadow-2xl ${
-          theme === "dark"
-            ? "border-white/10 bg-[#071412] text-white"
-            : "border-emerald-200 bg-white text-emerald-950"
-        }`}
-      >
-        <div
-          className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${
+      <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+        <form
+          onSubmit={handleSave}
+          className={`w-full max-w-md rounded-3xl border p-6 shadow-2xl ${
             theme === "dark"
-              ? "bg-amber-500/10 text-amber-300"
-              : "bg-amber-50 text-amber-600"
+              ? "border-white/10 bg-[#071412] text-white"
+              : "border-emerald-200 bg-white text-emerald-950"
           }`}
         >
-          <AlertTriangle size={24} />
-        </div>
-
-        <h2 className="text-xl font-bold">School ID required</h2>
-        <p
-          className={`mt-2 text-sm ${
-            theme === "dark" ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          Existing {roleLabel} accounts must enter a valid School ID before
-          continuing. If you do not complete this prompt, you will be logged out.
-        </p>
-
-        <label className="mt-5 block text-sm font-semibold" htmlFor="required-school-id">
-          School ID
-        </label>
-        <input
-          id="required-school-id"
-          value={value}
-          inputMode="numeric"
-          maxLength={rule.max}
-          onChange={(event) => {
-            setValue(normalizeSchoolId(event.target.value).slice(0, rule.max));
-            setError("");
-          }}
-          placeholder={rule.example}
-          className={`mt-2 ${inputClass(theme)}`}
-          autoFocus
-        />
-        <p
-          className={`mt-2 text-xs ${
-            theme === "dark" ? "text-gray-400" : "text-gray-500"
-          }`}
-        >
-          {getSchoolIdHelpText(user.role)}
-        </p>
-
-        {error && (
-          <p ref={errorRef} role="status" className="mt-3 text-sm text-red-500">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-[#031d1f] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Save size={16} />
-            {saving ? "Saving..." : "Save School ID"}
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+          <div
+            className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${
               theme === "dark"
-                ? "border-red-500/30 text-red-300 hover:bg-red-500/10"
-                : "border-red-200 text-red-600 hover:bg-red-50"
+                ? "bg-amber-500/10 text-amber-300"
+                : "bg-amber-50 text-amber-600"
             }`}
           >
-            <LogOut size={16} />
-            Log out
-          </button>
-        </div>
-      </form>
-    </div>
+            <AlertTriangle size={24} />
+          </div>
+
+          <h2 className="text-xl font-bold">
+            {isFacultyUpdate ? "Update your School ID" : "School ID required"}
+          </h2>
+          <p
+            className={`mt-2 text-sm ${
+              theme === "dark" ? "text-gray-300" : "text-gray-600"
+            }`}
+          >
+            {isFacultyUpdate
+              ? "Faculty School IDs must now be exactly 5 digits. Enter your updated ID to continue. Your subjects will stay linked to your account. If you skip this, you will be logged out."
+              : `Existing ${roleLabel} accounts must enter a valid School ID before continuing. If you do not complete this prompt, you will be logged out.`}
+          </p>
+
+          {existingId ? (
+            <p
+              className={`mt-3 rounded-xl border px-3 py-2 text-xs ${
+                theme === "dark"
+                  ? "border-white/10 bg-white/5 text-gray-300"
+                  : "border-emerald-100 bg-emerald-50/70 text-gray-600"
+              }`}
+            >
+              Current ID on file: <span className="font-semibold">{existingId}</span>
+            </p>
+          ) : null}
+
+          <label className="mt-5 block text-sm font-semibold" htmlFor="required-school-id">
+            School ID
+          </label>
+          <input
+            id="required-school-id"
+            value={value}
+            inputMode="numeric"
+            maxLength={rule.max}
+            onChange={(event) => {
+              setValue(normalizeSchoolId(event.target.value).slice(0, rule.max));
+              setError("");
+            }}
+            placeholder={rule.example}
+            className={`mt-2 ${inputClass(theme)}`}
+            autoFocus
+          />
+          <p
+            className={`mt-2 text-xs ${
+              theme === "dark" ? "text-gray-400" : "text-gray-500"
+            }`}
+          >
+            {getSchoolIdHelpText(user.role)}
+          </p>
+
+          {error && (
+            <p ref={errorRef} role="status" className="mt-3 text-sm text-red-500">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-[#031d1f] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Save size={16} />
+              {saving ? "Saving..." : isFacultyUpdate ? "Update School ID" : "Save School ID"}
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                theme === "dark"
+                  ? "border-red-500/30 text-red-300 hover:bg-red-500/10"
+                  : "border-red-200 text-red-600 hover:bg-red-50"
+              }`}
+            >
+              <LogOut size={16} />
+              Log out
+            </button>
+          </div>
+        </form>
+      </div>
     </ModalPortal>
   );
 }

@@ -185,22 +185,37 @@ export default function HomePage() {
                 <div className="en-home-dot-field pointer-events-none absolute -right-4 bottom-4 h-20 w-20 opacity-40" aria-hidden="true" />
                 <div
                   className={`en-home-orbit absolute left-1/2 top-1/2 h-[min(100%,380px)] w-[min(100%,380px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed ${
-                    isDark ? "border-emerald-500/25" : "border-teal-600/30"
+                    isDark ? "border-emerald-500/25" : "border-teal-700/40"
                   }`}
                 />
                 <div
                   className={`en-home-float-delay en-home-shape-accent-cyan absolute right-4 top-6 h-14 w-14 rounded-2xl border rotate-12 ${
-                    isDark ? "border-cyan-400/30 bg-cyan-500/10" : ""
+                    isDark
+                      ? "border-cyan-400/30 bg-cyan-500/10"
+                      : "border-cyan-600/35 bg-cyan-100/90 shadow-sm"
                   }`}
                   aria-hidden="true"
                 />
                 <div
                   className={`en-home-float en-home-shape-accent absolute left-2 bottom-16 h-10 w-10 rounded-full border ${
-                    isDark ? "border-emerald-400/30 bg-emerald-500/10" : ""
+                    isDark
+                      ? "border-emerald-400/30 bg-emerald-500/10"
+                      : "border-teal-600/40 bg-teal-100/90 shadow-sm"
                   }`}
                   aria-hidden="true"
                 />
-                <HeroIllustration className="en-home-float-slow relative mx-auto w-full max-w-xl text-emerald-400" />
+                <div
+                  className={`en-home-hero-illus-stage relative mx-auto w-full max-w-xl ${
+                    isDark
+                      ? ""
+                      : "rounded-[2rem] bg-gradient-to-br from-white via-teal-50/90 to-cyan-50/80 p-3 shadow-[0_24px_60px_rgba(15,118,110,0.14)] ring-1 ring-teal-700/15"
+                  }`}
+                >
+                  <HeroIllustration
+                    theme={theme}
+                    className="en-home-float-slow relative mx-auto w-full max-w-xl"
+                  />
+                </div>
               </ScrollReveal>
             </div>
           </div>

@@ -75,39 +75,56 @@ export default function AssessmentQuestionNav({
                   const navigable = isIndexNavigable?.(item.index) ?? true;
                   const disabled = locked || !navigable;
 
+                  // Flagged (review) wins over answered so "mark for review" stays visible.
+                  // Active unanswered must not use solid green — that reads as "done".
+                  let toneClass;
+                  if (disabled) {
+                    toneClass =
+                      theme === "dark"
+                        ? "cursor-not-allowed border border-white/5 bg-white/[0.02] text-gray-600 opacity-50"
+                        : "cursor-not-allowed border border-gray-100 bg-gray-50 text-gray-400 opacity-60";
+                  } else if (active && flagged) {
+                    toneClass =
+                      theme === "dark"
+                        ? "bg-amber-500 text-black ring-2 ring-amber-300"
+                        : "bg-amber-500 text-white ring-2 ring-amber-300";
+                  } else if (active && answered) {
+                    toneClass =
+                      theme === "dark"
+                        ? "bg-emerald-500 text-black ring-2 ring-emerald-300"
+                        : "bg-emerald-500 text-white ring-2 ring-teal-300";
+                  } else if (active) {
+                    toneClass =
+                      theme === "dark"
+                        ? "bg-white/10 text-white ring-2 ring-amber-400/80 border border-white/15"
+                        : "en-bg-elevated text-gray-900 ring-2 ring-amber-400 border border-amber-200";
+                  } else if (flagged) {
+                    toneClass =
+                      theme === "dark"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                        : "bg-amber-50 text-amber-800 border border-amber-300";
+                  } else if (answered) {
+                    toneClass =
+                      theme === "dark"
+                        ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                        : "bg-emerald-50 text-teal-800 border border-emerald-200";
+                  } else {
+                    toneClass =
+                      theme === "dark"
+                        ? "bg-white/5 text-gray-300 border border-white/10 hover:border-emerald-500/30"
+                        : "en-bg-elevated text-gray-700 border border-emerald-100 hover:border-emerald-300";
+                  }
+
                   return (
                     <button
                       key={item.questionId || item.index}
                       type="button"
                       disabled={disabled}
                       onClick={() => !disabled && onSelect(item.index)}
-                      className={`
-                        relative h-10 min-w-10 rounded-xl px-3 text-sm font-semibold transition
-                        ${
-                          disabled
-                            ? theme === "dark"
-                              ? "cursor-not-allowed border border-white/5 bg-white/[0.02] text-gray-600 opacity-50"
-                              : "cursor-not-allowed border border-gray-100 bg-gray-50 text-gray-400 opacity-60"
-                            : active
-                              ? theme === "dark"
-                                ? "bg-emerald-500 text-black ring-2 ring-emerald-300"
-                                : "bg-emerald-500 text-white ring-2 ring-teal-300"
-                              : answered
-                              ? theme === "dark"
-                                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                                : "bg-emerald-50 text-teal-800 border border-emerald-200"
-                              : flagged
-                                ? theme === "dark"
-                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                  : "bg-amber-50 text-amber-800 border border-amber-300"
-                                : theme === "dark"
-                                  ? "bg-white/5 text-gray-300 border border-white/10 hover:border-emerald-500/30"
-                                  : "en-bg-elevated text-gray-700 border border-emerald-100 hover:border-emerald-300"
-                        }
-                      `}
+                      className={`relative h-10 min-w-10 rounded-xl px-3 text-sm font-semibold transition ${toneClass}`}
                     >
                       {item.number}
-                      {flagged && !answered && !disabled && (
+                      {flagged && !disabled && (
                         <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-400" />
                       )}
                     </button>
@@ -130,7 +147,7 @@ export default function AssessmentQuestionNav({
         </div>
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 rounded bg-amber-500/20 border border-amber-500/40" />
-          Flagged
+          Flagged for review
         </div>
         <div className="flex items-center gap-2">
           <span

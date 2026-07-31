@@ -116,6 +116,7 @@ export function buildExamFacultyAnalytics(
         total,
         scorePct: total > 0 ? percentage(row.score, row.total) : null,
         pendingReview: total === 0,
+        submittedAt: row.created_at || row.submitted_at || null,
       };
     })
     .sort((a, b) => {
@@ -123,7 +124,11 @@ export function buildExamFacultyAnalytics(
       if (a.scorePct != null) return -1;
       if (b.scorePct != null) return 1;
       return a.name.localeCompare(b.name);
-    });
+    })
+    .map((student, index) => ({
+      ...student,
+      rank: index + 1,
+    }));
 
   const questionTimeAnalytics = buildQuestionTimeAnalytics(
     questions,

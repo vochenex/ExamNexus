@@ -129,6 +129,26 @@ export function computeRemainingSeconds(startedAtIso, totalSeconds) {
   return Math.max(0, totalSeconds - elapsed);
 }
 
+/** Remaining time from duration, capped by the assessment end window when set. */
+export function computeExamRemainingSeconds(startedAtIso, totalSeconds, endDatetime) {
+  const durationRemaining = computeRemainingSeconds(startedAtIso, totalSeconds);
+  if (!endDatetime) return durationRemaining;
+
+  const endMs = new Date(endDatetime).getTime();
+  if (!Number.isFinite(endMs)) return durationRemaining;
+
+  const untilEnd = Math.max(0, Math.floor((endMs - Date.now()) / 1000));
+  return Math.min(durationRemaining, untilEnd);
+}
+
+/** Seconds left until end_datetime from now (Infinity when unset/invalid). */
+export function secondsUntilEndDatetime(endDatetime) {
+  if (!endDatetime) return Number.POSITIVE_INFINITY;
+  const endMs = new Date(endDatetime).getTime();
+  if (!Number.isFinite(endMs)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, Math.floor((endMs - Date.now()) / 1000));
+}
+
 const RESTRICTED_SHORTCUTS = [
   { key: "F12" },
   { key: "F5" },

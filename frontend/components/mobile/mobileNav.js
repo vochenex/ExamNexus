@@ -52,7 +52,9 @@ export function getMobileNav(role) {
         { to: "/faculty/announcements", icon: Megaphone, label: "Announce" },
         { to: "/faculty/profile", icon: UserCircle, label: "Profile" },
       ],
-      more: [],
+      more: [
+        { to: "/faculty/exports", icon: Download, label: "Export data" },
+      ],
     };
   }
 

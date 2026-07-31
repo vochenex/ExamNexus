@@ -112,6 +112,7 @@ export default function StudentResults() {
   const [answers, setAnswers] = useState([]);
   const [showQuestionReview, setShowQuestionReview] = useState(true);
   const [showCorrectAnswers, setShowCorrectAnswers] = useState(true);
+  const [questionFilter, setQuestionFilter] = useState("all");
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -225,6 +226,24 @@ export default function StudentResults() {
   const isEssayOnly = examType === "essay";
   const pendingReviewCount = answers.filter((entry) => entry.is_correct === null).length;
   const wrongCount = answers.filter((entry) => entry.is_correct === false).length;
+  const correctCount = answers.filter((entry) => entry.is_correct === true).length;
+
+  const filteredQuestionGroups =
+    questionFilter === "all" || !showQuestionReview
+      ? questionGroups
+      : questionGroups
+          .map((group) => ({
+            ...group,
+            items: group.items.filter((item) => {
+              const question = questions[item.index];
+              if (!question) return false;
+              const entry = answerByQuestionId[question.id];
+              if (questionFilter === "correct") return entry?.is_correct === true;
+              if (questionFilter === "incorrect") return entry?.is_correct === false;
+              return true;
+            }),
+          }))
+          .filter((group) => group.items.length > 0);
 
   return (
     <div className={pageShellWithBellClass(theme)}>
@@ -247,7 +266,7 @@ export default function StudentResults() {
           )}
         </div>
 
-        <div className={staggerGridClass("mb-10 grid gap-4 sm:grid-cols-3")}>
+        <div className={staggerGridClass("mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4")}>
           <div
             className={`rounded-2xl border p-5 ${
               theme === "dark"
@@ -261,12 +280,48 @@ export default function StudentResults() {
             </p>
           </div>
 
-          <div
-            className={`rounded-2xl border p-5 ${
-              theme === "dark"
-                ? "border-red-500/20 bg-red-500/10"
-                : "border-red-200/80 en-bg-elevated"
-            }`}
+          <button
+            type="button"
+            disabled={!showQuestionReview || isEssayOnly}
+            onClick={() =>
+              setQuestionFilter((current) => (current === "correct" ? "all" : "correct"))
+            }
+            className={`rounded-2xl border p-5 text-left transition ${
+              questionFilter === "correct"
+                ? theme === "dark"
+                  ? "border-emerald-400/50 bg-emerald-500/20 ring-2 ring-emerald-400/40"
+                  : "border-teal-400 bg-teal-50 ring-2 ring-teal-300"
+                : theme === "dark"
+                  ? "border-emerald-500/20 bg-emerald-500/10 hover:border-emerald-400/40"
+                  : "border-emerald-200/80 en-bg-elevated hover:border-teal-300"
+            } ${!showQuestionReview || isEssayOnly ? "cursor-default opacity-80" : "cursor-pointer"}`}
+          >
+            <h2 className="text-sm font-semibold uppercase tracking-wide">Correct</h2>
+            <p className="mt-2 text-3xl font-bold">{isEssayOnly ? "—" : correctCount}</p>
+            {showQuestionReview && !isEssayOnly ? (
+              <p className={`mt-2 text-xs ${theme === "dark" ? "text-emerald-300/80" : "text-teal-700"}`}>
+                {questionFilter === "correct" ? "Showing correct only · tap again for all" : "Tap to list correct answers"}
+              </p>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            disabled={!showQuestionReview}
+            onClick={() =>
+              setQuestionFilter((current) =>
+                current === "incorrect" ? "all" : "incorrect"
+              )
+            }
+            className={`rounded-2xl border p-5 text-left transition ${
+              questionFilter === "incorrect"
+                ? theme === "dark"
+                  ? "border-red-400/50 bg-red-500/20 ring-2 ring-red-400/40"
+                  : "border-red-400 bg-red-50 ring-2 ring-red-300"
+                : theme === "dark"
+                  ? "border-red-500/20 bg-red-500/10 hover:border-red-400/40"
+                  : "border-red-200/80 en-bg-elevated hover:border-red-300"
+            } ${!showQuestionReview ? "cursor-default opacity-80" : "cursor-pointer"}`}
           >
             <h2 className="text-sm font-semibold uppercase tracking-wide">
               {isEssayOnly ? "Pending review" : "Incorrect"}
@@ -274,7 +329,14 @@ export default function StudentResults() {
             <p className="mt-2 text-3xl font-bold">
               {isEssayOnly ? pendingReviewCount : wrongCount}
             </p>
-          </div>
+            {showQuestionReview && !isEssayOnly ? (
+              <p className={`mt-2 text-xs ${theme === "dark" ? "text-red-300/80" : "text-red-700"}`}>
+                {questionFilter === "incorrect"
+                  ? "Showing incorrect only · tap again for all"
+                  : "Tap to list incorrect answers"}
+              </p>
+            ) : null}
+          </button>
 
           <div
             className={`rounded-2xl border p-5 ${
@@ -337,7 +399,26 @@ export default function StudentResults() {
 
         {showQuestionReview && (
           <div className="space-y-8">
-            <h2 className="text-xl font-bold">Question review</h2>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-xl font-bold">
+                {questionFilter === "correct"
+                  ? "Correct answers"
+                  : questionFilter === "incorrect"
+                    ? "Incorrect answers"
+                    : "Question review"}
+              </h2>
+              {questionFilter !== "all" ? (
+                <button
+                  type="button"
+                  onClick={() => setQuestionFilter("all")}
+                  className={`text-sm font-medium ${
+                    theme === "dark" ? "text-emerald-300 hover:text-emerald-200" : "text-teal-700 hover:text-teal-900"
+                  }`}
+                >
+                  Show all questions
+                </button>
+              ) : null}
+            </div>
 
             {!questions.length ? (
               <div
@@ -350,8 +431,18 @@ export default function StudentResults() {
                 No questions were found for this assessment review. Ask your teacher to
                 confirm the assessment still has questions, then refresh this page.
               </div>
+            ) : filteredQuestionGroups.length === 0 ? (
+              <div
+                className={`rounded-2xl border px-5 py-4 text-sm ${
+                  theme === "dark"
+                    ? "border-white/10 bg-white/[0.03] text-gray-300"
+                    : "border-emerald-200/80 en-bg-muted text-gray-700"
+                }`}
+              >
+                No {questionFilter} questions to show.
+              </div>
             ) : (
-              questionGroups.map((group) => (
+              filteredQuestionGroups.map((group) => (
                 <section key={group.type} className="space-y-4">
                   <div className="flex items-center gap-3">
                     <h3

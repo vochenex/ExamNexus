@@ -1,8 +1,17 @@
 import { BarChart3, TrendingUp } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { HorizontalBarChart } from "./StudentAnalyticsCharts";
+import { formatSectionLabel } from "../utils/sections";
 
-export default function SubjectClassAnalyticsPanel({ analytics, loading }) {
+export default function SubjectClassAnalyticsPanel({
+  analytics,
+  loading,
+  sectionLabel = null,
+  sections = [],
+  activeSection = "All",
+  onSectionChange,
+  sectionCounts = null,
+}) {
   const { theme } = useTheme();
 
   const panelClass = `rounded-2xl border p-5 h-full flex flex-col ${
@@ -27,6 +36,8 @@ export default function SubjectClassAnalyticsPanel({ analytics, loading }) {
     analytics?.classStandingPct != null ||
     analytics?.majorExamChart?.length > 0;
 
+  const showSectionFilter = typeof onSectionChange === "function" && sections.length > 0;
+
   return (
     <div className={panelClass}>
       <div className="mb-4 flex items-start gap-3">
@@ -37,7 +48,7 @@ export default function SubjectClassAnalyticsPanel({ analytics, loading }) {
         >
           <BarChart3 size={20} />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <h2
             className={`font-semibold text-lg ${
               theme === "dark" ? "text-emerald-400" : "text-teal-700"
@@ -46,15 +57,62 @@ export default function SubjectClassAnalyticsPanel({ analytics, loading }) {
             Class Performance
           </h2>
           <p className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-            Major exams and class standing for this subject
+            {sectionLabel
+              ? `Major exams and class standing for ${sectionLabel}`
+              : "Major exams and class standing for this subject"}
           </p>
         </div>
       </div>
 
+      {showSectionFilter && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onSectionChange("All")}
+            className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+              activeSection === "All"
+                ? theme === "dark"
+                  ? "bg-emerald-500 text-black"
+                  : "bg-teal-600 text-white"
+                : theme === "dark"
+                  ? "border border-white/10 bg-white/5 text-gray-300 hover:border-emerald-500/30"
+                  : "border border-emerald-200 en-bg-elevated text-gray-700 hover:border-teal-400"
+            }`}
+          >
+            All sections
+            {sectionCounts?.all != null ? ` (${sectionCounts.all})` : ""}
+          </button>
+          {sections.map((section) => {
+            const selected = activeSection === section;
+            const count = sectionCounts?.[section];
+            return (
+              <button
+                key={section}
+                type="button"
+                onClick={() => onSectionChange(section)}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                  selected
+                    ? theme === "dark"
+                      ? "bg-emerald-500 text-black"
+                      : "bg-teal-600 text-white"
+                    : theme === "dark"
+                      ? "border border-white/10 bg-white/5 text-gray-300 hover:border-emerald-500/30"
+                      : "border border-emerald-200 en-bg-elevated text-gray-700 hover:border-teal-400"
+                }`}
+              >
+                {formatSectionLabel(section)}
+                {count != null ? ` (${count})` : ""}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {!hasData ? (
         <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-          No graded submissions yet. Performance charts appear after students complete
-          assessments.
+          {activeSection !== "All"
+            ? `No graded submissions yet for ${formatSectionLabel(activeSection)}.`
+            : "No graded submissions yet. Performance charts appear after students complete assessments."}
         </p>
       ) : (
         <>
@@ -105,6 +163,7 @@ export default function SubjectClassAnalyticsPanel({ analytics, loading }) {
                 />
                 <p className={`text-sm font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
                   Major exam averages
+                  {sectionLabel ? ` · ${sectionLabel}` : ""}
                 </p>
               </div>
               <HorizontalBarChart items={analytics.majorExamChart} maxValue={100} />

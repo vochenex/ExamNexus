@@ -123,11 +123,19 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
         { key: "exam_title", label: "Assessment" },
         { key: "subject", label: "Subject" },
         { key: "student_name", label: "Student" },
-        { key: "student_email", label: "Email" },
         { key: "school_id", label: "School ID" },
+        { key: "section", label: "Section" },
+        { key: "department", label: "Department" },
+        { key: "course", label: "Course" },
+        { key: "student_email", label: "Email" },
         { key: "score", label: "Score" },
         { key: "total", label: "Total" },
         { key: "percentage", label: "Percentage" },
+        { key: "correct_count", label: "Correct Count" },
+        { key: "incorrect_count", label: "Incorrect Count" },
+        { key: "correct_question_numbers", label: "Correct Question Nos" },
+        { key: "incorrect_question_numbers", label: "Incorrect Question Nos" },
+        { key: "correct_answers", label: "Answer Key" },
         { key: "submitted_at", label: "Submitted At" },
       ]);
       await finishExport(
@@ -148,7 +156,7 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
     <CollapsiblePanel
       title="Export data"
       subtitle="Download CSV or HTML reports for your subjects and assessments"
-      defaultOpen={false}
+      defaultOpen
     >
       <div className="min-w-0 space-y-4">
         <p className={`text-sm break-words ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>

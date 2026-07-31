@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { UserMinus } from "lucide-react";
 import ProfileAvatar from "./ProfileAvatar";
 import ModalPortal from "./ui/ModalPortal";
 import { useTheme } from "../layouts/ThemeContext";
 import { formatSectionLabel } from "../utils/sections";
 import { getCourseLabel, getDepartmentLabel } from "../utils/academicOptions";
+import { iconButton } from "../utils/themeButtons";
 
 /** Only one student hover preview may be open app-wide. */
 let activePreviewId = null;
@@ -81,7 +83,7 @@ function StudentPreviewPopover({ preview, theme, name, student }) {
   );
 }
 
-export default function FacultyStudentCard({ student }) {
+export default function FacultyStudentCard({ student, canUnenroll = false, onUnenroll }) {
   const { theme } = useTheme();
   const cardRef = useRef(null);
   const previewId = useId();
@@ -189,12 +191,10 @@ export default function FacultyStudentCard({ student }) {
 
   return (
     <>
-      <button
-        ref={cardRef}
-        type="button"
+      <div
         className={`
           en-faculty-student-card
-          flex w-full min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-all duration-200
+          flex w-full min-w-0 items-center gap-2 rounded-xl border p-2.5 transition-all duration-200
           ${
             isActive
               ? theme === "dark"
@@ -205,54 +205,77 @@ export default function FacultyStudentCard({ student }) {
                 : "en-bg-elevated border-emerald-200 hover:border-emerald-300"
           }
         `}
-        onMouseEnter={showPreview}
-        onMouseLeave={closePreview}
-        onFocus={showPreview}
-        onBlur={closePreview}
-        onClick={togglePinned}
-        aria-expanded={isActive}
-        aria-label={`View details for ${name}`}
       >
-        <ProfileAvatar
-          src={student.avatar_url}
-          alt={name}
-          size="sm"
-          className={isActive ? "ring-2 ring-emerald-400/70" : ""}
-        />
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <p
-            className={`truncate text-sm font-semibold ${
-              theme === "dark" ? "text-gray-100" : "text-gray-900"
-            }`}
-          >
-            {name}
-          </p>
-          <p className={`truncate text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
-            {student.school_id ? `ID: ${student.school_id}` : "Student"}
-          </p>
-          {(departmentLabel || courseShort) && (
+        <button
+          ref={cardRef}
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-0.5 text-left"
+          onMouseEnter={showPreview}
+          onMouseLeave={closePreview}
+          onFocus={showPreview}
+          onBlur={closePreview}
+          onClick={togglePinned}
+          aria-expanded={isActive}
+          aria-label={`View details for ${name}`}
+        >
+          <ProfileAvatar
+            src={student.avatar_url}
+            alt={name}
+            size="sm"
+            className={isActive ? "ring-2 ring-emerald-400/70" : ""}
+          />
+          <div className="min-w-0 flex-1 overflow-hidden">
             <p
-              className={`mt-0.5 truncate text-[11px] ${
-                theme === "dark" ? "text-emerald-300/70" : "text-teal-700"
+              className={`truncate text-sm font-semibold ${
+                theme === "dark" ? "text-gray-100" : "text-gray-900"
               }`}
             >
-              {[departmentLabel, courseShort].filter(Boolean).join(" · ")}
+              {name}
             </p>
-          )}
-        </div>
-        <span
-          className={`
-            shrink-0 rounded-lg px-2 py-1 text-xs font-semibold
-            ${
-              theme === "dark"
-                ? "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20"
-                : "bg-cyan-50 text-cyan-800 border border-cyan-200"
-            }
-          `}
-        >
-          {formatSectionLabel(student.section)}
-        </span>
-      </button>
+            <p className={`truncate text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
+              {student.school_id ? `ID: ${student.school_id}` : "Student"}
+            </p>
+            {(departmentLabel || courseShort) && (
+              <p
+                className={`mt-0.5 truncate text-[11px] ${
+                  theme === "dark" ? "text-emerald-300/70" : "text-teal-700"
+                }`}
+              >
+                {[departmentLabel, courseShort].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+          <span
+            className={`
+              shrink-0 rounded-lg px-2 py-1 text-xs font-semibold
+              ${
+                theme === "dark"
+                  ? "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20"
+                  : "bg-cyan-50 text-cyan-800 border border-cyan-200"
+              }
+            `}
+          >
+            {formatSectionLabel(student.section)}
+          </span>
+        </button>
+
+        {canUnenroll && onUnenroll && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setPinned(false);
+              hidePreview();
+              onUnenroll(student);
+            }}
+            className={iconButton(theme, "danger", "!p-1.5")}
+            aria-label={`Unenroll ${name}`}
+            title="Unenroll student"
+          >
+            <UserMinus size={14} />
+          </button>
+        )}
+      </div>
 
       <StudentPreviewPopover
         preview={preview}

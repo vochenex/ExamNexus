@@ -80,16 +80,16 @@ export function AdminStatBadge({ value, label, alert = false }) {
 function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact }) {
   const maxValue = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
   const colWidth = compact ? undefined : 72;
-  const trackHeight = compact ? "88px" : "min(48vh, 220px)";
+  const trackHeight = compact ? "64px" : "min(48vh, 220px)";
   const minTrackWidth = compact
     ? undefined
     : Math.max(items.length * colWidth, Math.min(items.length, 1) * 120);
 
   return (
     <div
-      className={`en-chart-scroll flex items-end gap-1.5 ${
+      className={`en-chart-scroll flex items-end gap-2 ${
         compact
-          ? "h-28 w-full max-w-full justify-between overflow-hidden"
+          ? "min-h-[9.5rem] w-full max-w-full justify-between overflow-x-auto overflow-y-visible pb-1"
           : "h-[min(56vh,260px)] gap-2"
       }`}
       style={
@@ -106,14 +106,14 @@ function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact }) 
         return (
           <div
             key={item.key || item[labelKey]}
-            className={`flex flex-col items-center justify-end gap-1 ${
-              compact ? "min-w-0 w-8 flex-1" : "w-[4.5rem] shrink-0"
+            className={`flex flex-col items-center justify-end gap-1.5 ${
+              compact ? "min-w-[2.75rem] w-10 flex-1" : "w-[4.5rem] shrink-0"
             }`}
             style={!compact ? { width: colWidth } : undefined}
           >
             <span
-              className={`text-[10px] font-bold tabular-nums ${
-                theme === "dark" ? "text-emerald-300" : "text-teal-700"
+              className={`shrink-0 text-center text-xs font-bold tabular-nums leading-none ${
+                theme === "dark" ? "text-emerald-200" : "text-teal-800"
               }`}
             >
               {value}
@@ -131,9 +131,9 @@ function ChartBars({ items, valueKey, labelKey, theme, barClassName, compact }) 
               />
             </div>
             <span
-              className={`w-full text-center text-[9px] font-medium leading-tight ${
+              className={`w-full shrink-0 text-center text-[10px] font-medium leading-tight ${
                 compact ? "truncate" : "break-words"
-              } ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
+              } ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}
               title={label}
             >
               {label}

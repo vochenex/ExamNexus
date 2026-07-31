@@ -12,6 +12,7 @@ const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
 const ProfilePage = lazy(() => import("./pages/shared/ProfilePage"));
 const StudentDashboardPage = lazy(() => import("./pages/Student/StudentDashboardPage"));
 const FacultyDashboardPage = lazy(() => import("./pages/Faculty/FacultyDashboardPage"));
+const FacultyExportsPage = lazy(() => import("./pages/Faculty/FacultyExportsPage"));
 const CreateAssessmentPage = lazy(() => import("./pages/Faculty/CreateAssessmentPage"));
 const FacultySubjectDetailsPage = lazy(() => import("./pages/Faculty/FacultySubjectDetailsPage"));
 const FacultyAssessmentDetailsPage = lazy(() => import("./pages/Faculty/FacultyAssessmentDetailsPage"));
@@ -72,6 +73,7 @@ export default function App() {
           <Route element={<DashboardLayout />}>
             <Route path="/faculty/profile" element={<ProfilePage />} />
             <Route path="/faculty/dashboard" element={<FacultyDashboardPage />} />
+            <Route path="/faculty/exports" element={<FacultyExportsPage />} />
             <Route path="/faculty/platform-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/student/dashboard" element={<StudentDashboardPage />} />
             <Route path="/student/profile" element={<ProfilePage />} />

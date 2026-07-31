@@ -24,7 +24,7 @@ export default function InstallIconButton({ inverted = false, compact = false })
   const [busy, setBusy] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [iosSheetOpen, setIosSheetOpen] = useState(false);
-  const iconSize = compact ? 18 : 22;
+  const iconSize = compact ? 15 : 18;
 
   const closeChooser = useCallback(() => {
     if (busy) return;
@@ -130,7 +130,7 @@ export default function InstallIconButton({ inverted = false, compact = false })
           onClick={openChooser}
           disabled={busy}
           className={`en-install-icon-btn flex shrink-0 items-center justify-center transition-colors duration-150 ${
-            compact ? "h-10 w-10 rounded-xl" : "rounded-2xl p-3.5"
+            compact ? "h-8 w-8 rounded-lg sm:h-9 sm:w-9 sm:rounded-xl" : "rounded-2xl p-3.5"
           } ${
             onDarkSurface
               ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20"

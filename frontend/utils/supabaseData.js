@@ -15,6 +15,7 @@ import { getAuthSession } from "./authUser";
 import {
   gradeStudentAnswer,
   formatStoredAnswer,
+  formatQuestionCorrectAnswers,
   isAutoGradedType,
   normalizeExamTypeForDb,
 } from "./assessmentQuestions";
@@ -450,6 +451,22 @@ export async function unenrollStudentFromSubject(subjectId) {
   return data;
 }
 
+/** Faculty removes a student from a subject they teach. */
+export async function facultyUnenrollStudentFromSubject(subjectId, studentId) {
+  await requireSession();
+
+  const { data, error } = await supabase.rpc(
+    "faculty_unenroll_student_from_subject",
+    {
+      p_subject_id: subjectId,
+      p_student_id: studentId,
+    }
+  );
+
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchStudentEnrollmentSection(studentId, subjectId) {
   const { data, error } = await supabase
     .from("subject_students")
@@ -475,7 +492,7 @@ export async function fetchSubjectAssessments(subjectId) {
   return (data || []).map(enrichExamRecord);
 }
 
-export async function fetchSubjectClassAnalytics(subjectId) {
+export async function fetchSubjectClassAnalytics(subjectId, { sectionFilter = null } = {}) {
   await requireSession();
 
   const exams = await fetchSubjectAssessments(subjectId);
@@ -492,7 +509,41 @@ export async function fetchSubjectClassAnalytics(subjectId) {
 
   if (error) throw error;
 
-  return buildSubjectClassAnalytics(exams, results || []);
+  const normalizedSection = sectionFilter
+    ? String(sectionFilter).trim().toUpperCase()
+    : null;
+
+  let scopedResults = results || [];
+  let scopedExams = exams;
+
+  if (normalizedSection) {
+    const { data: enrollments, error: enrollmentError } = await supabase
+      .from("subject_students")
+      .select("student_id, section")
+      .eq("subject_id", subjectId);
+
+    if (enrollmentError) throw enrollmentError;
+
+    const studentIdsInSection = new Set(
+      (enrollments || [])
+        .filter(
+          (row) => String(row.section || "A").toUpperCase() === normalizedSection
+        )
+        .map((row) => row.student_id)
+    );
+
+    scopedResults = scopedResults.filter((row) =>
+      studentIdsInSection.has(row.student_id)
+    );
+
+    const subject = await fetchSubject(subjectId).catch(() => null);
+    const availableSections = getSubjectSections(subject);
+    scopedExams = exams.filter((exam) =>
+      isVisibleToSection(exam.target_sections, normalizedSection, availableSections)
+    );
+  }
+
+  return buildSubjectClassAnalytics(scopedExams, scopedResults);
 }
 
 export async function fetchSubjectStudentAnalytics(subjectId) {
@@ -591,32 +642,141 @@ export async function fetchFacultyExportResults(teacherSchoolId, examId = null) 
     .from("exam_results")
     .select(`
       exam_id,
+      student_id,
       score,
       total,
       created_at,
-      exams(title, subjects(name)),
-      users(first_name, last_name, email, school_id)
+      exams(id, title, subject_id, exam_type, subjects(name)),
+      users(first_name, last_name, email, school_id, department, course)
     `)
     .in("exam_id", examIds)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
-  return (data || []).map((row) => {
+  const rows = data || [];
+  const subjectIds = [
+    ...new Set(
+      rows
+        .map((row) => row.exams?.subject_id)
+        .filter(Boolean)
+        .map(String)
+    ),
+  ];
+
+  const sectionByKey = new Map();
+  if (subjectIds.length) {
+    const { data: enrollments } = await supabase
+      .from("subject_enrollments")
+      .select("subject_id, student_id, section")
+      .in("subject_id", subjectIds);
+
+    for (const enrollment of enrollments || []) {
+      sectionByKey.set(
+        `${enrollment.subject_id}:${enrollment.student_id}`,
+        String(enrollment.section || "A").toUpperCase()
+      );
+    }
+  }
+
+  const { data: questionRows } = await supabase
+    .from("questions")
+    .select(
+      "id, exam_id, question, question_type, option_a, option_b, option_c, option_d, correct_answer, correct_answers, created_at"
+    )
+    .in("exam_id", examIds)
+    .order("created_at", { ascending: true });
+
+  const questionsByExam = new Map();
+  const questionIds = [];
+  for (const question of questionRows || []) {
+    questionIds.push(question.id);
+    if (!questionsByExam.has(question.exam_id)) {
+      questionsByExam.set(question.exam_id, []);
+    }
+    questionsByExam.get(question.exam_id).push(question);
+  }
+
+  const answersByStudentExam = new Map();
+  if (questionIds.length) {
+    const { data: answerRows } = await supabase
+      .from("student_answers")
+      .select("question_id, student_id, is_correct, answer")
+      .in("question_id", questionIds);
+
+    const questionExamById = new Map(
+      (questionRows || []).map((question) => [question.id, question.exam_id])
+    );
+
+    for (const answer of answerRows || []) {
+      const examKey = questionExamById.get(answer.question_id);
+      if (!examKey) continue;
+      const key = `${examKey}:${answer.student_id}`;
+      if (!answersByStudentExam.has(key)) {
+        answersByStudentExam.set(key, []);
+      }
+      answersByStudentExam.get(key).push(answer);
+    }
+  }
+
+  return rows.map((row) => {
     const total = Number(row.total) || 0;
     const score = Number(row.score) || 0;
     const pct = total > 0 ? Math.round((score / total) * 1000) / 10 : 0;
     const student = row.users || {};
+    const subjectId = row.exams?.subject_id;
+    const section =
+      sectionByKey.get(`${subjectId}:${row.student_id}`) || "";
+    const examQuestions = questionsByExam.get(row.exam_id) || [];
+    const studentAnswers = answersByStudentExam.get(`${row.exam_id}:${row.student_id}`) || [];
+    const answerByQuestion = new Map(
+      studentAnswers.map((answer) => [answer.question_id, answer])
+    );
+
+    let correctCount = 0;
+    let incorrectCount = 0;
+    const correctQuestionNumbers = [];
+    const incorrectQuestionNumbers = [];
+    const correctAnswerKeys = [];
+
+    examQuestions.forEach((question, index) => {
+      const number = index + 1;
+      const answer = answerByQuestion.get(question.id);
+      const keyAnswers = formatQuestionCorrectAnswers(
+        question,
+        row.exams?.exam_type || question.question_type
+      );
+      if (keyAnswers.length) {
+        correctAnswerKeys.push(`Q${number}: ${keyAnswers.join(" | ")}`);
+      }
+
+      if (answer?.is_correct === true) {
+        correctCount += 1;
+        correctQuestionNumbers.push(String(number));
+      } else if (answer?.is_correct === false) {
+        incorrectCount += 1;
+        incorrectQuestionNumbers.push(String(number));
+      }
+    });
 
     return {
       exam_title: row.exams?.title || "",
       subject: row.exams?.subjects?.name || "",
-      student_name: [student.first_name, student.last_name].filter(Boolean).join(" ") || "Student",
+      student_name:
+        [student.first_name, student.last_name].filter(Boolean).join(" ") || "Student",
       student_email: student.email || "",
       school_id: student.school_id || "",
+      section: section ? `Section ${section}` : "",
+      department: student.department || "",
+      course: student.course || "",
       score,
       total,
       percentage: pct,
+      correct_count: correctCount,
+      incorrect_count: incorrectCount,
+      correct_question_numbers: correctQuestionNumbers.join(", "),
+      incorrect_question_numbers: incorrectQuestionNumbers.join(", "),
+      correct_answers: correctAnswerKeys.join("; "),
       submitted_at: row.created_at,
     };
   });
@@ -785,7 +945,27 @@ export async function updateUserProfile(userId, fields) {
     payload
   );
 
+  const syncAuthMetadata = async () => {
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          first_name: base.first_name || null,
+          last_name: base.last_name || null,
+          gender: fields.gender || null,
+          department: fields.department || null,
+          course: fields.course || null,
+          year_level: yearLevel,
+          age: Number.isFinite(parsedAge) ? parsedAge : null,
+          avatar_url: fields.avatar_url || null,
+        },
+      });
+    } catch {
+      // Profile row save still succeeds if metadata sync fails.
+    }
+  };
+
   if (!rpcError && rpcData) {
+    await syncAuthMetadata();
     return rpcData;
   }
 
@@ -807,6 +987,7 @@ export async function updateUserProfile(userId, fields) {
   );
 
   if (!upsertError && upserted) {
+    await syncAuthMetadata();
     return upserted;
   }
 
@@ -838,6 +1019,7 @@ export async function updateUserProfile(userId, fields) {
     );
   }
 
+  await syncAuthMetadata();
   return data;
 }
 
@@ -866,9 +1048,7 @@ export async function createExam(examPayload, questions) {
     target_sections: normalizeTargetSections(examPayload.target_sections),
     instructions: examPayload.instructions || "",
     shuffle_questions: Boolean(examPayload.shuffle_questions),
-    lock_completed_sections:
-      Boolean(examPayload.lock_completed_sections) ||
-      Boolean(examPayload.shuffle_questions),
+    lock_completed_sections: Boolean(examPayload.lock_completed_sections),
     allow_review: examPayload.allow_review !== false,
     allow_student_view: examPayload.show_result !== false,
     allow_question_review:
@@ -1277,8 +1457,7 @@ export async function updateExam(examId, exam, questions) {
     target_sections: normalizeTargetSections(exam.target_sections),
     instructions: exam.instructions || "",
     shuffle_questions: Boolean(exam.shuffle_questions),
-    lock_completed_sections:
-      Boolean(exam.lock_completed_sections) || Boolean(exam.shuffle_questions),
+    lock_completed_sections: Boolean(exam.lock_completed_sections),
     allow_review: exam.allow_review !== false,
     allow_student_view: exam.show_result !== false,
     allow_question_review:
@@ -1589,6 +1768,7 @@ function mapRpcAnalyticsResults(rows = []) {
     score: row.score,
     total: row.total,
     student_id: row.student_id,
+    created_at: row.created_at || row.submitted_at || null,
     users: {
       id: row.student_id,
       first_name: row.first_name,
@@ -1623,6 +1803,7 @@ async function loadExamFacultyAnalyticsPayload(examId) {
       score,
       total,
       student_id,
+      created_at,
       users:student_id (
         id,
         first_name,

@@ -50,8 +50,8 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
     ? "Generation complete"
     : status === "waiting"
       ? phase === "reading"
-        ? "Gemini is reading your document"
-        : "Gemini is generating questions"
+        ? "AI is reading your document"
+        : "AI is generating questions"
       : phase === "reading"
         ? "Reading document"
         : phase === "planning"
@@ -66,8 +66,8 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
     ? `${questionCount} question${questionCount === 1 ? "" : "s"} ready to review below`
     : status === "waiting"
       ? total
-        ? `Working toward ${total} question${total === 1 ? "" : "s"}… (paced for Gemini free-tier limits)`
-        : "Pacing requests for Gemini free-tier limits…"
+        ? `Working toward ${total} question${total === 1 ? "" : "s"}…`
+        : "Pacing AI requests…"
       : current && total
         ? `Question ${current} of ${total}${latestType ? ` · ${formatLabel(latestType)}` : ""}`
         : null;

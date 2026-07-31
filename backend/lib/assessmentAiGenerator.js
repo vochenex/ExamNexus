@@ -54,7 +54,40 @@ function getChunkSize() {
 }
 
 function questionDedupeKey(question) {
-  return String(question?.question || "").trim().toLowerCase();
+  return String(question?.question || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function questionsLookSimilar(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  const wordsA = new Set(a.split(" ").filter((w) => w.length > 2));
+  const wordsB = new Set(b.split(" ").filter((w) => w.length > 2));
+  if (!wordsA.size || !wordsB.size) return false;
+  let overlap = 0;
+  for (const word of wordsA) {
+    if (wordsB.has(word)) overlap += 1;
+  }
+  const ratio = overlap / Math.min(wordsA.size, wordsB.size);
+  return ratio >= 0.72;
+}
+
+function isDuplicateQuestion(question, seenKeys, existingKeys = []) {
+  const key = questionDedupeKey(question);
+  if (!key) return true;
+  if (seenKeys.has(key)) return true;
+  for (const existing of existingKeys) {
+    if (questionsLookSimilar(key, existing)) return true;
+  }
+  for (const existing of seenKeys) {
+    if (questionsLookSimilar(key, existing)) return true;
+  }
+  return false;
 }
 
 function clampQuestionCount(value) {
@@ -501,7 +534,7 @@ async function requestAiQuestionsBatched({
   const absorbQuestions = (items) => {
     for (const item of items) {
       const key = questionDedupeKey(item);
-      if (!key || seen.has(key)) continue;
+      if (!key || isDuplicateQuestion(item, seen)) continue;
       seen.add(key);
       questions.push(item);
       if (questions.length >= count) break;
@@ -559,16 +592,16 @@ async function requestAiQuestionsBatched({
     const step = questions.length;
     const format = pickFormatForStep(allowedFormats, step);
     const recent = questions
-      .slice(-5)
       .map((item) => item.question)
       .filter(Boolean)
+      .slice(-12)
       .join(" | ");
 
     const result = await requestSingleAiQuestion({
       sourceText,
       topicPrompt,
       additionalInstructions: recent
-        ? `${additionalInstructions}\nAvoid duplicating: ${recent}`
+        ? `${additionalInstructions}\nDo not repeat or paraphrase any of these existing questions: ${recent}`
         : additionalInstructions,
       format,
       difficulty,
@@ -587,7 +620,7 @@ async function requestAiQuestionsBatched({
     }
 
     const key = questionDedupeKey(result.question);
-    if (key && !seen.has(key)) {
+    if (key && !isDuplicateQuestion(result.question, seen)) {
       seen.add(key);
       questions.push(result.question);
     }
@@ -636,7 +669,8 @@ Rules:
 - essay: no answer field required.
 - Questions must be clear, classroom-appropriate, and aligned with the ${mode} content.
 - Difficulty target: ${difficulty}.
-
+- Every question must be unique. Do not repeat the same stem, near-paraphrase, topic angle, or answer set.
+- Prefer distinct concepts across the set; never create copy-paste variations of the same question.
 JSON shape:
 {
   "suggestedTitle": "short title",

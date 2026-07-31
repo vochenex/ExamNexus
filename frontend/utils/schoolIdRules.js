@@ -9,12 +9,21 @@ export function normalizeRole(role) {
 export function getSchoolIdRule(role) {
   const normalized = normalizeRole(role);
 
-  if (normalized === "admin" || normalized === "faculty") {
+  if (normalized === "admin") {
     return {
       min: 3,
       max: 3,
       label: "exactly 3 numbers",
       example: "123",
+    };
+  }
+
+  if (normalized === "faculty") {
+    return {
+      min: 5,
+      max: 5,
+      label: "exactly 5 numbers",
+      example: "12345",
     };
   }
 
@@ -84,6 +93,7 @@ export function validateSchoolIdAnyRole(value) {
   const valid =
     raw === normalized &&
     (/^\d{3}$/.test(normalized) ||
+      /^\d{5}$/.test(normalized) ||
       (normalized.length >= 9 && normalized.length <= 13));
 
   return {
@@ -91,6 +101,6 @@ export function validateSchoolIdAnyRole(value) {
     normalized,
     message: valid
       ? ""
-      : "Enter either a 3-digit admin/faculty ID or a 9 to 13-digit student ID.",
+      : "Enter a 3-digit admin ID, 5-digit faculty ID, or 9 to 13-digit student ID.",
   };
 }

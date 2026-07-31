@@ -1,4 +1,28 @@
-export function HeroIllustration({ className = "" }) {
+export function HeroIllustration({ className = "", theme = "dark" }) {
+  const isDark = theme !== "light";
+
+  const ground = isDark ? "rgba(16, 185, 129, 0.18)" : "rgba(13, 148, 136, 0.22)";
+  const panel = isDark ? "rgba(16, 185, 129, 0.28)" : "#ffffff";
+  const panelStroke = isDark ? "rgba(52, 211, 153, 0.35)" : "rgba(13, 148, 136, 0.45)";
+  const screen = isDark ? "rgba(34, 211, 238, 0.28)" : "#ecfeff";
+  const line = isDark ? "rgba(110, 231, 183, 0.55)" : "#0f766e";
+  const lineSoft = isDark ? "rgba(110, 231, 183, 0.35)" : "#14b8a6";
+  const badgeFill = isDark ? "rgba(52, 211, 153, 0.35)" : "#d1fae5";
+  const badgeText = isDark ? "#6ee7b7" : "#0f766e";
+  const badgeCyanFill = isDark ? "rgba(34, 211, 238, 0.3)" : "#cffafe";
+  const badgeCyanText = isDark ? "#5eead4" : "#0e7490";
+  const skinLeft = isDark ? "#fcd9b6" : "#d4a574";
+  const skinRight = isDark ? "#e8c4a8" : "#c4936a";
+  const skinCenter = isDark ? "#f5d0b5" : "#d2a07a";
+  const shirtLeft = isDark ? "#10b981" : "#047857";
+  const shirtRight = isDark ? "#14b8a6" : "#0f766e";
+  const shirtCenter = isDark ? "#047857" : "#065f46";
+  const device = isDark ? "#064e3b" : "#134e4a";
+  const hair = isDark ? "#1f2937" : "#111827";
+  const hairDark = isDark ? "#3f2e1f" : "#292524";
+  const collar = isDark ? "#fef3c7" : "#f59e0b";
+  const accentDot = isDark ? "#34d399" : "#059669";
+
   return (
     <svg
       viewBox="0 0 520 380"
@@ -7,36 +31,45 @@ export function HeroIllustration({ className = "" }) {
       className={className}
       aria-hidden="true"
     >
-      <ellipse cx="260" cy="340" rx="200" ry="24" fill="currentColor" className="text-emerald-500/15" />
-      <rect x="140" y="120" width="240" height="150" rx="16" fill="currentColor" className="text-emerald-500/20" />
-      <rect x="155" y="135" width="210" height="100" rx="8" fill="currentColor" className="text-cyan-400/25" />
-      <circle cx="195" cy="175" r="6" fill="#34d399" />
-      <rect x="210" y="170" width="120" height="8" rx="4" fill="currentColor" className="text-emerald-300/40" />
-      <rect x="210" y="188" width="90" height="8" rx="4" fill="currentColor" className="text-emerald-300/30" />
-      <rect x="210" y="206" width="105" height="8" rx="4" fill="currentColor" className="text-emerald-300/25" />
+      <ellipse cx="260" cy="340" rx="200" ry="24" fill={ground} />
+      <rect
+        x="140"
+        y="120"
+        width="240"
+        height="150"
+        rx="16"
+        fill={panel}
+        stroke={panelStroke}
+        strokeWidth="2"
+      />
+      <rect x="155" y="135" width="210" height="100" rx="8" fill={screen} stroke={panelStroke} strokeWidth="1.5" />
+      <circle cx="195" cy="175" r="6" fill={accentDot} />
+      <rect x="210" y="170" width="120" height="8" rx="4" fill={line} />
+      <rect x="210" y="188" width="90" height="8" rx="4" fill={lineSoft} />
+      <rect x="210" y="206" width="105" height="8" rx="4" fill={lineSoft} />
       {/* Student left */}
-      <circle cx="95" cy="200" r="28" fill="#fcd9b6" />
-      <path d="M67 248c8-28 48-28 56 0v52H67V248z" fill="#10b981" />
-      <rect x="78" y="230" width="34" height="22" rx="4" fill="#064e3b" />
+      <circle cx="95" cy="200" r="28" fill={skinLeft} stroke={isDark ? "none" : "#a16207"} strokeWidth={isDark ? 0 : 1} />
+      <path d="M67 248c8-28 48-28 56 0v52H67V248z" fill={shirtLeft} />
+      <rect x="78" y="230" width="34" height="22" rx="4" fill={device} />
       {/* Student right */}
-      <circle cx="425" cy="195" r="26" fill="#e8c4a8" />
-      <path d="M399 240c8-26 44-26 52 0v48H399V240z" fill="#14b8a6" />
-      <circle cx="425" cy="188" r="20" fill="#3f2e1f" opacity="0.85" />
+      <circle cx="425" cy="195" r="26" fill={skinRight} stroke={isDark ? "none" : "#a16207"} strokeWidth={isDark ? 0 : 1} />
+      <path d="M399 240c8-26 44-26 52 0v48H399V240z" fill={shirtRight} />
+      <circle cx="425" cy="188" r="20" fill={hairDark} opacity="0.9" />
       {/* Faculty center */}
-      <circle cx="260" cy="88" r="32" fill="#f5d0b5" />
-      <path d="M228 138c10-34 54-34 64 0v58H228V138z" fill="#047857" />
-      <rect x="238" y="118" width="44" height="8" rx="4" fill="#fef3c7" />
-      <path d="M248 78h24v6c0 8-6 14-12 14s-12-6-12-14v-6z" fill="#1f2937" />
+      <circle cx="260" cy="88" r="32" fill={skinCenter} stroke={isDark ? "none" : "#a16207"} strokeWidth={isDark ? 0 : 1} />
+      <path d="M228 138c10-34 54-34 64 0v58H228V138z" fill={shirtCenter} />
+      <rect x="238" y="118" width="44" height="8" rx="4" fill={collar} />
+      <path d="M248 78h24v6c0 8-6 14-12 14s-12-6-12-14v-6z" fill={hair} />
       {/* Floating badges */}
       <g className="en-home-float">
-        <rect x="360" y="60" width="72" height="36" rx="10" fill="currentColor" className="text-emerald-400/30" />
-        <text x="396" y="83" textAnchor="middle" fill="#6ee7b7" fontSize="11" fontWeight="600">
+        <rect x="360" y="60" width="72" height="36" rx="10" fill={badgeFill} stroke={panelStroke} strokeWidth="1.5" />
+        <text x="396" y="83" textAnchor="middle" fill={badgeText} fontSize="11" fontWeight="700">
           A+
         </text>
       </g>
       <g className="en-home-float-delay">
-        <rect x="48" y="70" width="88" height="32" rx="10" fill="currentColor" className="text-cyan-400/25" />
-        <text x="92" y="91" textAnchor="middle" fill="#5eead4" fontSize="10" fontWeight="600">
+        <rect x="48" y="70" width="88" height="32" rx="10" fill={badgeCyanFill} stroke={panelStroke} strokeWidth="1.5" />
+        <text x="92" y="91" textAnchor="middle" fill={badgeCyanText} fontSize="10" fontWeight="700">
           On time
         </text>
       </g>

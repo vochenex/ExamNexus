@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  FileSpreadsheet,
   Pencil,
   RotateCcw,
   Shield,
@@ -25,11 +26,14 @@ import {
   deleteExam,
   fetchExamFacultyAnalytics,
   fetchExamWithQuestions,
+  fetchFacultyExportResults,
 } from "../../utils/supabaseData";
 import { getAssessmentStatus } from "../../utils/assessmentStatus";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import { downloadCsv } from "../../utils/exportCsv";
+import { getCachedExamNexusUser } from "../../utils/authUser";
 
 const TABS = [
   { id: "analytics", label: "Analytics", icon: BarChart3 },
@@ -114,6 +118,8 @@ export default function AssessmentDetails() {
   const [bankSaveOpen, setBankSaveOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("analytics");
   const [headerOpen, setHeaderOpen] = useState(true);
+  const [exportingResults, setExportingResults] = useState(false);
+  const teacherSchoolId = getCachedExamNexusUser()?.school_id || "";
 
   const reloadAnalytics = useCallback(
     async (questionList, examRecord, { silent = false } = {}) => {
@@ -158,6 +164,55 @@ export default function AssessmentDetails() {
   );
 
   usePolling(load, [examId]);
+
+  const handleExportResults = async () => {
+    if (!teacherSchoolId) {
+      showError("Missing faculty school ID. Re-login and try again.");
+      return;
+    }
+    try {
+      setExportingResults(true);
+      const rows = await fetchFacultyExportResults(teacherSchoolId, examId);
+      if (!rows.length) {
+        showError("No results to export yet.");
+        return;
+      }
+      const result = await downloadCsv(
+        `examnexus-results-${examId}.csv`,
+        rows,
+        [
+          { key: "exam_title", label: "Assessment" },
+          { key: "subject", label: "Subject" },
+          { key: "student_name", label: "Student" },
+          { key: "school_id", label: "School ID" },
+          { key: "section", label: "Section" },
+          { key: "department", label: "Department" },
+          { key: "course", label: "Course" },
+          { key: "student_email", label: "Email" },
+          { key: "score", label: "Score" },
+          { key: "total", label: "Total" },
+          { key: "percentage", label: "Percentage" },
+          { key: "correct_count", label: "Correct Count" },
+          { key: "incorrect_count", label: "Incorrect Count" },
+          { key: "correct_question_numbers", label: "Correct Question Nos" },
+          { key: "incorrect_question_numbers", label: "Incorrect Question Nos" },
+          { key: "correct_answers", label: "Answer Key" },
+          { key: "submitted_at", label: "Submitted At" },
+        ]
+      );
+      if (result?.ok) {
+        await showSuccess(
+          result.shared
+            ? "Export ready — you chose where to save the results CSV."
+            : "Results CSV saved to your downloads."
+        );
+      }
+    } catch (err) {
+      showError(err.message || "Export failed.");
+    } finally {
+      setExportingResults(false);
+    }
+  };
 
   const handleDelete = async () => {
     const ok = await confirm({
@@ -290,6 +345,23 @@ export default function AssessmentDetails() {
                 >
                   <Pencil size={16} />
                 </button>
+
+                <ProgressButton
+                  type="button"
+                  onClick={handleExportResults}
+                  loading={exportingResults}
+                  loadingLabel="Exporting results"
+                  iconOnly
+                  className={`${actionButtonBase} ${
+                    theme === "dark"
+                      ? "border border-amber-400/35 bg-amber-500/15 text-amber-100"
+                      : "border border-amber-500/30 bg-amber-50 text-amber-900"
+                  }`}
+                  aria-label="Export results CSV"
+                  title="Export results CSV"
+                >
+                  <FileSpreadsheet size={16} />
+                </ProgressButton>
 
                 <button
                   type="button"

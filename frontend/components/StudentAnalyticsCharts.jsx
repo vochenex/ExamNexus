@@ -67,15 +67,23 @@ export function HorizontalBarChart({ items, valueKey = "value", labelKey = "labe
         return (
           <div key={item.key || item[labelKey]}>
             <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
-              <span className={`font-medium truncate ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
+              <span
+                className={`min-w-0 flex-1 truncate font-semibold ${
+                  theme === "dark" ? "text-gray-100" : "text-gray-900"
+                }`}
+              >
                 {item[labelKey]}
               </span>
-              <span className={`shrink-0 font-semibold ${theme === "dark" ? "text-emerald-400" : "text-teal-700"}`}>
+              <span
+                className={`shrink-0 text-sm font-bold tabular-nums ${
+                  theme === "dark" ? "text-emerald-300" : "text-teal-800"
+                }`}
+              >
                 {value}%
               </span>
             </div>
             <div
-              className={`h-2.5 overflow-hidden rounded-full ${
+              className={`h-3 overflow-hidden rounded-full ${
                 theme === "dark" ? "bg-white/10" : "en-skeleton-bone"
               }`}
             >
@@ -91,7 +99,11 @@ export function HorizontalBarChart({ items, valueKey = "value", labelKey = "labe
               />
             </div>
             {item.meta && (
-              <p className={`mt-1 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+              <p
+                className={`mt-1 text-xs font-medium ${
+                  theme === "dark" ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
                 {item.meta}
               </p>
             )}

@@ -63,8 +63,9 @@ export default function AdminLayout() {
       }`}
     >
       {!mobileNav && (
+      <div className="relative sticky top-0 z-40 flex h-screen shrink-0">
       <aside
-        className={`${motion.slideInLeft} en-sidebar-shell sticky top-0 flex h-screen shrink-0 flex-col border-r backdrop-blur-xl ${
+        className={`${motion.slideInLeft} en-sidebar-shell flex h-screen shrink-0 flex-col border-r backdrop-blur-xl ${
           collapsed ? "w-[4.75rem] p-2.5" : "w-72 p-4"
         } ${
           theme === "dark"
@@ -100,18 +101,6 @@ export default function AdminLayout() {
               </p>
             </div>
           </div>
-        </div>
-
-        <div
-          className={`mt-3 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            collapsed ? "flex justify-center" : ""
-          }`}
-        >
-          <SidebarCollapseToggle
-            collapsed={collapsed}
-            onToggle={toggleCollapsed}
-            theme={theme}
-          />
         </div>
 
         <nav
@@ -205,6 +194,13 @@ export default function AdminLayout() {
           </div>
         </div>
       </aside>
+      <SidebarCollapseToggle
+        collapsed={collapsed}
+        onToggle={toggleCollapsed}
+        theme={theme}
+        className="absolute right-0 top-1/2 z-50 translate-x-1/2 -translate-y-1/2"
+      />
+      </div>
       )}
 
       <main
@@ -228,11 +224,11 @@ export default function AdminLayout() {
           </header>
         ) : (
           <div
-            className={`absolute right-8 top-6 z-40 flex items-center gap-3 ${motion.fadeInDown} en-delay-2`}
+            className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
           >
-            <InstallIconButton />
-            <ThemeToggle />
-            <NotificationBell />
+            <InstallIconButton compact />
+            <ThemeToggle compact />
+            <NotificationBell compact />
           </div>
         )}
         <div

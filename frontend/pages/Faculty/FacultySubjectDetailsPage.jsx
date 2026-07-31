@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
-import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search} from "lucide-react";
+import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search, Plus} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
-import { iconButton, primaryButton, secondaryButtonSm } from "../../utils/themeButtons";
+import { iconButton, secondaryButtonSm } from "../../utils/themeButtons";
 import {
+  facultyUnenrollStudentFromSubject,
   fetchSubject,
   fetchSubjectAssessments,
   fetchSubjectClassAnalytics,
@@ -25,11 +26,13 @@ import SubjectStudentRatingsSidebar from "../../components/SubjectStudentRatings
 import SectionTabs from "../../components/SectionTabs";
 import SubjectFacultyCard from "../../components/SubjectFacultyCard";
 import ModalPortal from "../../components/ui/ModalPortal";
+import ActionDialog from "../../components/ui/ActionDialog";
 import {
   buildSectionCounts,
   formatSubjectSectionsLabel,
   formatTargetSectionsLabel,
   getSubjectSections,
+  isVisibleToSection,
 } from "../../utils/sections";
 import YearLevelBadge from "../../components/YearLevelBadge";
 import EditSubjectModal from "../../components/EditSubjectModal";
@@ -38,7 +41,6 @@ import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPa
 import { pageShellWithBellClass } from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
-import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
 import { inputClass } from "../../utils/themeInputs";
 import { matchesStudentSearch } from "../../utils/studentSearch";
 
@@ -79,7 +81,10 @@ export default function SubjectDetails() {
   const [ratingsOpen, setRatingsOpen] = useState(false);
   const [faculty, setFaculty] = useState(null);
   const [activeSection, setActiveSection] = useState("All");
+  const [performanceSection, setPerformanceSection] = useState("All");
   const [studentSearch, setStudentSearch] = useState("");
+  const [unenrollTarget, setUnenrollTarget] = useState(null);
+  const [unenrolling, setUnenrolling] = useState(false);
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
   const [facultyProfile, setFacultyProfile] = useState(cachedUser);
   const [loading, setLoading] = useState(true);
@@ -130,17 +135,19 @@ export default function SubjectDetails() {
   const loadAnalytics = useCallback(async (silent = false) => {
     if (!silent) setAnalyticsLoading(true);
     try {
-      const data = await fetchSubjectClassAnalytics(subjectId);
+      const data = await fetchSubjectClassAnalytics(subjectId, {
+        sectionFilter: performanceSection === "All" ? null : performanceSection,
+      });
       setClassAnalytics(data);
     } catch (err) {
       console.error(err);
     } finally {
       if (!silent) setAnalyticsLoading(false);
     }
-  }, [subjectId]);
+  }, [subjectId, performanceSection]);
 
   usePolling(loadSubjectPage, [subjectId]);
-  usePolling(loadAnalytics, [subjectId]);
+  usePolling(loadAnalytics, [subjectId, performanceSection]);
 
   const loadStudentRatings = useCallback(async (silent = false) => {
     if (!silent) setRatingsLoading(true);
@@ -191,16 +198,48 @@ export default function SubjectDetails() {
   const subjectSections = getSubjectSections(subject);
   const sectionCounts = buildSectionCounts(classmates, subjectSections);
 
+  const sortedClassmates = [...classmates].sort((a, b) => {
+    const aName = `${a.first_name || ""} ${a.last_name || ""}`.trim().toLowerCase();
+    const bName = `${b.first_name || ""} ${b.last_name || ""}`.trim().toLowerCase();
+    return (
+      aName.localeCompare(bName) ||
+      String(a.school_id || "").localeCompare(String(b.school_id || ""))
+    );
+  });
+
   const filteredClassmates =
     activeSection === "All"
-      ? classmates
-      : classmates.filter(
+      ? sortedClassmates
+      : sortedClassmates.filter(
           (c) => String(c.section || "A").toUpperCase() === activeSection
         );
 
   const visibleClassmates = filteredClassmates.filter((student) =>
     matchesStudentSearch(student, studentSearch)
   );
+
+  const visibleAssessments =
+    activeSection === "All"
+      ? assessments
+      : assessments.filter((assessment) =>
+          isVisibleToSection(assessment.target_sections, activeSection, subjectSections)
+        );
+
+  const handleConfirmUnenroll = async () => {
+    if (!unenrollTarget) return;
+    try {
+      setUnenrolling(true);
+      await facultyUnenrollStudentFromSubject(subjectId, unenrollTarget.id);
+      setClassmates((prev) => prev.filter((row) => row.id !== unenrollTarget.id));
+      setStudentRatings((prev) => prev.filter((row) => row.id !== unenrollTarget.id));
+      setUnenrollTarget(null);
+      loadAnalytics(true);
+    } catch (err) {
+      showError(err.message || "Failed to unenroll student.");
+    } finally {
+      setUnenrolling(false);
+    }
+  };
 
   return (
  <div className={pageShellWithBellClass(theme)}>
@@ -285,19 +324,27 @@ export default function SubjectDetails() {
       </div>
 
       {/* CREATE ASSESSMENT + SOCIAL */}
-      <div className="mb-6 flex flex-wrap gap-3 min-w-0">
+      <div className="mb-6 flex flex-wrap items-center gap-3 min-w-0">
         <button
-        onClick={() => {
-          if (!requireFacultyAvatar()) return;
-          setShowAssessmentModal(true);
-        }}
-        disabled={!facultyCanManage}
-        className={primaryButton(theme, "rounded-lg px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed")}
-      >
-        + Create Assessment
-      </button>
+          type="button"
+          onClick={() => {
+            if (!requireFacultyAvatar()) return;
+            setShowAssessmentModal(true);
+          }}
+          disabled={!facultyCanManage}
+          className={iconButton(
+            theme,
+            "primary",
+            "gap-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+          title="Create assessment"
+        >
+          <Plus size={18} />
+          <span className="text-sm font-semibold">Create Assessment</span>
+        </button>
 
         <button
+          type="button"
           onClick={() => navigate(`/faculty/subject/${subjectId}/social`)}
           disabled={!facultyCanManage}
           className={iconButton(theme, "primary", "disabled:opacity-50 disabled:cursor-not-allowed")}
@@ -373,13 +420,7 @@ export default function SubjectDetails() {
             sections={subjectSections}
           />
 
-          <div
-            className={`mt-4 min-w-0 space-y-2 ${
-              visibleClassmates.length > 8
-                ? "max-h-[min(28rem,60vh)] overflow-y-auto overscroll-contain pr-1"
-                : ""
-            }`}
-          >
+          <div className="mt-4 min-w-0 max-h-[min(28rem,60vh)] space-y-2 overflow-y-auto overscroll-contain pr-1">
             {visibleClassmates.length === 0 ? (
               <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
                 {studentSearch.trim()
@@ -388,25 +429,52 @@ export default function SubjectDetails() {
               </p>
             ) : (
               visibleClassmates.map((student) => (
-                <FacultyStudentCard key={student.id} student={student} />
+                <FacultyStudentCard
+                  key={student.id}
+                  student={student}
+                  canUnenroll={facultyCanManage}
+                  onUnenroll={
+                    facultyCanManage
+                      ? () => setUnenrollTarget(student)
+                      : undefined
+                  }
+                />
               ))
             )}
           </div>
         </div>
 
         {/* ASSESSMENTS */}
-        <CollapsiblePanel
-          title="Assessments"
-          subtitle={`${assessments.length} assessment${assessments.length === 1 ? "" : "s"} for this subject`}
-          defaultOpen={assessments.length > 0 && assessments.length <= 4}
-          className="mb-4"
+        <div
+          className={`mb-4 rounded-2xl border p-5 ${
+            theme === "dark"
+              ? "bg-white/5 border border-white/10"
+              : "en-bg-surface border border-emerald-300"
+          }`}
         >
-          {assessments.length === 0 ? (
+          <div className="mb-4">
+            <h2
+              className={`font-semibold text-lg ${
+                theme === "dark" ? "text-emerald-400" : "text-teal-700"
+              }`}
+            >
+              Assessments
+            </h2>
+            <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-700"}`}>
+              {activeSection === "All"
+                ? `${assessments.length} assessment${assessments.length === 1 ? "" : "s"} for this subject`
+                : `${visibleAssessments.length} assessment${visibleAssessments.length === 1 ? "" : "s"} for Section ${activeSection} · tap All Sections to see every post`}
+            </p>
+          </div>
+
+          {visibleAssessments.length === 0 ? (
             <p className={theme === "dark" ? "text-white" : "text-black"}>
-              No assessments yet
+              {assessments.length === 0
+                ? "No assessments yet"
+                : `No assessments posted for Section ${activeSection}.`}
             </p>
           ) : (
-            assessments.map((assessment) => (
+            visibleAssessments.map((assessment) => (
               <div
                 key={assessment.id}
                 onClick={() => navigate(`/faculty/assessment/${assessment.id}`)}
@@ -500,10 +568,20 @@ export default function SubjectDetails() {
               </div>
             ))
           )}
-        </CollapsiblePanel>
+        </div>
 
         {/* ANALYTICS */}
-        <SubjectClassAnalyticsPanel analytics={classAnalytics} loading={analyticsLoading} />
+        <SubjectClassAnalyticsPanel
+          analytics={classAnalytics}
+          loading={analyticsLoading}
+          sectionLabel={
+            performanceSection === "All" ? null : `Section ${performanceSection}`
+          }
+          sections={subjectSections}
+          activeSection={performanceSection}
+          onSectionChange={setPerformanceSection}
+          sectionCounts={sectionCounts}
+        />
 
       </div>
       {showAssessmentModal && (
@@ -752,14 +830,35 @@ export default function SubjectDetails() {
         onClose={() => setShowEditSubjectModal(false)}
         onSaved={(updated) => {
           setSubject(updated);
+          const nextSections = getSubjectSections(updated);
           if (
             activeSection !== "All" &&
-            !getSubjectSections(updated).includes(activeSection)
+            !nextSections.includes(activeSection)
           ) {
             setActiveSection("All");
           }
+          if (
+            performanceSection !== "All" &&
+            !nextSections.includes(performanceSection)
+          ) {
+            setPerformanceSection("All");
+          }
         }}
       />
+      <ActionDialog
+        open={Boolean(unenrollTarget)}
+        title="Unenroll student?"
+        confirmLabel="Unenroll"
+        cancelLabel="Keep enrolled"
+        tone="danger"
+        loading={unenrolling}
+        onConfirm={handleConfirmUnenroll}
+        onCancel={() => setUnenrollTarget(null)}
+      >
+        {unenrollTarget
+          ? `Remove ${`${unenrollTarget.first_name || ""} ${unenrollTarget.last_name || ""}`.trim() || "this student"} from ${subject?.name || "this subject"}? They can re-enroll later with the invite code.`
+          : null}
+      </ActionDialog>
     </div>
   );
 }

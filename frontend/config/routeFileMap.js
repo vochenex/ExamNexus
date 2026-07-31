@@ -81,6 +81,11 @@ export const ROUTE_FILE_MAP = [
     file: "frontend/pages/Faculty/FacultyDashboardPage.jsx",
   },
   {
+    match: /^\/faculty\/exports$/,
+    label: "Faculty data exports",
+    file: "frontend/pages/Faculty/FacultyExportsPage.jsx",
+  },
+  {
     match: /^\/faculty\/profile$/,
     label: "Faculty profile",
     file: "frontend/pages/shared/ProfilePage.jsx",
@@ -191,4 +196,73 @@ export function resolveRouteFileInfo(pathname) {
     file: "(no mapped page file)",
     match: null,
   };
+}
+
+/** Normalize Vite / OS paths to compare against routeFileMap entries. */
+export function normalizeSourcePath(filePath) {
+  return String(filePath || "")
+    .replace(/\\/g, "/")
+    .replace(/^\/@fs\//, "")
+    .replace(/^.*\/ExamNexus\//i, "")
+    .replace(/^\//, "")
+    .replace(/^src\//, "frontend/")
+    .trim();
+}
+
+/** Find mapped pages that own or are likely affected by a changed source file. */
+export function resolvePagesForSourceFile(filePath) {
+  const normalized = normalizeSourcePath(filePath);
+  if (!normalized) return [];
+
+  const exact = ROUTE_FILE_MAP.filter((entry) => {
+    const mapped = normalizeSourcePath(entry.file);
+    return mapped === normalized || normalized.endsWith(mapped) || mapped.endsWith(normalized);
+  });
+
+  if (exact.length) {
+    return exact.map((entry) => ({
+      label: entry.label,
+      file: entry.file,
+      relation: "page",
+    }));
+  }
+
+  // Home marketing components map to the public home page.
+  if (normalized.includes("/components/home/") || normalized.includes("/pages/public/HomePage")) {
+    return [
+      {
+        label: "Marketing home",
+        file: "frontend/pages/public/HomePage.jsx",
+        relation: "page",
+      },
+    ];
+  }
+
+  // Shared component / util — report as shared impact, still useful while debugging.
+  if (
+    normalized.includes("/components/") ||
+    normalized.includes("/layouts/") ||
+    normalized.includes("/utils/") ||
+    normalized.includes("/hooks/") ||
+    normalized.includes("/contexts/") ||
+    normalized.includes("/styles/")
+  ) {
+    return [
+      {
+        label: "Shared module (may affect multiple pages)",
+        file: normalized.startsWith("frontend/")
+          ? normalized
+          : `frontend/${normalized.replace(/^frontend\//, "")}`,
+        relation: "shared",
+      },
+    ];
+  }
+
+  return [
+    {
+      label: "Unmapped file",
+      file: normalized,
+      relation: "unknown",
+    },
+  ];
 }
