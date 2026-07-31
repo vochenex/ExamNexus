@@ -1,15 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { LogOut, MoreHorizontal, X } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import ProfileAvatar from "../ProfileAvatar";
 import { ProgressNavLink } from "../ProgressLink";
-import { getMobileNav } from "./mobileNav";
+import {
+  getMobileNav,
+  STUDENT_FLEX_SLOT_STORAGE_KEY,
+} from "./mobileNav";
 import { forceUnlockBodyScroll } from "../ui/ModalPortal";
 
 function isPathActive(pathname, to, end) {
   if (end) return pathname === to;
   return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+function readStoredFlexibleTo(defaultTo, flexibleItems) {
+  try {
+    const stored = localStorage.getItem(STUDENT_FLEX_SLOT_STORAGE_KEY);
+    if (stored && flexibleItems.some((item) => item.to === stored)) {
+      return stored;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return defaultTo;
 }
 
 function TabButton({ item, active, theme, onClick }) {
@@ -44,12 +59,71 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
   const { theme } = useTheme();
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { primary, more } = getMobileNav(role);
+  const nav = getMobileNav(role);
+  const flexibleItems = Array.isArray(nav.flexible) ? nav.flexible : [];
+  const usesFlexibleSlot = flexibleItems.length > 0;
+
+  const [flexibleTo, setFlexibleTo] = useState(() =>
+    usesFlexibleSlot
+      ? readStoredFlexibleTo(nav.defaultFlexibleTo, flexibleItems)
+      : null
+  );
+
+  useEffect(() => {
+    if (!usesFlexibleSlot) return;
+    setFlexibleTo(readStoredFlexibleTo(nav.defaultFlexibleTo, flexibleItems));
+  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps -- reset when role changes
 
   useEffect(() => {
     setSheetOpen(false);
     forceUnlockBodyScroll();
   }, [location.pathname]);
+
+  // If the student opens a flexible destination, promote it into the bar slot.
+  useEffect(() => {
+    if (!usesFlexibleSlot) return;
+    const match = flexibleItems.find((item) =>
+      isPathActive(location.pathname, item.to, item.end)
+    );
+    if (match && match.to !== flexibleTo) {
+      setFlexibleTo(match.to);
+      try {
+        localStorage.setItem(STUDENT_FLEX_SLOT_STORAGE_KEY, match.to);
+      } catch {
+        // ignore
+      }
+    }
+  }, [location.pathname, usesFlexibleSlot, flexibleItems, flexibleTo]);
+
+  const pinFlexibleItem = (to) => {
+    if (!usesFlexibleSlot) return;
+    if (!flexibleItems.some((item) => item.to === to)) return;
+    setFlexibleTo(to);
+    try {
+      localStorage.setItem(STUDENT_FLEX_SLOT_STORAGE_KEY, to);
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const { primary, more } = useMemo(() => {
+    if (!usesFlexibleSlot) {
+      return {
+        primary: nav.primary || [],
+        more: nav.more || [],
+      };
+    }
+
+    const activeFlex =
+      flexibleItems.find((item) => item.to === flexibleTo) ||
+      flexibleItems.find((item) => item.to === nav.defaultFlexibleTo) ||
+      flexibleItems[0];
+
+    return {
+      primary: [...(nav.primary || []), activeFlex].filter(Boolean),
+      more: flexibleItems.filter((item) => item.to !== activeFlex?.to),
+    };
+  }, [nav, usesFlexibleSlot, flexibleItems, flexibleTo]);
 
   const hasMore = more.length > 0;
   const moreActive = more.some((item) =>
@@ -141,7 +215,12 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
                     key={item.to}
                     to={item.to}
                     end={item.end}
-                    onClick={() => setSheetOpen(false)}
+                    onClick={() => {
+                      if (usesFlexibleSlot) {
+                        pinFlexibleItem(item.to);
+                      }
+                      setSheetOpen(false);
+                    }}
                     className={`en-sheet-tile ${active ? "en-sheet-tile--active" : ""}`}
                   >
                     <Icon size={22} strokeWidth={2.1} />

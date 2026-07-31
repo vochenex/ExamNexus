@@ -20,6 +20,10 @@ import {
  * `primary` items become tab-bar slots. `more` items (if any) surface behind a
  * "More" slot in an expandable sheet, so the bar stays to ~5 slots max — the
  * pattern iOS and Android users expect.
+ *
+ * Student nav uses a swappable last primary slot (`flexible` + `defaultFlexibleTo`):
+ * picking Profile/Announcements from More moves that item into the bar and
+ * sends the previous slot item (usually Results) into More.
  */
 export function getMobileNav(role) {
   const normalized = String(role || "").toLowerCase();
@@ -58,17 +62,21 @@ export function getMobileNav(role) {
     };
   }
 
-  // Student — Announcements + Profile live under More so the tab bar stays roomy.
+  // Student — last primary slot swaps with More picks (Results ↔ Profile/Announcements).
   return {
     primary: [
       { to: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard", end: true },
       { to: "/student/subjects", icon: BookOpen, label: "Subjects" },
       { to: "/student/assessments", icon: ClipboardCheck, label: "Assess" },
-      { to: "/student/results", icon: Trophy, label: "Results" },
     ],
-    more: [
+    flexible: [
+      { to: "/student/results", icon: Trophy, label: "Results" },
       { to: "/student/announcements", icon: Megaphone, label: "Announcements" },
       { to: "/student/profile", icon: UserCircle, label: "Profile" },
     ],
+    defaultFlexibleTo: "/student/results",
+    more: [],
   };
 }
+
+export const STUDENT_FLEX_SLOT_STORAGE_KEY = "examnexus_student_tab_flex";
