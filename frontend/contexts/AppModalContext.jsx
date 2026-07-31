@@ -65,6 +65,22 @@ export function AppModalProvider({ children }) {
     });
   }, []);
 
+  const choose = useCallback((input) => {
+    const options = normalizeAlertOptions(input, {
+      title: "Choose an option",
+      tone: "warning",
+      actions: [],
+    });
+
+    return new Promise((resolve) => {
+      setModal({
+        mode: "choice",
+        ...options,
+        resolve,
+      });
+    });
+  }, []);
+
   const success = useCallback(
     (message, title = "Success") =>
       alert({ title, message, tone: "success", confirmLabel: "OK" }),
@@ -84,8 +100,8 @@ export function AppModalProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ alert, confirm, success, error, warning }),
-    [alert, confirm, success, error, warning]
+    () => ({ alert, confirm, choose, success, error, warning }),
+    [alert, confirm, choose, success, error, warning]
   );
 
   return (
@@ -100,10 +116,12 @@ export function AppModalProvider({ children }) {
           message={modal.message}
           confirmLabel={modal.confirmLabel}
           cancelLabel={modal.cancelLabel}
+          actions={modal.actions}
           loading={modal.loading}
           showClose={modal.showClose !== false}
-          onCancel={() => close(false)}
+          onCancel={() => close(modal.mode === "choice" ? "cancel" : false)}
           onConfirm={() => close(modal.mode === "confirm" ? true : true)}
+          onAction={(actionId) => close(actionId)}
         />
       )}
     </AppModalContext.Provider>

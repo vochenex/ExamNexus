@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
@@ -20,7 +20,7 @@ import {
 } from "../../utils/assessmentReport";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
-import { iconButton, primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { iconButton } from "../../utils/themeButtons";
 
 async function finishExport(result, success, warning, sharedMsg, downloadMsg) {
   if (!result?.ok) {
@@ -34,6 +34,7 @@ export default function AdminExports() {
   const { theme } = useTheme();
   const { success, error, warning } = useAppModal();
   const [assessments, setAssessments] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedExamId, setSelectedExamId] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -55,6 +56,22 @@ export default function AdminExports() {
   }, []);
 
   usePolling(load, []);
+
+  const subjectOptions = useMemo(() => {
+    const names = new Set();
+    for (const exam of assessments) {
+      const name = exam.subject_name || exam.subject || "";
+      if (name) names.add(name);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [assessments]);
+
+  const filteredAssessments = useMemo(() => {
+    if (!selectedSubject) return assessments;
+    return assessments.filter(
+      (exam) => (exam.subject_name || exam.subject || "") === selectedSubject
+    );
+  }, [assessments, selectedSubject]);
 
   const exportAssessments = async () => {
     try {
@@ -108,7 +125,10 @@ export default function AdminExports() {
         "Assessment report saved. Open the HTML file to print or save as PDF."
       );
     } catch (err) {
-      error(err.message || "Export failed. If this keeps happening, run database/admin_export_assessment_report.sql in Supabase.");
+      error(
+        err.message ||
+          "Export failed. If this keeps happening, run database/admin_export_assessment_report.sql in Supabase."
+      );
     } finally {
       setExporting("");
     }
@@ -155,7 +175,9 @@ export default function AdminExports() {
     }
   };
 
-  if (loading && assessments.length === 0) return <PageLoadingSkeleton theme={theme} variant="cards" />;
+  if (loading && assessments.length === 0) {
+    return <PageLoadingSkeleton theme={theme} variant="cards" />;
+  }
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-4xl")}>
@@ -193,24 +215,62 @@ export default function AdminExports() {
       <div className={`${panelClass(theme)} space-y-4`}>
         <h2 className="font-semibold">Export assessment report / results</h2>
         <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-          Pick one assessment for a full HTML report (faculty, students, scores,
-          questions, pass/fail chart, and description). Or export raw results as CSV.
+          Filter by subject, then pick an assessment for a full HTML report (faculty, students,
+          scores, questions, pass/fail chart, and description). Or export raw results as CSV.
         </p>
-        <Select value={selectedExamId} onChange={(e) => setSelectedExamId(e.target.value)}>
-          <option value="">Select an assessment</option>
-          {assessments.map((exam) => (
-            <option key={exam.id} value={exam.id}>
-              {[exam.title, exam.subject_name].filter(Boolean).join(" — ")}
-            </option>
-          ))}
-        </Select>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-w-0">
+            <label
+              className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${
+                theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
+              }`}
+            >
+              Subject
+            </label>
+            <Select
+              value={selectedSubject}
+              onChange={(e) => {
+                setSelectedSubject(e.target.value);
+                setSelectedExamId("");
+              }}
+            >
+              <option value="">All subjects</option>
+              {subjectOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="min-w-0">
+            <label
+              className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${
+                theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
+              }`}
+            >
+              Assessment
+            </label>
+            <Select value={selectedExamId} onChange={(e) => setSelectedExamId(e.target.value)}>
+              <option value="">Select an assessment</option>
+              {filteredAssessments.map((exam) => (
+                <option key={exam.id} value={exam.id}>
+                  {exam.title}
+                  {!selectedSubject && exam.subject_name ? ` — ${exam.subject_name}` : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-3">
           <ProgressButton
             type="button"
             onClick={() => exportAssessmentReport(selectedExamId)}
             loading={exporting === `report-${selectedExamId}`}
             loadingLabel="Exporting report"
-            disabled={!selectedExamId || (Boolean(exporting) && exporting !== `report-${selectedExamId}`)}
+            disabled={
+              !selectedExamId ||
+              (Boolean(exporting) && exporting !== `report-${selectedExamId}`)
+            }
             className={iconButton(theme, "primary", "gap-2 px-3")}
             aria-label="Export full HTML report"
             title="Export full report"

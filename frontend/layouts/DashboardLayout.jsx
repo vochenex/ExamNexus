@@ -226,6 +226,12 @@ export default function DashboardLayout() {
                   label="Results"
                   collapsed={collapsed}
                 />
+                <SidebarNavLink
+                  to="/student/announcements"
+                  icon={Megaphone}
+                  label="Announcements"
+                  collapsed={collapsed}
+                />
               </SidebarSection>
             )}
           </nav>

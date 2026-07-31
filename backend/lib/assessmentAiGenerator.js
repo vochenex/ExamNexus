@@ -970,10 +970,52 @@ async function requestDocumentQuestions({
   }
 
   const allowedFormats = parseFormats(formats);
+  const requestedCount =
+    !isQuestionnaire && questionCount != null && String(questionCount).trim() !== ""
+      ? clampQuestionCount(questionCount)
+      : null;
+
+  // Large source-material sets: batch instead of one oversized Gemini call.
+  if (!isQuestionnaire && requestedCount != null && requestedCount > 15) {
+    const batched = await requestAiQuestionsBatched({
+      sourceText: resolvedSource,
+      additionalInstructions: [
+        "Ground every question strictly in the SOURCE MATERIAL.",
+        `Difficulty: ${String(difficulty || "medium")}.`,
+      ].join("\n"),
+      formats: allowedFormats,
+      questionCount: requestedCount,
+      difficulty: difficulty || "medium",
+    });
+    const questions = (batched.questions || []).slice(0, requestedCount);
+    if (!questions.length) {
+      const error = new Error(
+        "AI could not build questions from this document. Try a clearer file or a smaller item count."
+      );
+      error.statusCode = 422;
+      throw error;
+    }
+    return {
+      suggestedTitle: batched.suggestedTitle || "",
+      suggestedDescription: batched.suggestedDescription || "",
+      questions,
+      meta: {
+        generatedCount: questions.length,
+        requestedCount,
+        formats: [...new Set(questions.map((item) => item.type))],
+        provider: batched.meta?.provider,
+        model: batched.meta?.model,
+        mode: "document_source_material_batched",
+        isQuestionnaire: false,
+        partial: questions.length < requestedCount,
+      },
+    };
+  }
+
   const guidance = [];
-  if (!isQuestionnaire && questionCount != null && String(questionCount).trim() !== "") {
+  if (requestedCount != null) {
     guidance.push(
-      `Create approximately ${clampQuestionCount(questionCount)} questions.`
+      `Create exactly ${requestedCount} questions. Do not create more or fewer.`
     );
   }
   if (difficulty) {
@@ -1000,7 +1042,7 @@ async function requestDocumentQuestions({
         content: buildDocumentAnalysisSystemPrompt({
           isQuestionnaire,
           formats: allowedFormats,
-          questionCount,
+          questionCount: requestedCount,
           difficulty,
         }),
       },
@@ -1021,15 +1063,23 @@ async function requestDocumentQuestions({
     throw error;
   }
 
+  const questions =
+    requestedCount != null
+      ? normalized.questions.slice(0, requestedCount)
+      : normalized.questions;
+
   return {
     ...normalized,
+    questions,
     meta: {
-      generatedCount: normalized.questions.length,
-      formats: [...new Set(normalized.questions.map((item) => item.type))],
+      generatedCount: questions.length,
+      requestedCount,
+      formats: [...new Set(questions.map((item) => item.type))],
       provider: response.provider,
       model: response.model,
       mode: isQuestionnaire ? "document_questionnaire" : "document_source_material",
       isQuestionnaire: Boolean(isQuestionnaire),
+      partial: requestedCount != null ? questions.length < requestedCount : false,
     },
   };
 }

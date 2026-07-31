@@ -618,6 +618,7 @@ export async function fetchFacultyExportAssessments(teacherSchoolId) {
     assessment_id: exam.id,
     title: exam.title,
     type: exam.exam_type,
+    subject_id: exam.subject_id,
     subject: exam.subjects?.name || "",
     start: exam.start_datetime,
     end: exam.end_datetime,
@@ -2782,6 +2783,43 @@ export async function fetchSubjectAnnouncements(subjectId) {
 
   if (error) throw error;
   return [];
+}
+
+/** Recent class announcements across subjects the student is enrolled in. */
+export async function fetchStudentAnnouncementsHub(studentId, limit = 80) {
+  await requireSession();
+  const subjects = await getStudentEnrolledSubjects(studentId);
+  const subjectIds = (subjects || []).map((s) => s.id).filter(Boolean);
+  if (!subjectIds.length) return { subjects: [], announcements: [] };
+
+  const subjectNameById = Object.fromEntries(
+    (subjects || []).map((s) => [s.id, s.name || "Subject"])
+  );
+
+  let { data, error } = await supabase
+    .from("announcements")
+    .select("id, subject_id, title, body, target_sections, created_at, created_by")
+    .in("subject_id", subjectIds)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error?.message?.includes("created_by")) {
+    ({ data, error } = await supabase
+      .from("announcements")
+      .select("id, subject_id, title, body, target_sections, created_at")
+      .in("subject_id", subjectIds)
+      .order("created_at", { ascending: false })
+      .limit(limit));
+  }
+
+  if (error) throw error;
+
+  const announcements = (data || []).map((row) => ({
+    ...row,
+    subject_name: subjectNameById[row.subject_id] || "Subject",
+  }));
+
+  return { subjects: subjects || [], announcements };
 }
 
 /** Recent announcements posted by the signed-in faculty across their subjects. */

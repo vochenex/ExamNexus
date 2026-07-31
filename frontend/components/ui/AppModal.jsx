@@ -115,8 +115,10 @@ export default function AppModal({
   message,
   confirmLabel = "OK",
   cancelLabel = "Cancel",
+  actions = null,
   onConfirm,
   onCancel,
+  onAction,
   loading = false,
   showClose = true,
 }) {
@@ -125,6 +127,7 @@ export default function AppModal({
   const config = TONE_CONFIG[tone] || TONE_CONFIG.info;
   const Icon = config.icon;
   const isSuccessAlert = tone === "success" && mode === "alert";
+  const isChoice = mode === "choice" && Array.isArray(actions) && actions.length > 0;
 
   useModalDismiss(!loading && showClose && !isSuccessAlert ? onCancel : undefined, {
     enabled: open && !loading && showClose && !isSuccessAlert,
@@ -215,7 +218,35 @@ export default function AppModal({
           </div>
         </div>
 
-        {!isSuccessAlert && (
+        {!isSuccessAlert && isChoice && (
+          <div className="mt-6 flex flex-col gap-2.5">
+            {actions.map((action) => {
+              const actionTone = action.tone || tone;
+              const isSecondary = action.variant === "secondary" || action.secondary;
+              const isDanger = actionTone === "danger" || actionTone === "error";
+              return (
+                <ProgressButton
+                  key={action.id}
+                  type="button"
+                  loading={loading}
+                  loadingLabel="Please wait…"
+                  onClick={() => onAction?.(action.id)}
+                  className={
+                    isSecondary
+                      ? secondaryButton(theme, "w-full justify-center disabled:opacity-60")
+                      : isDanger
+                        ? "w-full rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                        : primaryButton(theme, "w-full justify-center disabled:opacity-60")
+                  }
+                >
+                  {action.label}
+                </ProgressButton>
+              );
+            })}
+          </div>
+        )}
+
+        {!isSuccessAlert && !isChoice && (
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           {isConfirm && (
             <button

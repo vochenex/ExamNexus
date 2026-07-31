@@ -147,10 +147,35 @@ function cleanupUploadedFile(file) {
   }
 }
 
+async function extractMultipleDocumentsText(files) {
+  const list = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (!list.length) {
+    throw new Error("No file uploaded.");
+  }
+
+  const parts = [];
+  for (const file of list) {
+    const text = await extractDocumentText(file);
+    const label = file.originalname || "document";
+    parts.push(`--- FILE: ${label} ---\n${text}`);
+  }
+
+  return normalizeExtractedText(parts.join("\n\n"));
+}
+
+function cleanupUploadedFiles(files) {
+  const list = Array.isArray(files) ? files : files ? [files] : [];
+  for (const file of list) {
+    cleanupUploadedFile(file);
+  }
+}
+
 module.exports = {
   MAX_EXTRACT_CHARS,
   MIN_EXTRACT_CHARS,
   isSupportedUpload,
   extractDocumentText,
+  extractMultipleDocumentsText,
   cleanupUploadedFile,
+  cleanupUploadedFiles,
 };

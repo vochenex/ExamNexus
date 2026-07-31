@@ -11,7 +11,7 @@ import ChipToggle from "../../components/ui/ChipToggle";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
-import { getSectionsForSubjects, normalizeTargetSections } from "../../utils/sections";
+import { getSectionsForSubjects, normalizeTargetSections, formatTargetSectionsLabel } from "../../utils/sections";
 import {
   createFacultyAnnouncements,
   fetchFacultyAnnouncements,
@@ -304,9 +304,7 @@ export default function FacultyAnnouncementsHub() {
                     </td>
                     <td className={adminTdClass(theme)}>{row.subject_name}</td>
                     <td className={adminTdClass(theme)}>
-                      {Array.isArray(row.target_sections) && row.target_sections.length
-                        ? row.target_sections.join(", ")
-                        : "All sections"}
+                      {formatTargetSectionsLabel(row.target_sections)}
                     </td>
                     <td className={adminTdClass(theme)}>
                       {row.created_at ? new Date(row.created_at).toLocaleString() : "—"}

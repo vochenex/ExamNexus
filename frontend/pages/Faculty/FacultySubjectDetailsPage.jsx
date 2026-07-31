@@ -896,6 +896,7 @@ export default function SubjectDetails() {
         onClose={() => setSectionAssessmentsOpen(false)}
         subject={subject}
         assessments={assessments}
+        loading={loading && assessments.length === 0}
         onSelectAssessment={(assessment) => {
           setSectionAssessmentsOpen(false);
           navigate(`/faculty/assessment/${assessment.id}`);

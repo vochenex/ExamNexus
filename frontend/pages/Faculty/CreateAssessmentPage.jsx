@@ -57,7 +57,7 @@ export default function CreateAssessment() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
-  const { warning: showWarning, success: showSuccess, error: showError, confirm } = useAppModal();
+  const { warning: showWarning, success: showSuccess, error: showError, choose } = useAppModal();
 
   const assessmentType = location.state?.type || "exam";
   const assessmentLabel = getAssessmentCategoryLabel(assessmentType);
@@ -78,6 +78,7 @@ export default function CreateAssessment() {
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
   const applyAiExamDetailsRef = useRef(false);
   const aiReplaceSnapshotRef = useRef(null);
+  const aiMergeModeRef = useRef("replace");
 
   const {
     questionSections,
@@ -187,34 +188,53 @@ export default function CreateAssessment() {
 
   const handleAiGenerationStart = async () => {
     const hasExisting = questions.some((question) => questionHasContent(question));
+    let mode = "replace";
+
     if (hasExisting) {
-      const shouldReplace = await confirm({
-        title: "Replace current questions?",
+      const choice = await choose({
+        title: "Questions already on this page",
         message:
-          "The questions already on this page will be replaced by the AI-generated set. Assessment title and description will refresh from the new AI result. You can still edit everything before publishing.",
+          "How should AI-generated questions interact with what you already have? Title and description still refresh from the AI result when you replace.",
+        tone: "warning",
+        actions: [
+          { id: "replace", label: "Replace all", tone: "warning" },
+          { id: "append", label: "Add to current", variant: "secondary" },
+          { id: "cancel", label: "Keep current", variant: "secondary" },
+        ],
       });
-      if (!shouldReplace) return false;
+
+      if (!choice || choice === "cancel" || choice === false) {
+        return { mode: "cancel" };
+      }
+      mode = choice === "append" ? "append" : "replace";
     }
 
-    // Always snapshot exam fields so classify-only / failed runs can restore them.
+    aiMergeModeRef.current = mode;
+
+    // Snapshot exam fields so classify-only / failed runs can restore them.
     aiReplaceSnapshotRef.current = {
       questions: questions.map((question) => ({ ...question })),
       examType: getExamTypeForSave() || exam.exam_type || "multiple_choice",
       title: exam.title,
       description: exam.description,
+      mode,
     };
 
-    applyAiExamDetailsRef.current = true;
-    resetForAiGeneration();
-    setExam((prev) => ({
-      ...prev,
-      title: "",
-      description: "",
-    }));
+    applyAiExamDetailsRef.current = mode === "replace";
+
+    if (mode === "replace") {
+      resetForAiGeneration();
+      setExam((prev) => ({
+        ...prev,
+        title: "",
+        description: "",
+      }));
+    }
+
     setAiGenerating(true);
     setAiProgress(null);
     setError("");
-    return true;
+    return { mode };
   };
 
   const resolveAiExamField = (currentValue, suggestedValue) => {

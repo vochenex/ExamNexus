@@ -60,8 +60,8 @@ export default function FormatGradingSettings({
           label="Accept alternative answers"
           hint={
             sectionType === "enumeration"
-              ? "Allow other accepted spellings for listed answers; casing is ignored."
-              : "Allow other accepted spellings; casing is ignored."
+              ? "Allow other accepted spellings or abbr/full forms per slot; casing is ignored unless case sensitive."
+              : "Allow other accepted spellings or abbr/full forms; casing is ignored unless case sensitive."
           }
           checked={grading.accept_alternatives}
           disabled={grading.case_sensitive}

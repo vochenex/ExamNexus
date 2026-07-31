@@ -1,4 +1,5 @@
 import { CheckCircle2, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../layouts/ThemeContext";
 import { AI_FORMAT_OPTIONS } from "../utils/aiQuestionMapper";
 
@@ -20,6 +21,20 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
   const { theme } = useTheme();
   const isLight = theme === "light";
   const isDone = progress?.status === "done";
+  const highestRef = useRef(0);
+  const [displayPercent, setDisplayPercent] = useState(0);
+
+  useEffect(() => {
+    if (!progress) {
+      highestRef.current = 0;
+      setDisplayPercent(0);
+      return;
+    }
+    const next = resolvePercent(progress);
+    const monotonic = Math.max(highestRef.current, next);
+    highestRef.current = isDone ? 100 : monotonic;
+    setDisplayPercent(highestRef.current);
+  }, [progress, isDone]);
 
   const panelClass = isLight
     ? "border-emerald-200/90 bg-gradient-to-r from-white via-emerald-50/80 to-emerald-100/90 en-panel-glow"
@@ -39,12 +54,25 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
             </p>
           </div>
         </div>
+        <div
+          className={`mt-3 h-2 overflow-hidden rounded-full ${
+            isLight ? "bg-emerald-100" : "bg-white/10"
+          }`}
+        >
+          <div
+            className={`h-full w-[8%] rounded-full transition-all duration-500 ${
+              isLight
+                ? "bg-gradient-to-r from-emerald-400 to-teal-500"
+                : "bg-gradient-to-r from-emerald-400 to-cyan-400"
+            }`}
+          />
+        </div>
       </div>
     );
   }
 
   const { phase, current, total, latestType, status } = progress;
-  const percent = resolvePercent(progress);
+  const percent = displayPercent;
 
   const phaseLabel = isDone
     ? "Generation complete"
@@ -52,19 +80,23 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
       ? phase === "reading"
         ? "AI is reading your document"
         : "AI is generating questions"
-      : phase === "reading"
-        ? "Reading document"
-        : phase === "planning"
-          ? "Planning questions from document"
-          : phase === "prompt"
-            ? "Generating from your prompt"
-            : phase === "structuring"
-              ? "Structuring questions"
-              : "Analyzing document";
+      : status === "classifying"
+        ? "Classifying document"
+        : status === "converting"
+          ? "Converting questionnaire"
+          : phase === "reading"
+            ? "Reading document"
+            : phase === "planning"
+              ? "Planning questions from document"
+              : phase === "prompt"
+                ? "Generating from your prompt"
+                : phase === "structuring"
+                  ? "Structuring questions"
+                  : "Analyzing document";
 
   const stepLabel = isDone
     ? `${questionCount} question${questionCount === 1 ? "" : "s"} ready to review below`
-    : status === "waiting"
+    : status === "waiting" || status === "classifying"
       ? total
         ? `Working toward ${total} question${total === 1 ? "" : "s"}…`
         : "Pacing AI requests…"
@@ -122,12 +154,12 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
               }`}
             >
               <div
-                className={`h-full rounded-full transition-all duration-500 ${
+                className={`h-full rounded-full transition-all duration-500 ease-out ${
                   isLight
                     ? "bg-gradient-to-r from-emerald-400 to-teal-500"
                     : "bg-gradient-to-r from-emerald-400 to-cyan-400"
                 }`}
-                style={{ width: `${percent}%` }}
+                style={{ width: `${Math.max(percent, 3)}%` }}
               />
             </div>
           )}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ClipboardList, X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ModalPortal from "./ui/ModalPortal";
+import PanelContentSkeleton from "./ui/PanelContentSkeleton";
 import SectionTabs from "./SectionTabs";
 import { getAssessmentStatus } from "../utils/assessmentStatus";
 import {
@@ -15,6 +16,7 @@ export default function SectionAssessmentsModal({
   onClose,
   subject,
   assessments = [],
+  loading = false,
   onSelectAssessment,
 }) {
   const { theme } = useTheme();
@@ -93,71 +95,77 @@ export default function SectionAssessmentsModal({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-            <SectionTabs
-              active={activeSection}
-              onChange={setActiveSection}
-              counts={sectionCounts}
-              sections={subjectSections}
-            />
+            {loading ? (
+              <PanelContentSkeleton rows={5} variant="list" />
+            ) : (
+              <>
+                <SectionTabs
+                  active={activeSection}
+                  onChange={setActiveSection}
+                  counts={sectionCounts}
+                  sections={subjectSections}
+                />
 
-            <div className="mt-4 space-y-2">
-              {visibleAssessments.length === 0 ? (
-                <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                  {activeSection === "All"
-                    ? "No assessments yet."
-                    : `No assessments posted for Section ${activeSection}.`}
-                </p>
-              ) : (
-                visibleAssessments.map((assessment) => {
-                  const status = getAssessmentStatus(assessment);
-                  return (
-                    <button
-                      key={assessment.id}
-                      type="button"
-                      onClick={() => onSelectAssessment?.(assessment)}
-                      className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
-                        theme === "dark"
-                          ? "border-white/10 bg-white/[0.03] hover:border-emerald-500/30 hover:bg-emerald-500/5"
-                          : "border-emerald-100 bg-emerald-50/40 hover:border-teal-300"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p
-                            className={`truncate text-sm font-semibold ${
-                              theme === "dark" ? "text-emerald-300" : "text-teal-800"
-                            }`}
-                          >
-                            {assessment.title}
-                          </p>
-                          <p className={`mt-1 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
-                            {formatTargetSectionsLabel(
-                              assessment.target_sections,
-                              subjectSections
-                            )}
-                          </p>
-                        </div>
-                        <span
-                          className={`shrink-0 text-[11px] font-bold ${
-                            status === "active"
-                              ? "text-emerald-400"
-                              : status === "scheduled"
-                                ? "text-amber-500"
-                                : "text-red-400"
+                <div className="mt-4 space-y-2">
+                  {visibleAssessments.length === 0 ? (
+                    <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                      {activeSection === "All"
+                        ? "No assessments yet."
+                        : `No assessments posted for Section ${activeSection}.`}
+                    </p>
+                  ) : (
+                    visibleAssessments.map((assessment) => {
+                      const status = getAssessmentStatus(assessment);
+                      return (
+                        <button
+                          key={assessment.id}
+                          type="button"
+                          onClick={() => onSelectAssessment?.(assessment)}
+                          className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
+                            theme === "dark"
+                              ? "border-white/10 bg-white/[0.03] hover:border-emerald-500/30 hover:bg-emerald-500/5"
+                              : "border-emerald-100 bg-emerald-50/40 hover:border-teal-300"
                           }`}
                         >
-                          {status === "active"
-                            ? "Active"
-                            : status === "scheduled"
-                              ? "Scheduled"
-                              : "Closed"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p
+                                className={`truncate text-sm font-semibold ${
+                                  theme === "dark" ? "text-emerald-300" : "text-teal-800"
+                                }`}
+                              >
+                                {assessment.title}
+                              </p>
+                              <p className={`mt-1 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
+                                {formatTargetSectionsLabel(
+                                  assessment.target_sections,
+                                  subjectSections
+                                )}
+                              </p>
+                            </div>
+                            <span
+                              className={`shrink-0 text-[11px] font-bold ${
+                                status === "active"
+                                  ? "text-emerald-400"
+                                  : status === "scheduled"
+                                    ? "text-amber-500"
+                                    : "text-red-400"
+                              }`}
+                            >
+                              {status === "active"
+                                ? "Active"
+                                : status === "scheduled"
+                                  ? "Scheduled"
+                                  : "Closed"}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

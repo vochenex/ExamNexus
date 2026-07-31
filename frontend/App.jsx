@@ -23,6 +23,7 @@ const StudentSubjectsPage = lazy(() => import("./pages/Student/StudentSubjectsPa
 const StudentSubjectDetailsPage = lazy(() => import("./pages/Student/StudentSubjectDetailsPage"));
 const FacultySubjectSocialPage = lazy(() => import("./pages/Faculty/FacultySubjectSocialPage"));
 const FacultyAnnouncementsHubPage = lazy(() => import("./pages/Faculty/FacultyAnnouncementsHubPage"));
+const StudentAnnouncementsHubPage = lazy(() => import("./pages/Student/StudentAnnouncementsHubPage"));
 const QuestionBankPage = lazy(() => import("./pages/Faculty/QuestionBankPage"));
 const StudentSubjectSocialPage = lazy(() => import("./pages/Student/StudentSubjectSocialPage"));
 const TakeAssessmentPage = lazy(() => import("./pages/Student/TakeAssessmentPage"));
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="/student/subjects" element={<StudentSubjectsPage />} />
             <Route path="/student/subject/:subjectId" element={<StudentSubjectDetailsPage />} />
             <Route path="/student/subject/:subjectId/social" element={<StudentSubjectSocialPage />} />
+            <Route path="/student/announcements" element={<StudentAnnouncementsHubPage />} />
             <Route path="/faculty/announcements" element={<FacultyAnnouncementsHubPage />} />
             <Route path="/faculty/question-bank" element={<QuestionBankPage />} />
             <Route path="/faculty/create-assessment" element={<CreateAssessmentPage />} />

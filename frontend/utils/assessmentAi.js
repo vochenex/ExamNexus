@@ -135,29 +135,45 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function startWaitingProgress({ onProgress, phase, total }) {
-  let percent = 3;
-  const cap = 78;
+function startWaitingProgress({ onProgress, phase, total, floorPercent = 3 }) {
+  let percent = Math.max(3, Number(floorPercent) || 3);
+  const cap = 72;
+  let highest = percent;
   onProgress?.({
     phase,
     current: 0,
     total,
-    percent,
+    percent: highest,
     status: "waiting",
   });
 
   const timer = setInterval(() => {
-    percent = Math.min(cap, percent + 2 + Math.random() * 3);
+    // Slow crawl only — never jump backward; stay below revealing range.
+    percent = Math.min(cap, percent + 0.6);
+    highest = Math.max(highest, Math.round(percent));
     onProgress?.({
       phase,
       current: 0,
       total,
-      percent: Math.round(percent),
+      percent: highest,
       status: "waiting",
     });
-  }, 350);
+  }, 500);
 
   return () => clearInterval(timer);
+}
+
+function appendFilesToFormData(formData, files) {
+  const list = Array.isArray(files) ? files.filter(Boolean) : files ? [files] : [];
+  if (!list.length) {
+    throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
+  }
+  for (const file of list) {
+    formData.append("files", file);
+  }
+  // Back-compat for older single-file handlers.
+  formData.append("file", list[0]);
+  return list;
 }
 
 async function revealQuestionsIncrementally({
@@ -293,6 +309,19 @@ export async function generateAssessmentFromPrompt({
   let suggestedDescription = "";
   let meta = {};
   let lastError = null;
+  let highestPercent = 2;
+
+  const emitProgress = (payload) => {
+    const nextPercent = Math.max(
+      highestPercent,
+      Number(payload.percent) || highestPercent
+    );
+    highestPercent = Math.min(100, nextPercent);
+    onProgress?.({
+      ...payload,
+      percent: highestPercent,
+    });
+  };
 
   const assertNotAborted = () => {
     if (signal?.aborted) {
@@ -302,7 +331,7 @@ export async function generateAssessmentFromPrompt({
     }
   };
 
-  onProgress?.({
+  emitProgress({
     phase: "prompt",
     current: 0,
     total,
@@ -330,15 +359,12 @@ export async function generateAssessmentFromPrompt({
           .join(" ")
       : "";
 
-    onProgress?.({
+    emitProgress({
       phase: "prompt",
       current: allQuestions.length,
       total,
-      percent: Math.min(
-        76,
-        Math.round(4 + (allQuestions.length / total) * 72)
-      ),
-      status: "waiting",
+      percent: Math.min(76, Math.round(4 + (allQuestions.length / total) * 72)),
+      status: "generating",
     });
 
     let res;
@@ -391,11 +417,13 @@ export async function generateAssessmentFromPrompt({
       rounds: (meta.rounds || 0) + 1,
     };
 
+    let addedThisRound = 0;
     for (const question of batch) {
       if (allQuestions.length >= total) break;
       allQuestions.push(question);
+      addedThisRound += 1;
       const current = allQuestions.length;
-      onProgress?.({
+      emitProgress({
         phase: "prompt",
         current,
         total,
@@ -418,17 +446,19 @@ export async function generateAssessmentFromPrompt({
       }
     }
 
-    // Avoid infinite loops if the model keeps returning the same count with no progress.
-    if (batch.length === 0) break;
+    // Avoid infinite loops if the model keeps returning only duplicates/empty progress.
+    if (addedThisRound === 0) break;
   }
 
-  if (!allQuestions.length) {
+  const finalQuestions = allQuestions.slice(0, total);
+
+  if (!finalQuestions.length) {
     throw lastError || new Error("AI did not return any usable questions.");
   }
 
-  onProgress?.({
+  emitProgress({
     phase: "prompt",
-    current: allQuestions.length,
+    current: finalQuestions.length,
     total,
     percent: 100,
     status: "done",
@@ -436,17 +466,17 @@ export async function generateAssessmentFromPrompt({
 
   return {
     success: true,
-    questions: allQuestions,
+    questions: finalQuestions,
     suggestedTitle,
     suggestedDescription,
     meta: {
       ...meta,
       requestedCount: total,
-      generatedCount: allQuestions.length,
-      partial: allQuestions.length < total,
+      generatedCount: finalQuestions.length,
+      partial: finalQuestions.length < total,
       warning:
-        allQuestions.length < total
-          ? `Generated ${allQuestions.length} of ${total} questions. You can run generate again to add more.`
+        finalQuestions.length < total
+          ? `Generated ${finalQuestions.length} of ${total} questions. You can run generate again to add more.`
           : null,
     },
     resolvedSettings: {
@@ -456,18 +486,14 @@ export async function generateAssessmentFromPrompt({
   };
 }
 
-export async function classifyAssessmentDocument({ file, signal }) {
-  if (!file) {
-    throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
-  }
-
+export async function classifyAssessmentDocument({ file, files, signal }) {
   const session = await getAuthSession({ forceRefresh: true });
   if (!session?.access_token) {
     throw new Error("Your session expired. Please sign in again.");
   }
 
   const formData = new FormData();
-  formData.append("file", file);
+  appendFilesToFormData(formData, files || file);
 
   let res;
   try {
@@ -497,6 +523,7 @@ export async function classifyAssessmentDocument({ file, signal }) {
 
 export async function generateAssessmentFromDocument({
   file,
+  files,
   questionCount,
   difficulty,
   formats,
@@ -505,17 +532,13 @@ export async function generateAssessmentFromDocument({
   onQuestionGenerated,
   signal,
 }) {
-  if (!file) {
-    throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
-  }
-
   const session = await getAuthSession({ forceRefresh: true });
   if (!session?.access_token) {
     throw new Error("Your session expired. Please sign in again.");
   }
 
   const formData = new FormData();
-  formData.append("file", file);
+  appendFilesToFormData(formData, files || file);
   formData.append("isQuestionnaire", isQuestionnaire ? "true" : "false");
   if (questionCount != null && String(questionCount).trim() !== "" && Number(questionCount) > 0) {
     formData.append("questionCount", String(questionCount));
@@ -527,11 +550,19 @@ export async function generateAssessmentFromDocument({
     formData.append("formats", JSON.stringify(formats));
   }
 
+  let highestPercent = 3;
+  const guardedProgress = (payload) => {
+    const next = Math.max(highestPercent, Number(payload?.percent) || highestPercent);
+    highestPercent = Math.min(100, next);
+    onProgress?.({ ...payload, percent: highestPercent });
+  };
+
   let res;
   const stopWaiting = startWaitingProgress({
-    onProgress,
+    onProgress: guardedProgress,
     phase: "reading",
     total: questionCount || undefined,
+    floorPercent: 3,
   });
 
   try {
@@ -560,18 +591,28 @@ export async function generateAssessmentFromDocument({
     throw new Error(formatApiError(payload, "Failed to analyze document"));
   }
 
-  const questions = Array.isArray(payload.questions) ? payload.questions : [];
+  let questions = Array.isArray(payload.questions) ? payload.questions : [];
+  const requested = Number(questionCount);
+  if (
+    !isQuestionnaire &&
+    Number.isFinite(requested) &&
+    requested > 0 &&
+    questions.length > requested
+  ) {
+    questions = questions.slice(0, requested);
+  }
+
   if (!questions.length) {
     throw new Error("AI did not return any usable questions from this document.");
   }
 
   await revealQuestionsIncrementally({
     questions,
-    onProgress,
+    onProgress: guardedProgress,
     onQuestionGenerated,
     phase: "structuring",
-    payload,
+    payload: { ...payload, questions },
   });
 
-  return payload;
+  return { ...payload, questions };
 }

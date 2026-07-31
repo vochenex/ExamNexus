@@ -3,7 +3,9 @@ const multer = require("multer");
 const { requireFaculty } = require("../middleware/requireFaculty");
 const {
   extractDocumentText,
+  extractMultipleDocumentsText,
   cleanupUploadedFile,
+  cleanupUploadedFiles,
   isSupportedUpload,
 } = require("../lib/documentExtractor");
 const {
@@ -25,6 +27,46 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
 });
+
+const uploadDocuments = upload.fields([
+  { name: "files", maxCount: 12 },
+  { name: "file", maxCount: 1 },
+]);
+
+function getUploadedFiles(req) {
+  const fromFiles = Array.isArray(req.files?.files) ? req.files.files : [];
+  const fromFile = Array.isArray(req.files?.file) ? req.files.file : [];
+  const single = req.file ? [req.file] : [];
+  return [...fromFiles, ...fromFile, ...single].filter(Boolean);
+}
+
+function parseFormatsField(formats) {
+  if (!formats) return undefined;
+  if (Array.isArray(formats)) return formats;
+  if (typeof formats === "string") {
+    try {
+      return JSON.parse(formats);
+    } catch {
+      return String(formats)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+  return undefined;
+}
+
+function handleMulterUpload(req, res, next) {
+  uploadDocuments(req, res, (err) => {
+    if (err?.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
+    }
+    if (err) {
+      return res.status(400).json({ error: err.message || "File upload failed." });
+    }
+    next();
+  });
+}
 
 function handleRouteError(res, err) {
   const status = err.statusCode || 500;
@@ -85,37 +127,31 @@ router.get("/public-config", async (req, res) => {
 router.post(
   "/extract-document",
   requireFaculty,
-  (req, res, next) => {
-    upload.single("file")(req, res, (err) => {
-      if (err?.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
-      }
-      if (err) {
-        return res.status(400).json({ error: err.message || "File upload failed." });
-      }
-      next();
-    });
-  },
+  handleMulterUpload,
   async (req, res) => {
-    const file = req.file;
+    const files = getUploadedFiles(req);
 
     try {
-      if (!file) {
-        return res.status(400).json({ error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file." });
-      }
-
-      if (!isSupportedUpload(file)) {
+      if (!files.length) {
         return res.status(400).json({
-          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
+          error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file.",
         });
       }
 
-      const text = await extractDocumentText(file);
-      res.json({ text, extractedChars: text.length });
+      for (const file of files) {
+        if (!isSupportedUpload(file)) {
+          return res.status(400).json({
+            error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
+          });
+        }
+      }
+
+      const text = await extractMultipleDocumentsText(files);
+      res.json({ text, extractedChars: text.length, fileCount: files.length });
     } catch (err) {
       handleRouteError(res, err);
     } finally {
-      cleanupUploadedFile(file);
+      cleanupUploadedFiles(files);
     }
   }
 );
@@ -236,45 +272,38 @@ router.post("/document-plan", requireFaculty, async (req, res) => {
 router.post(
   "/classify-document",
   requireFaculty,
-  (req, res, next) => {
-    upload.single("file")(req, res, (err) => {
-      if (err?.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
-      }
-      if (err) {
-        return res.status(400).json({ error: err.message || "File upload failed." });
-      }
-      next();
-    });
-  },
+  handleMulterUpload,
   async (req, res) => {
-    const file = req.file;
+    const files = getUploadedFiles(req);
 
     try {
-      if (!file) {
+      if (!files.length) {
         return res.status(400).json({
           error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file.",
         });
       }
 
-      if (!isSupportedUpload(file)) {
-        return res.status(400).json({
-          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
-        });
+      for (const file of files) {
+        if (!isSupportedUpload(file)) {
+          return res.status(400).json({
+            error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
+          });
+        }
       }
 
-      const sourceText = await extractDocumentText(file);
+      const sourceText = await extractMultipleDocumentsText(files);
       const classification = await classifyDocumentContent(sourceText);
 
       res.json({
         success: true,
         extractedChars: sourceText.length,
+        fileCount: files.length,
         ...classification,
       });
     } catch (err) {
       handleRouteError(res, err);
     } finally {
-      cleanupUploadedFile(file);
+      cleanupUploadedFiles(files);
     }
   }
 );
@@ -282,34 +311,26 @@ router.post(
 router.post(
   "/analyze-document",
   requireFaculty,
-  (req, res, next) => {
-    upload.single("file")(req, res, (err) => {
-      if (err?.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
-      }
-      if (err) {
-        return res.status(400).json({ error: err.message || "File upload failed." });
-      }
-      next();
-    });
-  },
+  handleMulterUpload,
   async (req, res) => {
-    const file = req.file;
+    const files = getUploadedFiles(req);
 
     try {
-      if (!file) {
+      if (!files.length) {
         return res.status(400).json({
           error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file.",
         });
       }
 
-      if (!isSupportedUpload(file)) {
-        return res.status(400).json({
-          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
-        });
+      for (const file of files) {
+        if (!isSupportedUpload(file)) {
+          return res.status(400).json({
+            error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
+          });
+        }
       }
 
-      const sourceText = await extractDocumentText(file);
+      const sourceText = await extractMultipleDocumentsText(files);
       const {
         questionCount,
         difficulty,
@@ -327,33 +348,21 @@ router.post(
         sourceText,
         questionCount,
         difficulty,
-        formats: formats
-          ? typeof formats === "string"
-            ? (() => {
-                try {
-                  return JSON.parse(formats);
-                } catch {
-                  return String(formats)
-                    .split(",")
-                    .map((item) => item.trim())
-                    .filter(Boolean);
-                }
-              })()
-            : formats
-          : undefined,
+        formats: parseFormatsField(formats),
         isQuestionnaire: questionnaire,
       });
 
       res.json({
         success: true,
         extractedChars: sourceText.length,
+        fileCount: files.length,
         isQuestionnaire: questionnaire,
         ...result,
       });
     } catch (err) {
       handleRouteError(res, err);
     } finally {
-      cleanupUploadedFile(file);
+      cleanupUploadedFiles(files);
     }
   }
 );
@@ -361,34 +370,26 @@ router.post(
 router.post(
   "/generate-from-document",
   requireFaculty,
-  (req, res, next) => {
-    upload.single("file")(req, res, (err) => {
-      if (err?.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
-      }
-      if (err) {
-        return res.status(400).json({ error: err.message || "File upload failed." });
-      }
-      next();
-    });
-  },
+  handleMulterUpload,
   async (req, res) => {
-    const file = req.file;
+    const files = getUploadedFiles(req);
 
     try {
-      if (!file) {
+      if (!files.length) {
         return res.status(400).json({
           error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file.",
         });
       }
 
-      if (!isSupportedUpload(file)) {
-        return res.status(400).json({
-          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
-        });
+      for (const file of files) {
+        if (!isSupportedUpload(file)) {
+          return res.status(400).json({
+            error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
+          });
+        }
       }
 
-      const sourceText = await extractDocumentText(file);
+      const sourceText = await extractMultipleDocumentsText(files);
       const {
         questionCount,
         difficulty,
@@ -406,33 +407,21 @@ router.post(
         sourceText,
         questionCount,
         difficulty,
-        formats: formats
-          ? typeof formats === "string"
-            ? (() => {
-                try {
-                  return JSON.parse(formats);
-                } catch {
-                  return String(formats)
-                    .split(",")
-                    .map((item) => item.trim())
-                    .filter(Boolean);
-                }
-              })()
-            : formats
-          : undefined,
+        formats: parseFormatsField(formats),
         isQuestionnaire: questionnaire,
       });
 
       res.json({
         success: true,
         extractedChars: sourceText.length,
+        fileCount: files.length,
         isQuestionnaire: questionnaire,
         ...result,
       });
     } catch (err) {
       handleRouteError(res, err);
     } finally {
-      cleanupUploadedFile(file);
+      cleanupUploadedFiles(files);
     }
   }
 );

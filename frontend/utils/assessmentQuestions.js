@@ -4,7 +4,6 @@ import {
   getQuestionType,
   getQuestionValidationMessage,
   isQuestionComplete,
-  answersMatch,
   identificationAnswersMatch,
   getAcceptedIdentificationAnswers,
   ensureEnumAlternativesForAnswers,
@@ -296,7 +295,8 @@ function enumAnswerMatches(studentAnswer, expectedAnswer, question, slotIndex, g
   const expectedCount =
     question.answers?.length || getExpectedEnumerationAnswers(question).length;
 
-  if (answersMatch(studentAnswer, primary, options)) {
+  // Same abbr/full soft-matching as identification (exact when case_sensitive).
+  if (identificationAnswersMatch(studentAnswer, primary, options)) {
     return true;
   }
 
@@ -310,7 +310,7 @@ function enumAnswerMatches(studentAnswer, expectedAnswer, question, slotIndex, g
   return slotAlternatives.some(
     (alternative) =>
       String(alternative || "").trim() &&
-      answersMatch(studentAnswer, alternative, options)
+      identificationAnswersMatch(studentAnswer, alternative, options)
   );
 }
 
@@ -327,6 +327,8 @@ function gradeEnumerationAnswer(question, rawAnswer) {
     return false;
   }
 
+  // ignore_order: greedy multiset match — each student slot consumes one unused
+  // expected answer (supports duplicates, e.g. two "CPU" blanks).
   if (grading.ignore_order) {
     const remaining = expected.map((answer, index) => ({ answer, index }));
     return studentAnswers.every((studentAnswer) => {

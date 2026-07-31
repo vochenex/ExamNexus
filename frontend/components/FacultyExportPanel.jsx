@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { useAppModal } from "../contexts/AppModalContext";
 import Select from "./ui/Select";
 import ProgressButton from "./ui/ProgressButton";
 import CollapsiblePanel from "./ui/CollapsiblePanel";
+import PanelContentSkeleton from "./ui/PanelContentSkeleton";
 import {
   fetchFacultyAssessmentReport,
   fetchFacultyExportAssessments,
@@ -29,6 +30,7 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
   const { theme } = useTheme();
   const { success, error, warning } = useAppModal();
   const [assessments, setAssessments] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedExamId, setSelectedExamId] = useState("");
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState("");
@@ -50,6 +52,35 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
   useEffect(() => {
     loadAssessments();
   }, [loadAssessments]);
+
+  const subjectOptions = useMemo(() => {
+    const map = new Map();
+    for (const exam of assessments) {
+      const key = exam.subject_id || exam.subject || "";
+      const label = exam.subject || "Untitled subject";
+      if (key && !map.has(key)) map.set(key, label);
+    }
+    return [...map.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  }, [assessments]);
+
+  const filteredAssessments = useMemo(() => {
+    if (!selectedSubject) return assessments;
+    return assessments.filter(
+      (exam) =>
+        String(exam.subject_id) === String(selectedSubject) ||
+        exam.subject === selectedSubject
+    );
+  }, [assessments, selectedSubject]);
+
+  useEffect(() => {
+    if (!selectedExamId) return;
+    const stillVisible = filteredAssessments.some(
+      (exam) => String(exam.assessment_id) === String(selectedExamId)
+    );
+    if (!stillVisible) setSelectedExamId("");
+  }, [filteredAssessments, selectedExamId]);
 
   const exportAssessments = async () => {
     try {
@@ -183,23 +214,63 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
         <div className={`min-w-0 overflow-hidden rounded-xl border p-4 ${theme === "dark" ? "border-white/10 bg-white/[0.02]" : "border-emerald-100 bg-white/70"}`}>
           <h3 className="font-semibold">Assessment report / results</h3>
           <p className={`mt-1 text-sm break-words ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-            Pick one assessment for a full HTML report or export raw results as CSV.
+            Filter by subject, then pick an assessment for a full HTML report or results CSV.
           </p>
-          <Select
-            value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value)}
-            className="mt-3 w-full min-w-0 max-w-full"
-            onFocus={() => {
-              if (!assessments.length && !loading) loadAssessments();
-            }}
-          >
-            <option value="">{loading ? "Loading assessments..." : "Select an assessment"}</option>
-            {assessments.map((exam) => (
-              <option key={exam.assessment_id} value={exam.assessment_id}>
-                {[exam.title, exam.subject].filter(Boolean).join(" — ")}
-              </option>
-            ))}
-          </Select>
+          {loading && assessments.length === 0 ? (
+            <div className="mt-3">
+              <PanelContentSkeleton rows={3} variant="list" />
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <label className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${
+                  theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
+                }`}>
+                  Subject
+                </label>
+                <Select
+                  value={selectedSubject}
+                  onChange={(e) => {
+                    setSelectedSubject(e.target.value);
+                    setSelectedExamId("");
+                  }}
+                  className="w-full min-w-0 max-w-full"
+                >
+                  <option value="">All subjects</option>
+                  {subjectOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="min-w-0">
+                <label className={`mb-1.5 block text-xs font-semibold uppercase tracking-wide ${
+                  theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
+                }`}>
+                  Assessment
+                </label>
+                <Select
+                  value={selectedExamId}
+                  onChange={(e) => setSelectedExamId(e.target.value)}
+                  className="w-full min-w-0 max-w-full"
+                  onFocus={() => {
+                    if (!assessments.length && !loading) loadAssessments();
+                  }}
+                >
+                  <option value="">
+                    {loading ? "Loading assessments..." : "Select an assessment"}
+                  </option>
+                  {filteredAssessments.map((exam) => (
+                    <option key={exam.assessment_id} value={exam.assessment_id}>
+                      {exam.title}
+                      {!selectedSubject && exam.subject ? ` — ${exam.subject}` : ""}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          )}
           <div className="mt-3 flex flex-wrap gap-3">
             <ProgressButton
               type="button"

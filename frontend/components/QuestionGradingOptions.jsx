@@ -160,8 +160,8 @@ export default function QuestionGradingOptions({
                 label="Accept alternative answers"
                 hint={
                   type === "enumeration"
-                    ? "Allow other valid spellings per correct answer; casing is ignored."
-                    : "Count other valid spellings as correct; casing is ignored."
+                    ? "Allow other valid spellings or abbr/full forms per slot; casing is ignored unless case sensitive."
+                    : "Count other valid spellings or abbr/full forms as correct; casing is ignored unless case sensitive."
                 }
                 checked={grading.accept_alternatives}
                 disabled={grading.case_sensitive}
