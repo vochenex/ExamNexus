@@ -39,7 +39,22 @@ function getUploadedFiles(req) {
   const fromFiles = Array.isArray(req.files?.files) ? req.files.files : [];
   const fromFile = Array.isArray(req.files?.file) ? req.files.file : [];
   const single = req.file ? [req.file] : [];
-  return [...fromFiles, ...fromFile, ...single].filter(Boolean);
+  const merged = [...fromFiles, ...fromFile, ...single].filter(Boolean);
+
+  // Client may send both `files` and legacy `file` — never count the same upload twice.
+  const seen = new Set();
+  const unique = [];
+  for (const file of merged) {
+    const key = [
+      file.originalname || "",
+      file.size ?? file.buffer?.length ?? "",
+      file.mimetype || "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(file);
+  }
+  return unique;
 }
 
 function parseFormatsField(formats) {

@@ -76,6 +76,30 @@ function fileKey(file, index) {
   return `${file.name}-${file.size}-${file.lastModified}-${index}`;
 }
 
+/** Match classified roles back onto the current File list (by name, then index). */
+function resolveFilesByRole(files, analysisFiles, wantQuestionnaire) {
+  const list = Array.isArray(files) ? files : [];
+  const meta = Array.isArray(analysisFiles) ? analysisFiles : [];
+  const matched = [];
+  const used = new Set();
+
+  for (const item of meta) {
+    if (Boolean(item?.isQuestionnaire) !== Boolean(wantQuestionnaire)) continue;
+
+    let index = list.findIndex(
+      (file, i) => !used.has(i) && file.name === item.name
+    );
+    if (index < 0 && Number.isFinite(item.index) && !used.has(item.index)) {
+      index = item.index;
+    }
+    if (index < 0 || index >= list.length || used.has(index)) continue;
+    used.add(index);
+    matched.push(list[index]);
+  }
+
+  return matched;
+}
+
 export default function AssessmentAiGenerator({
   mode,
   onGenerationStart,
@@ -310,15 +334,19 @@ export default function AssessmentAiGenerator({
         return;
       }
 
-      const sourceIndexes = Array.isArray(documentAnalysis?.sourceIndexes)
-        ? documentAnalysis.sourceIndexes
-        : null;
+      const sourceFiles = documentAnalysis?.mixed
+        ? resolveFilesByRole(files, documentAnalysis.files, false)
+        : files;
+
+      if (!sourceFiles.length) {
+        onError?.("No source/study files found to generate from.");
+        return;
+      }
 
       runGeneration(
         ({ onProgress, onQuestionGenerated, signal }) =>
           generateAssessmentFromDocument({
-            files,
-            fileIndexes: sourceIndexes,
+            files: sourceFiles,
             questionCount: resolvedQuestionCount,
             difficulty,
             formats: selectedFormats,
@@ -338,7 +366,10 @@ export default function AssessmentAiGenerator({
             );
             return payload;
           }),
-        waitingForSourceGenerate ? { preferredMode: "append" } : undefined
+        // Always append after a mixed questionnaire pass so we never wipe those items.
+        waitingForSourceGenerate || documentAnalysis?.mixed
+          ? { preferredMode: "append" }
+          : undefined
       );
       return;
     }
@@ -356,9 +387,15 @@ export default function AssessmentAiGenerator({
           questionnaireDone: false,
         });
 
-        const qIndexes = Array.isArray(classification.questionnaireIndexes)
-          ? classification.questionnaireIndexes
-          : [];
+        const questionnaireFiles = resolveFilesByRole(
+          files,
+          classification.files,
+          true
+        );
+
+        if (!questionnaireFiles.length) {
+          throw new Error("Could not locate the questionnaire file after classification.");
+        }
 
         onProgress?.({
           phase: "structuring",
@@ -369,8 +406,7 @@ export default function AssessmentAiGenerator({
         });
 
         const payload = await generateAssessmentFromDocument({
-          files,
-          fileIndexes: qIndexes,
+          files: questionnaireFiles,
           isQuestionnaire: true,
           onProgress,
           onQuestionGenerated,
@@ -413,9 +449,13 @@ export default function AssessmentAiGenerator({
           percent: 20,
           status: "converting",
         });
-        return generateAssessmentFromDocument({
+        const questionnaireFiles = resolveFilesByRole(
           files,
-          fileIndexes: classification.questionnaireIndexes,
+          classification.files,
+          true
+        );
+        return generateAssessmentFromDocument({
+          files: questionnaireFiles.length ? questionnaireFiles : files,
           isQuestionnaire: true,
           onProgress,
           onQuestionGenerated,

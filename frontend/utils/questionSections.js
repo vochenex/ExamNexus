@@ -71,7 +71,9 @@ export function buildSectionsFromQuestions(questions, fallbackType = "multiple_c
       sections.push(section);
     }
 
-    question.sectionId = question.sectionId || typeToSectionId.get(type);
+    // Always bind to the rebuilt section for this type (avoids orphaned sectionIds
+    // after snapshot restore / re-init).
+    question.sectionId = typeToSectionId.get(type);
     question.type = type;
   }
 

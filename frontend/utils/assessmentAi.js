@@ -171,8 +171,10 @@ function appendFilesToFormData(formData, files) {
   for (const file of list) {
     formData.append("files", file);
   }
-  // Back-compat for older single-file handlers.
-  formData.append("file", list[0]);
+  // Legacy single-file field only when exactly one upload (avoids duplicating file #1).
+  if (list.length === 1) {
+    formData.append("file", list[0]);
+  }
   return list;
 }
 

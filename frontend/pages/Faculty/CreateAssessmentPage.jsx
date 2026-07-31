@@ -274,6 +274,13 @@ export default function CreateAssessment() {
     const snapshot = aiReplaceSnapshotRef.current;
     if (!snapshot) return;
 
+    // Append mode never clears the builder — re-init would remint section ids and
+    // briefly orphan questions if anything goes wrong mid-flight.
+    if (snapshot.mode === "append") {
+      aiReplaceSnapshotRef.current = null;
+      return;
+    }
+
     initializeFromLoadedQuestions(snapshot.questions, snapshot.examType);
     setExam((prev) => ({
       ...prev,
@@ -293,12 +300,22 @@ export default function CreateAssessment() {
     }
 
     const mappedQuestions = mapAiPayloadToBuilderQuestions(payload);
+    const mergeMode = aiMergeModeRef.current || "replace";
 
     setAiGenerating(false);
 
     if (!mappedQuestions.length) {
       setAiProgress(null);
       applyAiExamDetailsRef.current = false;
+      if (mergeMode === "append") {
+        // Keep questionnaire (or prior) questions; only report the source failure.
+        aiReplaceSnapshotRef.current = null;
+        setError(
+          payload?.meta?.warning ||
+            "AI did not return usable questions from this pass. Your existing questions were kept."
+        );
+        return;
+      }
       restoreAiReplaceSnapshot();
       setError("AI did not return usable questions. Adjust your prompt or file and try again.");
       return;
@@ -314,12 +331,21 @@ export default function CreateAssessment() {
       total: mappedQuestions.length,
     }));
 
-    setExam((prev) => ({
-      ...prev,
-      title: resolveAiExamField(prev.title, payload.suggestedTitle),
-      description: resolveAiExamField(prev.description, payload.suggestedDescription),
-      exam_type: resolveExamTypeFromMapped(mappedQuestions),
-    }));
+    setExam((prev) => {
+      const nextType = resolveExamTypeFromMapped(mappedQuestions);
+      let examType = nextType;
+      if (mergeMode === "append" && prev.exam_type) {
+        if (prev.exam_type === "mixed" || prev.exam_type !== nextType) {
+          examType = "mixed";
+        }
+      }
+      return {
+        ...prev,
+        title: resolveAiExamField(prev.title, payload.suggestedTitle),
+        description: resolveAiExamField(prev.description, payload.suggestedDescription),
+        exam_type: examType,
+      };
+    });
     applyAiExamDetailsRef.current = false;
 
     setError(payload?.meta?.warning || "");
