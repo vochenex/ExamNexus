@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { KeyRound, X, CheckCheck, Eye, EyeOff, Sparkles } from "lucide-react";
+import { KeyRound, X, CheckCheck, Eye, EyeOff, Sparkles, Search } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -83,11 +83,23 @@ export default function AdminPasswordResets() {
   const [bulkCompleting, setBulkCompleting] = useState(false);
   const [bulkRejecting, setBulkRejecting] = useState(false);
   const [bulkResults, setBulkResults] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const pendingRows = useMemo(
     () => rows.filter((row) => row.status === "pending"),
     [rows]
   );
+
+  const visibleRows = useMemo(() => {
+    const trimmed = searchQuery.trim().toLowerCase();
+    if (!trimmed) return rows;
+    return rows.filter((row) => {
+      const email = String(row.email || "").toLowerCase();
+      const id = String(row.school_id || "").toLowerCase();
+      const name = `${row.first_name || ""} ${row.last_name || ""}`.trim().toLowerCase();
+      return email.includes(trimmed) || id.includes(trimmed) || name.includes(trimmed);
+    });
+  }, [rows, searchQuery]);
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -258,7 +270,24 @@ export default function AdminPasswordResets() {
         </div>
       )}
 
-      <div className={`${adminToolbarClass(theme)} flex flex-wrap items-center gap-3`}>
+      <div className={`${adminToolbarClass(theme)} flex flex-col gap-3`}>
+        <div className="relative min-w-0 w-full max-w-md">
+          <Search
+            size={16}
+            className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+              theme === "dark" ? "text-gray-500" : "text-gray-400"
+            }`}
+          />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, school ID, or email…"
+            className={inputClass(theme, "w-full min-w-0 py-2.5 pl-9 pr-3")}
+            aria-label="Search password reset requests by name, school ID, or email"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -300,6 +329,7 @@ export default function AdminPasswordResets() {
             </ProgressButton>
           </>
         )}
+        </div>
       </div>
 
       <div className={adminTableWrapClass(theme)}>
@@ -316,14 +346,14 @@ export default function AdminPasswordResets() {
               </tr>
             </thead>
             <tbody>
-              {!rows.length ? (
+              {!visibleRows.length ? (
                 <tr>
                   <td colSpan={6} className={`${adminTdClass(theme)} py-8 text-center`}>
                     No password reset requests match this filter.
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                visibleRows.map((row) => (
                   <tr key={row.id}>
                     <td className={adminTdClass(theme)}>
                       {row.created_at

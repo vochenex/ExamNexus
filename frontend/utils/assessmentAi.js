@@ -4,6 +4,8 @@ import { resolvePromptGenerationSettings } from "./promptPreferences";
 import { API_BASE, isLocalApiBase } from "./apiBase.js";
 
 const AI_REQUEST_TIMEOUT_MS = 600000;
+/** Keep each hosted API round small so Vercel's 60s limit is not exceeded. */
+const PROMPT_CLIENT_ROUND_SIZE = 8;
 
 function backendUnreachableMessage() {
   if (isLocalApiBase()) {
@@ -15,6 +17,18 @@ function backendUnreachableMessage() {
 async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const externalSignal = options.signal;
+
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timer);
+      const error = new Error("Generation cancelled.");
+      error.name = "AbortError";
+      throw error;
+    }
+    externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+  }
 
   try {
     return await fetch(url, {
@@ -23,6 +37,11 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOU
     });
   } catch (error) {
     if (error?.name === "AbortError") {
+      if (externalSignal?.aborted) {
+        const cancelled = new Error("Generation cancelled.");
+        cancelled.name = "AbortError";
+        throw cancelled;
+      }
       throw new Error(
         "The request took too long. Check your internet connection and try again."
       );
@@ -30,6 +49,9 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOU
     throw error;
   } finally {
     clearTimeout(timer);
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", onExternalAbort);
+    }
   }
 }
 
@@ -250,6 +272,7 @@ export async function generateAssessmentFromPrompt({
   difficulty,
   onProgress,
   onQuestionGenerated,
+  signal,
 }) {
   const trimmed = String(prompt || "").trim();
   const resolved = resolvePromptGenerationSettings({
@@ -259,58 +282,172 @@ export async function generateAssessmentFromPrompt({
     formats,
   });
 
-  const headers = await getAuthHeaders(true, { forceRefresh: true });
+  const total = Math.max(1, Number(resolved.questionCount) || 8);
+  const allQuestions = [];
+  let suggestedTitle = "";
+  let suggestedDescription = "";
+  let meta = {};
+  let lastError = null;
 
-  let res;
-  const stopWaiting = startWaitingProgress({
-    onProgress,
+  const assertNotAborted = () => {
+    if (signal?.aborted) {
+      const error = new Error("Generation cancelled.");
+      error.name = "AbortError";
+      throw error;
+    }
+  };
+
+  onProgress?.({
     phase: "prompt",
-    total: resolved.questionCount,
+    current: 0,
+    total,
+    percent: 2,
+    status: "waiting",
   });
 
-  try {
-    res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/generate-from-prompt`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        prompt: trimmed,
-        formats: resolved.formats,
-        questionCount: resolved.questionCount,
-        difficulty: resolved.difficulty,
-      }),
+  while (allQuestions.length < total) {
+    assertNotAborted();
+
+    const need = Math.min(PROMPT_CLIENT_ROUND_SIZE, total - allQuestions.length);
+    const recent = allQuestions
+      .map((item) => item?.question)
+      .filter(Boolean)
+      .slice(-12)
+      .join(" | ");
+
+    const additionalInstructions = allQuestions.length
+      ? [
+          `Already created ${allQuestions.length} of ${total} questions.`,
+          `Generate exactly ${need} NEW distinct questions.`,
+          recent ? `Do not repeat or paraphrase any of these existing questions: ${recent}` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : "";
+
+    onProgress?.({
+      phase: "prompt",
+      current: allQuestions.length,
+      total,
+      percent: Math.min(
+        76,
+        Math.round(4 + (allQuestions.length / total) * 72)
+      ),
+      status: "waiting",
     });
-  } catch (error) {
-    stopWaiting();
-    if (isBackendUnreachable(error)) {
-      throw new Error(backendUnreachableMessage());
+
+    let res;
+    try {
+      const headers = await getAuthHeaders(true, { forceRefresh: allQuestions.length === 0 });
+      res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/generate-from-prompt`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          prompt: trimmed,
+          formats: resolved.formats,
+          questionCount: need,
+          difficulty: resolved.difficulty,
+          additionalInstructions,
+          lockQuestionCount: true,
+        }),
+        signal,
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = isBackendUnreachable(error)
+        ? new Error(backendUnreachableMessage())
+        : error;
+      break;
     }
-    throw error;
-  } finally {
-    stopWaiting();
+
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      lastError = new Error(formatApiError(payload, "Failed to generate questions"));
+      break;
+    }
+
+    const batch = Array.isArray(payload.questions) ? payload.questions : [];
+    if (!batch.length) {
+      lastError = new Error("AI did not return any usable questions.");
+      break;
+    }
+
+    if (!suggestedTitle && payload.suggestedTitle) {
+      suggestedTitle = payload.suggestedTitle;
+    }
+    if (!suggestedDescription && payload.suggestedDescription) {
+      suggestedDescription = payload.suggestedDescription;
+    }
+    meta = {
+      ...(payload.meta || {}),
+      ...(meta || {}),
+      requestedCount: total,
+      generatedCount: allQuestions.length + batch.length,
+      rounds: (meta.rounds || 0) + 1,
+    };
+
+    for (const question of batch) {
+      if (allQuestions.length >= total) break;
+      allQuestions.push(question);
+      const current = allQuestions.length;
+      onProgress?.({
+        phase: "prompt",
+        current,
+        total,
+        percent: Math.round(78 + (current / total) * 22),
+        status: "revealing",
+      });
+      emitQuestionReady({
+        onQuestionGenerated,
+        question,
+        step: current - 1,
+        total,
+        phase: "prompt",
+        payload: {
+          suggestedTitle,
+          suggestedDescription,
+        },
+      });
+      if (current < total) {
+        await sleep(40);
+      }
+    }
+
+    // Avoid infinite loops if the model keeps returning the same count with no progress.
+    if (batch.length === 0) break;
   }
 
-  const payload = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(formatApiError(payload, "Failed to generate questions"));
+  if (!allQuestions.length) {
+    throw lastError || new Error("AI did not return any usable questions.");
   }
 
-  const questions = Array.isArray(payload.questions) ? payload.questions : [];
-  if (!questions.length) {
-    throw new Error("AI did not return any usable questions.");
-  }
-
-  await revealQuestionsIncrementally({
-    questions,
-    onProgress,
-    onQuestionGenerated,
+  onProgress?.({
     phase: "prompt",
-    payload,
+    current: allQuestions.length,
+    total,
+    percent: 100,
+    status: "done",
   });
 
   return {
-    ...payload,
-    resolvedSettings: payload.resolvedSettings || resolved,
+    success: true,
+    questions: allQuestions,
+    suggestedTitle,
+    suggestedDescription,
+    meta: {
+      ...meta,
+      requestedCount: total,
+      generatedCount: allQuestions.length,
+      partial: allQuestions.length < total,
+      warning:
+        allQuestions.length < total
+          ? `Generated ${allQuestions.length} of ${total} questions. You can run generate again to add more.`
+          : null,
+    },
+    resolvedSettings: {
+      ...resolved,
+      questionCount: total,
+    },
   };
 }
 
@@ -320,6 +457,7 @@ export async function generateAssessmentFromDocument({
   difficulty,
   onProgress,
   onQuestionGenerated,
+  signal,
 }) {
   if (!file) {
     throw new Error("Choose a PDF or Word (.docx) file to upload.");
@@ -353,9 +491,11 @@ export async function generateAssessmentFromDocument({
         Authorization: `Bearer ${session.access_token}`,
       },
       body: formData,
+      signal,
     });
   } catch (error) {
     stopWaiting();
+    if (error?.name === "AbortError") throw error;
     if (isBackendUnreachable(error)) {
       throw new Error(backendUnreachableMessage());
     }

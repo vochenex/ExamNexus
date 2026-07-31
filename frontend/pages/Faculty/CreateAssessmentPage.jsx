@@ -292,7 +292,7 @@ export default function CreateAssessment() {
     }));
     applyAiExamDetailsRef.current = false;
 
-    setError("");
+    setError(payload?.meta?.warning || "");
   };
 
   const handleAiError = (message) => {

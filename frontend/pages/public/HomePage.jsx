@@ -112,10 +112,11 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    if (location.hash !== "#home") return undefined;
+    const hash = location.hash?.replace(/^#/, "");
+    if (!hash) return undefined;
 
     const frame = requestAnimationFrame(() => {
-      const target = document.getElementById("home");
+      const target = document.getElementById(hash);
       target?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 

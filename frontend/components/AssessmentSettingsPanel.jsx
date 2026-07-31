@@ -109,7 +109,7 @@ export default function AssessmentSettingsPanel({
         onChange={(checked) =>
           onChange({
             show_result: checked,
-            ...(checked ? {} : { show_question_review: false, show_correct_answers: false }),
+            ...(checked ? {} : { show_question_review: false }),
           })
         }
       />
@@ -120,20 +120,14 @@ export default function AssessmentSettingsPanel({
         hint="When enabled, students can review each question and their answers. When off, only the score is shown."
         checked={exam.show_question_review !== false}
         disabled={exam.show_result === false}
-        onChange={(checked) =>
-          onChange({
-            show_question_review: checked,
-            ...(checked ? {} : { show_correct_answers: false }),
-          })
-        }
+        onChange={(checked) => onChange({ show_question_review: checked })}
       />
 
       <ToggleOptionRow
         theme={theme}
         label="Show correct answers after submission"
-        hint="When enabled, students see the correct answer for each question during review. When off, they only see their own response."
+        hint="Independent preference. Students only see correct answers when score and question review are also enabled."
         checked={exam.show_correct_answers !== false}
-        disabled={exam.show_result === false || exam.show_question_review === false}
         onChange={(checked) => onChange({ show_correct_answers: checked })}
       />
 

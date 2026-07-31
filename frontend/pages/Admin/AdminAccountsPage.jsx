@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Users, Pencil, Trash2, Check, CheckCheck, X } from "lucide-react";
+import { Users, Pencil, Trash2, Check, CheckCheck, X, Search } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -78,6 +78,7 @@ export default function AdminAccounts() {
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkRejecting, setBulkRejecting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const pendingUsers = useMemo(
     () =>
@@ -90,6 +91,17 @@ export default function AdminAccounts() {
   );
 
   const pendingCount = pendingUsers.length;
+
+  const visibleUsers = useMemo(() => {
+    const trimmed = searchQuery.trim().toLowerCase();
+    if (!trimmed) return users;
+    return users.filter((user) => {
+      const name = `${user.first_name || ""} ${user.last_name || ""}`.trim().toLowerCase();
+      const id = String(user.school_id || "").toLowerCase();
+      const email = String(user.email || "").toLowerCase();
+      return name.includes(trimmed) || id.includes(trimmed) || email.includes(trimmed);
+    });
+  }, [users, searchQuery]);
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -267,7 +279,24 @@ export default function AdminAccounts() {
         </div>
       )}
 
-      <div className={`${adminToolbarClass(theme)} flex flex-wrap items-center gap-3`}>
+      <div className={`${adminToolbarClass(theme)} flex flex-col gap-3`}>
+        <div className="relative min-w-0 w-full max-w-md">
+          <Search
+            size={16}
+            className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+              theme === "dark" ? "text-gray-500" : "text-gray-400"
+            }`}
+          />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, school ID, or email…"
+            className={inputClass(theme, "w-full min-w-0 py-2.5 pl-9 pr-3")}
+            aria-label="Search accounts by name, school ID, or email"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -321,10 +350,11 @@ export default function AdminAccounts() {
             </ProgressButton>
           </>
         )}
+        </div>
       </div>
 
       <div className={`${adminTableWrapClass(theme)} min-w-0`}>
-      {users.length === 0 ? (
+      {visibleUsers.length === 0 ? (
         <div
           className={`flex min-h-[12rem] w-full items-center justify-center px-4 py-10 text-center text-sm ${
             theme === "dark" ? "text-gray-400" : "text-gray-600"
@@ -348,7 +378,7 @@ export default function AdminAccounts() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user, index) => {
+              {visibleUsers.map((user, index) => {
                   const status = getAccountStatus(user);
                   const isPending = status === "pending";
                   const isAdmin = String(user.role || "").toLowerCase() === "admin";

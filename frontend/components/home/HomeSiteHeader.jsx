@@ -17,7 +17,7 @@ const NAV_LINKS = [
   { label: "Home", href: "#home" },
   { label: "About", href: "#about" },
   { label: "Team", href: "#team" },
-
+  { label: "Contact", href: "#contact" },
 ];
 
 function dashboardPath(role) {

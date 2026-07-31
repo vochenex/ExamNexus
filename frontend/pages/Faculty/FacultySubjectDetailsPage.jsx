@@ -347,21 +347,27 @@ export default function SubjectDetails() {
           type="button"
           onClick={() => navigate(`/faculty/subject/${subjectId}/social`)}
           disabled={!facultyCanManage}
-          className={iconButton(theme, "primary", "disabled:opacity-50 disabled:cursor-not-allowed")}
-          aria-label="Social and announcements"
-          title="Social / Announcements"
+          className={iconButton(
+            theme,
+            "primary",
+            "gap-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+          aria-label="Announcements"
+          title="Announcements"
         >
           <Megaphone size={18} />
+          <span className="text-sm font-semibold">Announcements</span>
         </button>
 
         <button
           type="button"
           onClick={() => setRatingsOpen(true)}
-          className={iconButton(theme, "primary")}
+          className={iconButton(theme, "primary", "gap-2 px-3")}
           aria-label="Student ratings"
           title="Student ratings"
         >
           <BarChart3 size={18} />
+          <span className="text-sm font-semibold">Student ratings</span>
         </button>
       </div>
 
@@ -420,7 +426,7 @@ export default function SubjectDetails() {
             sections={subjectSections}
           />
 
-          <div className="mt-4 min-w-0 max-h-[min(28rem,60vh)] space-y-2 overflow-y-auto overscroll-contain pr-1">
+          <div className="mt-4 h-[min(28rem,60vh)] min-h-[12rem] min-w-0 space-y-2 overflow-y-auto overscroll-contain pr-1">
             {visibleClassmates.length === 0 ? (
               <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
                 {studentSearch.trim()

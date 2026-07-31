@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BrainCircuit,
   CheckCircle2,
@@ -40,6 +40,7 @@ function clampQuestionCount(value) {
 
 function normalizeErrorMessage(error, fallback = "AI generation failed.") {
   if (!error) return fallback;
+  if (error?.name === "AbortError") return "";
   if (typeof error === "string") return error || fallback;
   if (typeof error.message === "string" && error.message.trim()) return error.message;
   return fallback;
@@ -64,6 +65,8 @@ export default function AssessmentAiGenerator({
   const [selectedFormats, setSelectedFormats] = useState(() => [...DEFAULT_AI_FORMATS]);
   const [file, setFile] = useState(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const inFlightRef = useRef(false);
+  const abortRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +79,7 @@ export default function AssessmentAiGenerator({
 
     return () => {
       cancelled = true;
+      abortRef.current?.abort();
     };
   }, []);
 
@@ -109,14 +113,21 @@ export default function AssessmentAiGenerator({
   };
 
   const runGeneration = async (generator) => {
-    if (disabled || loading) return;
+    // Sync lock first — React state alone is too late to stop double-clicks.
+    if (disabled || loading || inFlightRef.current) return;
+    inFlightRef.current = true;
+    setLoading(true);
 
-    if (mode === "prompt" && selectedFormats.length === 0) {
-      onError?.("Select at least one question format.");
-      return;
-    }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
+      if (mode === "prompt" && selectedFormats.length === 0) {
+        onError?.("Select at least one question format.");
+        return;
+      }
+
       const latestStatus = await fetchAssessmentAiStatus();
       setAiReady(latestStatus);
 
@@ -133,7 +144,6 @@ export default function AssessmentAiGenerator({
         if (!canStart) return;
       }
 
-      setLoading(true);
       if (onClearError) {
         onClearError();
       } else {
@@ -143,13 +153,25 @@ export default function AssessmentAiGenerator({
       const payload = await generator({
         onProgress,
         onQuestionGenerated,
+        signal: controller.signal,
       });
+
+      if (controller.signal.aborted) return;
 
       onGenerated?.(payload);
     } catch (error) {
-      onError?.(normalizeErrorMessage(error));
+      if (error?.name === "AbortError") {
+        onProgress?.(null);
+        return;
+      }
+      const message = normalizeErrorMessage(error);
+      if (message) onError?.(message);
       onProgress?.(null);
     } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      inFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -163,7 +185,7 @@ export default function AssessmentAiGenerator({
       return;
     }
 
-    runGeneration(({ onProgress, onQuestionGenerated }) =>
+    runGeneration(({ onProgress, onQuestionGenerated, signal }) =>
       generateAssessmentFromPrompt({
         prompt: trimmed,
         formats: selectedFormats,
@@ -171,6 +193,7 @@ export default function AssessmentAiGenerator({
         difficulty,
         onProgress,
         onQuestionGenerated,
+        signal,
       })
     );
   };
@@ -181,13 +204,14 @@ export default function AssessmentAiGenerator({
       return;
     }
 
-    runGeneration(({ onProgress, onQuestionGenerated }) =>
+    runGeneration(({ onProgress, onQuestionGenerated, signal }) =>
       generateAssessmentFromDocument({
         file,
         questionCount: resolvedQuestionCount,
         difficulty,
         onProgress,
         onQuestionGenerated,
+        signal,
       })
     );
   };
@@ -394,6 +418,9 @@ export default function AssessmentAiGenerator({
           <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
             {MIN_QUESTIONS}–{MAX_QUESTIONS} items ·{" "}
             {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+            {mode === "prompt"
+              ? " · Large sets generate in small rounds so hosted API timeouts are avoided"
+              : ""}
           </p>
         </div>
       )}

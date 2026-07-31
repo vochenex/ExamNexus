@@ -75,7 +75,11 @@ export default function SubjectStudentRatingsSidebar({
     if (searchQuery.trim()) {
       rows = rows.filter((student) => matchesStudentSearch(student, searchQuery));
     }
-    return rows;
+    return [...rows].sort((a, b) => {
+      const nameA = `${a.first_name || ""} ${a.last_name || ""}`.trim();
+      const nameB = `${b.first_name || ""} ${b.last_name || ""}`.trim();
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+    });
   }, [students, activeSection, searchQuery]);
 
   if (!open) return null;

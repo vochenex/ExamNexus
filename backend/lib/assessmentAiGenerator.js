@@ -31,6 +31,7 @@ const DEFAULT_QUESTIONS = 8;
 const MAX_SOURCE_CHARS = 14000;
 const MAX_PROMPT_CHARS = 4000;
 const DEFAULT_BATCH_DELAY_MS = 4000;
+const DEFAULT_GROQ_BATCH_DELAY_MS = 750;
 const DEFAULT_CHUNK_SIZE = 5;
 
 function sleep(ms) {
@@ -41,6 +42,10 @@ function getBatchDelayMs() {
   const configured = Number(process.env.GEMINI_BATCH_DELAY_MS);
   if (Number.isFinite(configured) && configured >= 0) {
     return configured;
+  }
+  // Groq free tier allows higher RPM than Gemini free; keep only a short gap.
+  if (String(process.env.GROQ_API_KEY || "").trim()) {
+    return DEFAULT_GROQ_BATCH_DELAY_MS;
   }
   return DEFAULT_BATCH_DELAY_MS;
 }
@@ -174,6 +179,7 @@ function resolvePromptGenerationSettings({
   questionCount,
   difficulty,
   formats,
+  lockQuestionCount = false,
 }) {
   const parsed = parsePromptPreferences(prompt);
   const uiFormats =
@@ -191,7 +197,9 @@ function resolvePromptGenerationSettings({
 
   return {
     questionCount: clampQuestionCount(
-      parsed.questionCount ?? questionCount ?? DEFAULT_QUESTIONS
+      lockQuestionCount
+        ? questionCount ?? DEFAULT_QUESTIONS
+        : parsed.questionCount ?? questionCount ?? DEFAULT_QUESTIONS
     ),
     difficulty: parsed.difficulty || difficulty || "medium",
     formats: finalFormats,
@@ -594,6 +602,7 @@ async function requestAiQuestionsBatched({
 
   let chunkRound = 0;
   const maxChunkRounds = Math.ceil(count / chunkSize) + 3;
+  let emptyStreak = 0;
 
   while (questions.length < count && chunkRound < maxChunkRounds) {
     if (chunkRound > 0) {
@@ -631,7 +640,12 @@ async function requestAiQuestionsBatched({
     const before = questions.length;
     absorbQuestions(result.questions);
     if (questions.length === before) {
-      break;
+      emptyStreak += 1;
+      if (emptyStreak >= 2) {
+        break;
+      }
+    } else {
+      emptyStreak = 0;
     }
   }
 

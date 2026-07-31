@@ -123,19 +123,11 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
         { key: "exam_title", label: "Assessment" },
         { key: "subject", label: "Subject" },
         { key: "student_name", label: "Student" },
-        { key: "school_id", label: "School ID" },
-        { key: "section", label: "Section" },
-        { key: "department", label: "Department" },
-        { key: "course", label: "Course" },
         { key: "student_email", label: "Email" },
+        { key: "school_id", label: "School ID" },
         { key: "score", label: "Score" },
         { key: "total", label: "Total" },
         { key: "percentage", label: "Percentage" },
-        { key: "correct_count", label: "Correct Count" },
-        { key: "incorrect_count", label: "Incorrect Count" },
-        { key: "correct_question_numbers", label: "Correct Question Nos" },
-        { key: "incorrect_question_numbers", label: "Incorrect Question Nos" },
-        { key: "correct_answers", label: "Answer Key" },
         { key: "submitted_at", label: "Submitted At" },
       ]);
       await finishExport(
@@ -173,13 +165,13 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
             onClick={exportAssessments}
             loading={exporting === "assessments"}
             loadingLabel="Exporting assessments"
-            iconOnly
             disabled={Boolean(exporting) && exporting !== "assessments"}
-            className={iconButton(theme, "primary", "mt-3")}
+            className={iconButton(theme, "primary", "mt-3 gap-2 px-3")}
             aria-label="Export assessments CSV"
             title="Export assessments CSV"
           >
             <Download size={18} />
+            <span className="text-sm font-semibold">Export assessments CSV</span>
           </ProgressButton>
         </div>
 
@@ -209,42 +201,42 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
               onClick={() => exportAssessmentReport(selectedExamId)}
               loading={exporting === `report-${selectedExamId}`}
               loadingLabel="Exporting report"
-              iconOnly
               disabled={!selectedExamId || (Boolean(exporting) && exporting !== `report-${selectedExamId}`)}
-              className={iconButton(theme, "primary")}
+              className={iconButton(theme, "primary", "gap-2 px-3")}
               aria-label="Export full HTML report"
               title="Export full report"
             >
               <Download size={18} />
+              <span className="text-sm font-semibold">Export HTML report</span>
             </ProgressButton>
             <ProgressButton
               type="button"
               onClick={() => exportResultsCsv(selectedExamId || null)}
               loading={Boolean(selectedExamId) && exporting === `results-${selectedExamId}`}
               loadingLabel="Exporting results"
-              iconOnly
               disabled={
                 !selectedExamId ||
                 (Boolean(exporting) && exporting !== `results-${selectedExamId}`)
               }
-              className={iconButton(theme, "secondary")}
+              className={iconButton(theme, "secondary", "gap-2 px-3")}
               aria-label="Export selected results CSV"
               title="Export selected results CSV"
             >
               <FileSpreadsheet size={18} />
+              <span className="text-sm font-semibold">Export results CSV</span>
             </ProgressButton>
             <ProgressButton
               type="button"
               onClick={() => exportResultsCsv(null)}
               loading={exporting === "all-results"}
               loadingLabel="Exporting all results"
-              iconOnly
               disabled={Boolean(exporting) && exporting !== "all-results"}
-              className={iconButton(theme, "secondary")}
+              className={iconButton(theme, "secondary", "gap-2 px-3")}
               aria-label="Export all my results CSV"
               title="Export all results CSV"
             >
               <FileSpreadsheet size={18} />
+              <span className="text-sm font-semibold">Export all results</span>
             </ProgressButton>
           </div>
         </div>

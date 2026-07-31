@@ -241,7 +241,7 @@ export default function NotificationBell({ compact = false }) {
 
   return (
     <div
-      className={`relative ${compact ? "inline-flex h-8 w-8 items-center justify-center sm:h-9 sm:w-9" : ""}`}
+      className={`relative ${compact ? "inline-flex h-9 w-9 items-center justify-center sm:h-10 sm:w-10" : ""}`}
     >
       <button
         ref={triggerRef}
@@ -252,7 +252,7 @@ export default function NotificationBell({ compact = false }) {
           if (!open) loadNotifications();
         }}
         className={`relative en-notif-btn en-header-action-btn flex shrink-0 items-center justify-center transition-all duration-200 ${
-          compact ? "h-8 w-8 rounded-lg p-0 sm:h-9 sm:w-9 sm:rounded-xl" : "p-3.5 rounded-2xl"
+          compact ? "h-9 w-9 rounded-xl p-0 sm:h-10 sm:w-10" : "p-3.5 rounded-2xl"
         } ${open ? "en-bell-ring" : ""} ${
           open
             ? theme === "dark"
@@ -265,7 +265,7 @@ export default function NotificationBell({ compact = false }) {
         aria-label="Notifications"
         aria-expanded={open}
       >
-        <Bell size={compact ? 16 : 22} strokeWidth={2.25} />
+        <Bell size={compact ? 18 : 22} strokeWidth={2.25} />
         {recentCount > 0 && (
           <span
             className={`en-notif-badge pointer-events-none absolute flex items-center justify-center rounded-full bg-red-500 font-bold text-white ring-2 ring-[#031d1f] en-badge-pulse ${

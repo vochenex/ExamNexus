@@ -15,7 +15,6 @@ import { getAuthSession } from "./authUser";
 import {
   gradeStudentAnswer,
   formatStoredAnswer,
-  formatQuestionCorrectAnswers,
   isAutoGradedType,
   normalizeExamTypeForDb,
 } from "./assessmentQuestions";
@@ -646,118 +645,20 @@ export async function fetchFacultyExportResults(teacherSchoolId, examId = null) 
       score,
       total,
       created_at,
-      exams(id, title, subject_id, exam_type, subjects(name)),
-      users(first_name, last_name, email, school_id, department, course)
+      exams(id, title, subject_id, subjects(name)),
+      users(first_name, last_name, email, school_id)
     `)
     .in("exam_id", examIds)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
-  const rows = data || [];
-  const subjectIds = [
-    ...new Set(
-      rows
-        .map((row) => row.exams?.subject_id)
-        .filter(Boolean)
-        .map(String)
-    ),
-  ];
-
-  const sectionByKey = new Map();
-  if (subjectIds.length) {
-    const { data: enrollments } = await supabase
-      .from("subject_enrollments")
-      .select("subject_id, student_id, section")
-      .in("subject_id", subjectIds);
-
-    for (const enrollment of enrollments || []) {
-      sectionByKey.set(
-        `${enrollment.subject_id}:${enrollment.student_id}`,
-        String(enrollment.section || "A").toUpperCase()
-      );
-    }
-  }
-
-  const { data: questionRows } = await supabase
-    .from("questions")
-    .select(
-      "id, exam_id, question, question_type, option_a, option_b, option_c, option_d, correct_answer, correct_answers, created_at"
-    )
-    .in("exam_id", examIds)
-    .order("created_at", { ascending: true });
-
-  const questionsByExam = new Map();
-  const questionIds = [];
-  for (const question of questionRows || []) {
-    questionIds.push(question.id);
-    if (!questionsByExam.has(question.exam_id)) {
-      questionsByExam.set(question.exam_id, []);
-    }
-    questionsByExam.get(question.exam_id).push(question);
-  }
-
-  const answersByStudentExam = new Map();
-  if (questionIds.length) {
-    const { data: answerRows } = await supabase
-      .from("student_answers")
-      .select("question_id, student_id, is_correct, answer")
-      .in("question_id", questionIds);
-
-    const questionExamById = new Map(
-      (questionRows || []).map((question) => [question.id, question.exam_id])
-    );
-
-    for (const answer of answerRows || []) {
-      const examKey = questionExamById.get(answer.question_id);
-      if (!examKey) continue;
-      const key = `${examKey}:${answer.student_id}`;
-      if (!answersByStudentExam.has(key)) {
-        answersByStudentExam.set(key, []);
-      }
-      answersByStudentExam.get(key).push(answer);
-    }
-  }
-
-  return rows.map((row) => {
+  const rows = (data || []).map((row) => {
     const total = Number(row.total) || 0;
     const score = Number(row.score) || 0;
     const pct = total > 0 ? Math.round((score / total) * 1000) / 10 : 0;
     const student = row.users || {};
-    const subjectId = row.exams?.subject_id;
-    const section =
-      sectionByKey.get(`${subjectId}:${row.student_id}`) || "";
-    const examQuestions = questionsByExam.get(row.exam_id) || [];
-    const studentAnswers = answersByStudentExam.get(`${row.exam_id}:${row.student_id}`) || [];
-    const answerByQuestion = new Map(
-      studentAnswers.map((answer) => [answer.question_id, answer])
-    );
-
-    let correctCount = 0;
-    let incorrectCount = 0;
-    const correctQuestionNumbers = [];
-    const incorrectQuestionNumbers = [];
-    const correctAnswerKeys = [];
-
-    examQuestions.forEach((question, index) => {
-      const number = index + 1;
-      const answer = answerByQuestion.get(question.id);
-      const keyAnswers = formatQuestionCorrectAnswers(
-        question,
-        row.exams?.exam_type || question.question_type
-      );
-      if (keyAnswers.length) {
-        correctAnswerKeys.push(`Q${number}: ${keyAnswers.join(" | ")}`);
-      }
-
-      if (answer?.is_correct === true) {
-        correctCount += 1;
-        correctQuestionNumbers.push(String(number));
-      } else if (answer?.is_correct === false) {
-        incorrectCount += 1;
-        incorrectQuestionNumbers.push(String(number));
-      }
-    });
+    const schoolId = String(student.school_id || "").trim();
 
     return {
       exam_title: row.exams?.title || "",
@@ -765,21 +666,22 @@ export async function fetchFacultyExportResults(teacherSchoolId, examId = null) 
       student_name:
         [student.first_name, student.last_name].filter(Boolean).join(" ") || "Student",
       student_email: student.email || "",
-      school_id: student.school_id || "",
-      section: section ? `Section ${section}` : "",
-      department: student.department || "",
-      course: student.course || "",
+      // Force text so Excel does not convert long IDs to scientific notation.
+      school_id: schoolId ? `="${schoolId}"` : "",
       score,
       total,
       percentage: pct,
-      correct_count: correctCount,
-      incorrect_count: incorrectCount,
-      correct_question_numbers: correctQuestionNumbers.join(", "),
-      incorrect_question_numbers: incorrectQuestionNumbers.join(", "),
-      correct_answers: correctAnswerKeys.join("; "),
-      submitted_at: row.created_at,
+      submitted_at: row.created_at || "",
     };
   });
+
+  rows.sort((a, b) =>
+    String(a.student_name || "").localeCompare(String(b.student_name || ""), undefined, {
+      sensitivity: "base",
+    })
+  );
+
+  return rows;
 }
 
 export async function fetchFacultyAssessmentReport(teacherSchoolId, examId) {
@@ -1053,10 +955,7 @@ export async function createExam(examPayload, questions) {
     allow_student_view: examPayload.show_result !== false,
     allow_question_review:
       examPayload.show_result !== false && examPayload.show_question_review !== false,
-    allow_show_correct_answers:
-      examPayload.show_result !== false &&
-      examPayload.show_question_review !== false &&
-      examPayload.show_correct_answers !== false,
+    allow_show_correct_answers: examPayload.show_correct_answers !== false,
     duration_value: durationFields.duration_value,
     duration_unit: durationFields.duration_unit,
   };
@@ -1462,10 +1361,7 @@ export async function updateExam(examId, exam, questions) {
     allow_student_view: exam.show_result !== false,
     allow_question_review:
       exam.show_result !== false && exam.show_question_review !== false,
-    allow_show_correct_answers:
-      exam.show_result !== false &&
-      exam.show_question_review !== false &&
-      exam.show_correct_answers !== false,
+    allow_show_correct_answers: exam.show_correct_answers !== false,
     duration_value: durationFields.duration_value,
     duration_unit: durationFields.duration_unit,
   };

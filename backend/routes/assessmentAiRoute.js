@@ -194,6 +194,7 @@ router.post("/generate-from-prompt", requireFaculty, async (req, res) => {
       questionCount,
       difficulty,
       formats,
+      lockQuestionCount: Boolean(req.body?.lockQuestionCount),
     });
 
     const result = await requestAiQuestionsBatched({
