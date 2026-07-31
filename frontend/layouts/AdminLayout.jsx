@@ -29,6 +29,8 @@ import SidebarCollapseToggle from "../components/SidebarCollapseToggle";
 import MobileTabBar from "../components/mobile/MobileTabBar";
 import useMobileNav from "../hooks/useMobileNav";
 import useSidebarCollapsed from "../hooks/useSidebarCollapsed";
+import useConnectionStatus from "../hooks/useConnectionStatus";
+import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
 import { motion } from "../utils/motion";
 
@@ -37,6 +39,7 @@ export default function AdminLayout() {
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
+  const { status: connectionStatus } = useConnectionStatus();
   const nativeApp = isNativeApp();
   const [user, setUser] = useState(() =>
     JSON.parse(localStorage.getItem("examnexus_user") || "{}")
@@ -238,6 +241,7 @@ export default function AdminLayout() {
               : "p-8"
           }`}
         >
+          <ConnectionStatusBanner status={connectionStatus} className="mb-4" />
           <Outlet />
           <RequiredSchoolIdGate theme={theme} onResolved={setUser} />
         </div>

@@ -31,6 +31,8 @@ import AnimatedPage from "../components/ui/AnimatedPage";
 import MobileTabBar from "../components/mobile/MobileTabBar";
 import useMobileNav from "../hooks/useMobileNav";
 import useSidebarCollapsed from "../hooks/useSidebarCollapsed";
+import useConnectionStatus from "../hooks/useConnectionStatus";
+import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
 import { motion } from "../utils/motion";
@@ -41,6 +43,9 @@ export default function DashboardLayout() {
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
+  const { status: connectionStatus } = useConnectionStatus({
+    enabled: !isLockdownActive,
+  });
   const nativeApp = isNativeApp();
   const cachedUser = getCachedExamNexusUser();
   const [accessState, setAccessState] = useState(cachedUser ? "allowed" : "checking");
@@ -345,6 +350,9 @@ export default function DashboardLayout() {
             isLockdownActive ? "p-0" : mobileNav ? "p-3 sm:p-5" : "p-8"
           } ${mobileNav && !isLockdownActive ? "en-has-tabbar pb-[calc(var(--en-tabbar-height,3.35rem)+2rem)]" : ""}`}
         >
+          {!isLockdownActive && (
+            <ConnectionStatusBanner status={connectionStatus} className="mb-4" />
+          )}
           <AnimatedPage>
             <Outlet />
           </AnimatedPage>

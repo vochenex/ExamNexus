@@ -78,7 +78,7 @@ export function resolvePromptGenerationSettings({
   const promptFormats = parsed.formats.length > 0 ? parsed.formats : [];
 
   return {
-    questionCount: parsed.questionCount ?? (hasUiCount ? uiCount : 8),
+    questionCount: parsed.questionCount ?? (hasUiCount ? uiCount : null),
     difficulty: parsed.difficulty ?? difficulty ?? "medium",
     formats: promptFormats.length > 0 ? promptFormats : uiFormats,
   };

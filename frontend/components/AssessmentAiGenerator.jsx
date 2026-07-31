@@ -16,6 +16,7 @@ import {
 } from "../utils/aiQuestionMapper";
 import { parsePromptPreferences } from "../utils/promptPreferences";
 import {
+  classifyAssessmentDocument,
   fetchAssessmentAiStatus,
   generateAssessmentFromDocument,
   generateAssessmentFromPrompt,
@@ -32,9 +33,10 @@ const DIFFICULTY_OPTIONS = [
 const MIN_QUESTIONS = 1;
 const MAX_QUESTIONS = 150;
 
-function clampQuestionCount(value) {
+function parseOptionalQuestionCount(value) {
+  if (value === "" || value == null) return null;
   const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return 8;
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return Math.min(MAX_QUESTIONS, Math.max(MIN_QUESTIONS, parsed));
 }
 
@@ -44,6 +46,11 @@ function normalizeErrorMessage(error, fallback = "AI generation failed.") {
   if (typeof error === "string") return error || fallback;
   if (typeof error.message === "string" && error.message.trim()) return error.message;
   return fallback;
+}
+
+function formatDocumentKind(kind) {
+  const value = String(kind || "study_material").replace(/_/g, " ");
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export default function AssessmentAiGenerator({
@@ -60,11 +67,12 @@ export default function AssessmentAiGenerator({
   const [aiReady, setAiReady] = useState(null);
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
-  const [questionCount, setQuestionCount] = useState(8);
+  const [questionCount, setQuestionCount] = useState(0);
   const [difficulty, setDifficulty] = useState("medium");
   const [selectedFormats, setSelectedFormats] = useState(() => [...DEFAULT_AI_FORMATS]);
   const [file, setFile] = useState(null);
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(true);
+  const [documentAnalysis, setDocumentAnalysis] = useState(null);
   const inFlightRef = useRef(false);
   const abortRef = useRef(null);
 
@@ -82,6 +90,10 @@ export default function AssessmentAiGenerator({
       abortRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    setDocumentAnalysis(null);
+  }, [file, mode]);
 
   const promptHints = useMemo(() => {
     if (mode !== "prompt" || !prompt.trim()) return null;
@@ -102,6 +114,11 @@ export default function AssessmentAiGenerator({
       .join(", ")}`;
   }, [selectedFormats, promptHints]);
 
+  const showDocumentOptions =
+    mode === "document" &&
+    documentAnalysis &&
+    documentAnalysis.isQuestionnaire === false;
+
   const toggleFormat = (value) => {
     setSelectedFormats((prev) => {
       if (prev.includes(value)) {
@@ -113,7 +130,6 @@ export default function AssessmentAiGenerator({
   };
 
   const runGeneration = async (generator) => {
-    // Sync lock first — React state alone is too late to stop double-clicks.
     if (disabled || loading || inFlightRef.current) return;
     inFlightRef.current = true;
     setLoading(true);
@@ -123,11 +139,6 @@ export default function AssessmentAiGenerator({
     abortRef.current = controller;
 
     try {
-      if (mode === "prompt" && selectedFormats.length === 0) {
-        onError?.("Select at least one question format.");
-        return;
-      }
-
       const latestStatus = await fetchAssessmentAiStatus();
       setAiReady(latestStatus);
 
@@ -176,7 +187,7 @@ export default function AssessmentAiGenerator({
     }
   };
 
-  const resolvedQuestionCount = clampQuestionCount(questionCount);
+  const resolvedQuestionCount = parseOptionalQuestionCount(questionCount);
 
   const handlePromptGenerate = () => {
     const trimmed = prompt.trim();
@@ -185,11 +196,22 @@ export default function AssessmentAiGenerator({
       return;
     }
 
+    if (selectedFormats.length === 0) {
+      onError?.("Select at least one question format.");
+      return;
+    }
+
+    const hints = parsePromptPreferences(trimmed);
+    if (!resolvedQuestionCount && !hints.questionCount) {
+      onError?.("Enter how many questions to generate (1–150), or include a count in your prompt.");
+      return;
+    }
+
     runGeneration(({ onProgress, onQuestionGenerated, signal }) =>
       generateAssessmentFromPrompt({
         prompt: trimmed,
         formats: selectedFormats,
-        questionCount: resolvedQuestionCount,
+        questionCount: resolvedQuestionCount || hints.questionCount,
         difficulty,
         onProgress,
         onQuestionGenerated,
@@ -198,22 +220,69 @@ export default function AssessmentAiGenerator({
     );
   };
 
-  const handleDocumentGenerate = () => {
+  const handleDocumentClassifyOrGenerate = () => {
     if (!file) {
-      onError?.("Choose a PDF or Word (.docx) file first.");
+      onError?.("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file first.");
       return;
     }
 
-    runGeneration(({ onProgress, onQuestionGenerated, signal }) =>
-      generateAssessmentFromDocument({
-        file,
-        questionCount: resolvedQuestionCount,
-        difficulty,
-        onProgress,
-        onQuestionGenerated,
-        signal,
-      })
-    );
+    // Phase 2: source material with user options → generate questions.
+    if (showDocumentOptions) {
+      if (!resolvedQuestionCount) {
+        onError?.("Enter how many questions to generate (1–150).");
+        return;
+      }
+      if (selectedFormats.length === 0) {
+        onError?.("Select at least one question format.");
+        return;
+      }
+
+      runGeneration(({ onProgress, onQuestionGenerated, signal }) =>
+        generateAssessmentFromDocument({
+          file,
+          questionCount: resolvedQuestionCount,
+          difficulty,
+          formats: selectedFormats,
+          isQuestionnaire: false,
+          onProgress,
+          onQuestionGenerated,
+          signal,
+        })
+      );
+      return;
+    }
+
+    // Phase 1: classify. Questionnaire → auto-generate. Otherwise → show options.
+    runGeneration(async ({ onProgress, onQuestionGenerated, signal }) => {
+      onProgress?.({ phase: "reading", current: 0, total: 1, percent: 8, status: "classifying" });
+      const classification = await classifyAssessmentDocument({ file, signal });
+
+      if (classification.isQuestionnaire) {
+        setDocumentAnalysis(classification);
+        onProgress?.({
+          phase: "structuring",
+          current: 0,
+          total: 1,
+          percent: 20,
+          status: "converting",
+        });
+        return generateAssessmentFromDocument({
+          file,
+          isQuestionnaire: true,
+          onProgress,
+          onQuestionGenerated,
+          signal,
+        });
+      }
+
+      setDocumentAnalysis(classification);
+      onProgress?.(null);
+      return {
+        success: true,
+        classifiedOnly: true,
+        ...classification,
+      };
+    });
   };
 
   const checkboxClass = `rounded border ${
@@ -223,6 +292,144 @@ export default function AssessmentAiGenerator({
   const labelClass = `mb-2 block text-xs font-semibold uppercase tracking-wide ${
     theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
   }`;
+
+  const renderCountDifficulty = () => (
+    <div
+      className={`rounded-xl border p-4 ${
+        theme === "dark"
+          ? "border-white/10 bg-white/[0.03]"
+          : "border-emerald-200/80 en-bg-elevated-soft en-panel-glow"
+      }`}
+    >
+      <div className="grid grid-cols-2 items-end gap-4">
+        <div className="min-w-0">
+          <label className={labelClass}>Number of questions</label>
+          <input
+            type="number"
+            min={0}
+            max={MAX_QUESTIONS}
+            disabled={disabled || loading}
+            className={assessmentInputClass(theme)}
+            value={questionCount}
+            onFocus={(event) => event.target.select()}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next === "") {
+                setQuestionCount("");
+                return;
+              }
+              const parsed = Number(next);
+              if (Number.isFinite(parsed)) {
+                setQuestionCount(parsed);
+              }
+            }}
+            onBlur={() => {
+              if (questionCount === "" || questionCount == null) {
+                setQuestionCount(0);
+                return;
+              }
+              const parsed = Number(questionCount);
+              if (!Number.isFinite(parsed) || parsed < 0) {
+                setQuestionCount(0);
+                return;
+              }
+              setQuestionCount(Math.min(MAX_QUESTIONS, Math.floor(parsed)));
+            }}
+          />
+        </div>
+        <div className="min-w-0">
+          <label className={labelClass}>Difficulty</label>
+          <Select
+            disabled={disabled || loading}
+            value={difficulty}
+            onChange={(event) => setDifficulty(event.target.value)}
+          >
+            {DIFFICULTY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+      <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
+        {MIN_QUESTIONS}–{MAX_QUESTIONS} items ·{" "}
+        {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+        {mode === "prompt"
+          ? " · Large sets generate in small rounds so hosted API timeouts are avoided"
+          : ""}
+      </p>
+    </div>
+  );
+
+  const renderFormats = () => (
+    <div
+      className={`rounded-xl border ${
+        theme === "dark"
+          ? "border-white/10 bg-white/[0.03]"
+          : "border-emerald-100 bg-emerald-50/30"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setOptionsOpen((value) => !value)}
+        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${
+          theme === "dark" ? "text-emerald-300" : "text-teal-800"
+        }`}
+      >
+        <span>
+          <span className="block text-sm font-semibold">Question formats</span>
+          <span
+            className={`mt-0.5 block text-xs ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
+            {selectedFormats.length} format(s) selected
+          </span>
+        </span>
+        {optionsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+
+      {optionsOpen && (
+        <div className="space-y-4 border-t border-inherit px-4 py-4">
+          <div>
+            <label className={labelClass}>Question formats</label>
+            <div className="flex flex-wrap gap-2">
+              {AI_FORMAT_OPTIONS.map((option) => {
+                const checked = selectedFormats.includes(option.value);
+                return (
+                  <label
+                    key={option.value}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+                      checked
+                        ? theme === "dark"
+                          ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
+                          : "border-teal-300 bg-teal-50 text-teal-900"
+                        : theme === "dark"
+                          ? "border-white/10 bg-white/[0.03] text-gray-300"
+                          : "border-emerald-100 bg-white text-gray-700"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className={checkboxClass}
+                      checked={checked}
+                      disabled={disabled || loading}
+                      onChange={() => toggleFormat(option.value)}
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+            <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+              {formatHint}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -244,7 +451,7 @@ export default function AssessmentAiGenerator({
           </h2>
           <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
             {mode === "document"
-              ? "Upload a PDF or Word file. Optional count/difficulty below guide the analysis when the document has no ready-made questions."
+              ? "Upload a PDF, Word, or PowerPoint file (questionnaire, topic, story, report, or slides). AI classifies it first, then converts or asks for generation options."
               : "Describe what you want assessed. If you name formats in the prompt (e.g. essay, MCQ), those override the checkboxes."}
           </p>
         </div>
@@ -299,13 +506,20 @@ export default function AssessmentAiGenerator({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{file.name}</p>
                 <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                  Ready to analyze
+                  {documentAnalysis
+                    ? documentAnalysis.isQuestionnaire
+                      ? "Detected questionnaire — converting questions"
+                      : `Detected ${formatDocumentKind(documentAnalysis.documentKind)} — set options below`
+                    : "Ready to analyze"}
                 </p>
               </div>
               <button
                 type="button"
                 disabled={disabled || loading}
-                onClick={() => setFile(null)}
+                onClick={() => {
+                  setFile(null);
+                  setDocumentAnalysis(null);
+                }}
                 className={`rounded-lg p-1.5 transition ${
                   theme === "dark"
                     ? "text-gray-400 hover:bg-white/10 hover:text-white"
@@ -319,10 +533,11 @@ export default function AssessmentAiGenerator({
           ) : (
             <input
               type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
               disabled={disabled || loading}
               onChange={(event) => {
                 setFile(event.target.files?.[0] || null);
+                setDocumentAnalysis(null);
                 if (onClearError) {
                   onClearError();
                 } else {
@@ -368,137 +583,44 @@ export default function AssessmentAiGenerator({
         </div>
       )}
 
-      {mode === "prompt" && (
+      {mode === "document" && documentAnalysis && (
         <div
-          className={`rounded-xl border p-4 ${
+          className={`rounded-xl border p-3 text-sm ${
             theme === "dark"
-              ? "border-white/10 bg-white/[0.03]"
-              : "border-emerald-200/80 en-bg-elevated-soft en-panel-glow"
+              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
+              : "border-emerald-200 bg-emerald-50 text-teal-900"
           }`}
         >
-          <div className="grid grid-cols-2 items-end gap-4">
-            <div className="min-w-0">
-              <label className={labelClass}>Number of questions</label>
-              <input
-                type="number"
-                min={MIN_QUESTIONS}
-                max={MAX_QUESTIONS}
-                disabled={disabled || loading}
-                className={assessmentInputClass(theme)}
-                value={questionCount}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  if (next === "") {
-                    setQuestionCount("");
-                    return;
-                  }
-                  const parsed = Number(next);
-                  if (Number.isFinite(parsed)) {
-                    setQuestionCount(parsed);
-                  }
-                }}
-                onBlur={() => setQuestionCount(clampQuestionCount(questionCount))}
-              />
-            </div>
-            <div className="min-w-0">
-              <label className={labelClass}>Difficulty</label>
-              <Select
-                disabled={disabled || loading}
-                value={difficulty}
-                onChange={(event) => setDifficulty(event.target.value)}
-              >
-                {DIFFICULTY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-          <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
-            {MIN_QUESTIONS}–{MAX_QUESTIONS} items ·{" "}
-            {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-            {mode === "prompt"
-              ? " · Large sets generate in small rounds so hosted API timeouts are avoided"
-              : ""}
+          <p className="font-semibold">
+            {documentAnalysis.isQuestionnaire
+              ? "Questionnaire detected"
+              : `${formatDocumentKind(documentAnalysis.documentKind)} detected`}
           </p>
+          {documentAnalysis.summary ? (
+            <p className={`mt-1 text-xs ${theme === "dark" ? "text-emerald-100/80" : "text-teal-800/90"}`}>
+              {documentAnalysis.summary}
+            </p>
+          ) : null}
+          {!documentAnalysis.isQuestionnaire ? (
+            <p className={`mt-2 text-xs ${theme === "dark" ? "text-emerald-100/70" : "text-teal-800/80"}`}>
+              Choose item count, difficulty, and formats, then click Analyze document again to
+              generate questions.
+            </p>
+          ) : null}
         </div>
       )}
 
-      {mode === "prompt" && (
-        <div
-          className={`rounded-xl border ${
-            theme === "dark"
-              ? "border-white/10 bg-white/[0.03]"
-              : "border-emerald-100 bg-emerald-50/30"
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => setOptionsOpen((value) => !value)}
-            className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${
-              theme === "dark" ? "text-emerald-300" : "text-teal-800"
-            }`}
-          >
-            <span>
-              <span className="block text-sm font-semibold">Question formats</span>
-              <span
-                className={`mt-0.5 block text-xs ${
-                  theme === "dark" ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
-                {selectedFormats.length} format(s) selected
-              </span>
-            </span>
-            {optionsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
+      {mode === "prompt" && renderCountDifficulty()}
+      {mode === "prompt" && renderFormats()}
 
-          {optionsOpen && (
-            <div className="space-y-4 border-t border-inherit px-4 py-4">
-              <div>
-                <label className={labelClass}>Question formats</label>
-                <div className="flex flex-wrap gap-2">
-                  {AI_FORMAT_OPTIONS.map((option) => {
-                    const checked = selectedFormats.includes(option.value);
-                    return (
-                      <label
-                        key={option.value}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-                          checked
-                            ? theme === "dark"
-                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
-                              : "border-teal-300 bg-teal-50 text-teal-900"
-                            : theme === "dark"
-                              ? "border-white/10 bg-white/[0.03] text-gray-300"
-                              : "border-emerald-100 bg-white text-gray-700"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className={checkboxClass}
-                          checked={checked}
-                          disabled={disabled || loading}
-                          onChange={() => toggleFormat(option.value)}
-                        />
-                        {option.label}
-                      </label>
-                    );
-                  })}
-                </div>
-                <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                  {formatHint}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {showDocumentOptions && renderCountDifficulty()}
+      {showDocumentOptions && renderFormats()}
 
       {mode === "document" ? (
         <button
           type="button"
           disabled={disabled || loading || !file || (aiReady && !aiReady.configured)}
-          onClick={handleDocumentGenerate}
+          onClick={handleDocumentClassifyOrGenerate}
           className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition ${
             disabled || loading || !file || (aiReady && !aiReady.configured)
               ? "cursor-not-allowed opacity-60"
@@ -508,7 +630,13 @@ export default function AssessmentAiGenerator({
           }`}
         >
           <FileSearch size={18} />
-          {loading ? "Analyzing document…" : "Analyze document"}
+          {loading
+            ? showDocumentOptions
+              ? "Generating questions…"
+              : "Analyzing document…"
+            : showDocumentOptions
+              ? "Analyze document"
+              : "Analyze document"}
         </button>
       ) : (
         <button

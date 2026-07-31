@@ -282,7 +282,12 @@ export async function generateAssessmentFromPrompt({
     formats,
   });
 
-  const total = Math.max(1, Number(resolved.questionCount) || 8);
+  const total = Number(resolved.questionCount);
+  if (!Number.isFinite(total) || total < 1) {
+    throw new Error(
+      "Enter how many questions to generate (1–150), or include a count in your prompt."
+    );
+  }
   const allQuestions = [];
   let suggestedTitle = "";
   let suggestedDescription = "";
@@ -451,16 +456,9 @@ export async function generateAssessmentFromPrompt({
   };
 }
 
-export async function generateAssessmentFromDocument({
-  file,
-  questionCount,
-  difficulty,
-  onProgress,
-  onQuestionGenerated,
-  signal,
-}) {
+export async function classifyAssessmentDocument({ file, signal }) {
   if (!file) {
-    throw new Error("Choose a PDF or Word (.docx) file to upload.");
+    throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
   }
 
   const session = await getAuthSession({ forceRefresh: true });
@@ -470,11 +468,63 @@ export async function generateAssessmentFromDocument({
 
   const formData = new FormData();
   formData.append("file", file);
-  if (questionCount != null && String(questionCount).trim() !== "") {
+
+  let res;
+  try {
+    res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/classify-document`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: formData,
+      signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw error;
+    if (isBackendUnreachable(error)) {
+      throw new Error(backendUnreachableMessage());
+    }
+    throw error;
+  }
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(formatApiError(payload, "Failed to classify document"));
+  }
+
+  return payload;
+}
+
+export async function generateAssessmentFromDocument({
+  file,
+  questionCount,
+  difficulty,
+  formats,
+  isQuestionnaire = true,
+  onProgress,
+  onQuestionGenerated,
+  signal,
+}) {
+  if (!file) {
+    throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
+  }
+
+  const session = await getAuthSession({ forceRefresh: true });
+  if (!session?.access_token) {
+    throw new Error("Your session expired. Please sign in again.");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("isQuestionnaire", isQuestionnaire ? "true" : "false");
+  if (questionCount != null && String(questionCount).trim() !== "" && Number(questionCount) > 0) {
     formData.append("questionCount", String(questionCount));
   }
   if (difficulty) {
     formData.append("difficulty", String(difficulty));
+  }
+  if (Array.isArray(formats) && formats.length) {
+    formData.append("formats", JSON.stringify(formats));
   }
 
   let res;

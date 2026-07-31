@@ -195,12 +195,16 @@ function resolvePromptGenerationSettings({
         ? uiFormats
         : parseFormats(null);
 
+  const uiCount = Number.parseInt(questionCount, 10);
+  const hasUiCount = Number.isFinite(uiCount) && uiCount > 0;
+  const rawCount = lockQuestionCount
+    ? hasUiCount
+      ? uiCount
+      : null
+    : parsed.questionCount ?? (hasUiCount ? uiCount : null);
+
   return {
-    questionCount: clampQuestionCount(
-      lockQuestionCount
-        ? questionCount ?? DEFAULT_QUESTIONS
-        : parsed.questionCount ?? questionCount ?? DEFAULT_QUESTIONS
-    ),
+    questionCount: rawCount == null ? null : clampQuestionCount(rawCount),
     difficulty: parsed.difficulty || difficulty || "medium",
     formats: finalFormats,
   };
@@ -782,24 +786,33 @@ function buildUserPrompt({ sourceText, topicPrompt, additionalInstructions }) {
   return parts.join("\n\n");
 }
 
-function buildDocumentAnalysisSystemPrompt() {
-  return `You are an expert at reading teacher documents and converting them into structured exam questions for ExamNexus.
+function buildDocumentAnalysisSystemPrompt({
+  isQuestionnaire = true,
+  formats = ALL_FORMATS,
+  questionCount,
+  difficulty,
+} = {}) {
+  const formatList = (formats?.length ? formats : ALL_FORMATS)
+    .map((value) => TYPE_LABELS[value] || value)
+    .join(", ");
+
+  if (isQuestionnaire) {
+    return `You are an expert at reading teacher documents and converting them into structured exam questions for ExamNexus.
 
 Your job:
-1. Read the uploaded document carefully (exam papers, worksheets, handouts, study guides).
-2. If the document ALREADY contains numbered or labeled questions, convert EACH one into a structured question. Keep the original wording when possible.
+1. Read the uploaded document carefully (exam papers, quizzes, worksheets with numbered items).
+2. The document ALREADY contains questions — convert EACH one into a structured question. Keep the original wording when possible.
 3. Detect the correct question type from layout:
    - A/B/C/D or multiple choices → multiple_choice (4 choices, answer as A, B, C, or D)
    - True/False statements → true_false
    - Fill-in-the-blank or identification lines → identification
    - Enumerate, list, or ordered answer sets → enumeration
    - Long answer, explain, or essay prompts → essay
-4. If the document is ONLY study material with NO existing questions, create a suitable quiz from the content. Infer an appropriate number of questions from the material (typically 5-15 for short docs, more for longer docs, never exceed 150).
+4. Include every question found. Do not invent extra items beyond what is in the document.
 5. Infer overall difficulty from vocabulary, grade level, and complexity.
 
 Rules:
 - Return ONLY valid JSON. No markdown fences or commentary.
-- Include every question found or reasonably derived from the source.
 - multiple_choice: exactly 4 non-empty choices; answer must be A, B, C, or D.
 - enumeration: provide an "answers" array with every required item in order.
 - identification: provide a single correct "answer" string.
@@ -811,7 +824,52 @@ JSON shape:
   "suggestedTitle": "short title from document topic",
   "suggestedDescription": "one sentence summary",
   "analysis": {
-    "sourceType": "existing_exam or study_material",
+    "sourceType": "existing_exam",
+    "questionCount": 0,
+    "inferredDifficulty": "easy, medium, or hard"
+  },
+  "questions": [
+    {
+      "type": "multiple_choice",
+      "question": "text",
+      "choices": ["A text", "B text", "C text", "D text"],
+      "answer": "A"
+    }
+  ]
+}`;
+  }
+
+  const countLine =
+    questionCount != null && String(questionCount).trim() !== ""
+      ? `Create exactly ${clampQuestionCount(questionCount)} questions.`
+      : "Create a suitable number of questions from the material (typically 5–15, never exceed 150).";
+
+  return `You are an expert exam writer for ExamNexus.
+
+The uploaded file is NOT a ready-made questionnaire. It may be a topic outline, story, report, study guide, handout, or presentation (.pptx).
+
+Your job:
+1. Read the source carefully and invent high-quality assessment questions from its content.
+2. ${countLine}
+3. Target difficulty: ${String(difficulty || "medium")}.
+4. Use ONLY these question formats: ${formatList}.
+5. Mix the allowed formats when more than one is selected.
+
+Rules:
+- Return ONLY valid JSON. No markdown fences or commentary.
+- multiple_choice: exactly 4 non-empty choices; answer must be A, B, C, or D.
+- enumeration: provide an "answers" array with every required item in order.
+- identification: provide a single correct "answer" string.
+- true_false: answer must be "true" or "false".
+- essay: no answer field required.
+- Ground every question in the source material (topics, stories, reports, slides).
+
+JSON shape:
+{
+  "suggestedTitle": "short title from document topic",
+  "suggestedDescription": "one sentence summary",
+  "analysis": {
+    "sourceType": "study_material",
     "questionCount": 0,
     "inferredDifficulty": "easy, medium, or hard"
   },
@@ -826,10 +884,81 @@ JSON shape:
 }`;
 }
 
+async function classifyDocumentContent(sourceText) {
+  assertGeminiConfigured();
+
+  const resolvedSource = String(sourceText || "").trim();
+  if (!resolvedSource) {
+    const error = new Error("The document did not contain readable text.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const response = await requestDocumentChatCompletion({
+    temperature: 0.1,
+    jsonMode: true,
+    messages: [
+      {
+        role: "system",
+        content: `You classify teacher-uploaded documents for ExamNexus assessment generation.
+
+Return ONLY valid JSON:
+{
+  "documentKind": "questionnaire" | "topic" | "story" | "report" | "presentation" | "study_material" | "other",
+  "isQuestionnaire": true or false,
+  "summary": "one short sentence about what the document contains",
+  "suggestedTitle": "short title"
+}
+
+Rules:
+- isQuestionnaire = true ONLY when the document already contains numbered/labeled exam or quiz questions that can be converted as-is.
+- Topics, stories, reports, slide decks, handouts, and reading material without ready-made questions must set isQuestionnaire = false.
+- Prefer presentation for PowerPoint-style slide notes/outlines.`,
+      },
+      {
+        role: "user",
+        content: `Classify this document:\n\n${resolvedSource.slice(0, MAX_SOURCE_CHARS)}`,
+      },
+    ],
+  });
+
+  let parsed = {};
+  try {
+    parsed = JSON.parse(String(response.content || "").trim());
+  } catch {
+    parsed = {};
+  }
+
+  const kind = String(parsed.documentKind || "other")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const isQuestionnaire =
+    parsed.isQuestionnaire === true ||
+    kind === "questionnaire" ||
+    kind === "existing_exam" ||
+    kind === "exam" ||
+    kind === "quiz";
+
+  return {
+    documentKind: isQuestionnaire ? "questionnaire" : kind || "study_material",
+    isQuestionnaire,
+    summary: String(parsed.summary || "").trim(),
+    suggestedTitle: String(parsed.suggestedTitle || "").trim(),
+    meta: {
+      provider: response.provider,
+      model: response.model,
+      mode: "document_classify",
+    },
+  };
+}
+
 async function requestDocumentQuestions({
   sourceText = "",
   questionCount,
   difficulty,
+  formats,
+  isQuestionnaire = true,
 }) {
   assertGeminiConfigured();
 
@@ -840,14 +969,22 @@ async function requestDocumentQuestions({
     throw error;
   }
 
+  const allowedFormats = parseFormats(formats);
   const guidance = [];
-  if (questionCount != null && String(questionCount).trim() !== "") {
+  if (!isQuestionnaire && questionCount != null && String(questionCount).trim() !== "") {
     guidance.push(
-      `Target approximately ${clampQuestionCount(questionCount)} questions unless the document clearly contains fewer.`
+      `Create approximately ${clampQuestionCount(questionCount)} questions.`
     );
   }
   if (difficulty) {
     guidance.push(`Target difficulty level: ${String(difficulty).trim()}.`);
+  }
+  if (!isQuestionnaire && allowedFormats.length) {
+    guidance.push(
+      `Allowed formats only: ${allowedFormats
+        .map((value) => TYPE_LABELS[value] || value)
+        .join(", ")}.`
+    );
   }
 
   const userPrompt = buildUserPrompt({
@@ -855,19 +992,30 @@ async function requestDocumentQuestions({
     additionalInstructions: guidance.join("\n"),
   });
   const response = await requestDocumentChatCompletion({
-    temperature: 0.2,
+    temperature: isQuestionnaire ? 0.2 : 0.35,
     jsonMode: true,
     messages: [
-      { role: "system", content: buildDocumentAnalysisSystemPrompt() },
+      {
+        role: "system",
+        content: buildDocumentAnalysisSystemPrompt({
+          isQuestionnaire,
+          formats: allowedFormats,
+          questionCount,
+          difficulty,
+        }),
+      },
       { role: "user", content: userPrompt },
     ],
   });
 
-  const normalized = await parseAiResponse(response.content, ALL_FORMATS);
+  const normalized = await parseAiResponse(
+    response.content,
+    isQuestionnaire ? ALL_FORMATS : allowedFormats
+  );
 
   if (!normalized.questions.length) {
     const error = new Error(
-      "AI could not extract or build questions from this document. Try a clearer PDF or Word file."
+      "AI could not extract or build questions from this document. Try a clearer PDF, Word, or PowerPoint file."
     );
     error.statusCode = 422;
     throw error;
@@ -880,7 +1028,8 @@ async function requestDocumentQuestions({
       formats: [...new Set(normalized.questions.map((item) => item.type))],
       provider: response.provider,
       model: response.model,
-      mode: "document_analysis",
+      mode: isQuestionnaire ? "document_questionnaire" : "document_source_material",
+      isQuestionnaire: Boolean(isQuestionnaire),
     },
   };
 }
@@ -1047,6 +1196,7 @@ module.exports = {
   requestAiQuestionsBatched,
   requestDocumentQuestions,
   requestDocumentQuestionsStepwise,
+  classifyDocumentContent,
   getDocumentPlan,
   requestSingleAiQuestion,
   assertGeminiConfigured,

@@ -15,6 +15,7 @@ const {
   clampQuestionCount,
   resolvePromptGenerationSettings,
   getAiServiceStatus,
+  classifyDocumentContent,
 } = require("../lib/assessmentAiGenerator");
 
 const router = express.Router();
@@ -100,12 +101,12 @@ router.post(
 
     try {
       if (!file) {
-        return res.status(400).json({ error: "Upload a PDF or Word (.docx) file." });
+        return res.status(400).json({ error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file." });
       }
 
       if (!isSupportedUpload(file)) {
         return res.status(400).json({
-          error: "Unsupported file type. Use PDF or Word (.docx) only.",
+          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
         });
       }
 
@@ -197,6 +198,13 @@ router.post("/generate-from-prompt", requireFaculty, async (req, res) => {
       lockQuestionCount: Boolean(req.body?.lockQuestionCount),
     });
 
+    if (!resolved.questionCount) {
+      return res.status(400).json({
+        error:
+          "Enter how many questions to generate (1–150), or include a count in your prompt.",
+      });
+    }
+
     const result = await requestAiQuestionsBatched({
       topicPrompt,
       additionalInstructions,
@@ -226,6 +234,52 @@ router.post("/document-plan", requireFaculty, async (req, res) => {
 });
 
 router.post(
+  "/classify-document",
+  requireFaculty,
+  (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err?.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
+      }
+      if (err) {
+        return res.status(400).json({ error: err.message || "File upload failed." });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    const file = req.file;
+
+    try {
+      if (!file) {
+        return res.status(400).json({
+          error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file.",
+        });
+      }
+
+      if (!isSupportedUpload(file)) {
+        return res.status(400).json({
+          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
+        });
+      }
+
+      const sourceText = await extractDocumentText(file);
+      const classification = await classifyDocumentContent(sourceText);
+
+      res.json({
+        success: true,
+        extractedChars: sourceText.length,
+        ...classification,
+      });
+    } catch (err) {
+      handleRouteError(res, err);
+    } finally {
+      cleanupUploadedFile(file);
+    }
+  }
+);
+
+router.post(
   "/analyze-document",
   requireFaculty,
   (req, res, next) => {
@@ -244,27 +298,56 @@ router.post(
 
     try {
       if (!file) {
-        return res.status(400).json({ error: "Upload a PDF or Word (.docx) file." });
+        return res.status(400).json({
+          error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file.",
+        });
       }
 
       if (!isSupportedUpload(file)) {
         return res.status(400).json({
-          error: "Unsupported file type. Use PDF or Word (.docx) only.",
+          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
         });
       }
 
       const sourceText = await extractDocumentText(file);
-      const { questionCount, difficulty } = req.body || {};
+      const {
+        questionCount,
+        difficulty,
+        formats,
+        isQuestionnaire,
+      } = req.body || {};
+
+      const questionnaire =
+        isQuestionnaire === true ||
+        isQuestionnaire === "true" ||
+        isQuestionnaire === "1" ||
+        isQuestionnaire == null;
 
       const result = await requestDocumentQuestions({
         sourceText,
         questionCount,
         difficulty,
+        formats: formats
+          ? typeof formats === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(formats);
+                } catch {
+                  return String(formats)
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean);
+                }
+              })()
+            : formats
+          : undefined,
+        isQuestionnaire: questionnaire,
       });
 
       res.json({
         success: true,
         extractedChars: sourceText.length,
+        isQuestionnaire: questionnaire,
         ...result,
       });
     } catch (err) {
@@ -294,27 +377,56 @@ router.post(
 
     try {
       if (!file) {
-        return res.status(400).json({ error: "Upload a PDF or Word (.docx) file." });
+        return res.status(400).json({
+          error: "Upload a PDF, Word (.docx), or PowerPoint (.pptx) file.",
+        });
       }
 
       if (!isSupportedUpload(file)) {
         return res.status(400).json({
-          error: "Unsupported file type. Use PDF or Word (.docx) only.",
+          error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
         });
       }
 
       const sourceText = await extractDocumentText(file);
-      const { questionCount, difficulty } = req.body || {};
+      const {
+        questionCount,
+        difficulty,
+        formats,
+        isQuestionnaire,
+      } = req.body || {};
+
+      const questionnaire =
+        isQuestionnaire === true ||
+        isQuestionnaire === "true" ||
+        isQuestionnaire === "1" ||
+        isQuestionnaire == null;
 
       const result = await requestDocumentQuestions({
         sourceText,
         questionCount,
         difficulty,
+        formats: formats
+          ? typeof formats === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(formats);
+                } catch {
+                  return String(formats)
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean);
+                }
+              })()
+            : formats
+          : undefined,
+        isQuestionnaire: questionnaire,
       });
 
       res.json({
         success: true,
         extractedChars: sourceText.length,
+        isQuestionnaire: questionnaire,
         ...result,
       });
     } catch (err) {

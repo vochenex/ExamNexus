@@ -264,6 +264,14 @@ export default function CreateAssessment() {
   };
 
   const handleAiGenerationComplete = (payload) => {
+    if (payload?.classifiedOnly) {
+      setAiGenerating(false);
+      setAiProgress(null);
+      applyAiExamDetailsRef.current = false;
+      restoreAiReplaceSnapshot();
+      return;
+    }
+
     const mappedQuestions = mapAiPayloadToBuilderQuestions(payload);
 
     setAiGenerating(false);

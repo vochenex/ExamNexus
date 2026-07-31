@@ -69,10 +69,22 @@ export default function QuestionGradingOptions({
     return null;
   }
 
-  const grading = normalizeGradingOptions(question.grading);
+  const grading = {
+    ...normalizeGradingOptions(question.grading),
+    points:
+      question.grading?.points === ""
+        ? ""
+        : question.grading?.points ??
+          normalizeGradingOptions(question.grading).points,
+  };
 
   const patchGrading = (patch) => {
-    onUpdateGrading(normalizeGradingOptions({ ...grading, ...patch }));
+    const next = { ...grading, ...patch };
+    if (Object.prototype.hasOwnProperty.call(patch, "points") && patch.points === "") {
+      onUpdateGrading({ ...normalizeGradingOptions(next), points: "" });
+      return;
+    }
+    onUpdateGrading(normalizeGradingOptions(next));
   };
 
   const addAlternative = () => {
@@ -235,12 +247,27 @@ export default function QuestionGradingOptions({
               min="1"
               step="1"
               className={inputClass(theme)}
-              value={grading.points}
-              onChange={(e) =>
-                patchGrading({
-                  points: Math.max(1, Number(e.target.value) || 1),
-                })
+              value={
+                grading.points === "" || grading.points == null ? "" : grading.points
               }
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (next === "") {
+                  patchGrading({ points: "" });
+                  return;
+                }
+                const parsed = Number(next);
+                if (Number.isFinite(parsed)) {
+                  patchGrading({ points: parsed });
+                }
+              }}
+              onBlur={() => {
+                const parsed = Number(grading.points);
+                patchGrading({
+                  points: Number.isFinite(parsed) && parsed >= 0 ? parsed : 1,
+                });
+              }}
             />
           </div>
         </div>

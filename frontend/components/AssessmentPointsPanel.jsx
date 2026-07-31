@@ -19,7 +19,15 @@ export default function AssessmentPointsPanel({ sections, onChange }) {
   return (
     <div className="space-y-2">
       {sections.map((section) => {
-        const grading = normalizeGradingOptions(section.gradingDefaults);
+        const grading = {
+          ...normalizeGradingOptions(section.gradingDefaults),
+          // Preserve in-progress empty edits so the field is not stuck at 1.
+          points:
+            section.gradingDefaults?.points === ""
+              ? ""
+              : section.gradingDefaults?.points ??
+                normalizeGradingOptions(section.gradingDefaults).points,
+        };
 
         return (
           <div
@@ -54,13 +62,34 @@ export default function AssessmentPointsPanel({ sections, onChange }) {
                 min="1"
                 step="1"
                 className={inputClass(theme)}
-                value={grading.points}
-                onChange={(e) =>
+                value={
+                  grading.points === "" || grading.points == null ? "" : grading.points
+                }
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next === "") {
+                    onChange(section.id, {
+                      ...grading,
+                      points: "",
+                    });
+                    return;
+                  }
+                  const parsed = Number(next);
+                  if (Number.isFinite(parsed)) {
+                    onChange(section.id, {
+                      ...grading,
+                      points: parsed,
+                    });
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = Number(grading.points);
                   onChange(section.id, {
                     ...grading,
-                    points: Math.max(1, Number(e.target.value) || 1),
-                  })
-                }
+                    points: Number.isFinite(parsed) && parsed >= 0 ? parsed : 1,
+                  });
+                }}
               />
             </div>
           </div>

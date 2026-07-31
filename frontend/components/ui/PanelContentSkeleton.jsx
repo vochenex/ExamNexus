@@ -1,4 +1,4 @@
-import { useTheme } from "../layouts/ThemeContext";
+import { useTheme } from "../../layouts/ThemeContext";
 
 function Bone({ theme, className = "" }) {
   return (
