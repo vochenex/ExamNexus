@@ -689,8 +689,7 @@ export async function fetchFacultyAssessmentReport(teacherSchoolId, examId) {
   if (!examId) throw new Error("Assessment id is required.");
 
   const exam = await assertFacultyOwnsExam(examId, teacherSchoolId);
-  const [analytics, questionsBundle, results] = await Promise.all([
-    fetchExamFacultyAnalytics(examId),
+  const [questionsBundle, results] = await Promise.all([
     fetchExamWithQuestions(examId),
     fetchFacultyExportResults(teacherSchoolId, examId),
   ]);
@@ -706,20 +705,31 @@ export async function fetchFacultyAssessmentReport(teacherSchoolId, examId) {
     title: questionsBundle?.exam?.title || exam.title,
     description: questionsBundle?.exam?.description || "",
     subject: exam.subjects?.name || "",
+    type: questionsBundle?.exam?.exam_type || exam.exam_type || "",
+    category:
+      questionsBundle?.exam?.assessment_category || exam.assessment_category || "",
+    start: questionsBundle?.exam?.start_datetime || exam.start_datetime || "",
+    end: questionsBundle?.exam?.end_datetime || exam.end_datetime || "",
     faculty: facultyProfile || {},
+    faculty_name: [facultyProfile?.first_name, facultyProfile?.last_name]
+      .filter(Boolean)
+      .join(" "),
+    faculty_school_id: facultyProfile?.school_id || "",
+    pass_mark: Number.isFinite(Number(questionsBundle?.exam?.pass_mark))
+      ? Number(questionsBundle.exam.pass_mark)
+      : Number.isFinite(Number(exam?.pass_mark))
+        ? Number(exam.pass_mark)
+        : 50,
     questions: (questionsBundle?.questions || []).map((row) => ({
       question_text: row.question,
       question_type: row.question_type,
       options: [row.option_a, row.option_b, row.option_c, row.option_d].filter(Boolean),
       points: Number(row.grading_options?.points) || 1,
+      correct_answer: row.correct_answer,
+      correct_answers: row.correct_answers,
     })),
-    students: (analytics?.studentPerformance || []).map((student) => ({
-      name: student.name,
-      score: student.score,
-      total: student.total,
-      percentage: student.scorePct,
-      pending_review: student.pendingReview,
-    })),
+    // Prefer export results (name/email/id/submitted) over score-ranked analytics.
+    students: results,
     results,
   };
 }
@@ -937,6 +947,7 @@ export async function createExam(examPayload, questions) {
   );
 
   const durationFields = durationFieldsForDb(examPayload);
+  const passMark = normalizePassMark(examPayload.pass_mark);
 
   const examRow = {
     subject_id: examPayload.subject_id,
@@ -958,6 +969,7 @@ export async function createExam(examPayload, questions) {
     allow_show_correct_answers: examPayload.show_correct_answers !== false,
     duration_value: durationFields.duration_value,
     duration_unit: durationFields.duration_unit,
+    pass_mark: passMark,
   };
 
   const { data: createdExam, error: examError } = await supabase
@@ -982,9 +994,34 @@ export async function createExam(examPayload, questions) {
     delete rowWithoutVisibility.allow_student_view;
     delete rowWithoutVisibility.allow_show_correct_answers;
     delete rowWithoutVisibility.lock_completed_sections;
+    if (examError.message?.includes("pass_mark")) {
+      delete rowWithoutVisibility.pass_mark;
+    }
 
     const fallbackRows = [
       rowWithoutVisibility,
+      (() => {
+        const next = { ...rowWithoutVisibility };
+        delete next.pass_mark;
+        return next;
+      })(),
+      {
+        subject_id: examRow.subject_id,
+        title: examRow.title,
+        description: descriptionWithCategory,
+        exam_type: examRow.exam_type,
+        assessment_category: category,
+        start_datetime: examRow.start_datetime,
+        end_datetime: examRow.end_datetime,
+        created_by: examRow.created_by,
+        target_sections: examRow.target_sections,
+        instructions: examRow.instructions,
+        shuffle_questions: examRow.shuffle_questions,
+        allow_review: examRow.allow_review,
+        duration_value: examRow.duration_value,
+        duration_unit: examRow.duration_unit,
+        pass_mark: passMark,
+      },
       {
         subject_id: examRow.subject_id,
         title: examRow.title,
@@ -1178,9 +1215,20 @@ export async function fetchExamWithQuestions(examId) {
   };
 }
 
+function normalizePassMark(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.min(100, Math.max(0, Math.round(n * 10) / 10));
+}
+
 async function updateExamRowWithColumnFallback(examId, examUpdate) {
   const attempts = [
     examUpdate,
+    (() => {
+      const next = { ...examUpdate };
+      delete next.pass_mark;
+      return next;
+    })(),
     (() => {
       const next = { ...examUpdate };
       delete next.lock_completed_sections;
@@ -1190,8 +1238,26 @@ async function updateExamRowWithColumnFallback(examId, examUpdate) {
       const next = { ...examUpdate };
       delete next.lock_completed_sections;
       delete next.assessment_category;
+      delete next.pass_mark;
       return next;
     })(),
+    {
+      title: examUpdate.title,
+      description: examUpdate.description,
+      exam_type: examUpdate.exam_type,
+      start_datetime: examUpdate.start_datetime,
+      end_datetime: examUpdate.end_datetime,
+      target_sections: examUpdate.target_sections,
+      instructions: examUpdate.instructions,
+      shuffle_questions: examUpdate.shuffle_questions,
+      allow_review: examUpdate.allow_review,
+      allow_student_view: examUpdate.allow_student_view,
+      allow_question_review: examUpdate.allow_question_review,
+      allow_show_correct_answers: examUpdate.allow_show_correct_answers,
+      duration_value: examUpdate.duration_value,
+      duration_unit: examUpdate.duration_unit,
+      pass_mark: examUpdate.pass_mark,
+    },
     {
       title: examUpdate.title,
       description: examUpdate.description,
@@ -1364,6 +1430,7 @@ export async function updateExam(examId, exam, questions) {
     allow_show_correct_answers: exam.show_correct_answers !== false,
     duration_value: durationFields.duration_value,
     duration_unit: durationFields.duration_unit,
+    pass_mark: normalizePassMark(exam.pass_mark),
   };
 
   const { error: examError } = await supabase

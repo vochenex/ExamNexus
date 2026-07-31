@@ -24,6 +24,7 @@ export default function useAssessmentIntegrity({
   examId,
   active,
   isRetakeAttempt = false,
+  isOffline = false,
   onAlert,
   onFocusViolation,
   onStrikeChange,
@@ -37,8 +38,10 @@ export default function useAssessmentIntegrity({
   const graceUntilRef = useRef(0);
   const externalAppTimerRef = useRef(null);
   const suppressAlertsRef = useRef(suppressAlerts);
+  const isOfflineRef = useRef(isOffline);
 
   suppressAlertsRef.current = suppressAlerts;
+  isOfflineRef.current = isOffline;
 
   const isInGracePeriod = useCallback(() => Date.now() < graceUntilRef.current, []);
 
@@ -47,7 +50,8 @@ export default function useAssessmentIntegrity({
   }, []);
 
   const shouldIgnoreEvent = useCallback(() => {
-    return suppressAlertsRef.current || isInGracePeriod();
+    // Offline / unstable network must never burn integrity strikes or auto-submit.
+    return suppressAlertsRef.current || isOfflineRef.current || isInGracePeriod();
   }, [isInGracePeriod]);
 
   const recordEvent = useCallback(
@@ -89,6 +93,10 @@ export default function useAssessmentIntegrity({
   const recordStrike = useCallback(
     (eventType, options = {}) => {
       const { ignoreGrace = false } = options;
+      // Never count strikes while offline — even for ignoreGrace events (e.g. fullscreen).
+      if (isOfflineRef.current) {
+        return;
+      }
       if (!isStrikeWorthyEvent(eventType) || (!ignoreGrace && shouldIgnoreEvent())) {
         return;
       }
@@ -110,6 +118,7 @@ export default function useAssessmentIntegrity({
         eventType,
       });
 
+      // Strikes 1–2: warn only. Strike 3: auto-submit.
       if (next >= MAX_INTEGRITY_STRIKES && !autoSubmitTriggeredRef.current) {
         autoSubmitTriggeredRef.current = true;
         onAutoSubmit?.(eventType);
@@ -154,6 +163,7 @@ export default function useAssessmentIntegrity({
 
     const handleStorage = (event) => {
       if (event.key === tabLockKey && event.newValue && event.newValue !== tabId) {
+        if (isOfflineRef.current) return;
         // Multiple assessment tabs should always be recorded, even during grace.
         leftPageRef.current = true;
         onFocusViolation?.(true);
@@ -209,6 +219,10 @@ export default function useAssessmentIntegrity({
       const exited = !document.fullscreenElement;
 
       if (exited) {
+        if (isOfflineRef.current) {
+          extendGracePeriod(RETURN_GRACE_MS);
+          return;
+        }
         // Exiting fullscreen (via Escape or other means) should always be recorded.
         leftPageRef.current = true;
         onFocusViolation?.(true);

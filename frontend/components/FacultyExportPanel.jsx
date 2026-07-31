@@ -116,10 +116,15 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
         warning("No results to export.");
         return;
       }
+      const sortedRows = [...rows].sort((a, b) =>
+        String(a.student_name || "").localeCompare(String(b.student_name || ""), undefined, {
+          sensitivity: "base",
+        })
+      );
       const filename = examId
         ? `examnexus-results-${examId}.csv`
         : "examnexus-my-results.csv";
-      const result = await downloadCsv(filename, rows, [
+      const result = await downloadCsv(filename, sortedRows, [
         { key: "exam_title", label: "Assessment" },
         { key: "subject", label: "Subject" },
         { key: "student_name", label: "Student" },
@@ -223,7 +228,7 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
               title="Export selected results CSV"
             >
               <FileSpreadsheet size={18} />
-              <span className="text-sm font-semibold">Export results CSV</span>
+              <span className="text-sm font-semibold">Export selected results CSV</span>
             </ProgressButton>
             <ProgressButton
               type="button"

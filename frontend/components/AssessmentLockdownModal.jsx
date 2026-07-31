@@ -83,10 +83,15 @@ export default function AssessmentLockdownModal({
               <strong>prohibited</strong>.
             </li>
             <li>
-              Switching tabs or opening another assessment tab counts as an integrity{" "}
-              <strong>violation</strong>. You may receive up to{" "}
-              <strong>{maxStrikes} alerts</strong> before your exam is{" "}
+              Switching tabs, leaving fullscreen, or opening another assessment tab counts as an
+              integrity <strong>violation</strong>. The first{" "}
+              <strong>{Math.max(0, maxStrikes - 1)}</strong> are warnings; on violation{" "}
+              <strong>#{maxStrikes}</strong> your exam is{" "}
               <strong>submitted automatically</strong>, even if you have not finished.
+            </li>
+            <li>
+              Losing internet does <strong>not</strong> auto-submit. Stay on this page — answers
+              are saved on your device until you reconnect and submit.
             </li>
             <li>
               The assessment runs in <strong>fullscreen</strong> and blocks access if you leave

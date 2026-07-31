@@ -1,5 +1,5 @@
--- Include time_spent_seconds in faculty analytics RPC
--- Run in Supabase SQL Editor after student_answer_time_spent.sql
+-- Include submission timestamps so faculty can sort by first-to-submit.
+-- Run in Supabase SQL Editor (safe to re-run).
 
 CREATE OR REPLACE FUNCTION public.get_exam_faculty_analytics(p_exam_id uuid)
 RETURNS jsonb
@@ -94,9 +94,10 @@ BEGIN
             'student_id', eie.student_id,
             'event_type', eie.event_type,
             'description', eie.description,
+            'metadata', eie.metadata,
             'created_at', eie.created_at
           )
-          ORDER BY eie.created_at DESC
+          ORDER BY eie.created_at ASC
         )
         FROM public.exam_integrity_events eie
         WHERE eie.exam_id = p_exam_id
@@ -109,5 +110,3 @@ $$;
 
 REVOKE ALL ON FUNCTION public.get_exam_faculty_analytics(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_exam_faculty_analytics(uuid) TO authenticated;
-
-NOTIFY pgrst, 'reload schema';

@@ -293,14 +293,15 @@ html.light .en-interactive-card:hover {
 
 /* Collapsible desktop sidebar */
 .en-sidebar-shell {
+  overflow: hidden;
   transition:
-    width 0.48s cubic-bezier(0.22, 1, 0.36, 1),
-    padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+    width 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.75s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: width;
 }
 
 .en-sidebar-panel {
-  transition: padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: padding 0.75s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-label {
@@ -311,9 +312,9 @@ html.light .en-interactive-card:hover {
   opacity: 1;
   transform: translateX(0);
   transition:
-    max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.28s ease,
-    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    max-width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.45s ease 0.08s,
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-label.is-collapsed {
@@ -321,6 +322,10 @@ html.light .en-interactive-card:hover {
   opacity: 0;
   transform: translateX(-8px);
   pointer-events: none;
+  transition:
+    max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.28s ease,
+    transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .en-sidebar-section-title {
@@ -328,9 +333,9 @@ html.light .en-interactive-card:hover {
   max-height: 1.5rem;
   opacity: 1;
   transition:
-    max-height 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.24s ease,
-    margin 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    max-height 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.4s ease 0.06s,
+    margin 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-section-title.is-collapsed {
@@ -338,6 +343,10 @@ html.light .en-interactive-card:hover {
   opacity: 0;
   margin-bottom: 0;
   pointer-events: none;
+  transition:
+    max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s ease,
+    margin 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .en-nav-item:hover {

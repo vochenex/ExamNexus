@@ -26,6 +26,7 @@ import useQuestionSections from "../../hooks/useQuestionSections";
 import { saveQuestionToBank } from "../../utils/questionBank";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
+import { pageShellWithBellClass } from "../../utils/themeInputs";
 
 const defaultAssessment = {
   subject_id: "",
@@ -39,6 +40,7 @@ const defaultAssessment = {
   show_result: true,
   show_question_review: true,
   show_correct_answers: true,
+  pass_mark: 50,
   duration_value: 60,
   duration_unit: "minutes",
 };
@@ -136,6 +138,9 @@ export default function EditAssessment() {
           show_correct_answers: data.exam.allow_show_correct_answers !== false,
           duration_value: parseDurationValue(data.exam.duration_value, DEFAULT_DURATION_VALUE),
           duration_unit: data.exam.duration_unit || "minutes",
+          pass_mark: Number.isFinite(Number(data.exam.pass_mark))
+            ? Number(data.exam.pass_mark)
+            : 50,
         });
         setTargetSections(
           normalizeTargetSections(data.exam.target_sections, sections)
@@ -215,6 +220,13 @@ export default function EditAssessment() {
         return;
       }
 
+      const passMark = Number(exam.pass_mark);
+      if (!Number.isFinite(passMark) || passMark < 0 || passMark > 100) {
+        setError("Set a passing rate between 0 and 100% in Settings.");
+        setLoading(false);
+        return;
+      }
+
       const validationError = validateAllQuestions();
       if (validationError) {
         setError(validationError);
@@ -256,11 +268,7 @@ export default function EditAssessment() {
   }
 
   return (
-    <div
-      className={`min-h-screen p-6 ${
-        theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page text-gray-900"
-      }`}
-    >
+    <div className={pageShellWithBellClass(theme)}>
       <BackButton />
 
       <div className="mb-8">

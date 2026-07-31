@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 
 export default function CollapsiblePanel({
@@ -23,7 +23,8 @@ export default function CollapsiblePanel({
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={`flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left ${
+        aria-expanded={open}
+        className={`flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-300 ${
           theme === "dark" ? "text-emerald-300" : "text-teal-800"
         }`}
       >
@@ -39,13 +40,25 @@ export default function CollapsiblePanel({
             </span>
           )}
         </span>
-        {open ? <ChevronUp size={16} className="shrink-0" /> : <ChevronDown size={16} className="shrink-0" />}
+        <ChevronDown
+          size={16}
+          className={`shrink-0 transition-transform duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            open ? "rotate-180" : "rotate-0"
+          }`}
+        />
       </button>
-      {open && (
-        <div className="min-w-0 space-y-3 overflow-hidden border-t border-inherit px-3 py-3 sm:px-4 sm:py-4">
-          {children}
+
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="min-w-0 space-y-3 border-t border-inherit px-3 py-3 sm:px-4 sm:py-4">
+            {children}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

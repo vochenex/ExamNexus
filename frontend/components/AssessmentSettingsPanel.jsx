@@ -26,6 +26,37 @@ export default function AssessmentSettingsPanel({
             theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
           }`}
         >
+          Passing rate (%)
+        </label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          className={inputClass}
+          value={
+            Number.isFinite(Number(exam.pass_mark)) ? Number(exam.pass_mark) : 50
+          }
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => {
+            const raw = Number.parseFloat(e.target.value);
+            const next = Number.isFinite(raw)
+              ? Math.min(100, Math.max(0, Math.round(raw * 10) / 10))
+              : 50;
+            onChange({ pass_mark: next });
+          }}
+        />
+        <p className={`mt-1.5 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
+          Required for grading. Students at or above this percentage are marked as Passed in results and exports.
+        </p>
+      </div>
+
+      <div>
+        <label
+          className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${
+            theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
+          }`}
+        >
           Student instructions
         </label>
         <textarea

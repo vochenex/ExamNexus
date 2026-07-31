@@ -18,7 +18,7 @@ import {
   fetchSubjectFaculty,
   fetchStudentEnrollmentSection,
 } from "../../utils/supabaseData";
-import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 
 export default function StudentSubjectDetails() {
@@ -84,7 +84,35 @@ export default function StudentSubjectDetails() {
   }, [classmates]);
 
   if (loading && !subject) {
-    return <PageLoadingSkeleton theme={theme} variant="detail" />;
+    return (
+      <div className={pageShellClass(theme)}>
+        <BackButton />
+        <div className="mb-6 space-y-3" aria-hidden="true">
+          <div
+            className={`h-9 w-64 max-w-full rounded-xl ${
+              theme === "dark" ? "animate-pulse bg-white/10" : "en-skeleton-bone"
+            }`}
+          />
+          <div
+            className={`h-4 w-72 max-w-full rounded-lg ${
+              theme === "dark" ? "animate-pulse bg-white/10" : "en-skeleton-bone"
+            }`}
+          />
+        </div>
+        <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className={panelClass(theme)}>
+            <PanelContentSkeleton rows={3} variant="list" />
+          </div>
+          <div className={panelClass(theme)}>
+            <PanelContentSkeleton rows={2} variant="cards" />
+          </div>
+          <div className={panelClass(theme)}>
+            <PanelContentSkeleton rows={2} variant="cards" />
+          </div>
+        </div>
+        <PanelContentSkeleton rows={4} variant="list" />
+      </div>
+    );
   }
 
   if (error || !subject) {
@@ -176,7 +204,9 @@ export default function StudentSubjectDetails() {
           </p>
         </div>
 
-        {classmates.length === 0 ? (
+        {loading ? (
+          <PanelContentSkeleton rows={5} variant="list" className="mt-2" />
+        ) : classmates.length === 0 ? (
           <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
             No classmates in your section yet.
           </p>

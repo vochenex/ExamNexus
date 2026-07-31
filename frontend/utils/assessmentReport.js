@@ -139,14 +139,52 @@ function formatAssessmentType(report, questions) {
   return formatQuestionTypeLabel(raw) || "—";
 }
 
+function displaySchoolId(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const excelText = raw.match(/^="(.*)"$/);
+  return excelText ? excelText[1] : raw;
+}
+
+function normalizeReportStudent(row = {}) {
+  return {
+    student_name: row.student_name || row.name || "",
+    school_id: displaySchoolId(row.school_id || row.schoolId),
+    student_email: row.student_email || row.email || "",
+    score: row.score,
+    total: row.total,
+    percentage:
+      row.percentage != null
+        ? row.percentage
+        : row.scorePct != null
+          ? row.scorePct
+          : null,
+    submitted_at: row.submitted_at || row.submittedAt || null,
+  };
+}
+
 /**
  * Build a printable HTML assessment report.
  * @param {object} report
  */
 export function buildAssessmentReportHtml(report) {
   const passMark = Number(report.pass_mark) || 50;
-  const students = Array.isArray(report.students) ? report.students : [];
   const questions = Array.isArray(report.questions) ? report.questions : [];
+
+  const rawStudents =
+    Array.isArray(report.results) && report.results.length
+      ? report.results
+      : Array.isArray(report.students)
+        ? report.students
+        : [];
+
+  const students = rawStudents
+    .map(normalizeReportStudent)
+    .sort((a, b) =>
+      String(a.student_name || "").localeCompare(String(b.student_name || ""), undefined, {
+        sensitivity: "base",
+      })
+    );
 
   const passed = students.filter((row) => isPassing(row, passMark)).length;
   const failed = students.length - passed;
@@ -191,9 +229,11 @@ export function buildAssessmentReportHtml(report) {
     : `<tr><td colspan="5" class="muted">No questions were available for this export.</td></tr>`;
 
   const title = report.title || "Assessment Report";
-  const faculty =
+  const facultyName =
     report.faculty_name ||
+    [report.faculty?.first_name, report.faculty?.last_name].filter(Boolean).join(" ") ||
     report.faculty_school_id ||
+    report.faculty?.school_id ||
     "Unassigned";
   const assessmentType = formatAssessmentType(report, questions);
 
@@ -209,9 +249,9 @@ export function buildAssessmentReportHtml(report) {
     h1 { margin: 0 0 4px; font-size: 1.6rem; color: #0f766e; }
     h2 { margin: 28px 0 10px; font-size: 1.15rem; color: #134e4a; border-bottom: 2px solid #99f6e4; padding-bottom: 6px; }
     .meta { color: #475569; font-size: 0.92rem; line-height: 1.5; }
-    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px; margin-top: 14px; }
+    .card { background: transparent; border: 0; border-radius: 0; padding: 8px 0; margin-top: 18px; }
     .desc { white-space: pre-wrap; line-height: 1.55; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
     th, td { border-bottom: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; vertical-align: top; }
     th { background: #f0fdfa; color: #0f766e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
     .pass { color: #047857; font-weight: 700; }
@@ -219,7 +259,7 @@ export function buildAssessmentReportHtml(report) {
     .muted { color: #64748b; }
     .chart-wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     .donut { width: 140px; height: 140px; border-radius: 50%; display: grid; place-items: center; }
-    .donut-hole { width: 78px; height: 78px; border-radius: 50%; background: #fff; display: grid; place-items: center; text-align: center; line-height: 1.1; }
+    .donut-hole { width: 78px; height: 78px; border-radius: 50%; background: #f8fafc; display: grid; place-items: center; text-align: center; line-height: 1.1; }
     .donut-hole strong { font-size: 1.25rem; }
     .donut-hole span { font-size: 0.7rem; color: #64748b; text-transform: uppercase; }
     .legend { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -241,7 +281,7 @@ export function buildAssessmentReportHtml(report) {
     <h2 style="margin-top:0">Assessment details</h2>
     <p class="meta">
       <strong>Subject:</strong> ${escapeHtml(report.subject || "—")}<br/>
-      <strong>Assigned faculty:</strong> ${escapeHtml(faculty)}<br/>
+      <strong>Assigned faculty:</strong> ${escapeHtml(facultyName)}<br/>
       <strong>Type:</strong> ${escapeHtml(assessmentType)}<br/>
       <strong>Category:</strong> ${escapeHtml(report.category || report.assessment_category || "—")}<br/>
       <strong>Schedule:</strong> ${escapeHtml(formatDate(report.start || report.start_datetime))}

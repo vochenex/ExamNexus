@@ -43,8 +43,8 @@ export default function AssessmentExamInstructionsBar({
                 theme === "dark" ? "text-amber-100/70" : "text-amber-900/80"
               }`}
             >
-              Stay on this tab. Switching tabs or opening another assessment tab counts as a
-              violation. After {maxStrikes} violations, your exam is submitted automatically.
+              Stay on this tab. Violations 1–{Math.max(0, maxStrikes - 1)} are warnings; on
+              violation #{maxStrikes} the exam auto-submits. Going offline does not auto-submit.
             </p>
           </div>
         </div>

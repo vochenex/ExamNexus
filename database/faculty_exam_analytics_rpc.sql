@@ -108,6 +108,8 @@ BEGIN
           'score', er.score,
           'total', er.total,
           'student_id', er.student_id,
+          'created_at', er.created_at,
+          'submitted_at', er.created_at,
           'first_name', u.first_name,
           'last_name', u.last_name,
           'school_id', u.school_id,

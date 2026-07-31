@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
-import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search, Plus} from "lucide-react";
+import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search, Plus, ClipboardList} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { iconButton, secondaryButtonSm } from "../../utils/themeButtons";
@@ -38,10 +38,10 @@ import YearLevelBadge from "../../components/YearLevelBadge";
 import EditSubjectModal from "../../components/EditSubjectModal";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPanel";
-import { pageShellWithBellClass } from "../../utils/themeInputs";
-import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
+import SectionAssessmentsModal from "../../components/SectionAssessmentsModal";
+import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
+import { pageShellWithBellClass, inputClass } from "../../utils/themeInputs";
 import { usePolling } from "../../hooks/useRealtimeFetch";
-import { inputClass } from "../../utils/themeInputs";
 import { matchesStudentSearch } from "../../utils/studentSearch";
 
 function getAssessmentStatus(assessment) {
@@ -70,6 +70,7 @@ export default function SubjectDetails() {
   const { subjectId } = useParams();
   const navigate = useNavigate();
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+  const [sectionAssessmentsOpen, setSectionAssessmentsOpen] = useState(false);
   const [showEditSubjectModal, setShowEditSubjectModal] = useState(false);
   const [subject, setSubject] = useState(null);
   const [assessments, setAssessments] = useState([]);
@@ -184,7 +185,60 @@ export default function SubjectDetails() {
   }, [cachedUser.id, cachedUser.role]);
 
   if (loading && !subject) {
-    return <PageLoadingSkeleton theme={theme} variant="detail" />;
+    const shellCard = `min-w-0 overflow-hidden rounded-2xl border p-5 ${
+      theme === "dark"
+        ? "border-white/10 bg-white/5"
+        : "en-bg-surface border border-emerald-300"
+    }`;
+    return (
+      <div className={pageShellWithBellClass(theme)}>
+        <BackButton />
+        <div className="mb-8 space-y-3" aria-hidden="true">
+          <div
+            className={`h-9 w-64 max-w-full rounded-xl ${
+              theme === "dark" ? "animate-pulse bg-white/10" : "en-skeleton-bone"
+            }`}
+          />
+          <div
+            className={`h-4 w-80 max-w-full rounded-lg ${
+              theme === "dark" ? "animate-pulse bg-white/10" : "en-skeleton-bone"
+            }`}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className={`${shellCard} lg:col-span-1`}>
+            <h2
+              className={`mb-4 text-lg font-semibold ${
+                theme === "dark" ? "text-emerald-400" : "text-teal-700"
+              }`}
+            >
+              Students
+            </h2>
+            <PanelContentSkeleton rows={5} variant="list" />
+          </div>
+          <div className={shellCard}>
+            <h2
+              className={`mb-4 text-lg font-semibold ${
+                theme === "dark" ? "text-emerald-400" : "text-teal-700"
+              }`}
+            >
+              Assessments
+            </h2>
+            <PanelContentSkeleton rows={4} variant="cards" />
+          </div>
+          <div className={shellCard}>
+            <h2
+              className={`mb-4 text-lg font-semibold ${
+                theme === "dark" ? "text-emerald-400" : "text-teal-700"
+              }`}
+            >
+              Class Performance
+            </h2>
+            <PanelContentSkeleton variant="chart" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!subject) {
@@ -345,6 +399,17 @@ export default function SubjectDetails() {
 
         <button
           type="button"
+          onClick={() => setSectionAssessmentsOpen(true)}
+          className={iconButton(theme, "primary", "gap-2 px-3")}
+          aria-label="Section assessments"
+          title="Section assessments"
+        >
+          <ClipboardList size={18} />
+          <span className="text-sm font-semibold">Section assessments</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => navigate(`/faculty/subject/${subjectId}/social`)}
           disabled={!facultyCanManage}
           className={iconButton(
@@ -427,7 +492,9 @@ export default function SubjectDetails() {
           />
 
           <div className="mt-4 h-[min(28rem,60vh)] min-h-[12rem] min-w-0 space-y-2 overflow-y-auto overscroll-contain pr-1">
-            {visibleClassmates.length === 0 ? (
+            {loading ? (
+              <PanelContentSkeleton rows={5} variant="list" />
+            ) : visibleClassmates.length === 0 ? (
               <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
                 {studentSearch.trim()
                   ? "No students match your search."
@@ -473,7 +540,9 @@ export default function SubjectDetails() {
             </p>
           </div>
 
-          {visibleAssessments.length === 0 ? (
+          {loading ? (
+            <PanelContentSkeleton rows={4} variant="cards" />
+          ) : visibleAssessments.length === 0 ? (
             <p className={theme === "dark" ? "text-white" : "text-black"}>
               {assessments.length === 0
                 ? "No assessments yet"
@@ -822,6 +891,17 @@ export default function SubjectDetails() {
   </div>
   </ModalPortal>
 )}
+      <SectionAssessmentsModal
+        open={sectionAssessmentsOpen}
+        onClose={() => setSectionAssessmentsOpen(false)}
+        subject={subject}
+        assessments={assessments}
+        onSelectAssessment={(assessment) => {
+          setSectionAssessmentsOpen(false);
+          navigate(`/faculty/assessment/${assessment.id}`);
+        }}
+      />
+
       <SubjectStudentRatingsSidebar
         open={ratingsOpen}
         onClose={() => setRatingsOpen(false)}

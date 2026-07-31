@@ -177,9 +177,14 @@ export default function AssessmentDetails() {
         showError("No results to export yet.");
         return;
       }
+      const sortedRows = [...rows].sort((a, b) =>
+        String(a.student_name || "").localeCompare(String(b.student_name || ""), undefined, {
+          sensitivity: "base",
+        })
+      );
       const result = await downloadCsv(
         `examnexus-results-${examId}.csv`,
-        rows,
+        sortedRows,
         [
           { key: "exam_title", label: "Assessment" },
           { key: "subject", label: "Subject" },
@@ -327,15 +332,16 @@ export default function AssessmentDetails() {
                 <button
                   type="button"
                   onClick={() => navigate(`/faculty/edit-assessment/${examId}`)}
-                  className={`${actionButtonBase} ${
+                  className={`${actionButtonBase} gap-1.5 px-2.5 ${
                     theme === "dark"
                       ? "border border-cyan-400/35 bg-cyan-500/15 text-cyan-200"
                       : "border border-cyan-600/25 bg-cyan-50 text-cyan-900"
                   }`}
                   aria-label="Edit assessment"
-                  title="Edit"
+                  title="Edit assessment"
                 >
                   <Pencil size={16} />
+                  <span className="hidden sm:inline">Edit</span>
                 </button>
 
                 <ProgressButton
@@ -359,7 +365,7 @@ export default function AssessmentDetails() {
                   type="button"
                   onClick={() => setBankSaveOpen(true)}
                   disabled={questions.length === 0}
-                  className={`${actionButtonBase} ${
+                  className={`${actionButtonBase} gap-1.5 px-2.5 ${
                     theme === "dark"
                       ? "border border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
                       : "border border-emerald-600/25 bg-emerald-50 text-teal-900"
@@ -368,6 +374,7 @@ export default function AssessmentDetails() {
                   title="Save to bank"
                 >
                   <Archive size={16} />
+                  <span className="hidden sm:inline">Save to bank</span>
                 </button>
 
                 <ProgressButton
@@ -375,16 +382,16 @@ export default function AssessmentDetails() {
                   onClick={handleDelete}
                   loading={deleting}
                   loadingLabel="Deleting assessment"
-                  iconOnly
-                  className={`${actionButtonBase} ${
+                  className={`${actionButtonBase} gap-1.5 px-2.5 ${
                     theme === "dark"
                       ? "border border-red-400/35 bg-red-500/15 text-red-200"
                       : "border border-red-400/40 bg-red-50 text-red-800"
                   }`}
                   aria-label="Delete assessment"
-                  title="Delete"
+                  title="Delete assessment"
                 >
                   <Trash2 size={16} />
+                  <span className="hidden sm:inline">Delete</span>
                 </ProgressButton>
               </div>
             </div>

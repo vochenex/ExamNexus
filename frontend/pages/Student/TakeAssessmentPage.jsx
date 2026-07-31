@@ -169,9 +169,15 @@ function TakeAssessmentExperience() {
   const [submitBlocked, setSubmitBlocked] = useState(false);
   const [isRetakeAttempt, setIsRetakeAttempt] = useState(false);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
+  const [isOffline, setIsOffline] = useState(
+    () => typeof navigator !== "undefined" && navigator.onLine === false
+  );
+  const [connectionBanner, setConnectionBanner] = useState(null);
   const alertTimerRef = useRef(null);
+  const connectionBannerTimerRef = useRef(null);
   const submitExamRef = useRef(null);
   const autoSubmittingRef = useRef(false);
+  const pendingIntegrityAutoSubmitRef = useRef(false);
   const examRef = useRef(null);
 
   const isActive = phase === "active";
@@ -181,6 +187,42 @@ function TakeAssessmentExperience() {
   useEffect(() => {
     examRef.current = exam;
   }, [exam]);
+
+  useEffect(() => {
+    const showConnectionBanner = (kind) => {
+      setConnectionBanner(kind);
+      if (connectionBannerTimerRef.current) {
+        clearTimeout(connectionBannerTimerRef.current);
+      }
+      if (kind === "unstable") {
+        connectionBannerTimerRef.current = setTimeout(() => {
+          setConnectionBanner((current) => (current === "unstable" ? null : current));
+        }, 10000);
+      }
+    };
+
+    const syncOnline = () => {
+      setIsOffline(false);
+      showConnectionBanner("unstable");
+    };
+    const syncOffline = () => {
+      setIsOffline(true);
+      showConnectionBanner("offline");
+    };
+    window.addEventListener("online", syncOnline);
+    window.addEventListener("offline", syncOffline);
+    setIsOffline(navigator.onLine === false);
+    if (navigator.onLine === false) {
+      showConnectionBanner("offline");
+    }
+    return () => {
+      window.removeEventListener("online", syncOnline);
+      window.removeEventListener("offline", syncOffline);
+      if (connectionBannerTimerRef.current) {
+        clearTimeout(connectionBannerTimerRef.current);
+      }
+    };
+  }, []);
 
   const {
     flushCurrentQuestionTime,
@@ -205,6 +247,12 @@ function TakeAssessmentExperience() {
   const handleStrikeChange = useCallback(
     ({ strikes, remaining, maxStrikes }) => {
       setIntegrityStrikes(strikes);
+      if (strikes >= maxStrikes) {
+        showIntegrityAlert(
+          `Integrity violation recorded (${strikes}/${maxStrikes}). Maximum reached — submitting automatically.`
+        );
+        return;
+      }
       showIntegrityAlert(
         `Integrity violation recorded (${strikes}/${maxStrikes}). ${remaining} alert${remaining === 1 ? "" : "s"} left before auto-submit.`
       );
@@ -214,7 +262,18 @@ function TakeAssessmentExperience() {
 
   const handleAutoSubmit = useCallback(() => {
     if (autoSubmittingRef.current) return;
+
+    // Offline never auto-submits. Queue integrity auto-submit until connection returns.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      pendingIntegrityAutoSubmitRef.current = true;
+      showIntegrityAlert(
+        "Maximum integrity violations reached. Submission will run automatically once your connection returns."
+      );
+      return;
+    }
+
     autoSubmittingRef.current = true;
+    pendingIntegrityAutoSubmitRef.current = false;
     setAutoSubmitting(true);
     setFocusBlocked(false);
     showIntegrityAlert(
@@ -230,10 +289,21 @@ function TakeAssessmentExperience() {
     }
   }, [handleAutoSubmit, id, isActive]);
 
+  useEffect(() => {
+    if (isOffline || !isActive) return;
+    if (!pendingIntegrityAutoSubmitRef.current) return;
+    if (loadIntegrityStrikes(id) < MAX_INTEGRITY_STRIKES) {
+      pendingIntegrityAutoSubmitRef.current = false;
+      return;
+    }
+    handleAutoSubmit();
+  }, [handleAutoSubmit, id, isActive, isOffline]);
+
   const { clearFocusViolation } = useAssessmentIntegrity({
     examId: id,
     active: isActive,
     isRetakeAttempt,
+    isOffline,
     onAlert: showIntegrityAlert,
     onFocusViolation: setFocusBlocked,
     onStrikeChange: handleStrikeChange,
@@ -691,6 +761,23 @@ function TakeAssessmentExperience() {
     const { reason } = options;
     if (submitting || submitBlocked) return;
 
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      // Integrity auto-submit must not force a submit while offline.
+      if (reason === "integrity") {
+        autoSubmittingRef.current = false;
+        pendingIntegrityAutoSubmitRef.current = true;
+        setAutoSubmitting(false);
+      }
+      setConnectionBanner("offline");
+      setResultDialog({
+        tone: "warning",
+        title: "You are offline",
+        message:
+          "Your answers are saved on this device. Reconnect to the internet, then submit again. Do not close the browser until submission succeeds.",
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
       flushCurrentQuestionTime();
@@ -706,6 +793,7 @@ function TakeAssessmentExperience() {
 
       clearExamSession(id);
       setFocusBlocked(false);
+      pendingIntegrityAutoSubmitRef.current = false;
 
       const hasEssayQuestions = questions.some(
         (question) => getQuestionFormatType(question, exam.exam_type) === "essay"
@@ -735,17 +823,36 @@ function TakeAssessmentExperience() {
       });
     } catch (err) {
       const alreadySubmitted = /already submitted/i.test(err.message || "");
+      const networkError =
+        /failed to fetch|networkerror|network request failed|offline|timed out|timeout/i.test(
+          String(err.message || "")
+        );
       if (alreadySubmitted) {
         setSubmitBlocked(true);
         clearExamSession(id);
       }
 
+      if (networkError) {
+        setConnectionBanner("unstable");
+        if (reason === "integrity") {
+          autoSubmittingRef.current = false;
+          pendingIntegrityAutoSubmitRef.current = true;
+          setAutoSubmitting(false);
+        }
+      }
+
       setResultDialog({
         tone: "danger",
-        title: alreadySubmitted ? "Already submitted" : "Submission failed",
+        title: alreadySubmitted
+          ? "Already submitted"
+          : networkError
+            ? "Connection lost"
+            : "Submission failed",
         message: alreadySubmitted
           ? "This attempt could not be saved because a submission already exists. You have been returned to your assessments list."
-          : err.message || "Could not submit your answers. Please try again.",
+          : networkError
+            ? "Could not reach the server. Your answers are still saved on this device — reconnect and tap Submit again. The exam will not auto-submit for a network outage."
+            : err.message || "Could not submit your answers. Please try again.",
         exitLockdown: alreadySubmitted,
       });
     } finally {
@@ -1043,6 +1150,35 @@ function TakeAssessmentExperience() {
         message={integrityAlert}
         onDismiss={() => setIntegrityAlert("")}
       />
+
+      {isActive && (isOffline || connectionBanner) && (
+        <div
+          role="status"
+          className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+            isOffline || connectionBanner === "offline"
+              ? theme === "dark"
+                ? "border-amber-500/35 bg-amber-500/10 text-amber-100"
+                : "border-amber-300 bg-amber-50 text-amber-950"
+              : theme === "dark"
+                ? "border-orange-500/35 bg-orange-500/10 text-orange-100"
+                : "border-orange-300 bg-orange-50 text-orange-950"
+          }`}
+        >
+          {isOffline || connectionBanner === "offline" ? (
+            <>
+              <strong>You are offline.</strong> Keep this page open — your answers stay saved on
+              this device. Reconnect, then submit when the connection returns. The timer still
+              counts down. Network outages do not auto-submit your exam.
+            </>
+          ) : (
+            <>
+              <strong>Unstable internet connection.</strong> Your answers are still saved locally.
+              Stay on this page until the connection is steady, then submit. A weak connection will
+              not auto-submit your exam.
+            </>
+          )}
+        </div>
+      )}
 
       <div className="mx-auto max-w-6xl">
         <AssessmentExamInstructionsBar

@@ -478,9 +478,14 @@ export default function ExamAnalyticsPanel({
       sorted.sort((a, b) => (Number(b.scorePct) || -1) - (Number(a.scorePct) || -1));
     } else if (studentSort === "first_submit") {
       sorted.sort((a, b) => {
-        const aTime = a.submittedAt ? new Date(a.submittedAt).getTime() : Number.POSITIVE_INFINITY;
-        const bTime = b.submittedAt ? new Date(b.submittedAt).getTime() : Number.POSITIVE_INFINITY;
-        return aTime - bTime;
+        const aTime = a.submittedAt ? new Date(a.submittedAt).getTime() : Number.NaN;
+        const bTime = b.submittedAt ? new Date(b.submittedAt).getTime() : Number.NaN;
+        const aValid = Number.isFinite(aTime);
+        const bValid = Number.isFinite(bTime);
+        if (aValid && bValid && aTime !== bTime) return aTime - bTime;
+        if (aValid && !bValid) return -1;
+        if (!aValid && bValid) return 1;
+        return String(a.name || "").localeCompare(String(b.name || ""));
       });
     } else {
       sorted.sort((a, b) => (a.rank || 0) - (b.rank || 0));
@@ -670,7 +675,7 @@ export default function ExamAnalyticsPanel({
                 >
                   <option value="rank">Sort by rank</option>
                   <option value="name">Sort by name</option>
-                  <option value="score">Sort by score %</option>
+                  <option value="score">Sort by points</option>
                   <option value="first_submit">First to submit</option>
                 </select>
               </div>
@@ -699,7 +704,14 @@ export default function ExamAnalyticsPanel({
                       <div className="min-w-0">
                         <p className="font-medium text-sm truncate">{student.name}</p>
                         <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                          Rank #{student.rank} · Tap to view answers
+                          Rank #{student.rank}
+                          {student.submittedAt
+                            ? ` · ${new Date(student.submittedAt).toLocaleString("en-PH", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })}`
+                            : ""}
+                          {" · Tap to view answers"}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -709,10 +721,9 @@ export default function ExamAnalyticsPanel({
                               theme === "dark" ? "text-emerald-400" : "text-teal-700"
                             }`}
                           >
-                            {student.scorePct != null ? `${student.scorePct}%` : "Pending"}
-                          </p>
-                          <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                            {student.score}/{student.total} pts
+                            {student.pendingReview
+                              ? "Pending"
+                              : `${student.score}/${student.total} pts`}
                           </p>
                         </div>
                         <ChevronRight size={16} className="opacity-50" />

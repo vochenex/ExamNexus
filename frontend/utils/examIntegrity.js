@@ -63,20 +63,42 @@ export function getIntegrityStrikesKey(examId) {
 
 export function loadIntegrityStrikes(examId) {
   try {
+    const localRaw = localStorage.getItem(getIntegrityStrikesKey(examId));
+    if (localRaw != null) {
+      const parsed = Number.parseInt(localRaw, 10);
+      if (Number.isFinite(parsed)) {
+        return Math.max(0, Math.min(MAX_INTEGRITY_STRIKES, parsed));
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
     const raw = sessionStorage.getItem(getIntegrityStrikesKey(examId));
     const parsed = Number.parseInt(raw, 10);
     if (!Number.isFinite(parsed)) return 0;
-    return Math.max(0, Math.min(MAX_INTEGRITY_STRIKES, parsed));
+    const strikes = Math.max(0, Math.min(MAX_INTEGRITY_STRIKES, parsed));
+    // Migrate legacy session strikes so blackout resume still counts toward auto-submit.
+    localStorage.setItem(getIntegrityStrikesKey(examId), String(strikes));
+    return strikes;
   } catch {
     return 0;
   }
 }
 
 export function saveIntegrityStrikes(examId, strikes) {
-  sessionStorage.setItem(
-    getIntegrityStrikesKey(examId),
-    String(Math.max(0, Math.min(MAX_INTEGRITY_STRIKES, strikes)))
-  );
+  const value = String(Math.max(0, Math.min(MAX_INTEGRITY_STRIKES, strikes)));
+  try {
+    localStorage.setItem(getIntegrityStrikesKey(examId), value);
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.setItem(getIntegrityStrikesKey(examId), value);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getIntegrityStrikesRemaining(examId) {
@@ -105,22 +127,62 @@ export function getExamTabLockKey(examId) {
 }
 
 export function saveExamSession(examId, payload) {
-  sessionStorage.setItem(getExamSessionKey(examId), JSON.stringify(payload));
+  // localStorage survives blackouts / browser restarts; studentId gate prevents cross-account reuse.
+  localStorage.setItem(getExamSessionKey(examId), JSON.stringify(payload));
+  try {
+    sessionStorage.removeItem(getExamSessionKey(examId));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function loadExamSession(examId) {
   try {
+    const localRaw = localStorage.getItem(getExamSessionKey(examId));
+    if (localRaw) return JSON.parse(localRaw);
+  } catch {
+    /* fall through to legacy sessionStorage */
+  }
+
+  try {
     const raw = sessionStorage.getItem(getExamSessionKey(examId));
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Migrate older in-progress sessions to localStorage.
+    localStorage.setItem(getExamSessionKey(examId), raw);
+    sessionStorage.removeItem(getExamSessionKey(examId));
+    return parsed;
   } catch {
     return null;
   }
 }
 
 export function clearExamSession(examId) {
-  sessionStorage.removeItem(getExamSessionKey(examId));
-  sessionStorage.removeItem(getExamTabLockKey(examId));
-  sessionStorage.removeItem(getIntegrityStrikesKey(examId));
+  try {
+    localStorage.removeItem(getExamSessionKey(examId));
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.removeItem(getExamSessionKey(examId));
+  } catch {
+    /* ignore */
+  }
+  try {
+    localStorage.removeItem(getIntegrityStrikesKey(examId));
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.removeItem(getExamTabLockKey(examId));
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.removeItem(getIntegrityStrikesKey(examId));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function computeRemainingSeconds(startedAtIso, totalSeconds) {

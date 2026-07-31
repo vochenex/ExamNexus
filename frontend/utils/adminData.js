@@ -306,7 +306,12 @@ export async function fetchAdminExportResults(examId = null) {
     p_exam_id: examId,
   });
   if (error) throw error;
-  return normalizeJson(data);
+  const rows = normalizeJson(data) || [];
+  return [...rows].sort((a, b) =>
+    String(a.student_name || "").localeCompare(String(b.student_name || ""), undefined, {
+      sensitivity: "base",
+    })
+  );
 }
 
 /**
@@ -337,7 +342,15 @@ export async function fetchAdminAssessmentReport(examId) {
             points: row.points ?? (Number(row.grading_options?.points) || 1),
           }))
         : [];
-      return { ...report, questions };
+      let results = Array.isArray(report.results) ? report.results : [];
+      if (!results.length) {
+        try {
+          results = await fetchAdminExportResults(examId);
+        } catch {
+          results = Array.isArray(report.students) ? report.students : [];
+        }
+      }
+      return { ...report, questions, results, students: results };
     }
   } catch (err) {
     console.warn("admin_export_assessment_report RPC failed, using fallback:", err);
@@ -381,7 +394,7 @@ export async function fetchAdminAssessmentReport(examId) {
   try {
     const { data: examRow } = await supabase
       .from("exams")
-      .select("description, instructions, exam_type, assessment_category, start_datetime, end_datetime")
+      .select("description, instructions, exam_type, assessment_category, start_datetime, end_datetime, pass_mark")
       .eq("id", examId)
       .maybeSingle();
     description = examRow?.description || "";
@@ -390,6 +403,7 @@ export async function fetchAdminAssessmentReport(examId) {
       meta.category = meta.category || examRow.assessment_category;
       meta.start = meta.start || examRow.start_datetime;
       meta.end = meta.end || examRow.end_datetime;
+      meta.pass_mark = examRow.pass_mark;
     }
   } catch {
     /* ignore */
@@ -408,9 +422,10 @@ export async function fetchAdminAssessmentReport(examId) {
       : meta.faculty_school_id || "",
     start: meta.start,
     end: meta.end,
-    pass_mark: 50,
+    pass_mark: Number.isFinite(Number(meta.pass_mark)) ? Number(meta.pass_mark) : 50,
     questions,
     students: results,
+    results,
   };
 }
 

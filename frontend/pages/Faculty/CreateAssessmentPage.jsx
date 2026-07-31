@@ -23,6 +23,7 @@ import AiGenerationProgress from "../../components/AiGenerationProgress";
 import { mapAiQuestionToBuilder, mapAiPayloadToBuilderQuestions } from "../../utils/aiQuestionMapper";
 import { getSubjectSections } from "../../utils/sections";
 import { createExam } from "../../utils/supabaseData";
+import { pageShellWithBellClass } from "../../utils/themeInputs";
 import { supabase } from "../../supabaseClient";
 import {
   canFacultyManageSubjects,
@@ -47,6 +48,7 @@ const defaultAssessment = {
   show_result: true,
   show_question_review: true,
   show_correct_answers: true,
+  pass_mark: 50,
   duration_value: 60,
   duration_unit: "minutes",
 };
@@ -337,6 +339,13 @@ export default function CreateAssessment() {
         return;
       }
 
+      const passMark = Number(exam.pass_mark);
+      if (!Number.isFinite(passMark) || passMark < 0 || passMark > 100) {
+        setError("Set a passing rate between 0 and 100% in Settings.");
+        setLoading(false);
+        return;
+      }
+
       const validationError = validateAllQuestions();
       if (validationError) {
         setError(validationError);
@@ -379,11 +388,7 @@ export default function CreateAssessment() {
   };
 
   return (
-    <div
-      className={`min-h-screen p-6 ${
-        theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page text-gray-900"
-      }`}
-    >
+    <div className={pageShellWithBellClass(theme)}>
       <BackButton />
 
       <div className="mb-8">
