@@ -58,15 +58,17 @@ export function getMobileNav(role) {
     };
   }
 
-  // Student (default) — app dashboard (not marketing Home).
+  // Student — Announcements must be reachable on iPhone PWA (tab bar / More).
   return {
     primary: [
       { to: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard", end: true },
       { to: "/student/subjects", icon: BookOpen, label: "Subjects" },
       { to: "/student/assessments", icon: ClipboardCheck, label: "Assess" },
       { to: "/student/results", icon: Trophy, label: "Results" },
+      { to: "/student/announcements", icon: Megaphone, label: "Announce" },
+    ],
+    more: [
       { to: "/student/profile", icon: UserCircle, label: "Profile" },
     ],
-    more: [],
   };
 }

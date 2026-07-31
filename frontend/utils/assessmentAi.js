@@ -6,6 +6,7 @@ import { API_BASE, isLocalApiBase } from "./apiBase.js";
 const AI_REQUEST_TIMEOUT_MS = 600000;
 /** Keep each hosted API round small so Vercel's 60s limit is not exceeded. */
 const PROMPT_CLIENT_ROUND_SIZE = 8;
+const DOCUMENT_CLIENT_ROUND_SIZE = 8;
 
 function backendUnreachableMessage() {
   if (isLocalApiBase()) {
@@ -535,6 +536,27 @@ export async function generateAssessmentFromDocument({
   onQuestionGenerated,
   signal,
 }) {
+  const requested = Number(questionCount);
+
+  // Source material with large N: extract once, then short client rounds (same pattern as prompts).
+  if (
+    !isQuestionnaire &&
+    Number.isFinite(requested) &&
+    requested > DOCUMENT_CLIENT_ROUND_SIZE
+  ) {
+    return generateSourceMaterialBatched({
+      file,
+      files,
+      fileIndexes,
+      questionCount: requested,
+      difficulty,
+      formats,
+      onProgress,
+      onQuestionGenerated,
+      signal,
+    });
+  }
+
   const session = await getAuthSession({ forceRefresh: true });
   if (!session?.access_token) {
     throw new Error("Your session expired. Please sign in again.");
@@ -598,7 +620,6 @@ export async function generateAssessmentFromDocument({
   }
 
   let questions = Array.isArray(payload.questions) ? payload.questions : [];
-  const requested = Number(questionCount);
   if (
     !isQuestionnaire &&
     Number.isFinite(requested) &&
@@ -621,4 +642,223 @@ export async function generateAssessmentFromDocument({
   });
 
   return { ...payload, questions };
+}
+
+async function extractDocumentsText({ file, files, fileIndexes, signal }) {
+  const session = await getAuthSession({ forceRefresh: true });
+  if (!session?.access_token) {
+    throw new Error("Your session expired. Please sign in again.");
+  }
+
+  const formData = new FormData();
+  appendFilesToFormData(formData, files || file);
+  if (Array.isArray(fileIndexes) && fileIndexes.length) {
+    formData.append("fileIndexes", JSON.stringify(fileIndexes));
+  }
+
+  const res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/extract-document`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: formData,
+    signal,
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(formatApiError(payload, "Failed to read document text"));
+  }
+
+  const text = String(payload.text || "").trim();
+  if (!text) {
+    throw new Error("The document did not contain readable text.");
+  }
+  return text;
+}
+
+async function generateSourceMaterialBatched({
+  file,
+  files,
+  fileIndexes,
+  questionCount,
+  difficulty,
+  formats,
+  onProgress,
+  onQuestionGenerated,
+  signal,
+}) {
+  const total = Math.min(150, Math.max(1, Number(questionCount) || 1));
+  let highestPercent = 2;
+
+  const emitProgress = (payload) => {
+    const nextPercent = Math.max(highestPercent, Number(payload.percent) || highestPercent);
+    highestPercent = Math.min(100, nextPercent);
+    onProgress?.({ ...payload, percent: highestPercent });
+  };
+
+  const assertNotAborted = () => {
+    if (signal?.aborted) {
+      const error = new Error("Generation cancelled.");
+      error.name = "AbortError";
+      throw error;
+    }
+  };
+
+  emitProgress({
+    phase: "reading",
+    current: 0,
+    total,
+    percent: 4,
+    status: "waiting",
+  });
+
+  const sourceText = await extractDocumentsText({ file, files, fileIndexes, signal });
+
+  const allQuestions = [];
+  let suggestedTitle = "";
+  let suggestedDescription = "";
+  let meta = {};
+  let lastError = null;
+
+  while (allQuestions.length < total) {
+    assertNotAborted();
+
+    const need = Math.min(DOCUMENT_CLIENT_ROUND_SIZE, total - allQuestions.length);
+    const recent = allQuestions
+      .map((item) => item?.question)
+      .filter(Boolean)
+      .slice(-12)
+      .join(" | ");
+
+    const additionalInstructions = allQuestions.length
+      ? [
+          `Already created ${allQuestions.length} of ${total} questions from this source.`,
+          `Generate exactly ${need} NEW distinct questions grounded in the source.`,
+          recent ? `Do not repeat or paraphrase any of these: ${recent}` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : `Generate exactly ${need} questions grounded in the source.`;
+
+    emitProgress({
+      phase: "structuring",
+      current: allQuestions.length,
+      total,
+      percent: Math.min(76, Math.round(8 + (allQuestions.length / total) * 68)),
+      status: "generating",
+    });
+
+    let res;
+    try {
+      const headers = await getAuthHeaders(true, { forceRefresh: allQuestions.length === 0 });
+      res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/generate-from-source-text`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          sourceText,
+          formats,
+          questionCount: need,
+          difficulty,
+          additionalInstructions,
+        }),
+        signal,
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = isBackendUnreachable(error)
+        ? new Error(backendUnreachableMessage())
+        : error;
+      break;
+    }
+
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      lastError = new Error(formatApiError(payload, "Failed to generate from source"));
+      break;
+    }
+
+    const batch = Array.isArray(payload.questions) ? payload.questions : [];
+    if (!batch.length) {
+      lastError = new Error("AI did not return any usable questions from this source.");
+      break;
+    }
+
+    if (!suggestedTitle && payload.suggestedTitle) {
+      suggestedTitle = payload.suggestedTitle;
+    }
+    if (!suggestedDescription && payload.suggestedDescription) {
+      suggestedDescription = payload.suggestedDescription;
+    }
+    meta = {
+      ...(payload.meta || {}),
+      ...(meta || {}),
+      requestedCount: total,
+      generatedCount: allQuestions.length + batch.length,
+      rounds: (meta.rounds || 0) + 1,
+    };
+
+    let addedThisRound = 0;
+    for (const question of batch) {
+      if (allQuestions.length >= total) break;
+      allQuestions.push(question);
+      addedThisRound += 1;
+      const current = allQuestions.length;
+      emitProgress({
+        phase: "structuring",
+        current,
+        total,
+        percent: Math.round(78 + (current / total) * 22),
+        status: "revealing",
+      });
+      emitQuestionReady({
+        onQuestionGenerated,
+        question,
+        step: current - 1,
+        total,
+        phase: "structuring",
+        payload: {
+          suggestedTitle,
+          suggestedDescription,
+        },
+      });
+      if (current < total) {
+        await sleep(40);
+      }
+    }
+
+    if (addedThisRound === 0) break;
+  }
+
+  const finalQuestions = allQuestions.slice(0, total);
+
+  if (!finalQuestions.length) {
+    throw lastError || new Error("AI did not return any usable questions from this document.");
+  }
+
+  emitProgress({
+    phase: "structuring",
+    current: finalQuestions.length,
+    total,
+    percent: 100,
+    status: "done",
+  });
+
+  return {
+    success: true,
+    questions: finalQuestions,
+    suggestedTitle,
+    suggestedDescription,
+    meta: {
+      ...meta,
+      requestedCount: total,
+      generatedCount: finalQuestions.length,
+      partial: finalQuestions.length < total,
+      warning:
+        finalQuestions.length < total
+          ? `Generated ${finalQuestions.length} of ${total} source questions. You can generate again to add more.`
+          : null,
+      mode: "document_source_material_client_batched",
+    },
+  };
 }

@@ -148,6 +148,11 @@ export const ROUTE_FILE_MAP = [
     file: "frontend/pages/shared/PlatformAnnouncementsPage.jsx",
   },
   {
+    match: /^\/student\/announcements$/,
+    label: "Student announcements hub",
+    file: "frontend/pages/Student/StudentAnnouncementsHubPage.jsx",
+  },
+  {
     match: /^\/student\/assessments$/,
     label: "Student assessments list",
     file: "frontend/pages/Student/StudentAssessmentsPage.jsx",

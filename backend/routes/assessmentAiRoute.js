@@ -12,6 +12,7 @@ const {
 } = require("../lib/documentExtractor");
 const {
   requestAiQuestionsBatched,
+  requestAiQuestions,
   requestDocumentQuestions,
   requestSingleAiQuestion,
   getDocumentPlan,
@@ -298,6 +299,63 @@ router.post("/generate-from-prompt", requireFaculty, async (req, res) => {
       success: true,
       ...result,
       resolvedSettings: resolved,
+    });
+  } catch (err) {
+    handleRouteError(res, err);
+  }
+});
+
+/** One short source-material round (JSON). Client batches many rounds under Vercel limits. */
+router.post("/generate-from-source-text", requireFaculty, async (req, res) => {
+  try {
+    const {
+      sourceText,
+      formats,
+      questionCount,
+      difficulty,
+      additionalInstructions,
+    } = req.body || {};
+
+    const resolvedSource = String(sourceText || "").trim();
+    if (!resolvedSource) {
+      return res.status(400).json({ error: "Source text is required." });
+    }
+
+    const count = clampQuestionCount(questionCount);
+    if (!count) {
+      return res.status(400).json({
+        error: "Enter how many questions to generate for this round (1–150).",
+      });
+    }
+
+    // Cap a single hosted round so this request finishes within Vercel maxDuration.
+    const roundCount = Math.min(count, 8);
+    const result = await requestAiQuestions({
+      sourceText: resolvedSource,
+      additionalInstructions: [
+        "Ground every question strictly in the SOURCE MATERIAL.",
+        `Difficulty: ${String(difficulty || "medium")}.`,
+        additionalInstructions || "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      formats: parseFormats(formats),
+      questionCount: roundCount,
+      difficulty: difficulty || "medium",
+      mode: "document",
+    });
+
+    res.json({
+      success: true,
+      suggestedTitle: result.suggestedTitle || "",
+      suggestedDescription: result.suggestedDescription || "",
+      questions: (result.questions || []).slice(0, roundCount),
+      meta: {
+        ...(result.meta || {}),
+        requestedCount: roundCount,
+        generatedCount: (result.questions || []).length,
+        mode: "document_source_text_round",
+      },
     });
   } catch (err) {
     handleRouteError(res, err);

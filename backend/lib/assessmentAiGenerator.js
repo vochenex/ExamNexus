@@ -975,19 +975,23 @@ async function requestDocumentQuestions({
       ? clampQuestionCount(questionCount)
       : null;
 
-  // Large source-material sets: batch instead of one oversized Gemini call.
-  if (!isQuestionnaire && requestedCount != null && requestedCount > 15) {
-    const batched = await requestAiQuestionsBatched({
+  // Large source-material sets must be batched by the client (short Vercel requests).
+  // Never run multi-round Gemini loops inside a single analyze-document call.
+  if (!isQuestionnaire && requestedCount != null && requestedCount > getChunkSize()) {
+    const oneRound = getChunkSize();
+    const result = await requestAiQuestions({
       sourceText: resolvedSource,
       additionalInstructions: [
         "Ground every question strictly in the SOURCE MATERIAL.",
         `Difficulty: ${String(difficulty || "medium")}.`,
+        `Create exactly ${oneRound} questions for this round.`,
       ].join("\n"),
       formats: allowedFormats,
-      questionCount: requestedCount,
+      questionCount: oneRound,
       difficulty: difficulty || "medium",
+      mode: "document",
     });
-    const questions = (batched.questions || []).slice(0, requestedCount);
+    const questions = (result.questions || []).slice(0, oneRound);
     if (!questions.length) {
       const error = new Error(
         "AI could not build questions from this document. Try a clearer file or a smaller item count."
@@ -996,18 +1000,19 @@ async function requestDocumentQuestions({
       throw error;
     }
     return {
-      suggestedTitle: batched.suggestedTitle || "",
-      suggestedDescription: batched.suggestedDescription || "",
+      suggestedTitle: result.suggestedTitle || "",
+      suggestedDescription: result.suggestedDescription || "",
       questions,
       meta: {
         generatedCount: questions.length,
         requestedCount,
         formats: [...new Set(questions.map((item) => item.type))],
-        provider: batched.meta?.provider,
-        model: batched.meta?.model,
-        mode: "document_source_material_batched",
+        provider: result.meta?.provider,
+        model: result.meta?.model,
+        mode: "document_source_material_single_round",
         isQuestionnaire: false,
-        partial: questions.length < requestedCount,
+        partial: true,
+        warning: `Generated ${questions.length} of ${requestedCount} in this request. The client should continue in rounds.`,
       },
     };
   }

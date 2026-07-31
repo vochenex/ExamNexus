@@ -367,7 +367,7 @@ export default function CreateAssessment() {
   const clearAiError = () => setError("");
 
   const showQuestionPanel =
-    creationMode === "manual" || (!aiGenerating && questions.length > 0);
+    creationMode === "manual" || questions.length > 0;
 
   const showAiProgress = aiGenerating || aiProgress?.status === "done";
   const errorFeedbackRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
