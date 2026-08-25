@@ -1,8 +1,9 @@
 const { Agent, fetch: undiciFetch } = require("undici");
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-// Groq retired llama-3.3-70b-versatile on 2026-08-16 (free/developer tier).
-const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
+// Prefer 20B over 120B: same JSON generation tasks, usually less queue contention.
+const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
+const FALLBACK_GROQ_MODEL = "qwen/qwen3.6-27b";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_CHAT_TIMEOUT_MS = 300000;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;
@@ -20,11 +21,27 @@ function isQuotaError(error) {
   const message = String(error?.message || "").toLowerCase();
   return (
     status === 429 ||
+    status === 503 ||
     message.includes("quota exceeded") ||
     message.includes("rate limit") ||
     message.includes("rate-limit") ||
     message.includes("resource_exhausted") ||
-    message.includes("too many requests")
+    message.includes("too many requests") ||
+    message.includes("high demand") ||
+    message.includes("over capacity") ||
+    message.includes("capacity") ||
+    message.includes("temporarily unavailable") ||
+    message.includes("try again later")
+  );
+}
+
+function isHighDemandError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    message.includes("high demand") ||
+    message.includes("over capacity") ||
+    message.includes("capacity") ||
+    message.includes("temporarily unavailable")
   );
 }
 
@@ -180,8 +197,11 @@ function formatGroqConfigError() {
   return "Groq is not configured. Add GROQ_API_KEY to backend/.env (get a free key at https://console.groq.com), then restart the backend.";
 }
 
-function formatGroqQuotaError(retryMs) {
+function formatGroqQuotaError(retryMs, error) {
   const seconds = Math.max(1, Math.ceil(retryMs / 1000));
+  if (isHighDemandError(error)) {
+    return `Groq is temporarily busy (high demand). Wait about ${seconds} seconds and try again, or generate fewer questions at once.`;
+  }
   return `Groq rate limit reached. Wait about ${seconds} seconds and try again, or generate fewer questions at once.`;
 }
 
@@ -212,6 +232,12 @@ function validateGroqApiKey(apiKey) {
   const key = String(apiKey || "").trim();
   if (!key) return false;
   return key.length >= 20;
+}
+
+function getGroqFallbackModel() {
+  return String(
+    process.env.GROQ_FALLBACK_MODEL || FALLBACK_GROQ_MODEL
+  ).trim();
 }
 
 function getGroqRuntimeConfig() {
@@ -483,7 +509,7 @@ async function requestGroqChatCompletion(
           await sleep(waitMs);
           continue;
         }
-        const wrapped = new Error(formatGroqQuotaError(waitMs));
+        const wrapped = new Error(formatGroqQuotaError(waitMs, error));
         wrapped.statusCode = 429;
         wrapped.cause = error;
         throw wrapped;
@@ -569,6 +595,36 @@ async function requestPromptChatCompletion(options) {
         model: groq.model,
       };
     } catch (error) {
+      const fallbackModel = getGroqFallbackModel();
+      if (
+        isHighDemandError(error) &&
+        fallbackModel &&
+        fallbackModel !== groq.model
+      ) {
+        try {
+          console.warn(
+            `[assessment-ai] Groq model ${groq.model} busy; trying ${fallbackModel}.`
+          );
+          const content = await requestGroqChatCompletion(
+            { ...groq, model: fallbackModel },
+            options
+          );
+          return {
+            content,
+            provider: groq.provider,
+            model: fallbackModel,
+          };
+        } catch (fallbackError) {
+          if (isGroqJsonFailure(fallbackError) && getGeminiRuntimeConfig()) {
+            console.warn(
+              "[assessment-ai] Groq fallback JSON failed; using Gemini for prompt."
+            );
+            return requestChatCompletion(options);
+          }
+          throw fallbackError;
+        }
+      }
+
       // If Groq still cannot produce usable JSON, fall back to Gemini when available.
       if (isGroqJsonFailure(error) && getGeminiRuntimeConfig()) {
         console.warn(

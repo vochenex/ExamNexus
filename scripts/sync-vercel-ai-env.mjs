@@ -19,7 +19,8 @@ function get(name) {
 
 const vars = {
   GROQ_API_KEY: get("GROQ_API_KEY"),
-  GROQ_MODEL: get("GROQ_MODEL") || "openai/gpt-oss-120b",
+  GROQ_MODEL: get("GROQ_MODEL") || "openai/gpt-oss-20b",
+  GROQ_FALLBACK_MODEL: get("GROQ_FALLBACK_MODEL") || "qwen/qwen3.6-27b",
   GEMINI_API_KEY: get("GEMINI_API_KEY"),
   GEMINI_MODEL: get("GEMINI_MODEL") || "gemini-2.5-flash",
 };
