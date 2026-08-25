@@ -42,7 +42,7 @@ Add **all** of these (Production). Copy values from your local `.env` and `backe
 | `GEMINI_API_KEY` | `backend/.env` |
 | `GEMINI_MODEL` | `gemini-2.5-flash` (optional) |
 | `GROQ_API_KEY` | `backend/.env` (prompt generation) |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` (optional) |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` (optional; replaces retired `llama-3.3-70b-versatile`) |
 
 Optional push:
 

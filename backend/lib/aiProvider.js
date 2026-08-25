@@ -1,7 +1,8 @@
 const { Agent, fetch: undiciFetch } = require("undici");
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+// Groq retired llama-3.3-70b-versatile on 2026-08-16 (free/developer tier).
+const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_CHAT_TIMEOUT_MS = 300000;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;

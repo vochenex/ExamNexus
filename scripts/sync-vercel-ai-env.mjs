@@ -19,7 +19,7 @@ function get(name) {
 
 const vars = {
   GROQ_API_KEY: get("GROQ_API_KEY"),
-  GROQ_MODEL: get("GROQ_MODEL") || "llama-3.3-70b-versatile",
+  GROQ_MODEL: get("GROQ_MODEL") || "openai/gpt-oss-120b",
   GEMINI_API_KEY: get("GEMINI_API_KEY"),
   GEMINI_MODEL: get("GEMINI_MODEL") || "gemini-2.5-flash",
 };
