@@ -216,9 +216,9 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
       title="Student ranking"
       subtitle="Best overall class performance by subject and section"
       defaultOpen
-      className={`${panelClass(theme)} max-w-3xl`}
+      className={panelClass(theme)}
     >
-      <div className="mx-auto w-full max-w-2xl space-y-4">
+      <div className="space-y-4">
         <div className={`rounded-2xl border p-3 sm:p-4 ${panelClass(theme)}`}>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <Filter size={15} className="text-emerald-400" />
@@ -293,10 +293,7 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
         ) : (
           <ul className="space-y-2">
             {ranked.map((student) => (
-              <li
-                key={student.id}
-                className="flex min-w-0 items-stretch gap-2"
-              >
+              <li key={student.id} className="flex min-w-0 items-stretch gap-2">
                 <div
                   className={`flex w-9 shrink-0 items-center justify-center self-stretch rounded-xl text-sm font-bold tabular-nums ${rankBadgeClass(
                     student.rank,
@@ -323,24 +320,19 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <FacultyStudentCard student={student} />
-                </div>
-
-                <div
-                  className={`flex w-14 shrink-0 items-center justify-center rounded-xl border px-1 ${
-                    theme === "dark"
-                      ? "border-white/10 bg-black/20"
-                      : "border-emerald-100 bg-white"
-                  }`}
-                  title="Overall class performance"
-                >
-                  <p
-                    className={`text-center text-sm font-bold tabular-nums leading-none ${
-                      theme === "dark" ? "text-emerald-300" : "text-teal-700"
-                    }`}
-                  >
-                    {student.grade}
-                  </p>
+                  <FacultyStudentCard
+                    student={student}
+                    endAddon={
+                      <p
+                        className={`w-12 text-center text-sm font-bold tabular-nums leading-none ${
+                          theme === "dark" ? "text-emerald-300" : "text-teal-700"
+                        }`}
+                        title="Overall class performance"
+                      >
+                        {student.grade}
+                      </p>
+                    }
+                  />
                 </div>
               </li>
             ))}

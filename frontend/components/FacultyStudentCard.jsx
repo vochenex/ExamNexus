@@ -91,7 +91,12 @@ function StudentPreviewPopover({ preview, theme, name, student }) {
   );
 }
 
-export default function FacultyStudentCard({ student, canUnenroll = false, onUnenroll }) {
+export default function FacultyStudentCard({
+  student,
+  canUnenroll = false,
+  onUnenroll,
+  endAddon = null,
+}) {
   const { theme } = useTheme();
   const cardRef = useRef(null);
   const avatarRef = useRef(null);
@@ -269,6 +274,8 @@ export default function FacultyStudentCard({ student, canUnenroll = false, onUne
             {formatSectionLabel(student.section)}
           </span>
         </button>
+
+        {endAddon ? <div className="shrink-0 pl-1">{endAddon}</div> : null}
 
         {canUnenroll && onUnenroll && (
           <button
