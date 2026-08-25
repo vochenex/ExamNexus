@@ -545,16 +545,36 @@ export async function fetchSubjectClassAnalytics(subjectId, { sectionFilter = nu
   return buildSubjectClassAnalytics(scopedExams, scopedResults);
 }
 
-export async function fetchSubjectStudentAnalytics(subjectId) {
+export async function fetchSubjectStudentAnalytics(
+  subjectId,
+  { sectionFilter = null } = {}
+) {
   await requireSession();
+
+  const normalizedSection = sectionFilter
+    ? String(sectionFilter).trim().toUpperCase()
+    : null;
 
   const [subject, exams, classmates] = await Promise.all([
     fetchSubject(subjectId),
     fetchSubjectAssessments(subjectId),
-    fetchSubjectClassmates(subjectId),
+    fetchSubjectClassmates(subjectId, {
+      sectionFilter: normalizedSection || null,
+    }),
   ]);
 
-  const examIds = exams.map((exam) => exam.id);
+  const availableSections = getSubjectSections(subject);
+  const scopedExams = normalizedSection
+    ? exams.filter((exam) =>
+        isVisibleToSection(
+          exam.target_sections,
+          normalizedSection,
+          availableSections
+        )
+      )
+    : exams;
+
+  const examIds = scopedExams.map((exam) => exam.id);
   if (!examIds.length) {
     return buildPerStudentSubjectAnalytics([], [], classmates, subject);
   }
@@ -566,7 +586,17 @@ export async function fetchSubjectStudentAnalytics(subjectId) {
 
   if (error) throw error;
 
-  return buildPerStudentSubjectAnalytics(exams, results || [], classmates, subject);
+  const classmateIds = new Set((classmates || []).map((row) => row.id));
+  const scopedResults = (results || []).filter((row) =>
+    classmateIds.has(row.student_id)
+  );
+
+  return buildPerStudentSubjectAnalytics(
+    scopedExams,
+    scopedResults,
+    classmates,
+    subject
+  );
 }
 
 async function assertFacultyOwnsExam(examId, teacherSchoolId) {

@@ -123,7 +123,7 @@ export function buildPerStudentSubjectAnalytics(
         classStandingPct,
         overallRating,
         ratingPct: overallRating,
-        tier: tierFromScore(ratingValue),
+        tier: overallRating != null ? tierFromScore(ratingValue) : null,
         grade: overallRating != null ? `${overallRating}%` : "—",
         sectionScores,
         submissions: studentResults.filter((row) => Number(row.total) > 0).length,

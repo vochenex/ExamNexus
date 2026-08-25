@@ -50,6 +50,7 @@ import { usePolling } from "../../hooks/useRealtimeFetch";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { staggerGridClass } from "../../utils/themeInputs";
 import FacultyDashboardAnalyticsPanel from "../../components/FacultyDashboardAnalyticsPanel";
+import FacultyStudentRankingPanel from "../../components/FacultyStudentRankingPanel";
 import FacultyCreateSubjectPanel from "../../components/FacultyCreateSubjectPanel";
 import FacultyExportPanel from "../../components/FacultyExportPanel";
 import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
@@ -378,6 +379,10 @@ export default function FacultyDashboard() {
           </h2>
         </div>
         <FacultyDashboardAnalyticsPanel teacherSchoolId={teacherId} />
+      </div>
+
+      <div className="mb-6">
+        <FacultyStudentRankingPanel teacherSchoolId={teacherId} />
       </div>
 
       {subjects.length > 0 && (
