@@ -68,17 +68,6 @@ function rankBadgeClass(rank, theme) {
     : "bg-emerald-50 text-teal-800";
 }
 
-function tierToneClass(theme, tone) {
-  const map = {
-    emerald: theme === "dark" ? "text-emerald-300" : "text-emerald-700",
-    teal: theme === "dark" ? "text-teal-300" : "text-teal-700",
-    cyan: theme === "dark" ? "text-cyan-300" : "text-cyan-700",
-    amber: theme === "dark" ? "text-amber-300" : "text-amber-700",
-    orange: theme === "dark" ? "text-orange-300" : "text-orange-700",
-  };
-  return map[tone] || map.emerald;
-}
-
 /**
  * Faculty dashboard: rank enrolled students by overall class performance
  * (weighted major exams + class standing) for a subject/section.
@@ -191,18 +180,24 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
 
   usePolling(loadRanks, [subjectId, sectionFilter]);
 
+  // Unique ordinal ranks (1..n). Ties broken by name so numbers never repeat.
   const ranked = useMemo(() => {
-    const list = Array.isArray(rows) ? rows : [];
+    const list = [...(Array.isArray(rows) ? rows : [])].sort((a, b) => {
+      const scoreDiff = (b.overallRating ?? -1) - (a.overallRating ?? -1);
+      if (scoreDiff !== 0) return scoreDiff;
+      const nameA = `${a.last_name || ""} ${a.first_name || ""}`.trim().toLowerCase();
+      const nameB = `${b.last_name || ""} ${b.first_name || ""}`.trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    let nextRank = 1;
     return list.map((student) => {
       if (student.overallRating == null) {
         return { ...student, rank: null };
       }
-      const higher = list.filter(
-        (other) =>
-          other.overallRating != null &&
-          other.overallRating > student.overallRating
-      ).length;
-      return { ...student, rank: higher + 1 };
+      const rank = nextRank;
+      nextRank += 1;
+      return { ...student, rank };
     });
   }, [rows]);
 
@@ -221,11 +216,11 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
       title="Student ranking"
       subtitle="Best overall class performance by subject and section"
       defaultOpen
-      className={panelClass(theme)}
+      className={`${panelClass(theme)} max-w-3xl`}
     >
-      <div className="space-y-4">
+      <div className="mx-auto w-full max-w-2xl space-y-4">
         <div className={`rounded-2xl border p-3 sm:p-4 ${panelClass(theme)}`}>
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <Filter size={15} className="text-emerald-400" />
             <h3
               className={`text-xs font-semibold uppercase tracking-wide ${
@@ -300,10 +295,10 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
             {ranked.map((student) => (
               <li
                 key={student.id}
-                className="flex min-w-0 items-stretch gap-2 sm:gap-3"
+                className="flex min-w-0 items-stretch gap-2"
               >
                 <div
-                  className={`flex h-auto w-10 shrink-0 items-center justify-center self-stretch rounded-xl text-sm font-bold tabular-nums ${rankBadgeClass(
+                  className={`flex w-9 shrink-0 items-center justify-center self-stretch rounded-xl text-sm font-bold tabular-nums ${rankBadgeClass(
                     student.rank,
                     theme
                   )}`}
@@ -315,8 +310,8 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
                 >
                   {student.rank != null ? (
                     student.rank <= 3 ? (
-                      <span className="flex flex-col items-center gap-0.5">
-                        <Medal size={16} />
+                      <span className="flex flex-col items-center gap-0.5 leading-none">
+                        <Medal size={14} />
                         <span className="text-[10px]">#{student.rank}</span>
                       </span>
                     ) : (
@@ -332,30 +327,19 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
                 </div>
 
                 <div
-                  className={`flex w-[4.75rem] shrink-0 flex-col items-end justify-center rounded-xl border px-2 py-2 sm:w-24 ${
+                  className={`flex w-14 shrink-0 items-center justify-center rounded-xl border px-1 ${
                     theme === "dark"
                       ? "border-white/10 bg-black/20"
                       : "border-emerald-100 bg-white"
                   }`}
+                  title="Overall class performance"
                 >
                   <p
-                    className={`text-sm font-bold tabular-nums ${
+                    className={`text-center text-sm font-bold tabular-nums leading-none ${
                       theme === "dark" ? "text-emerald-300" : "text-teal-700"
                     }`}
                   >
                     {student.grade}
-                  </p>
-                  <p
-                    className={`truncate text-[10px] ${
-                      student.tier
-                        ? tierToneClass(theme, student.tier.tone)
-                        : muted
-                    }`}
-                  >
-                    {student.tier?.label ||
-                      (student.submissions
-                        ? `${student.submissions} submitted`
-                        : "No scores")}
                   </p>
                 </div>
               </li>

@@ -17,15 +17,24 @@ function notifyPreviewChange(nextId) {
 }
 
 function computePreviewPosition(rect) {
-  const width = Math.min(220, window.innerWidth - 16);
-  let left = rect.left + rect.width / 2 - width / 2;
+  const width = Math.min(200, window.innerWidth - 16);
+  const estimatedHeight = 210;
+  const gap = 10;
+
+  // Prefer the right side of the avatar; flip left if it would leave the viewport.
+  let left = rect.right + gap;
+  if (left + width > window.innerWidth - 8) {
+    left = rect.left - width - gap;
+  }
   left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
 
-  const spaceBelow = window.innerHeight - rect.bottom;
-  const placement = spaceBelow < 200 && rect.top > 200 ? "above" : "below";
-  const top = placement === "below" ? rect.bottom + 8 : rect.top - 8;
+  // Align near the avatar (top), keep fully on-screen.
+  let top = rect.top;
+  if (top + estimatedHeight > window.innerHeight - 8) {
+    top = Math.max(8, window.innerHeight - estimatedHeight - 8);
+  }
 
-  return { top, left, width, placement };
+  return { top, left, width, placement: "side" };
 }
 
 function StudentPreviewPopover({ preview, theme, name, student }) {
@@ -36,7 +45,6 @@ function StudentPreviewPopover({ preview, theme, name, student }) {
     top: preview.top,
     left: preview.left,
     width: preview.width,
-    transform: preview.placement === "above" ? "translateY(-100%)" : undefined,
     zIndex: 200,
   };
 
@@ -86,6 +94,7 @@ function StudentPreviewPopover({ preview, theme, name, student }) {
 export default function FacultyStudentCard({ student, canUnenroll = false, onUnenroll }) {
   const { theme } = useTheme();
   const cardRef = useRef(null);
+  const avatarRef = useRef(null);
   const previewId = useId();
   const [preview, setPreview] = useState(null);
   const [pinned, setPinned] = useState(false);
@@ -109,7 +118,7 @@ export default function FacultyStudentCard({ student, canUnenroll = false, onUne
   }, [previewId]);
 
   const showPreview = useCallback(() => {
-    const el = cardRef.current;
+    const el = avatarRef.current || cardRef.current;
     if (!el) return;
     notifyPreviewChange(previewId);
     setPreview(computePreviewPosition(el.getBoundingClientRect()));
@@ -218,12 +227,14 @@ export default function FacultyStudentCard({ student, canUnenroll = false, onUne
           aria-expanded={isActive}
           aria-label={`View details for ${name}`}
         >
-          <ProfileAvatar
-            src={student.avatar_url}
-            alt={name}
-            size="sm"
-            className={isActive ? "ring-2 ring-emerald-400/70" : ""}
-          />
+          <span ref={avatarRef} className="inline-flex shrink-0">
+            <ProfileAvatar
+              src={student.avatar_url}
+              alt={name}
+              size="sm"
+              className={isActive ? "ring-2 ring-emerald-400/70" : ""}
+            />
+          </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             <p
               className={`truncate text-sm font-semibold ${

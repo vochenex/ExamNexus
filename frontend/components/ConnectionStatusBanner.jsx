@@ -11,36 +11,33 @@ export default function ConnectionStatusBanner({ status, className = "" }) {
   return (
     <div
       role="status"
-      className={`rounded-xl border px-4 py-3 text-sm ${
+      className={`inline-flex max-w-full w-fit items-start gap-2 rounded-xl border px-3 py-2 text-sm ${
         offline
           ? theme === "dark"
-            ? "border-amber-500/35 bg-amber-500/10 text-amber-100"
-            : "border-amber-300 bg-amber-50 text-amber-950"
+            ? "border-red-500/40 bg-red-500/15 text-red-100"
+            : "border-red-300 bg-red-50 text-red-900"
           : theme === "dark"
             ? "border-orange-500/35 bg-orange-500/10 text-orange-100"
             : "border-orange-300 bg-orange-50 text-orange-950"
       } ${className}`}
     >
-      <div className="flex items-start gap-2.5">
+      {offline ? (
+        <WifiOff size={16} className="mt-0.5 shrink-0" />
+      ) : (
+        <Wifi size={16} className="mt-0.5 shrink-0" />
+      )}
+      <p className="min-w-0 leading-snug">
         {offline ? (
-          <WifiOff size={18} className="mt-0.5 shrink-0" />
+          <>
+            <strong>You are offline.</strong> Loaded content stays available;
+            reconnect to sync.
+          </>
         ) : (
-          <Wifi size={18} className="mt-0.5 shrink-0" />
+          <>
+            <strong>Unstable connection.</strong> Checking for a steady link…
+          </>
         )}
-        <div>
-          {offline ? (
-            <>
-              <strong>You are offline.</strong> Keep this page open. Content already loaded
-              stays available; reconnect to save or sync changes.
-            </>
-          ) : (
-            <>
-              <strong>Unstable internet connection.</strong> The page stays open while we
-              silently check for a steady connection.
-            </>
-          )}
-        </div>
-      </div>
+      </p>
     </div>
   );
 }
