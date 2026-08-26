@@ -56,7 +56,7 @@ export default function StudentAssessmentCard({
 }) {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const { error, confirm, warning } = useAppModal();
+  const { error, warning } = useAppModal();
   const [requesting, setRequesting] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");

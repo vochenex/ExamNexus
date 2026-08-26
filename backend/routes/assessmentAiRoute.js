@@ -2,11 +2,9 @@ const express = require("express");
 const multer = require("multer");
 const { requireFaculty } = require("../middleware/requireFaculty");
 const {
-  extractDocumentText,
   extractMultipleDocumentsText,
   extractDocumentsSeparately,
   mergeDocumentTexts,
-  cleanupUploadedFile,
   cleanupUploadedFiles,
   isSupportedUpload,
 } = require("../lib/documentExtractor");
@@ -92,14 +90,6 @@ function parseIndexList(value) {
     .map((item) => Number.parseInt(item, 10))
     .filter((item) => Number.isFinite(item) && item >= 0);
   return indexes.length ? indexes : null;
-}
-
-function selectFilesByIndexes(files, indexes) {
-  if (!indexes?.length) return files;
-  const selected = indexes
-    .map((index) => files[index])
-    .filter(Boolean);
-  return selected.length ? selected : files;
 }
 
 function handleMulterUpload(req, res, next) {

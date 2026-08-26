@@ -93,9 +93,11 @@ export default function ExamAutoSubmittedPanel({ examId }) {
               const pendingReview = !student.total;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={student.studentId}
-                  className={`min-w-[14rem] max-w-xs rounded-xl border px-3 py-2 ${
+                  onClick={() => openAlertsDetail(student)}
+                  className={`min-w-[14rem] max-w-xs rounded-xl border px-3 py-2 text-left transition hover:opacity-90 ${
                     theme === "dark"
                       ? "border-red-500/25 bg-red-500/10 text-red-100"
                       : "border-red-200 bg-white text-red-950"
@@ -116,7 +118,7 @@ export default function ExamAutoSubmittedPanel({ examId }) {
                         : `Score ${student.scorePct}% (${student.score}/${student.total})`}
                     </p>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

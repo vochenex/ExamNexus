@@ -322,11 +322,7 @@ async function postJsonWithTimeout(urlString, body, timeoutMs, headers = {}) {
       throw error;
     }
 
-    try {
-      return JSON.parse(raw);
-    } catch (parseError) {
-      throw parseError;
-    }
+    return JSON.parse(raw);
   } catch (error) {
     if (error?.name === "AbortError") {
       throw Object.assign(new Error("AI request timed out."), {

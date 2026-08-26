@@ -24,6 +24,6 @@ export function adminTdClass(theme) {
   }`;
 }
 
-export function adminToolbarClass(theme) {
+export function adminToolbarClass(_theme) {
   return `mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`;
 }

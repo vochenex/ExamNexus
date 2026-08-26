@@ -2,7 +2,7 @@ import { normalizeGradingOptions, getQuestionType } from "./questionGrading";
 import { parseStoredAnswer } from "./assessmentQuestions";
 import { getFormatLabel } from "./questionSections";
 
-export function getQuestionMaxPoints(question, examType = "multiple_choice") {
+export function getQuestionMaxPoints(question, _examType = "multiple_choice") {
   const grading = normalizeGradingOptions(
     question?.grading_options || question?.grading
   );

@@ -15,7 +15,6 @@ import { getAuthSession } from "./authUser";
 import {
   gradeStudentAnswer,
   formatStoredAnswer,
-  isAutoGradedType,
   normalizeExamTypeForDb,
 } from "./assessmentQuestions";
 import {

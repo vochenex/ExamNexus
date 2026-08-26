@@ -16,7 +16,6 @@ import {
   KeyRound,
 } from "lucide-react";
 import { useTheme } from "./ThemeContext";
-import { supabase } from "../supabaseClient";
 import ProfileAvatar from "../components/ProfileAvatar";
 import ExamNexusLogo from "../components/ExamNexusLogo";
 import ExamNexusBrand from "../components/ExamNexusBrand";

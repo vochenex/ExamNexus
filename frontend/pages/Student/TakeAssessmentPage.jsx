@@ -72,7 +72,7 @@ function formatDurationLabel(examData) {
  * the student opens the website on those devices.
  */
 export default function TakeAssessment() {
-  const { id } = useParams();
+  const { id: _id } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
   const blocked = !canTakeAssessmentOnThisDevice();

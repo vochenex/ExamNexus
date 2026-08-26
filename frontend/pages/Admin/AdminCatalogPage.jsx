@@ -21,7 +21,6 @@ import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs"
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import {
   iconButton,
-  primaryButtonSm,
   secondaryButtonSm,
   primaryButton,
 } from "../../utils/themeButtons";

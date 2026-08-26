@@ -155,7 +155,7 @@ export function expandIdentificationVariants(value) {
 
   add(raw);
 
-  const parenMatch = raw.match(/^(.+?)\s*[(\[]\s*([^)\]]+)\s*[)\]]\s*$/);
+  const parenMatch = raw.match(/^(.+?)\s*[([]\s*([^)\]]+)\s*[)\]]\s*$/);
   if (parenMatch) {
     const outer = parenMatch[1].trim();
     const inner = parenMatch[2].trim();

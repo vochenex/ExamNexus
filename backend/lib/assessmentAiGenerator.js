@@ -522,7 +522,7 @@ async function requestSingleAiQuestion({
   difficulty = "medium",
   stepIndex = 0,
   totalSteps = 1,
-  mode = "prompt",
+  mode: _mode = "prompt",
 }) {
   assertPromptAiConfigured();
 

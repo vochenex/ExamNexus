@@ -377,7 +377,7 @@ function createApp() {
   app.use("/assessment-ai", assessmentAiRoute);
   app.use("/push", pushRoute);
 
-  app.use((err, req, res, next) => {
+  app.use((err, req, res, _next) => {
     console.error("GLOBAL EXPRESS ERROR:", err);
     res.status(500).json({
       error: err.message || "Internal Server Error",
