@@ -84,7 +84,40 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
   }
 
   .en-auth-card--blend.en-auth-card--signup {
-    min-height: min(72vh, 600px) !important;
+    min-height: min(70vh, 580px) !important;
+    max-height: calc(100dvh - 9rem);
+  }
+
+  .en-auth-card--signup .en-auth-panel-form {
+    overflow-y: hidden !important;
+  }
+
+  .en-auth-panel-brand--signup {
+    justify-content: flex-start !important;
+    padding-top: 2rem !important;
+    overflow-y: auto !important;
+  }
+
+  .en-auth-card--signup .en-auth-form-inner {
+    max-width: min(24rem, 100%);
+  }
+
+  .en-auth-native-select {
+    color-scheme: dark;
+  }
+
+  html.light .en-auth-native-select {
+    color-scheme: light;
+  }
+
+  html:not(.light) .en-auth-native-select option {
+    background-color: #111827;
+    color: #f3f4f6;
+  }
+
+  html.light .en-auth-native-select option {
+    background-color: #ffffff;
+    color: #0f172a;
   }
 
   /* Forgot has more fields — taller card + guaranteed form scroll */

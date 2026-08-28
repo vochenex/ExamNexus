@@ -1,6 +1,14 @@
 import { GraduationCap, UserRound } from "lucide-react";
 
-export default function AuthRoleToggle({ value, onChange, theme, className = "" }) {
+export default function AuthRoleToggle({
+  value,
+  onChange,
+  theme,
+  className = "",
+  layout = "grid",
+}) {
+  const isStack = layout === "stack";
+
   return (
     <div className={className}>
       <p
@@ -11,7 +19,9 @@ export default function AuthRoleToggle({ value, onChange, theme, className = "" 
         Account type
       </p>
       <div
-        className={`grid grid-cols-2 gap-2 rounded-2xl border p-1.5 ${
+        className={`${
+          isStack ? "flex flex-col gap-2" : "grid grid-cols-2 gap-2"
+        } rounded-2xl border p-1.5 ${
           theme === "dark"
             ? "border-white/10 bg-white/[0.03]"
             : "border-emerald-200/80 bg-emerald-50/50"
@@ -27,7 +37,9 @@ export default function AuthRoleToggle({ value, onChange, theme, className = "" 
               key={roleValue}
               type="button"
               onClick={() => onChange(roleValue)}
-              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+              className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+                isStack ? "justify-start" : "justify-center"
+              } ${
                 active
                   ? theme === "dark"
                     ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"

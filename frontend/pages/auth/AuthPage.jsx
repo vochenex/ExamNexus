@@ -46,8 +46,8 @@ import {
   clearAuthNotice,
   peekAuthNotice,
 } from "../../utils/authNotice";
-import SignupFormFields from "../../components/auth/SignupFormFields";
-import AuthRoleToggle from "../../components/auth/AuthRoleToggle";
+import SignupWizard from "../../components/auth/SignupWizard";
+import SignupStepRail from "../../components/auth/SignupStepRail";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import HomeSiteHeader from "../../components/home/HomeSiteHeader";
 import HomeBottomBar from "../../components/home/HomeBottomBar";
@@ -89,6 +89,7 @@ export default function ExamNexusAuth() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isLogin, setIsLogin] = useState(true);
   const [authView, setAuthView] = useState("login");
+  const [signupStep, setSignupStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
   const [errors, setErrors] = useState({});
@@ -121,6 +122,26 @@ export default function ExamNexusAuth() {
 
     return () => window.clearTimeout(timer);
   }, [resetStatusResult, successMessage, serverError, pendingReviewMessage]);
+
+  useEffect(() => {
+    if (authView !== "signup" || !formPanelRef.current) return;
+    formPanelRef.current.scrollTop = 0;
+  }, [authView, signupStep]);
+
+  const updateSavedScrollState = () => {
+    const list = savedListRef.current;
+    if (!list) {
+      setSavedScrollUp(false);
+      setSavedScrollDown(false);
+      return;
+    }
+
+    const overflow = list.scrollHeight > list.clientHeight + 2;
+    setSavedScrollUp(overflow && list.scrollTop > 4);
+    setSavedScrollDown(
+      overflow && list.scrollTop + list.clientHeight < list.scrollHeight - 4
+    );
+  };
 
   const [form, setForm] = useState({
   firstName: "",
@@ -173,26 +194,6 @@ export default function ExamNexusAuth() {
       current.email === suggested ? current : { ...current, email: suggested }
     );
   }, [authView, emailManuallyEdited, form.firstName, form.lastName]);
-
-  useEffect(() => {
-    if (authView !== "signup" || !formPanelRef.current) return;
-    formPanelRef.current.scrollTop = 0;
-  }, [authView]);
-
-  const updateSavedScrollState = () => {
-    const list = savedListRef.current;
-    if (!list) {
-      setSavedScrollUp(false);
-      setSavedScrollDown(false);
-      return;
-    }
-
-    const overflow = list.scrollHeight > list.clientHeight + 2;
-    setSavedScrollUp(overflow && list.scrollTop > 4);
-    setSavedScrollDown(
-      overflow && list.scrollTop + list.clientHeight < list.scrollHeight - 4
-    );
-  };
 
   useEffect(() => {
     if (!savedOpen || authView !== "login") return undefined;
@@ -532,6 +533,7 @@ function getAuthInputProps(theme) {
   const switchToLogin = () => {
     setAuthView("login");
     setIsLogin(true);
+    setSignupStep(1);
     setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
@@ -545,6 +547,7 @@ function getAuthInputProps(theme) {
   const switchToSignup = () => {
     setAuthView("signup");
     setIsLogin(false);
+    setSignupStep(1);
     setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
@@ -779,6 +782,8 @@ function getAuthInputProps(theme) {
   const handleSubmit = async (e) => {
   try {
     e.preventDefault();
+
+    if (authView === "signup" && signupStep < 3) return;
 
     if (!validate()) return;
 
@@ -1090,7 +1095,9 @@ function getAuthInputProps(theme) {
         
         {/* Branding Panel — tablet/desktop; slides to the right on sign up */}
         <div
-          className={`en-auth-panel-brand hidden md:flex flex-col items-center p-8 md:p-10 ${
+          className={`en-auth-panel-brand hidden md:flex flex-col p-8 md:p-10 ${
+            authView === "signup" ? "en-auth-panel-brand--signup items-start justify-start" : "items-center justify-center"
+          } ${
             useBlendCard
               ? "bg-transparent"
               : theme === "dark"
@@ -1113,8 +1120,12 @@ function getAuthInputProps(theme) {
             </>
           )}
 
-          <div className="relative z-10 flex w-full flex-col items-center">
-            <div className="max-w-sm">
+          <div
+            className={`relative z-10 flex w-full flex-col ${
+              authView === "signup" ? "items-start" : "items-center"
+            }`}
+          >
+            <div className="max-w-sm w-full">
               <ExamNexusBrand
                 variant="hero"
                 idSuffix="auth"
@@ -1122,6 +1133,7 @@ function getAuthInputProps(theme) {
                 panelTone={useBlendCard && theme === "light" ? "light" : "dark"}
               />
             </div>
+            {authView === "signup" ? <SignupStepRail step={signupStep} theme={theme} /> : null}
           </div>
         </div>
 
@@ -1171,7 +1183,7 @@ function getAuthInputProps(theme) {
         : "Submit a request and an administrator will reset your password."
       : isLogin
         ? "Sign in to continue to ExamNexus."
-        : "Join ExamNexus as a student or faculty member."}
+        : "Three quick steps — account, school, then login."}
   </p>
 
           <form onSubmit={handleSubmit}>
@@ -1401,34 +1413,24 @@ function getAuthInputProps(theme) {
               </div>
             ) : (
               <>
-                {authView === "signup" && (
-                  <>
-                    <AuthRoleToggle
-                      value={form.role}
-                      onChange={handleRoleChange}
-                      theme={theme}
-                      className="mb-5"
-                    />
-                    <SignupFormFields
-                      form={form}
-                      errors={errors}
-                      theme={theme}
-                      authInputProps={authInputProps}
-                      onFieldChange={handleChange}
-                    />
-                  </>
-                )}
-
-                {authView === "signup" && (
-                  <p
-                    className={`mb-4 mt-5 text-xs font-semibold uppercase tracking-wider ${
-                      theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
-                    }`}
-                  >
-                    Login credentials
-                  </p>
-                )}
-
+                {authView === "signup" ? (
+                  <SignupWizard
+                    form={form}
+                    errors={errors}
+                    theme={theme}
+                    authInputProps={authInputProps}
+                    onFieldChange={handleChange}
+                    onRoleChange={handleRoleChange}
+                    step={signupStep}
+                    onStepChange={setSignupStep}
+                    setErrors={setErrors}
+                    showPassword={showPassword}
+                    setShowPassword={setShowPassword}
+                    emailCopied={emailCopied}
+                    onCopyEmail={copySignupEmail}
+                    loading={loading}
+                  />
+                ) : (
                 <div className="space-y-4">
                   {authView === "login" && savedAccounts.length > 0 && (
                     <div
@@ -1597,43 +1599,8 @@ function getAuthInputProps(theme) {
                         autoComplete="email"
                         placeholder={CRMCC_EMAIL_PLACEHOLDER}
                         {...authInputProps}
-                        className={`${authInputProps.className} ${
-                          authView === "signup" ? "pr-12" : ""
-                        }`}
                       />
-                      {authView === "signup" && form.email ? (
-                        <button
-                          type="button"
-                          onClick={copySignupEmail}
-                          title={emailCopied ? "Copied!" : "Copy email"}
-                          aria-label={emailCopied ? "Email copied" : "Copy email"}
-                          className={`absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border transition ${
-                            emailCopied
-                              ? theme === "dark"
-                                ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
-                                : "border-emerald-400 bg-emerald-50 text-emerald-700"
-                              : theme === "dark"
-                                ? "border-white/15 bg-white/5 text-emerald-400 hover:bg-white/10"
-                                : "border-emerald-200 bg-white text-teal-700 hover:border-teal-400"
-                          }`}
-                        >
-                          {emailCopied ? (
-                            <Check size={16} strokeWidth={2.5} />
-                          ) : (
-                            <Copy size={16} strokeWidth={2.25} />
-                          )}
-                        </button>
-                      ) : null}
                     </div>
-                    {authView === "signup" && (
-                      <p
-                        className={`mt-1.5 text-xs ${
-                          theme === "dark" ? "text-gray-500" : "text-gray-500"
-                        }`}
-                      >
-                        Auto-filled from your name — tap copy to paste elsewhere, or edit if needed.
-                      </p>
-                    )}
                     {errors.email && (
                       <p className="text-red-500 text-xs mt-1">{errors.email}</p>
                     )}
@@ -1724,6 +1691,7 @@ function getAuthInputProps(theme) {
                   </div>
                   </div>
                 </div>
+                )}
               </>
             )}
 
@@ -1776,6 +1744,7 @@ function getAuthInputProps(theme) {
   </div>
 )}
 
+            {authView !== "signup" ? (
             <ProgressButton
   type="submit"
   loading={loading}
@@ -1790,6 +1759,7 @@ function getAuthInputProps(theme) {
       ? "Login"
       : "Sign Up"}
 </ProgressButton>
+            ) : null}
           </form>
 
           <p
