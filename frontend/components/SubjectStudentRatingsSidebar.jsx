@@ -6,6 +6,7 @@ import SectionTabs from "./SectionTabs";
 import { useTheme } from "../layouts/ThemeContext";
 import { buildSectionCounts, getSubjectSections } from "../utils/sections";
 import { getCourseLabel, getDepartmentLabel } from "../utils/academicOptions";
+import { formatMaskedSchoolIdLabel } from "../utils/schoolIdPrivacy";
 import { matchesStudentSearch } from "../utils/studentSearch";
 import { inputClass } from "../utils/themeInputs";
 
@@ -204,7 +205,7 @@ export default function SubjectStudentRatingsSidebar({
                             {name}
                           </p>
                           <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
-                            {student.school_id ? `ID: ${student.school_id}` : "Student"} · Section{" "}
+                            {formatMaskedSchoolIdLabel(student.school_id)} · Section{" "}
                             {student.section || "A"}
                           </p>
                           {(student.department || student.course) && (

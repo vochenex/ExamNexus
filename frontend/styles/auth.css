@@ -152,6 +152,10 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
     padding-bottom: 1.5rem !important;
   }
 
+  .en-auth-card--blend.en-auth-card--signup .en-auth-panel-form {
+    justify-content: flex-start !important;
+  }
+
   .en-auth-panel-form::-webkit-scrollbar {
     width: 6px;
   }

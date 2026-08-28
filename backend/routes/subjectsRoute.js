@@ -229,11 +229,19 @@ router.get("/:subjectId/assessments", async (req, res) => {
   try {
     const { subjectId } = req.params;
 
-    const { data, error } = await getAnon()
+    let { data, error } = await getAnon()
       .from("exams")
       .select("*")
       .eq("subject_id", subjectId)
       .order("created_at", { ascending: false });
+
+    if (error?.message?.toLowerCase().includes("created_at")) {
+      ({ data, error } = await getAnon()
+        .from("exams")
+        .select("*")
+        .eq("subject_id", subjectId)
+        .order("start_datetime", { ascending: false, nullsFirst: false }));
+    }
 
     if (error) throw error;
 

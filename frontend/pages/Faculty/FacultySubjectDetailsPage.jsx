@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search, Plus, ClipboardList} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
@@ -39,6 +39,7 @@ import ExamNexusBrand from "../../components/ExamNexusBrand";
 import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPanel";
 import SectionAssessmentsModal from "../../components/SectionAssessmentsModal";
 import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
+import AlertBanner from "../../components/ui/AlertBanner";
 import { pageShellWithBellClass, inputClass } from "../../utils/themeInputs";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { matchesStudentSearch } from "../../utils/studentSearch";
@@ -68,6 +69,8 @@ export default function SubjectDetails() {
   const { error: showError, warning: showWarning } = useAppModal();
   const { subjectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [flashNotice, setFlashNotice] = useState(null);
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [sectionAssessmentsOpen, setSectionAssessmentsOpen] = useState(false);
   const [showEditSubjectModal, setShowEditSubjectModal] = useState(false);
@@ -89,6 +92,14 @@ export default function SubjectDetails() {
   const [facultyProfile, setFacultyProfile] = useState(cachedUser);
   const [loading, setLoading] = useState(true);
   const facultyCanManage = canFacultyManageSubjects(facultyProfile);
+
+  useEffect(() => {
+    const notice = location.state?.notice;
+    if (!notice?.message) return;
+
+    setFlashNotice(notice);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, navigate]);
 
   const requireFacultyAvatar = () => {
     if (facultyCanManage) return true;
@@ -295,6 +306,18 @@ export default function SubjectDetails() {
 
   return (
  <div className={pageShellWithBellClass(theme)}>
+
+    {flashNotice?.message && (
+      <AlertBanner
+        variant={flashNotice.variant || "success"}
+        className="mb-6"
+        scrollIntoView={false}
+        autoDismissMs={4500}
+        onDismiss={() => setFlashNotice(null)}
+      >
+        {flashNotice.message}
+      </AlertBanner>
+    )}
 
     <div className="mb-6">
       <ExamNexusBrand variant="compact" idSuffix="subject-faculty" className="mb-5 opacity-90" />

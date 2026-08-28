@@ -47,6 +47,7 @@ import {
   peekAuthNotice,
 } from "../../utils/authNotice";
 import SignupFormFields from "../../components/auth/SignupFormFields";
+import AuthRoleToggle from "../../components/auth/AuthRoleToggle";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import HomeSiteHeader from "../../components/home/HomeSiteHeader";
 import HomeBottomBar from "../../components/home/HomeBottomBar";
@@ -551,6 +552,9 @@ function getAuthInputProps(theme) {
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
+    window.requestAnimationFrame(() => {
+      formPanelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   const switchToForgot = () => {
@@ -1170,6 +1174,15 @@ function getAuthInputProps(theme) {
         : "Join ExamNexus as a student or faculty member."}
   </p>
 
+          {(authView === "login" || authView === "signup") && (
+            <AuthRoleToggle
+              value={form.role}
+              onChange={handleRoleChange}
+              theme={theme}
+              className="mb-5"
+            />
+          )}
+
           <form onSubmit={handleSubmit}>
             {authView === "forgot" ? (
               <div className="space-y-4">
@@ -1404,7 +1417,6 @@ function getAuthInputProps(theme) {
                     theme={theme}
                     authInputProps={authInputProps}
                     onFieldChange={handleChange}
-                    onRoleChange={handleRoleChange}
                   />
                 )}
 

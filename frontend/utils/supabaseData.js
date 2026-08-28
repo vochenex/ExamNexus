@@ -363,6 +363,53 @@ export async function fetchSubject(subjectId) {
   return data;
 }
 
+async function resolveAvailableSections(examLike = {}) {
+  const fromPayload = examLike.available_sections;
+  if (Array.isArray(fromPayload) && fromPayload.length) {
+    return fromPayload;
+  }
+
+  if (examLike.subject_id) {
+    try {
+      const subject = await fetchSubject(examLike.subject_id);
+      return getSubjectSections(subject);
+    } catch {
+      // fall through to default section list
+    }
+  }
+
+  return getSubjectSections(null);
+}
+
+async function listQuestionsForExam(examId) {
+  const orderAttempts = [
+    { column: "created_at", ascending: true },
+    { column: "id", ascending: true },
+    null,
+  ];
+
+  let lastError = null;
+
+  for (const orderOpts of orderAttempts) {
+    let query = supabase.from("questions").select("*").eq("exam_id", examId);
+
+    if (orderOpts) {
+      query = query.order(orderOpts.column, { ascending: orderOpts.ascending });
+    }
+
+    const { data, error } = await query;
+    if (!error) return data || [];
+
+    lastError = error;
+    if (orderOpts && isMissingColumnError(error, orderOpts.column)) {
+      continue;
+    }
+    break;
+  }
+
+  throw lastError || new Error("Failed to load assessment questions.");
+}
+
 export async function fetchSubjectFaculty(subject) {
   if (!subject?.teacher_school_id) return null;
 
@@ -477,17 +524,104 @@ export async function fetchStudentEnrollmentSection(studentId, subjectId) {
   return data?.section || "A";
 }
 
+function isMissingColumnError(error, columnName) {
+  const message = String(error?.message || "").toLowerCase();
+  const column = String(columnName || "").toLowerCase();
+  if (!column) return false;
+
+  return (
+    message.includes(column) &&
+    (message.includes("column") ||
+      message.includes("does not exist") ||
+      message.includes("could not find") ||
+      message.includes("schema cache"))
+  );
+}
+
+async function listExamsBySubjectId(subjectId, { select = "*" } = {}) {
+  const orderAttempts = [
+    { column: "created_at", ascending: false },
+    { column: "start_datetime", ascending: false, nullsFirst: false },
+    { column: "title", ascending: true },
+    null,
+  ];
+
+  let lastError = null;
+
+  for (const orderOpts of orderAttempts) {
+    let query = supabase.from("exams").select(select).eq("subject_id", subjectId);
+
+    if (orderOpts) {
+      query = query.order(orderOpts.column, {
+        ascending: orderOpts.ascending,
+        ...(orderOpts.nullsFirst !== undefined
+          ? { nullsFirst: orderOpts.nullsFirst }
+          : {}),
+      });
+    }
+
+    const { data, error } = await query;
+    if (!error) return data || [];
+
+    lastError = error;
+    if (orderOpts && isMissingColumnError(error, orderOpts.column)) {
+      continue;
+    }
+    break;
+  }
+
+  throw lastError || new Error("Failed to load assessments.");
+}
+
+async function listFacultyExamsForExport(subjectIds) {
+  const selectAttempts = [
+    "id, title, exam_type, subject_id, start_datetime, end_datetime, subjects:subject_id(name)",
+    "id, title, exam_type, subject_id, start_datetime, end_datetime, subjects(name)",
+  ];
+  const orderAttempts = [
+    { column: "created_at", ascending: false },
+    { column: "start_datetime", ascending: false, nullsFirst: false },
+    { column: "title", ascending: true },
+    null,
+  ];
+
+  let lastError = null;
+
+  for (const select of selectAttempts) {
+    for (const orderOpts of orderAttempts) {
+      let query = supabase.from("exams").select(select).in("subject_id", subjectIds);
+
+      if (orderOpts) {
+        query = query.order(orderOpts.column, {
+          ascending: orderOpts.ascending,
+          ...(orderOpts.nullsFirst !== undefined
+            ? { nullsFirst: orderOpts.nullsFirst }
+            : {}),
+        });
+      }
+
+      const { data, error } = await query;
+      if (!error) return data || [];
+
+      lastError = error;
+      if (orderOpts && isMissingColumnError(error, orderOpts.column)) {
+        continue;
+      }
+      if (error.message?.includes("subjects") && select.includes("subjects:subject_id")) {
+        break;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError || new Error("Failed to load assessments.");
+}
+
 export async function fetchSubjectAssessments(subjectId) {
   await requireSession();
 
-  const { data, error } = await supabase
-    .from("exams")
-    .select("*")
-    .eq("subject_id", subjectId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return (data || []).map(enrichExamRecord);
+  const data = await listExamsBySubjectId(subjectId);
+  return data.map(enrichExamRecord);
 }
 
 export async function fetchSubjectClassAnalytics(subjectId, { sectionFilter = null } = {}) {
@@ -621,13 +755,7 @@ export async function fetchFacultyExportAssessments(teacherSchoolId) {
   const subjectIds = subjects.map((subject) => subject.id);
   if (!subjectIds.length) return [];
 
-  const { data: exams, error } = await supabase
-    .from("exams")
-    .select("id, title, exam_type, subject_id, start_datetime, end_datetime, created_at, subjects(name)")
-    .in("subject_id", subjectIds)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
+  const exams = await listFacultyExamsForExport(subjectIds);
 
   const examIds = (exams || []).map((exam) => exam.id);
   let submissionCounts = new Map();
@@ -987,6 +1115,7 @@ export async function createExam(examPayload, questions) {
 
   const durationFields = durationFieldsForDb(examPayload);
   const passMark = normalizePassMark(examPayload.pass_mark);
+  const availableSections = await resolveAvailableSections(examPayload);
 
   const examRow = {
     subject_id: examPayload.subject_id,
@@ -997,7 +1126,10 @@ export async function createExam(examPayload, questions) {
     start_datetime: examPayload.start_datetime,
     end_datetime: examPayload.end_datetime,
     created_by: examPayload.created_by || null,
-    target_sections: normalizeTargetSections(examPayload.target_sections),
+    target_sections: normalizeTargetSections(
+      examPayload.target_sections,
+      availableSections
+    ),
     instructions: examPayload.instructions || "",
     shuffle_questions: Boolean(examPayload.shuffle_questions),
     lock_completed_sections: Boolean(examPayload.lock_completed_sections),
@@ -1166,7 +1298,10 @@ export async function createExam(examPayload, questions) {
       .select("student_id, section")
       .eq("subject_id", exam.subject_id);
 
-    const sections = normalizeTargetSections(exam.target_sections);
+    const sections = normalizeTargetSections(
+      exam.target_sections,
+      await resolveAvailableSections({ subject_id: exam.subject_id })
+    );
     const recipientIds = (enrolled || [])
       .filter((row) => isVisibleToSection(sections, row.section))
       .map((row) => row.student_id);
@@ -1240,17 +1375,11 @@ export async function fetchExamWithQuestions(examId) {
 
   if (examError) throw examError;
 
-  const { data: questions, error: qError } = await supabase
-    .from("questions")
-    .select("*")
-    .eq("exam_id", examId)
-    .order("created_at", { ascending: true });
-
-  if (qError) throw qError;
+  const questions = await listQuestionsForExam(examId);
 
   return {
     exam: enrichExamRecord(exam),
-    questions: dedupeExamQuestions(questions || []),
+    questions: dedupeExamQuestions(questions),
   };
 }
 
@@ -1342,6 +1471,11 @@ async function updateExamRowWithColumnFallback(examId, examUpdate) {
     const { error } = await supabase.from("exams").update(cleaned).eq("id", examId);
     if (!error) return;
     lastError = error;
+    if (isTargetSectionsConstraintError(error)) {
+      throw new Error(
+        "One or more selected sections are not allowed. Run database/subject_sections_extended.sql in Supabase SQL Editor."
+      );
+    }
     if (!error.message?.includes("column")) {
       throw error;
     }
@@ -1450,6 +1584,7 @@ export async function updateExam(examId, exam, questions) {
   );
 
   const durationFields = durationFieldsForDb(exam);
+  const availableSections = await resolveAvailableSections(exam);
 
   const examUpdate = {
     title: exam.title,
@@ -1458,7 +1593,7 @@ export async function updateExam(examId, exam, questions) {
     assessment_category: category,
     start_datetime: exam.start_datetime,
     end_datetime: exam.end_datetime,
-    target_sections: normalizeTargetSections(exam.target_sections),
+    target_sections: normalizeTargetSections(exam.target_sections, availableSections),
     instructions: exam.instructions || "",
     shuffle_questions: Boolean(exam.shuffle_questions),
     lock_completed_sections: Boolean(exam.lock_completed_sections),
@@ -1472,25 +1607,49 @@ export async function updateExam(examId, exam, questions) {
     pass_mark: normalizePassMark(exam.pass_mark),
   };
 
-  const { error: examError } = await supabase
-    .from("exams")
-    .update(examUpdate)
-    .eq("id", examId);
+  const applyExamUpdate = async (payload) => {
+    const { data, error } = await supabase
+      .from("exams")
+      .update(payload)
+      .eq("id", examId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      if (isTargetSectionsConstraintError(error)) {
+        throw new Error(
+          "One or more selected sections are not allowed. Run database/subject_sections_extended.sql in Supabase SQL Editor."
+        );
+      }
+      return { ok: false, error };
+    }
+
+    if (!data?.id) {
+      throw new Error(
+        "Assessment update was blocked. You may not have permission to edit this assessment."
+      );
+    }
+
+    return { ok: true, error: null };
+  };
+
+  let updateResult = await applyExamUpdate(examUpdate);
+  let examError = updateResult.error;
 
   if (examError?.message?.includes("assessment_category")) {
     const { assessment_category, ...fallbackUpdate } = examUpdate;
-    const { error: fallbackError } = await supabase
-      .from("exams")
-      .update(fallbackUpdate)
-      .eq("id", examId);
+    updateResult = await applyExamUpdate(fallbackUpdate);
+    examError = updateResult.error;
 
-    if (fallbackError?.message?.includes("column")) {
+    if (examError?.message?.includes("column")) {
       await updateExamRowWithColumnFallback(examId, fallbackUpdate);
-    } else if (fallbackError) {
-      throw fallbackError;
+      examError = null;
+    } else if (examError) {
+      throw examError;
     }
   } else if (examError?.message?.includes("column")) {
     await updateExamRowWithColumnFallback(examId, examUpdate);
+    examError = null;
   } else if (examError) {
     throw examError;
   }

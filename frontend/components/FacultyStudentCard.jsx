@@ -5,6 +5,7 @@ import ModalPortal from "./ui/ModalPortal";
 import { useTheme } from "../layouts/ThemeContext";
 import { formatSectionLabel } from "../utils/sections";
 import { getCourseLabel, getDepartmentLabel } from "../utils/academicOptions";
+import { formatMaskedSchoolIdLabel } from "../utils/schoolIdPrivacy";
 import { iconButton } from "../utils/themeButtons";
 
 /** Only one student hover preview may be open app-wide. */
@@ -82,7 +83,7 @@ function StudentPreviewPopover({ preview, theme, name, student }) {
                 theme === "dark" ? "text-emerald-300" : "text-teal-700"
               }`}
             >
-              {student.school_id ? `ID: ${student.school_id}` : "No school ID"}
+              {formatMaskedSchoolIdLabel(student.school_id) || "No school ID"}
             </p>
           </div>
         </div>
@@ -249,7 +250,7 @@ export default function FacultyStudentCard({
               {name}
             </p>
             <p className={`truncate text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
-              {student.school_id ? `ID: ${student.school_id}` : "Student"}
+              {formatMaskedSchoolIdLabel(student.school_id)}
             </p>
             {(departmentLabel || courseShort) && (
               <p

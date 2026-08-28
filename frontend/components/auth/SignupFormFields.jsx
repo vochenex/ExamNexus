@@ -1,4 +1,3 @@
-import { GraduationCap, UserRound } from "lucide-react";
 import Select from "../ui/Select";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { getSchoolIdHelpText, getSchoolIdRule } from "../../utils/schoolIdRules";
@@ -62,7 +61,6 @@ export default function SignupFormFields({
   theme,
   authInputProps,
   onFieldChange,
-  onRoleChange,
 }) {
   const isStudent = form.role === "Student";
   const courses = getCoursesForDepartment(form.department);
@@ -70,43 +68,6 @@ export default function SignupFormFields({
 
   return (
     <div className="space-y-5">
-      <div>
-        <SectionTitle theme={theme}>Account type</SectionTitle>
-        <div
-          className={`grid grid-cols-2 gap-2 rounded-2xl border p-1.5 ${
-            theme === "dark"
-              ? "border-white/10 bg-white/[0.03]"
-              : "border-emerald-100 en-bg-muted"
-          }`}
-        >
-          {[
-            { value: "Student", label: "Student", icon: GraduationCap },
-            { value: "Faculty", label: "Faculty", icon: UserRound },
-          ].map(({ value, label, icon: Icon }) => {
-            const active = form.role === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onRoleChange(value)}
-                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
-                  active
-                    ? theme === "dark"
-                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
-                      : "en-bg-elevated text-teal-800 shadow-md"
-                    : theme === "dark"
-                      ? "text-gray-400 hover:text-gray-200"
-                      : "text-gray-600 hover:text-teal-800"
-                }`}
-              >
-                <Icon size={16} />
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <div>
         <SectionTitle theme={theme}>Personal details</SectionTitle>
         <div className="grid grid-cols-2 gap-3">

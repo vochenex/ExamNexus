@@ -434,6 +434,14 @@ export default function CreateAssessment() {
         return;
       }
 
+      if (!selectedSubject?.id) {
+        setError(
+          "Subject is missing. Go back to your subject page and use Create Assessment there."
+        );
+        setLoading(false);
+        return;
+      }
+
       const passMark = Number(exam.pass_mark);
       if (!Number.isFinite(passMark) || passMark < 0 || passMark > 100) {
         setError("Set a passing rate between 0 and 100% in Settings.");
@@ -471,11 +479,12 @@ export default function CreateAssessment() {
           subject_id: selectedSubject?.id || "",
           created_by: user.id || null,
           target_sections: targetSections,
+          available_sections: subjectSections,
         },
         formattedQuestions
       );
 
-      navigate("/faculty/dashboard", {
+      navigate(`/faculty/subject/${selectedSubject.id}`, {
         state: {
           notice: {
             variant: "success",

@@ -281,11 +281,13 @@ export default function EditAssessment() {
           ? `${formatLocalDate(dateRange.to)}T${endTime}`
           : null,
         target_sections: targetSections,
+        available_sections: subjectSections,
       };
 
       await updateExam(examId, updatedExam, formattedQuestions);
 
-      navigate("/faculty/dashboard", {
+      const subjectId = exam.subject_id;
+      navigate(subjectId ? `/faculty/subject/${subjectId}` : "/faculty/dashboard", {
         state: {
           notice: {
             variant: "success",
