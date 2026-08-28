@@ -60,7 +60,10 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const nav = getMobileNav(role);
-  const flexibleItems = Array.isArray(nav.flexible) ? nav.flexible : [];
+  const flexibleItems = useMemo(
+    () => (Array.isArray(nav.flexible) ? nav.flexible : []),
+    [nav.flexible]
+  );
   const usesFlexibleSlot = flexibleItems.length > 0;
 
   const [flexibleTo, setFlexibleTo] = useState(() =>

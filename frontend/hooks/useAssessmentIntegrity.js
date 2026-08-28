@@ -369,6 +369,7 @@ export default function useAssessmentIntegrity({
     flagFocusViolation,
     onFocusViolation,
     recordEvent,
+    recordStrike,
     shouldIgnoreEvent,
   ]);
 

@@ -60,7 +60,7 @@ export default function StudentDashboard() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
   usePolling(load, []);
 

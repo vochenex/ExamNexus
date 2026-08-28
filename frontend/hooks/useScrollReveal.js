@@ -55,5 +55,6 @@ export function useScrollReveal(
     });
 
     return () => observer.disconnect();
-  }, [fadeOut, rootMargin, threshold]);
+    // ref identity is stable; reading ref.current inside the effect is intentional.
+  }, [fadeOut, rootMargin, threshold]); // eslint-disable-line react-hooks/exhaustive-deps
 }

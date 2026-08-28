@@ -37,7 +37,27 @@ export default defineConfig([
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': [
         'warn',
-        { allowConstantExport: true },
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            'formatAdminError',
+            'forceUnlockBodyScroll',
+            'stashAuthNotice',
+            'consumeAuthNotice',
+            'peekAuthNotice',
+            'clearAuthNotice',
+            'useAppModal',
+            'useAppSplash',
+            'useAssessmentLockdown',
+            'useNavigationProgress',
+            'useTheme',
+            'AppModalProvider',
+            'AppSplashProvider',
+            'AssessmentLockdownProvider',
+            'NavigationProgressProvider',
+            'ThemeProvider',
+          ],
+        },
       ],
       // Common intentional patterns: catch (_err), destructure leftovers.
       'no-unused-vars': [

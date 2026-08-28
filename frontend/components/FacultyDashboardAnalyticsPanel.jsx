@@ -107,8 +107,14 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
 
   usePolling(load, [teacherSchoolId]);
 
-  const submissions = analytics?.submissions ?? [];
-  const assessments = analytics?.assessments ?? [];
+  const submissions = useMemo(
+    () => analytics?.submissions ?? [],
+    [analytics?.submissions]
+  );
+  const assessments = useMemo(
+    () => analytics?.assessments ?? [],
+    [analytics?.assessments]
+  );
 
   const filteredSubmissions = useMemo(
     () =>

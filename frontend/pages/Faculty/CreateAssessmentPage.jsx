@@ -8,9 +8,11 @@ import AssessmentSchedule from "../../components/AssessmentSchedule";
 import SectionPicker from "../../components/SectionPicker";
 import {
   AssessmentTypeSelect,
+} from "../../components/QuestionBuilderCard";
+import {
   assessmentPanelClass,
   assessmentInputClass,
-} from "../../components/QuestionBuilderCard";
+} from "../../utils/assessmentFormStyles";
 import AssessmentSettingsPanel from "../../components/AssessmentSettingsPanel";
 import FormatGradingSettings from "../../components/FormatGradingSettings";
 import AssessmentPointsPanel from "../../components/AssessmentPointsPanel";
@@ -150,7 +152,7 @@ export default function CreateAssessment() {
       showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       navigate("/faculty/profile");
     }
-  }, [facultyProfile.role, facultyCanManage, navigate]);
+  }, [facultyProfile.role, facultyCanManage, navigate, showWarning]);
 
   const clearError = () => setError("");
   const clearFieldErrors = (questionIndex) => {

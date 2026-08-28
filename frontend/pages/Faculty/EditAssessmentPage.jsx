@@ -9,9 +9,11 @@ import AssessmentSchedule from "../../components/AssessmentSchedule";
 import SectionPicker from "../../components/SectionPicker";
 import {
   AssessmentTypeSelect,
+} from "../../components/QuestionBuilderCard";
+import {
   assessmentPanelClass,
   assessmentInputClass,
-} from "../../components/QuestionBuilderCard";
+} from "../../utils/assessmentFormStyles";
 import AssessmentSettingsPanel from "../../components/AssessmentSettingsPanel";
 import FormatGradingSettings from "../../components/FormatGradingSettings";
 import AssessmentPointsPanel from "../../components/AssessmentPointsPanel";
@@ -162,7 +164,7 @@ export default function EditAssessment() {
         setError(err.message || "Failed to load assessment.");
       })
       .finally(() => setPageLoading(false));
-  }, [examId]);
+  }, [examId, initializeFromLoadedQuestions]);
 
   const formatLocalDate = (date) => {
     const year = date.getFullYear();

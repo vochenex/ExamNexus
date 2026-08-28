@@ -80,7 +80,7 @@ export default function FacultySubjectSocial() {
       showWarning(FACULTY_AVATAR_REQUIRED_MESSAGE, "Profile photo required");
       navigate("/faculty/profile");
     }
-  }, [cachedUser.role, facultyCanManage, navigate]);
+  }, [cachedUser.role, facultyCanManage, navigate, showWarning]);
 
   usePolling(loadPage, [subjectId]);
 

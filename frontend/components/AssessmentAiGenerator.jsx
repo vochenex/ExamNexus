@@ -21,7 +21,7 @@ import {
   generateAssessmentFromDocument,
   generateAssessmentFromPrompt,
 } from "../utils/assessmentAi";
-import { assessmentInputClass } from "./QuestionBuilderCard";
+import { assessmentInputClass } from "../utils/assessmentFormStyles";
 import Select from "./ui/Select";
 
 const DIFFICULTY_OPTIONS = [

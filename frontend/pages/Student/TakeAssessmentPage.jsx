@@ -411,7 +411,7 @@ function TakeAssessmentExperience() {
     };
 
     loadExam();
-  }, [id, startLockdown, endLockdown, loadRetryToken]);
+  }, [id, startLockdown, endLockdown, loadRetryToken, replaceTimes]);
 
   useEffect(() => {
     if (!isActive || !id) return;

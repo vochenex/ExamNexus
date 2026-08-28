@@ -131,7 +131,7 @@ export default function SubjectDetails() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [subjectId]);
+  }, [subjectId, showError]);
 
   const loadAnalytics = useCallback(async (silent = false) => {
     if (!silent) setAnalyticsLoading(true);
