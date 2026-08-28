@@ -140,16 +140,17 @@ html.light .en-auth-native-select {
   }
 
   .en-auth-card--blend {
-    height: auto !important;
-    min-height: min(68vh, 520px) !important;
-    max-height: none !important;
+    height: min(72vh, 580px) !important;
+    min-height: min(72vh, 580px) !important;
+    max-height: calc(100dvh - 9.5rem) !important;
     max-width: min(64rem, 94vw);
     overflow: hidden !important;
     isolation: isolate !important;
   }
 
   .en-auth-card--blend.en-auth-card--signup {
-    min-height: min(72vh, 600px) !important;
+    height: min(72vh, 580px) !important;
+    min-height: min(72vh, 580px) !important;
     max-width: min(68rem, 94vw);
   }
 
@@ -191,7 +192,7 @@ html.light .en-auth-native-select {
   .en-auth-card--blend .en-auth-panel-brand,
   .en-auth-card--blend .en-auth-panel-form {
     overflow-y: auto !important;
-    scrollbar-gutter: auto;
+    scrollbar-gutter: stable;
   }
 
   .en-auth-panel-brand {

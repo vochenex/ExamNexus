@@ -58,13 +58,14 @@
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  align-items: flex-start !important;
+  align-items: center !important;
   justify-content: center !important;
   min-height: calc(100dvh - 3.75rem - var(--en-safe-top));
 }
 
-:is(html.en-native-app, html.en-mobile-shell) .en-auth-body--login {
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-body--centered {
   align-items: center !important;
+  justify-content: center !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-body.en-auth-body--saved-open {
@@ -138,10 +139,6 @@
     align-items: center !important;
     justify-content: center !important;
     min-height: calc(100dvh - var(--en-native-topbar-height) - var(--en-safe-top) - 1rem);
-  }
-
-  :is(html.en-native-app, html.en-mobile-shell) .en-auth-body:not(.en-auth-body--login) {
-    align-items: flex-start !important;
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {

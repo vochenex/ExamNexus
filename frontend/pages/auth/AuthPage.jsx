@@ -316,9 +316,11 @@ export default function ExamNexusAuth() {
     });
   };
 
-  // Keep the focused field visible above the on-screen keyboard (especially signup).
+  // Keep the focused field visible above the on-screen keyboard (native app only).
   useEffect(() => {
-    const root = authBodyRef.current || formPanelRef.current;
+    if (!isNativeApp()) return undefined;
+
+    const root = formPanelRef.current;
     if (!root) return undefined;
 
     const onFocusIn = (event) => {
@@ -326,20 +328,17 @@ export default function ExamNexusAuth() {
       if (!(target instanceof HTMLElement)) return;
       if (!["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
 
-      const scrollFocused = () => {
+      window.setTimeout(() => {
         try {
           target.scrollIntoView({
-            block: "center",
+            block: "nearest",
             inline: "nearest",
             behavior: "smooth",
           });
         } catch {
           target.scrollIntoView(true);
         }
-      };
-
-      window.setTimeout(scrollFocused, 50);
-      window.setTimeout(scrollFocused, 320);
+      }, 120);
     };
 
     root.addEventListener("focusin", onFocusIn);
@@ -551,9 +550,9 @@ function getAuthInputProps(theme) {
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
-    window.requestAnimationFrame(() => {
-      formPanelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    });
+    if (formPanelRef.current) {
+      formPanelRef.current.scrollTop = 0;
+    }
   };
 
   const switchToForgot = () => {
@@ -1024,9 +1023,7 @@ function getAuthInputProps(theme) {
 
   <div
     ref={authBodyRef}
-    className={`en-auth-body en-page-enter ${
-      authView === "login" || authView === "forgot" ? "en-auth-body--login" : ""
-    }`}
+    className="en-auth-body en-page-enter en-auth-body--centered"
   >  {/* Background Orb 1 */}
 <div
   className="
