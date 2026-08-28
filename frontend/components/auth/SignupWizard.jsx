@@ -204,7 +204,7 @@ export default function SignupWizard({
           </div>
         </section>
 
-        <section className="en-signup-column">
+        <section className="en-signup-column en-signup-column--credentials">
           <SectionTitle theme={theme}>Login credentials</SectionTitle>
 
           <div className="space-y-2">
@@ -212,6 +212,9 @@ export default function SignupWizard({
               <FieldLabel theme={theme} htmlFor="signup-email">
                 Email
               </FieldLabel>
+              <p className="en-signup-format-hint mb-1.5 text-xs">
+                {CRMCC_EMAIL_PLACEHOLDER}
+              </p>
               <div className="relative">
                 <input
                   id="signup-email"
@@ -222,7 +225,7 @@ export default function SignupWizard({
                   autoComplete="email"
                   placeholder={CRMCC_EMAIL_PLACEHOLDER}
                   {...authInputProps}
-                  className={`${authInputProps.className} ${form.email ? "pr-12" : ""}`}
+                  className={`en-signup-credentials-input ${authInputProps.className} ${form.email ? "pr-12" : ""}`}
                 />
                 {form.email ? (
                   <button
@@ -268,7 +271,7 @@ export default function SignupWizard({
                   autoComplete="new-password"
                   placeholder="Create a password"
                   {...authInputProps}
-                  className={`${authInputProps.className} pr-12`}
+                  className={`en-signup-credentials-input ${authInputProps.className} pr-11`}
                 />
                 <button
                   type="button"

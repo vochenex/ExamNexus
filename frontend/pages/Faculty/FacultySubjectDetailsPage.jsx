@@ -38,7 +38,6 @@ import EditSubjectModal from "../../components/EditSubjectModal";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPanel";
 import SectionAssessmentsModal from "../../components/SectionAssessmentsModal";
-import BackButton from "../../components/BackButton";
 import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
 import AlertBanner from "../../components/ui/AlertBanner";
 import { pageShellWithBellClass, inputClass } from "../../utils/themeInputs";
@@ -399,7 +398,6 @@ export default function SubjectDetails() {
 
       {/* CREATE ASSESSMENT + SOCIAL */}
       <div className="mb-6 flex flex-wrap items-center gap-3 min-w-0">
-        <BackButton compact />
         <button
           type="button"
           onClick={() => {

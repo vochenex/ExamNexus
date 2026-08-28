@@ -58,7 +58,6 @@ const checks = [
   { name: "Input", jsx: "<Input" },
   { name: "Textarea", jsx: "<Textarea" },
   { name: "Select", jsx: "<Select" },
-  { name: "BackButton", jsx: "<BackButton" },
   { name: "ModalPortal", jsx: "<ModalPortal" },
   { name: "ProgressButton", jsx: "<ProgressButton" },
   { name: "formatAdminError", call: /\bformatAdminError\s*\(/ },

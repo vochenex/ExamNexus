@@ -47,7 +47,7 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
 
 @media (min-width: 768px) {
   .en-signup-columns {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 0.92fr) minmax(280px, 1.45fr);
     gap: 1rem 1.25rem;
   }
 }
@@ -96,6 +96,32 @@ html.light .en-signup-hint {
 
 .en-signup-form .examnexus-auth-input::placeholder {
   opacity: 0.72;
+}
+
+.en-signup-format-hint {
+  color: rgba(156, 163, 175, 0.95);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+html.light .en-signup-format-hint {
+  color: rgba(75, 85, 99, 0.95);
+}
+
+.en-signup-column--credentials .en-signup-credentials-input {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.en-signup-column--credentials .en-signup-credentials-input::placeholder {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  opacity: 0.8;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .en-auth-native-select {
@@ -155,7 +181,7 @@ html.light .en-auth-native-select {
   .en-auth-card--blend.en-auth-card--signup {
     height: min(90vh, 780px) !important;
     min-height: min(90vh, 780px) !important;
-    max-width: min(82rem, 96vw);
+    max-width: min(88rem, 98vw);
   }
 
   .en-auth-card--signup .en-auth-form-inner {
