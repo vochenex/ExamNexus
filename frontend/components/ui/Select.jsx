@@ -61,6 +61,7 @@ export default function Select({
   value,
   onChange,
   disabled,
+  invalid = false,
   className = "",
   children,
   ...props
@@ -115,7 +116,13 @@ export default function Select({
         onClick={() => {
           if (!disabled) setOpen(true);
         }}
-        className={`${selectClass(theme, className)} en-select-trigger relative w-full text-left`}
+        aria-invalid={invalid || undefined}
+        className={`${selectClass(
+          theme,
+          invalid
+            ? `!border-red-500 !ring-2 !ring-red-400 focus:!border-red-500 focus:!ring-red-400 ${className}`
+            : className
+        )} en-select-trigger relative w-full text-left`}
         {...props}
       >
         <span className="block truncate pr-1">{label}</span>

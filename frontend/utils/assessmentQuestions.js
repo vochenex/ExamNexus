@@ -3,6 +3,7 @@ import {
   normalizeGradingOptions,
   getQuestionType,
   getQuestionValidationMessage,
+  getQuestionInvalidFields,
   isQuestionComplete,
   identificationAnswersMatch,
   getAcceptedIdentificationAnswers,
@@ -12,6 +13,7 @@ import {
 export {
   getQuestionType,
   getQuestionValidationMessage,
+  getQuestionInvalidFields,
   isQuestionComplete,
 };
 

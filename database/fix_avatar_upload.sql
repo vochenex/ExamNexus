@@ -176,8 +176,14 @@ BEGIN
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
-    first_name = COALESCE(EXCLUDED.first_name, public.users.first_name),
-    last_name = COALESCE(EXCLUDED.last_name, public.users.last_name),
+    first_name = COALESCE(
+      NULLIF(TRIM(public.users.first_name), ''),
+      EXCLUDED.first_name
+    ),
+    last_name = COALESCE(
+      NULLIF(TRIM(public.users.last_name), ''),
+      EXCLUDED.last_name
+    ),
     school_id = COALESCE(NULLIF(TRIM(EXCLUDED.school_id), ''), public.users.school_id),
     role = COALESCE(EXCLUDED.role, public.users.role),
     gender = COALESCE(EXCLUDED.gender, public.users.gender),
@@ -202,3 +208,4 @@ GRANT EXECUTE ON FUNCTION public.upsert_signup_profile(
 ) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
+

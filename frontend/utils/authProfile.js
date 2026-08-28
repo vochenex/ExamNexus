@@ -190,6 +190,27 @@ export function mergeProfileWithAuthMetadata(profile, authUser) {
 }
 
 async function persistSchoolIdToProfile(supabase, authUser, profile, schoolId) {
+  // Prefer a school_id-only write so repair paths cannot overwrite names from
+  // stale auth metadata (same class of bug as avatar upsert fallback).
+  const { data: updated, error: updateError } = await supabase
+    .from("users")
+    .update({ school_id: schoolId })
+    .eq("id", authUser.id)
+    .select("*")
+    .maybeSingle();
+
+  if (!updateError && updated) {
+    return updated;
+  }
+
+  const { data: repaired, error: repairError } = await supabase.rpc(
+    "repair_profile_school_id"
+  );
+
+  if (!repairError && repaired) {
+    return repaired;
+  }
+
   const meta = authUser.user_metadata || {};
   const rpcParams = buildUpsertSignupProfileParams({
     id: authUser.id,
@@ -210,25 +231,6 @@ async function persistSchoolIdToProfile(supabase, authUser, profile, schoolId) {
 
   if (!error && data) {
     return data;
-  }
-
-  const { data: repaired, error: repairError } = await supabase.rpc(
-    "repair_profile_school_id"
-  );
-
-  if (!repairError && repaired) {
-    return repaired;
-  }
-
-  const { data: updated, error: updateError } = await supabase
-    .from("users")
-    .update({ school_id: schoolId })
-    .eq("id", authUser.id)
-    .select("*")
-    .maybeSingle();
-
-  if (!updateError && updated) {
-    return updated;
   }
 
   return { ...profile, school_id: schoolId };

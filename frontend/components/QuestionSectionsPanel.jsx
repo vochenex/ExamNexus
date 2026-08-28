@@ -15,6 +15,7 @@ export default function QuestionSectionsPanel({
   questionSections,
   activeSectionId,
   questions,
+  fieldErrorsByIndex = {},
   onAddQuestionToSection,
   onUpdateQuestion,
   onUpdateChoice,
@@ -91,6 +92,42 @@ export default function QuestionSectionsPanel({
       return next;
     });
   }, [questions.length, questionSections, questions]);
+
+  useEffect(() => {
+    const invalidIndexes = Object.keys(fieldErrorsByIndex)
+      .map(Number)
+      .filter((index) => Array.isArray(fieldErrorsByIndex[index]) && fieldErrorsByIndex[index].length > 0);
+
+    if (invalidIndexes.length === 0) return;
+
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      invalidIndexes.forEach((globalIndex) => {
+        const question = questions[globalIndex];
+        if (question?.sectionId) next.add(question.sectionId);
+      });
+      return next;
+    });
+
+    setExpandedQuestions((prev) => {
+      const next = new Set(prev);
+      invalidIndexes.forEach((globalIndex) => {
+        const question = questions[globalIndex];
+        if (!question?.sectionId) return;
+        const localIndex = questions
+          .filter((item) => item.sectionId === question.sectionId)
+          .findIndex((item) => item === question);
+        if (localIndex >= 0) {
+          next.add(`${question.sectionId}-${localIndex}`);
+        }
+      });
+      return next;
+    });
+
+    requestAnimationFrame(() => {
+      scrollTargetRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [fieldErrorsByIndex, questions]);
 
   const toggleSection = (sectionId) => {
     setExpandedSections((prev) => {
@@ -291,12 +328,15 @@ export default function QuestionSectionsPanel({
                     {sectionQuestions.map((question, localIndex) => {
                       const globalIndex = questions.findIndex((item) => item === question);
                       const questionKey = `${section.id}-${localIndex}`;
+                      const questionFieldErrors = fieldErrorsByIndex[globalIndex] || [];
+                      const hasFieldErrors = questionFieldErrors.length > 0;
                       const isQuestionExpanded =
+                        hasFieldErrors ||
                         expandedQuestions.has(questionKey) ||
                         (sectionQuestions.length === 1 && expandedQuestions.size === 0);
 
                       const isLastInSection = localIndex === sectionQuestions.length - 1;
-                      const shouldScroll = isLastInSection;
+                      const shouldScroll = hasFieldErrors || isLastInSection;
                       const showAlternatives =
                         (section.type === "identification" ||
                           section.type === "enumeration") &&
@@ -307,9 +347,13 @@ export default function QuestionSectionsPanel({
                           key={question.id || questionKey}
                           ref={shouldScroll ? scrollTargetRef : null}
                           className={`rounded-xl border ${
-                            theme === "dark"
-                              ? "border-white/10 bg-black/20"
-                              : "border-emerald-100 en-bg-elevated"
+                            hasFieldErrors
+                              ? theme === "dark"
+                                ? "border-red-500/50 bg-red-500/5"
+                                : "border-red-300 en-bg-elevated"
+                              : theme === "dark"
+                                ? "border-white/10 bg-black/20"
+                                : "border-emerald-100 en-bg-elevated"
                           }`}
                         >
                           {!isQuestionExpanded ? (
@@ -349,6 +393,7 @@ export default function QuestionSectionsPanel({
                                 index={localIndex}
                                 examType={section.type}
                                 showAlternatives={showAlternatives}
+                                invalidFields={questionFieldErrors}
                                 onUpdate={(field, value) =>
                                   onUpdateQuestion(globalIndex, field, value)
                                 }

@@ -56,6 +56,32 @@ function notifyPushReceived(detail = {}) {
   window.dispatchEvent(new CustomEvent("en:push-received", { detail }));
 }
 
+/** Current signed-in ExamNexus user id (cache only — never mutate from push). */
+function getCachedUserId() {
+  try {
+    const raw = localStorage.getItem("examnexus_user");
+    const user = raw ? JSON.parse(raw) : null;
+    return user?.id ? String(user.id) : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Ignore pushes addressed to a different saved account on this device.
+ * Never merge notification payloads into the profile / localStorage.
+ */
+function isPushForCurrentUser(notification) {
+  const data = notification?.data || {};
+  const recipient = String(
+    data.recipient_user_id || data.recipientUserId || ""
+  ).trim();
+  if (!recipient) return true;
+  const currentId = getCachedUserId();
+  if (!currentId) return true;
+  return recipient === currentId;
+}
+
 async function upsertToken(token, platform = getPlatform()) {
   if (!token) return;
   lastToken = token;
@@ -188,6 +214,8 @@ async function ensureAndroidAlertsChannel(PushNotifications) {
 }
 
 function showForegroundBanner(notification) {
+  if (!isPushForCurrentUser(notification)) return;
+
   const title = notification?.title || "ExamNexus";
   const body = notification?.body || "";
   const data = notification?.data || {};
@@ -252,14 +280,18 @@ export async function initPushNotifications() {
 
       PushNotifications.addListener("pushNotificationReceived", (notification) => {
         // App is open: refresh in-app bell immediately and show a heads-up when possible.
+        // Never write notification fields into examnexus_user / profile.
+        if (!isPushForCurrentUser(notification)) return;
         notifyPushReceived(notification);
         showForegroundBanner(notification);
       });
 
       PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-        const data = action?.notification?.data || {};
+        const notification = action?.notification;
+        if (!isPushForCurrentUser(notification)) return;
+        const data = notification?.data || {};
         const path = data.path || data.url || "";
-        notifyPushReceived(action?.notification);
+        notifyPushReceived(notification);
         if (path && typeof path === "string" && path.startsWith("/")) {
           window.location.hash = "";
           window.dispatchEvent(

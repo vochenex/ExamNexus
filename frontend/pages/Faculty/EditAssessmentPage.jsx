@@ -21,6 +21,7 @@ import QuestionSectionsPanel from "../../components/QuestionSectionsPanel";
 import QuestionBankPicker from "../../components/QuestionBankPicker";
 import { getSubjectSections, normalizeTargetSections } from "../../utils/sections";
 import { deserializeQuestion, serializeQuestionForDb } from "../../utils/assessmentQuestions";
+import { getAssessmentCategoryLabel } from "../../utils/assessmentCategories";
 import { parseDurationValue, DEFAULT_DURATION_VALUE } from "../../utils/assessmentDuration";
 import useQuestionSections from "../../hooks/useQuestionSections";
 import { saveQuestionToBank } from "../../utils/questionBank";
@@ -59,6 +60,7 @@ export default function EditAssessment() {
   const [loading, setLoading] = useState(false);
   const [savingToBankId, setSavingToBankId] = useState(null);
   const [error, setError] = useState("");
+  const [fieldErrorsByIndex, setFieldErrorsByIndex] = useState({});
   const [subjectSections, setSubjectSections] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
@@ -96,7 +98,7 @@ export default function EditAssessment() {
     importBankQuestions,
   } = useQuestionSections(defaultAssessment.exam_type);
 
-  const assessmentLabel = "Assessment";
+  const assessmentLabel = getAssessmentCategoryLabel(exam.assessment_category);
 
   useEffect(() => {
     fetchExamWithQuestions(examId)
@@ -170,6 +172,32 @@ export default function EditAssessment() {
   };
 
   const clearError = () => setError("");
+  const clearFieldErrors = (questionIndex) => {
+    if (questionIndex == null) {
+      setFieldErrorsByIndex({});
+      return;
+    }
+    setFieldErrorsByIndex((prev) => {
+      if (!prev[questionIndex]) return prev;
+      const next = { ...prev };
+      delete next[questionIndex];
+      return next;
+    });
+  };
+  const clearQuestionFeedback = (questionIndex) => {
+    clearError();
+    clearFieldErrors(questionIndex);
+  };
+
+  const handleAddQuestionToSection = (sectionId) => {
+    clearError();
+    const result = addQuestionToSection(sectionId);
+    if (!result?.ok && result?.reason === "incomplete_question") {
+      setFieldErrorsByIndex({ [result.questionIndex]: result.fields });
+      return;
+    }
+    clearFieldErrors();
+  };
 
   const handleSaveQuestionToBank = async (question) => {
     if (savingToBankId != null) return;
@@ -227,12 +255,14 @@ export default function EditAssessment() {
         return;
       }
 
-      const validationError = validateAllQuestions();
-      if (validationError) {
-        setError(validationError);
+      const validation = validateAllQuestions();
+      if (validation) {
+        setFieldErrorsByIndex(validation.errorsByIndex || {});
         setLoading(false);
         return;
       }
+
+      clearFieldErrors();
 
       const questionsToSave = getQuestionsForSave();
       const formattedQuestions = questionsToSave.map((q) => ({
@@ -254,8 +284,14 @@ export default function EditAssessment() {
 
       await updateExam(examId, updatedExam, formattedQuestions);
 
-      showSuccess("Assessment updated successfully.");
-      navigate("/faculty/dashboard");
+      navigate("/faculty/dashboard", {
+        state: {
+          notice: {
+            variant: "success",
+            message: `${assessmentLabel} updated`,
+          },
+        },
+      });
     } catch (err) {
       setError(err.message || "Failed to save assessment.");
     } finally {
@@ -352,31 +388,39 @@ export default function EditAssessment() {
               questionSections={questionSections}
               activeSectionId={activeSectionId}
               questions={questions}
-              onAddQuestionToSection={(sectionId) =>
-                addQuestionToSection(sectionId, setError, clearError)
-              }
+              fieldErrorsByIndex={fieldErrorsByIndex}
+              onAddQuestionToSection={handleAddQuestionToSection}
               onUpdateQuestion={(index, field, value) =>
-                updateQuestion(index, field, value, clearError)
+                updateQuestion(index, field, value, clearQuestionFeedback)
               }
               onUpdateChoice={(qIndex, cIndex, value) =>
-                updateChoice(qIndex, cIndex, value, clearError)
+                updateChoice(qIndex, cIndex, value, clearQuestionFeedback)
               }
               onUpdateEnumAnswer={(qIndex, aIndex, value) =>
-                updateEnumAnswer(qIndex, aIndex, value, clearError)
+                updateEnumAnswer(qIndex, aIndex, value, clearQuestionFeedback)
               }
               onAddEnumAnswer={addEnumAnswer}
               onRemoveEnumAnswer={removeEnumAnswer}
               onAddEnumSlotAlternative={addEnumSlotAlternative}
               onUpdateEnumSlotAlternative={(qIndex, aIndex, altIndex, value) =>
-                updateEnumSlotAlternative(qIndex, aIndex, altIndex, value, clearError)
+                updateEnumSlotAlternative(
+                  qIndex,
+                  aIndex,
+                  altIndex,
+                  value,
+                  clearQuestionFeedback
+                )
               }
               onRemoveEnumSlotAlternative={removeEnumSlotAlternative}
               onAddAlternativeAnswer={addAlternativeAnswer}
               onUpdateAlternativeAnswer={(qIndex, aIndex, value) =>
-                updateAlternativeAnswer(qIndex, aIndex, value, clearError)
+                updateAlternativeAnswer(qIndex, aIndex, value, clearQuestionFeedback)
               }
               onRemoveAlternativeAnswer={removeAlternativeAnswer}
-              onDeleteQuestion={deleteQuestion}
+              onDeleteQuestion={(index) => {
+                clearFieldErrors();
+                deleteQuestion(index);
+              }}
               onSelectSection={setActiveSectionId}
               onSaveQuestionToBank={handleSaveQuestionToBank}
               savingToBankId={savingToBankId}

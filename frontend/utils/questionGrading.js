@@ -286,83 +286,134 @@ export function getAcceptedIdentificationAnswers(question) {
   return [...new Set([primary, ...extras].filter(Boolean))];
 }
 
-export function getQuestionValidationMessage(question, examType) {
+/** Field keys used by QuestionBuilderCard for red invalid glow. */
+export function getQuestionInvalidFields(question, examType) {
   const type = getQuestionType(question, examType);
+  const fields = [];
 
   if (!question.question?.trim()) {
-    return "Enter the question text.";
+    fields.push("question");
   }
 
   if (type === "multiple_choice") {
-    if (!Array.isArray(question.choices) || question.choices.length !== 4) {
-      return "Add four choices for this multiple choice question.";
+    const choices = Array.isArray(question.choices) ? question.choices : [];
+    for (let i = 0; i < 4; i += 1) {
+      if (!String(choices[i] || "").trim()) {
+        fields.push(`choice:${i}`);
+      }
     }
-
-    const emptyChoice = question.choices.findIndex((choice) => !String(choice || "").trim());
-    if (emptyChoice !== -1) {
-      const letters = ["A", "B", "C", "D"];
-      return `Fill in choice ${letters[emptyChoice] || emptyChoice + 1}.`;
-    }
-
     if (!String(question.answer || "").trim()) {
-      return "Select the correct choice.";
+      fields.push("answer");
     }
-
-    return null;
+    return fields;
   }
 
   if (type === "enumeration") {
-    if (!Array.isArray(question.answers) || question.answers.length === 0) {
-      return "Add at least one correct answer.";
+    const answers = Array.isArray(question.answers) ? question.answers : [];
+    if (answers.length === 0) {
+      fields.push("enum:0");
+    } else {
+      answers.forEach((answer, index) => {
+        if (!String(answer || "").trim()) {
+          fields.push(`enum:${index}`);
+        }
+      });
     }
 
-    const emptyAnswer = question.answers.findIndex((answer) => !String(answer || "").trim());
-    if (emptyAnswer !== -1) {
-      return `Fill in correct answer ${emptyAnswer + 1}.`;
+    if (normalizeGradingOptions(question.grading).accept_alternatives) {
+      ensureEnumAlternativesForAnswers(question.grading, answers.length || 0).forEach(
+        (slot, answerIndex) => {
+          slot.forEach((alt, altIndex) => {
+            if (!String(alt || "").trim()) {
+              fields.push(`enumAlt:${answerIndex}:${altIndex}`);
+            }
+          });
+        }
+      );
     }
 
-    if (
-      normalizeGradingOptions(question.grading).accept_alternatives &&
-      ensureEnumAlternativesForAnswers(question.grading, question.answers?.length || 0).some(
-        (slot) => slot.some((alt) => !String(alt || "").trim())
-      )
-    ) {
-      return "Remove empty enumeration alternatives or turn off alternative matching.";
-    }
-
-    return null;
+    return fields;
   }
 
   if (type === "true_false") {
     if (question.answer !== "true" && question.answer !== "false") {
-      return "Select True or False as the correct answer.";
+      fields.push("answer");
     }
-
-    return null;
+    return fields;
   }
 
   if (type === "essay") {
-    return null;
+    return fields;
   }
 
+  // identification (and any other answer-based type)
   if (!String(question.answer || "").trim()) {
+    fields.push("answer");
+  }
+
+  if (normalizeGradingOptions(question.grading).accept_alternatives) {
+    normalizeGradingOptions(question.grading).alternatives.forEach((alt, index) => {
+      if (!String(alt || "").trim()) {
+        fields.push(`alt:${index}`);
+      }
+    });
+  }
+
+  return fields;
+}
+
+export function getQuestionValidationMessage(question, examType) {
+  const type = getQuestionType(question, examType);
+  const fields = getQuestionInvalidFields(question, examType);
+
+  if (fields.length === 0) return null;
+
+  if (fields.includes("question")) {
+    return "Enter the question text.";
+  }
+
+  if (type === "multiple_choice") {
+    const emptyChoice = fields.find((field) => field.startsWith("choice:"));
+    if (emptyChoice) {
+      const letters = ["A", "B", "C", "D"];
+      const index = Number(emptyChoice.split(":")[1]);
+      return `Fill in choice ${letters[index] || index + 1}.`;
+    }
+    if (fields.includes("answer")) {
+      return "Select the correct choice.";
+    }
+    return "Complete this multiple choice question.";
+  }
+
+  if (type === "enumeration") {
+    const emptyAnswer = fields.find((field) => field.startsWith("enum:"));
+    if (emptyAnswer) {
+      const index = Number(emptyAnswer.split(":")[1]);
+      return `Fill in correct answer ${index + 1}.`;
+    }
+    if (fields.some((field) => field.startsWith("enumAlt:"))) {
+      return "Remove empty enumeration alternatives or turn off alternative matching.";
+    }
+    return "Complete this enumeration question.";
+  }
+
+  if (type === "true_false") {
+    return "Select True or False as the correct answer.";
+  }
+
+  if (fields.includes("answer")) {
     return "Enter the correct answer.";
   }
 
-  if (
-    normalizeGradingOptions(question.grading).accept_alternatives &&
-    normalizeGradingOptions(question.grading).alternatives.some(
-      (alt) => !String(alt || "").trim()
-    )
-  ) {
+  if (fields.some((field) => field.startsWith("alt:"))) {
     return "Remove empty alternative answers or turn off alternative matching.";
   }
 
-  return null;
+  return "Complete this question.";
 }
 
 export function isQuestionComplete(question, examType) {
-  return getQuestionValidationMessage(question, examType) === null;
+  return getQuestionInvalidFields(question, examType).length === 0;
 }
 
 export function supportsGradingOptions(type) {

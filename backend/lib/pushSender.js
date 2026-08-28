@@ -234,11 +234,34 @@ function buildRichPushPayload({
       subject_name: subject,
       content_title: contentTitle,
       content_body: contentBody,
-      ...Object.fromEntries(
-        Object.entries(extraData || {}).map(([k, v]) => [k, String(v ?? "")])
-      ),
+      // Allowlist only — never forward arbitrary client keys into FCM data
+      // (old clients could confuse payload fields with profile identity).
+      ...pickPushDataExtras(extraData),
     },
   };
+}
+
+const PUSH_DATA_ALLOWLIST = new Set([
+  "kind",
+  "path",
+  "url",
+  "tag",
+  "subject_id",
+  "exam_id",
+  "announcement_id",
+  "assessment_id",
+  "comment_id",
+  "target_sections",
+]);
+
+function pickPushDataExtras(extraData = {}) {
+  const out = {};
+  for (const [key, value] of Object.entries(extraData || {})) {
+    if (!PUSH_DATA_ALLOWLIST.has(key)) continue;
+    if (key === "kind" || key === "path" || key === "actor_name") continue;
+    out[key] = String(value ?? "");
+  }
+  return out;
 }
 
 async function getFcmAccessToken() {
@@ -617,10 +640,13 @@ async function sendPushToUsers(admin, userIds, payload) {
   let failures = [];
   for (const [userId, deviceRows] of byUser.entries()) {
     const accountName = nameById.get(userId) || "Your account";
+    // Do not put recipient names in the OS title/body. Shared-device / old-APK
+    // multi-account pushes previously showed another account's name and students
+    // thought their profile had been renamed. Keep identity only in data.
     const personalized = {
       ...baseRich,
-      title: truncate(`For ${accountName}: ${baseRich.title}`, 65),
-      body: truncate(`${baseRich.body}\nAccount: ${accountName}`, 240),
+      title: truncate(baseRich.title, 65),
+      body: truncate(baseRich.body, 240),
       data: {
         ...(baseRich.data || {}),
         for_account: accountName,

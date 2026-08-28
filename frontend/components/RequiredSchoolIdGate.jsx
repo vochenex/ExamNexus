@@ -167,6 +167,8 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
           const { data: signupData, error: signupError } = await supabase.rpc(
             "upsert_signup_profile",
             {
+              // Prefer existing profile names; never invent a new name from metadata alone
+              // when the profile already has one (SQL also preserves non-empty names).
               p_first_name:
                 user.first_name || authUser.user_metadata?.first_name || "User",
               p_last_name: user.last_name || authUser.user_metadata?.last_name || "",

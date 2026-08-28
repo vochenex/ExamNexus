@@ -807,28 +807,9 @@ export async function updateUserAvatar(avatarUrl) {
     return rpcData;
   }
 
-  const base = profileFieldsFromSession(session);
-  const { data: upserted, error: upsertError } = await supabase.rpc(
-    "upsert_signup_profile",
-    {
-      p_first_name: base.first_name,
-      p_last_name: base.last_name,
-      p_email: base.email,
-      p_school_id: base.school_id,
-      p_role: base.role,
-      p_gender: base.gender,
-      p_department: base.department,
-      p_course: base.course,
-      p_year_level: base.year_level,
-      p_age: null,
-      p_avatar_url: url,
-    }
-  );
-
-  if (!upsertError && upserted) {
-    return upserted;
-  }
-
+  // Never rebuild the profile from auth metadata alone — that used to overwrite
+  // first_name/last_name with stale signup metadata when update_user_avatar
+  // was missing. Prefer an avatar-only update, then a name-preserving upsert.
   const { data: updated, error: updateError } = await supabase
     .from("users")
     .update({ avatar_url: url })
@@ -840,10 +821,38 @@ export async function updateUserAvatar(avatarUrl) {
     return updated;
   }
 
+  const { data: existing } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const base = profileFieldsFromSession(session, existing || {});
+  const { data: upserted, error: upsertError } = await supabase.rpc(
+    "upsert_signup_profile",
+    {
+      p_first_name: base.first_name || existing?.first_name || "User",
+      p_last_name: base.last_name || existing?.last_name || "",
+      p_email: base.email,
+      p_school_id: base.school_id || existing?.school_id || "",
+      p_role: base.role || existing?.role || "Student",
+      p_gender: base.gender ?? existing?.gender ?? null,
+      p_department: base.department ?? existing?.department ?? null,
+      p_course: base.course ?? existing?.course ?? null,
+      p_year_level: base.year_level ?? existing?.year_level ?? null,
+      p_age: existing?.age == null ? null : String(existing.age),
+      p_avatar_url: url,
+    }
+  );
+
+  if (!upsertError && upserted) {
+    return upserted;
+  }
+
   throw new Error(
     rpcError?.message ||
-      upsertError?.message ||
       updateError?.message ||
+      upsertError?.message ||
       "Failed to save avatar."
   );
 }

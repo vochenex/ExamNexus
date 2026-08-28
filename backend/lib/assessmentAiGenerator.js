@@ -1189,7 +1189,11 @@ async function requestAiQuestions({
   difficulty = "medium",
   mode = "document",
 }) {
-  assertPromptAiConfigured();
+  if (mode === "document") {
+    assertGeminiConfigured();
+  } else {
+    assertPromptAiConfigured();
+  }
 
   const allowedFormats = parseFormats(formats);
   const count = clampQuestionCount(questionCount);
@@ -1208,14 +1212,25 @@ async function requestAiQuestions({
     mode,
   });
 
-  const response = await requestPromptChatCompletion({
-    temperature: 0.4,
-    jsonMode: true,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-  });
+  // Document/source rounds MUST use Gemini. Groq is prompt-only (and models churn often).
+  const response =
+    mode === "document"
+      ? await requestDocumentChatCompletion({
+          temperature: 0.35,
+          jsonMode: true,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        })
+      : await requestPromptChatCompletion({
+          temperature: 0.4,
+          jsonMode: true,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        });
 
   const content = response.content;
   const normalized = await parseAiResponse(content, allowedFormats);

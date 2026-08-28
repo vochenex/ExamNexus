@@ -48,8 +48,13 @@ function parseValidQuestionCount(value) {
 }
 
 function questionCountWarning(value) {
+  if (value === "" || value == null) {
+    return "Enter how many questions to generate (1–150).";
+  }
   const parsed = parseRawQuestionCount(value);
-  if (parsed == null) return "";
+  if (parsed == null) {
+    return "Enter how many questions to generate (1–150).";
+  }
   if (parsed < MIN_QUESTIONS) {
     return `Enter at least ${MIN_QUESTIONS} question.`;
   }
@@ -113,8 +118,10 @@ export default function AssessmentAiGenerator({
   const { theme } = useTheme();
   const [aiReady, setAiReady] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [panelError, setPanelError] = useState("");
+  const [panelNotice, setPanelNotice] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [questionCount, setQuestionCount] = useState(0);
+  const [questionCount, setQuestionCount] = useState("");
   const [difficulty, setDifficulty] = useState("medium");
   const [selectedFormats, setSelectedFormats] = useState(() => [...DEFAULT_AI_FORMATS]);
   const [files, setFiles] = useState([]);
@@ -123,6 +130,18 @@ export default function AssessmentAiGenerator({
   const inFlightRef = useRef(false);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const reportError = (message) => {
+    const text = String(message || "").trim();
+    setPanelError(text);
+    setPanelNotice("");
+  };
+
+  const clearPanelMessages = () => {
+    setPanelError("");
+    setPanelNotice("");
+    if (onClearError) onClearError();
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +160,8 @@ export default function AssessmentAiGenerator({
 
   useEffect(() => {
     setDocumentAnalysis(null);
+    setPanelError("");
+    setPanelNotice("");
   }, [files, mode]);
 
   const promptHints = useMemo(() => {
@@ -173,13 +194,14 @@ export default function AssessmentAiGenerator({
     Boolean(documentAnalysis?.sourcePending) &&
     Boolean(documentAnalysis?.questionnaireDone);
 
-  const countWarning = questionCountWarning(questionCount);
+  const countWarningRaw = questionCountWarning(questionCount);
   const resolvedQuestionCount = parseValidQuestionCount(questionCount);
-  const countInvalid =
-    questionCount !== "" &&
-    questionCount != null &&
-    Number(questionCount) !== 0 &&
-    resolvedQuestionCount == null;
+  const countWarning =
+    countWarningRaw.startsWith("Enter how many") &&
+    mode === "prompt" &&
+    promptHints?.questionCount
+      ? ""
+      : countWarningRaw;
 
   const toggleFormat = (value) => {
     setSelectedFormats((prev) => {
@@ -208,13 +230,13 @@ export default function AssessmentAiGenerator({
       return next.slice(0, 12);
     });
     setDocumentAnalysis(null);
-    if (onClearError) onClearError();
-    else onError?.("");
+    clearPanelMessages();
   };
 
   const removeFile = (index) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
     setDocumentAnalysis(null);
+    clearPanelMessages();
   };
 
   const runGeneration = async (generator, startOptions = undefined) => {
@@ -231,10 +253,11 @@ export default function AssessmentAiGenerator({
       setAiReady(latestStatus);
 
       if (!latestStatus.configured) {
-        onError?.(
+        const message =
           latestStatus.error ||
-            "AI is not ready. Add GEMINI_API_KEY to backend/.env, then restart the backend."
-        );
+          "AI is not ready. Add GEMINI_API_KEY to backend/.env, then restart the backend.";
+        reportError(message);
+        onError?.(message);
         return;
       }
 
@@ -249,11 +272,7 @@ export default function AssessmentAiGenerator({
         }
       }
 
-      if (onClearError) {
-        onClearError();
-      } else {
-        onError?.("");
-      }
+      clearPanelMessages();
 
       const payload = await generator({
         onProgress,
@@ -263,6 +282,9 @@ export default function AssessmentAiGenerator({
 
       if (controller.signal.aborted) return;
 
+      const notice = String(payload?.meta?.warning || payload?.panelNotice || "").trim();
+      if (notice) setPanelNotice(notice);
+
       onGenerated?.(payload);
     } catch (error) {
       if (error?.name === "AbortError") {
@@ -270,7 +292,10 @@ export default function AssessmentAiGenerator({
         return;
       }
       const message = normalizeErrorMessage(error);
-      if (message) onError?.(message);
+      if (message) {
+        reportError(message);
+        onError?.(message);
+      }
       onProgress?.(null);
     } finally {
       if (abortRef.current === controller) {
@@ -284,23 +309,23 @@ export default function AssessmentAiGenerator({
   const handlePromptGenerate = () => {
     const trimmed = prompt.trim();
     if (!trimmed) {
-      onError?.("Describe the topic, skills, or content for the AI to generate.");
+      reportError("Describe the topic, skills, or content for the AI to generate.");
       return;
     }
 
     if (selectedFormats.length === 0) {
-      onError?.("Select at least one question format.");
+      reportError("Select at least one question format.");
       return;
     }
 
     const hints = parsePromptPreferences(trimmed);
     const count = resolvedQuestionCount || hints.questionCount;
     if (!count) {
-      onError?.("Enter how many questions to generate (1–150), or include a count in your prompt.");
+      reportError("Enter how many questions to generate (1–150), or include a count in your prompt.");
       return;
     }
     if (countWarning) {
-      onError?.(countWarning);
+      reportError(countWarning);
       return;
     }
 
@@ -319,18 +344,18 @@ export default function AssessmentAiGenerator({
 
   const handleDocumentClassifyOrGenerate = () => {
     if (!files.length) {
-      onError?.("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file first.");
+      reportError("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file first.");
       return;
     }
 
     // Phase 2: generate from source / study material (options apply only here).
     if (showDocumentOptions && (!documentAnalysis?.mixed || waitingForSourceGenerate)) {
       if (countWarning || !resolvedQuestionCount) {
-        onError?.(countWarning || "Enter how many questions to generate (1–150).");
+        reportError(countWarning || "Enter how many questions to generate (1–150).");
         return;
       }
       if (selectedFormats.length === 0) {
-        onError?.("Select at least one question format.");
+        reportError("Select at least one question format.");
         return;
       }
 
@@ -339,7 +364,9 @@ export default function AssessmentAiGenerator({
         : files;
 
       if (!sourceFiles.length) {
-        onError?.("No source/study files found to generate from.");
+        reportError(
+          "No source/study files found to generate from. Re-analyze after confirming one file is a study guide (not a questionnaire)."
+        );
         return;
       }
 
@@ -364,7 +391,19 @@ export default function AssessmentAiGenerator({
                   }
                 : prev
             );
-            return payload;
+            return {
+              ...payload,
+              meta: {
+                ...(payload.meta || {}),
+                // Keep warning local to this panel; do not bubble to page banner.
+                warning: undefined,
+              },
+              panelNotice:
+                payload?.meta?.warning ||
+                (documentAnalysis?.mixed
+                  ? "Source questions added below the questionnaire items."
+                  : ""),
+            };
           }),
         // Always append after a mixed questionnaire pass so we never wipe those items.
         waitingForSourceGenerate || documentAnalysis?.mixed
@@ -386,6 +425,9 @@ export default function AssessmentAiGenerator({
           sourcePending: true,
           questionnaireDone: false,
         });
+        setPanelNotice(
+          "Mixed upload detected. Converting questionnaire files now. Count/difficulty/formats below apply only to the study/source file afterward."
+        );
 
         const questionnaireFiles = resolveFilesByRole(
           files,
@@ -432,10 +474,11 @@ export default function AssessmentAiGenerator({
           ...payload,
           mixedPhase: "questionnaire_done",
           sourcePending: true,
+          panelNotice:
+            "Questionnaire converted. Set count/difficulty/formats for the study guide, then click Generate from source.",
           meta: {
             ...(payload.meta || {}),
-            warning:
-              "Questionnaire files converted. Options below apply only to source files — set count/difficulty/formats, then generate again.",
+            warning: undefined,
           },
         };
       }
@@ -473,6 +516,8 @@ export default function AssessmentAiGenerator({
         success: true,
         classifiedOnly: true,
         ...classification,
+        panelNotice:
+          "Study/source material detected. Set count, difficulty, and formats, then generate questions.",
       };
     });
   };
@@ -488,13 +533,13 @@ export default function AssessmentAiGenerator({
   const promptNeedsCount =
     mode === "prompt" &&
     !promptHints?.questionCount &&
-    (countInvalid || resolvedQuestionCount == null);
+    resolvedQuestionCount == null;
   const documentNeedsCount =
     showDocumentOptions &&
     (!documentAnalysis?.mixed || waitingForSourceGenerate) &&
-    (countInvalid || resolvedQuestionCount == null);
+    resolvedQuestionCount == null;
   const generateDisabledByCount =
-    (mode === "prompt" && (countInvalid || (promptNeedsCount && !promptHints?.questionCount))) ||
+    (mode === "prompt" && promptNeedsCount) ||
     (showDocumentOptions && documentNeedsCount);
 
   const renderCountDifficulty = () => (
@@ -510,10 +555,12 @@ export default function AssessmentAiGenerator({
           <label className={labelClass}>Number of questions</label>
           <input
             type="number"
-            min={0}
+            min={MIN_QUESTIONS}
+            max={MAX_QUESTIONS}
             disabled={disabled || loading}
             className={assessmentInputClass(theme)}
             value={questionCount}
+            placeholder="e.g. 20"
             onFocus={(event) => event.target.select()}
             onChange={(event) => {
               const next = event.target.value;
@@ -528,15 +575,12 @@ export default function AssessmentAiGenerator({
               }
             }}
             onBlur={() => {
-              if (questionCount === "" || questionCount == null) {
-                setQuestionCount(0);
-                return;
-              }
+              // Stay blank when empty so faculty must enter a count (no default 0).
+              if (questionCount === "" || questionCount == null) return;
               const parsed = Number(questionCount);
               if (!Number.isFinite(parsed) || parsed < 0) {
-                setQuestionCount(0);
+                setQuestionCount("");
               }
-              // Do not clamp down to MAX on blur.
             }}
             aria-invalid={Boolean(countWarning)}
           />
@@ -709,6 +753,23 @@ export default function AssessmentAiGenerator({
           Documents: {aiReady.documentProvider || "gemini"} ·{" "}
           {aiReady.documentModel || aiReady.model || "gemini-2.5-flash"}
         </p>
+      )}
+
+      {(panelError || panelNotice) && (
+        <div
+          role="status"
+          className={`rounded-xl border p-3 text-sm ${
+            panelError
+              ? theme === "dark"
+                ? "border-red-500/30 bg-red-500/10 text-red-200"
+                : "border-red-300 bg-red-50 text-red-700"
+              : theme === "dark"
+                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
+                : "border-emerald-200 bg-emerald-50 text-teal-900"
+          }`}
+        >
+          {panelError || panelNotice}
+        </div>
       )}
 
       {mode === "document" ? (

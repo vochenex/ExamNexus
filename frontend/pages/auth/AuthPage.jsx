@@ -45,10 +45,8 @@ import {
   buildPendingAuthNotice,
   clearAuthNotice,
   peekAuthNotice,
-  stashAuthNotice,
 } from "../../utils/authNotice";
 import SignupFormFields from "../../components/auth/SignupFormFields";
-import PendingApprovalModal from "../../components/auth/PendingApprovalModal";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import HomeSiteHeader from "../../components/home/HomeSiteHeader";
 import HomeBottomBar from "../../components/home/HomeBottomBar";
@@ -61,10 +59,14 @@ import { isNativeApp } from "../../utils/platform";
 import {
   getRememberedPassword,
   getSavedAccounts,
+  hasAccountPin,
   removeSavedAccount,
+  setAccountPin,
   setRememberedPassword,
   upsertSavedAccount,
+  verifyAccountPin,
 } from "../../utils/savedAccounts";
+import DevicePinLock from "../../components/DevicePinLock";
 import "../../styles/home.css";
 
 export default function ExamNexusAuth() {
@@ -90,12 +92,15 @@ export default function ExamNexusAuth() {
   const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
-  const [authNotice, setAuthNotice] = useState(null);
+  const [pendingReviewMessage, setPendingReviewMessage] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState(() => getSavedAccounts());
   const [savedOpen, setSavedOpen] = useState(false);
   const [savedScrollUp, setSavedScrollUp] = useState(false);
   const [savedScrollDown, setSavedScrollDown] = useState(false);
+  const [pinSession, setPinSession] = useState(null);
+  const [pinError, setPinError] = useState("");
+  const [pinBusy, setPinBusy] = useState(false);
   const [forgotMode, setForgotMode] = useState("send");
   const [resetStatusResult, setResetStatusResult] = useState(null);
   const [showTempPassword, setShowTempPassword] = useState(false);
@@ -103,7 +108,9 @@ export default function ExamNexusAuth() {
   const feedbackRef = useRef(null);
 
   useEffect(() => {
-    if (!resetStatusResult && !successMessage && !serverError) return;
+    if (!resetStatusResult && !successMessage && !serverError && !pendingReviewMessage) {
+      return;
+    }
 
     const timer = window.setTimeout(() => {
       const target =
@@ -112,7 +119,7 @@ export default function ExamNexusAuth() {
     }, 80);
 
     return () => window.clearTimeout(timer);
-  }, [resetStatusResult, successMessage, serverError]);
+  }, [resetStatusResult, successMessage, serverError, pendingReviewMessage]);
 
   const [form, setForm] = useState({
   firstName: "",
@@ -365,7 +372,10 @@ export default function ExamNexusAuth() {
     lastNoticeKeyRef.current = noticeKey;
 
     clearAuthNotice();
-    setAuthNotice(notice);
+    setServerError("");
+    setPendingReviewMessage(notice.message || notice.title || "");
+    setAuthView("login");
+    setIsLogin(true);
 
     if (location.state?.authNotice) {
       navigate("/auth", { replace: true, state: {} });
@@ -374,12 +384,16 @@ export default function ExamNexusAuth() {
 
   const blockPendingAccess = async (accessProfile) => {
     const notice = buildPendingAuthNotice(accessProfile);
+    // Stop the branded splash immediately — show an inline review warning instead.
+    setLoading(false);
+    setServerError("");
+    setPendingReviewMessage(
+      notice.message ||
+        "Your account is still under review by an administrator. You can log in after it is approved."
+    );
+    clearAuthNotice();
     await supabase.auth.signOut();
     localStorage.removeItem("examnexus_user");
-    setServerError("");
-    setLoading(false);
-    stashAuthNotice(notice);
-    setAuthNotice(notice);
   };
 
   const handleRoleChange = (role) => {
@@ -520,6 +534,7 @@ function getAuthInputProps(theme) {
     setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
+    setPendingReviewMessage("");
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
@@ -532,6 +547,7 @@ function getAuthInputProps(theme) {
     setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
+    setPendingReviewMessage("");
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
@@ -543,10 +559,217 @@ function getAuthInputProps(theme) {
     setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
+    setPendingReviewMessage("");
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
     setShowTempPassword(false);
+  };
+
+  const finishAuthenticatedSession = (profile, { bindPush = true } = {}) => {
+    if (bindPush) {
+      import("../../utils/pushNotifications")
+        .then(({ syncPushTokenForCurrentUser }) => syncPushTokenForCurrentUser())
+        .catch(() => {});
+    }
+
+    navigateForRole((to, options) => {
+      beginNavigation(to);
+      navigate(to, options);
+    }, profile.role, { replace: true });
+  };
+
+  const persistRememberedAccount = async ({
+    email,
+    password,
+    profile,
+    userId,
+    pin,
+  }) => {
+    await setAccountPin(email, pin);
+    upsertSavedAccount({
+      email,
+      role: profile.role,
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+      avatar_url: profile.avatar_url,
+      user_id: profile.id || userId,
+    });
+    setRememberedPassword(email, password, true);
+    setSavedAccounts(getSavedAccounts());
+  };
+
+  const closePinSession = () => {
+    setPinSession(null);
+    setPinError("");
+    setPinBusy(false);
+  };
+
+  const handlePinComplete = async (pin) => {
+    if (!pinSession || pinBusy) return false;
+
+    if (pinSession.stage === "create") {
+      setPinError("");
+      setPinSession((current) =>
+        current
+          ? {
+              ...current,
+              stage: "confirm",
+              draftPin: pin,
+            }
+          : null
+      );
+      return true;
+    }
+
+    if (pinSession.stage === "confirm") {
+      if (pin !== pinSession.draftPin) {
+        setPinError("PINs did not match. Try again.");
+        setPinSession((current) =>
+          current
+            ? {
+                ...current,
+                stage: "create",
+                draftPin: "",
+              }
+            : null
+        );
+        return false;
+      }
+
+        try {
+        setPinBusy(true);
+        await persistRememberedAccount({
+          email: pinSession.email,
+          password: pinSession.password,
+          profile: pinSession.profile,
+          userId: pinSession.userId,
+          pin,
+        });
+        const profile = pinSession.profile;
+        localStorage.setItem("examnexus_user", JSON.stringify(profile));
+        closePinSession();
+        finishAuthenticatedSession(profile);
+        return true;
+      } catch (err) {
+        setPinError(err?.message || "Could not save device PIN.");
+        setPinBusy(false);
+        return false;
+      }
+    }
+
+    if (pinSession.stage === "unlock") {
+      try {
+        setPinBusy(true);
+        const ok = await verifyAccountPin(pinSession.email, pin);
+        if (!ok) {
+          setPinError("Incorrect PIN. Try again.");
+          setPinBusy(false);
+          return false;
+        }
+
+        const password = pinSession.password || getRememberedPassword(pinSession.email);
+        if (!password) {
+          setPinError("Saved credentials are missing. Sign in with your password.");
+          setPinBusy(false);
+          closePinSession();
+          return false;
+        }
+
+        // Never put the remembered password into the visible form before PIN passes.
+        setRememberMe(true);
+        setShowPassword(false);
+        setEmailManuallyEdited(true);
+        setErrors({});
+        setServerError("");
+        const unlockEmail = pinSession.email;
+        closePinSession();
+
+        // Auto-login only after a verified device PIN.
+        setLoading(true);
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: unlockEmail,
+          password,
+        });
+
+        if (error) {
+          setServerError(formatSupabaseError(error, { context: "login" }));
+          setLoading(false);
+          return false;
+        }
+
+        const access = await fetchAccountAccess(supabase, data.user.id);
+        if (!access.allowed) {
+          await blockPendingAccess(access.profile);
+          return false;
+        }
+
+        const { profile, error: profileError, pendingApproval } =
+          await fetchOrCreateProfile(supabase);
+
+        if (pendingApproval) {
+          await blockPendingAccess(access.profile);
+          return false;
+        }
+
+        if (profileError || !profile) {
+          setServerError(
+            formatSupabaseError(profileError, {
+              context: "profile",
+              fallback:
+                "Your account exists but the profile could not be loaded. Run database/users_signup_policies.sql in Supabase, then try again.",
+            })
+          );
+          setLoading(false);
+          return false;
+        }
+
+        if (!isAccountApproved(profile) && !isAdminUser(profile)) {
+          await blockPendingAccess(profile);
+          return false;
+        }
+
+        saveSignupSchoolIdCache(data.user.id, profile.school_id);
+        localStorage.setItem("examnexus_user", JSON.stringify(profile));
+        clearPasswordResetTemporaryPassword().catch(() => {});
+
+        upsertSavedAccount({
+          email: unlockEmail,
+          role: profile.role,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          avatar_url: profile.avatar_url,
+          user_id: profile.id || data.user.id,
+        });
+        setRememberedPassword(unlockEmail, password, true);
+        setSavedAccounts(getSavedAccounts());
+        finishAuthenticatedSession(profile);
+        return true;
+      } catch (err) {
+        setPinError(err?.message || "Could not verify PIN.");
+        setPinBusy(false);
+        return false;
+      }
+    }
+
+    return false;
+  };
+
+  const handlePinCancel = () => {
+    if (!pinSession || pinBusy) return;
+
+    if (pinSession.stage === "create" || pinSession.stage === "confirm") {
+      // Login already succeeded — skip saving on this device and continue.
+      const profile = pinSession.profile;
+      closePinSession();
+      if (profile) {
+        localStorage.setItem("examnexus_user", JSON.stringify(profile));
+        finishAuthenticatedSession(profile);
+      }
+      return;
+    }
+
+    closePinSession();
   };
 
   const handleSubmit = async (e) => {
@@ -561,6 +784,8 @@ function getAuthInputProps(theme) {
     }
 
     setLoading(true);
+    setPendingReviewMessage("");
+    setServerError("");
 
     // LOGIN
     if (isLogin) {
@@ -609,50 +834,41 @@ function getAuthInputProps(theme) {
 
       saveSignupSchoolIdCache(data.user.id, profile.school_id);
 
-      localStorage.setItem(
-        "examnexus_user",
-        JSON.stringify(profile)
-      );
-
       // Hide temporary password on forgot-password "check/update" after a successful login.
       clearPasswordResetTemporaryPassword().catch(() => {});
 
       if (rememberMe) {
-        upsertSavedAccount({
-          email: form.email,
-          role: profile.role,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          avatar_url: profile.avatar_url,
-          user_id: profile.id || data.user.id,
+        const label =
+          [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+          form.email;
+        // Do not write examnexus_user / navigate yet — PIN must complete first.
+        // Also keep splash off so the PIN sheet is visible above the auth page.
+        setPinError("");
+        setLoading(false);
+        setPinSession({
+          stage: "create",
+          email: String(form.email || "").trim().toLowerCase(),
+          label,
+          password: form.password,
+          profile,
+          userId: profile.id || data.user.id,
         });
-        setRememberedPassword(form.email, form.password, true);
-      } else {
-        const { removed } = removeSavedAccount(form.email);
-        setRememberedPassword(form.email, form.password, false);
-        if (removed?.user_id) {
-          import("../../utils/pushNotifications")
-            .then(({ removePushBindingForSavedAccount }) =>
-              removePushBindingForSavedAccount(removed.user_id)
-            )
-            .catch(() => {});
-        }
+        return;
+      }
+
+      localStorage.setItem("examnexus_user", JSON.stringify(profile));
+
+      const { removed } = removeSavedAccount(form.email);
+      setRememberedPassword(form.email, form.password, false);
+      if (removed?.user_id) {
+        import("../../utils/pushNotifications")
+          .then(({ removePushBindingForSavedAccount }) =>
+            removePushBindingForSavedAccount(removed.user_id)
+          )
+          .catch(() => {});
       }
       setSavedAccounts(getSavedAccounts());
-
-      // Bind this device's push token to the signed-in account (keeps other saved accounts too).
-      import("../../utils/pushNotifications")
-        .then(({ syncPushTokenForCurrentUser }) => syncPushTokenForCurrentUser())
-        .catch(() => {});
-
-      // Keep the branded loader visible through the route change + lazy
-      // dashboard load. Clearing `loading` here would re-reveal the login form
-      // for a beat before navigation commits — which looked like the page
-      // "bouncing back to login and then auto-logging in after a delay".
-      navigateForRole((to, options) => {
-        beginNavigation(to);
-        navigate(to, options);
-      }, profile.role, { replace: true });
+      finishAuthenticatedSession(profile);
       return;
     }
 
@@ -775,14 +991,23 @@ function getAuthInputProps(theme) {
         theme === "dark" ? "bg-[#031d1f]" : "en-auth-shell-bg en-home-shell"
       }`}
     >
-  <PendingApprovalModal
-    notice={authNotice}
-    onClose={() => {
-      clearAuthNotice();
-      setAuthNotice(null);
-    }}
-  />
-  {loading && <LogoSplashScreen theme={theme} />}
+  {loading && !pinSession && <LogoSplashScreen theme={theme} />}
+
+      <DevicePinLock
+        open={Boolean(pinSession)}
+        mode={
+          pinSession?.stage === "confirm"
+            ? "confirm"
+            : pinSession?.stage === "create"
+              ? "create"
+              : "unlock"
+        }
+        accountLabel={pinSession?.label || pinSession?.email || ""}
+        errorMessage={pinError}
+        busy={pinBusy}
+        onComplete={handlePinComplete}
+        onCancel={handlePinCancel}
+      />
 
   {useCompactAuthHeader ? (
     <>
@@ -1236,17 +1461,37 @@ function getAuthInputProps(theme) {
                                   type="button"
                                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                   onClick={() => {
-                                    const rememberedPassword = getRememberedPassword(account.email);
-                                    setForm((current) => ({
-                                      ...current,
-                                      email: account.email,
-                                      password: rememberedPassword || "",
-                                    }));
-                                    setRememberMe(Boolean(rememberedPassword));
-                                    setShowPassword(false);
-                                    setEmailManuallyEdited(true);
-                                    setErrors({});
+                                    const email = String(account.email || "")
+                                      .trim()
+                                      .toLowerCase();
+                                    const rememberedPassword = getRememberedPassword(email);
+                                    if (!rememberedPassword || !hasAccountPin(email)) {
+                                      // Remove insecure / incomplete saves so they cannot
+                                      // silently fill passwords and skip the PIN gate.
+                                      const { accounts } = removeSavedAccount(email);
+                                      setSavedAccounts(accounts);
+                                      setRememberedPassword(email, "", false);
+                                      setServerError(
+                                        "That saved account had no device PIN, so it was removed. Sign in with your password and turn on Remember me to set a PIN."
+                                      );
+                                      setForm((current) => ({
+                                        ...current,
+                                        email,
+                                        password: "",
+                                      }));
+                                      setRememberMe(false);
+                                      setSavedOpen(false);
+                                      return;
+                                    }
+
+                                    setPinError("");
                                     setServerError("");
+                                    setPinSession({
+                                      stage: "unlock",
+                                      email,
+                                      label,
+                                      password: rememberedPassword,
+                                    });
                                     setSavedOpen(false);
                                   }}
                                 >
@@ -1431,6 +1676,16 @@ function getAuthInputProps(theme) {
                         </span>
                       </label>
                     )}
+                    {authView === "login" && rememberMe && (
+                      <p
+                        className={`mt-1.5 text-[11px] leading-snug ${
+                          theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}
+                      >
+                        You’ll create a 6-digit device PIN after signing in. Saved
+                        accounts require that PIN to unlock.
+                      </p>
+                    )}
                     {authView === "login" && (
                       <button
                         type="button"
@@ -1446,6 +1701,21 @@ function getAuthInputProps(theme) {
                   </div>
                 </div>
               </>
+            )}
+
+            {pendingReviewMessage && (
+              <div
+                ref={feedbackRef}
+                role="status"
+                className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-relaxed ${
+                  theme === "dark"
+                    ? "border-amber-500/35 bg-amber-500/10 text-amber-100"
+                    : "border-amber-300 bg-amber-50 text-amber-900"
+                }`}
+              >
+                <p className="font-semibold">Account under review</p>
+                <p className="mt-1 opacity-90">{pendingReviewMessage}</p>
+              </div>
             )}
 
             {serverError && (

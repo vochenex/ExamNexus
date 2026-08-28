@@ -1,9 +1,11 @@
 const { Agent, fetch: undiciFetch } = require("undici");
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-// Prefer 20B over 120B: same JSON generation tasks, usually less queue contention.
+// llama-3.1-8b-instant / llama-3.3-70b-versatile were retired for free/developer
+// tiers on 2026-08-16. gpt-oss ids MUST include the openai/ prefix.
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
-const FALLBACK_GROQ_MODEL = "qwen/qwen3.6-27b";
+const FALLBACK_GROQ_MODEL = "openai/gpt-oss-120b";
+const SECONDARY_FALLBACK_GROQ_MODEL = "qwen/qwen3.6-27b";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_CHAT_TIMEOUT_MS = 300000;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;
@@ -43,6 +45,34 @@ function isHighDemandError(error) {
     message.includes("capacity") ||
     message.includes("temporarily unavailable")
   );
+}
+
+function isModelUnavailableError(error) {
+  const status = Number(error?.statusCode);
+  const message = String(error?.message || "").toLowerCase();
+  const code = String(error?.code || error?.errorCode || "").toLowerCase();
+  return (
+    status === 404 ||
+    code === "model_not_found" ||
+    message.includes("model_not_found") ||
+    message.includes("does not exist") ||
+    message.includes("do not have access") ||
+    message.includes("you do not have access") ||
+    (message.includes("model") && message.includes("not found"))
+  );
+}
+
+function normalizeGroqModelId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return DEFAULT_GROQ_MODEL;
+  // Common misconfig: omitting the openai/ org prefix.
+  if (raw === "gpt-oss-20b" || raw === "gpt-oss-120b") {
+    return `openai/${raw}`;
+  }
+  if (raw === "gpt-oss-20B" || raw === "gpt-oss-120B") {
+    return `openai/${raw.toLowerCase()}`;
+  }
+  return raw;
 }
 
 function isGroqJsonFailure(error) {
@@ -221,7 +251,9 @@ function validateGeminiApiKey(apiKey) {
 }
 
 function getGroqModel() {
-  return String(process.env.GROQ_MODEL || process.env.GROQ_ASSESSMENT_MODEL || DEFAULT_GROQ_MODEL).trim();
+  return normalizeGroqModelId(
+    process.env.GROQ_MODEL || process.env.GROQ_ASSESSMENT_MODEL || DEFAULT_GROQ_MODEL
+  );
 }
 
 function getGroqApiKey() {
@@ -235,9 +267,30 @@ function validateGroqApiKey(apiKey) {
 }
 
 function getGroqFallbackModel() {
-  return String(
+  return normalizeGroqModelId(
     process.env.GROQ_FALLBACK_MODEL || FALLBACK_GROQ_MODEL
-  ).trim();
+  );
+}
+
+function getGroqSecondaryFallbackModel() {
+  return normalizeGroqModelId(
+    process.env.GROQ_SECONDARY_FALLBACK_MODEL || SECONDARY_FALLBACK_GROQ_MODEL
+  );
+}
+
+function getGroqFallbackCandidates(primaryModel) {
+  const primary = normalizeGroqModelId(primaryModel);
+  const candidates = [
+    getGroqFallbackModel(),
+    getGroqSecondaryFallbackModel(),
+    DEFAULT_GROQ_MODEL,
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.6-27b",
+    "qwen/qwen3.8-27b",
+  ];
+  return [...new Set(candidates.map(normalizeGroqModelId))].filter(
+    (model) => model && model !== primary
+  );
 }
 
 function getGroqRuntimeConfig() {
@@ -583,53 +636,48 @@ async function requestChatCompletion({
 async function requestPromptChatCompletion(options) {
   const groq = getGroqRuntimeConfig();
   if (groq) {
-    try {
-      const content = await requestGroqChatCompletion(groq, options);
-      return {
-        content,
-        provider: groq.provider,
-        model: groq.model,
-      };
-    } catch (error) {
-      const fallbackModel = getGroqFallbackModel();
-      if (
-        isHighDemandError(error) &&
-        fallbackModel &&
-        fallbackModel !== groq.model
-      ) {
-        try {
+    let lastError = null;
+    const modelsToTry = [groq.model, ...getGroqFallbackCandidates(groq.model)];
+
+    for (const model of modelsToTry) {
+      try {
+        if (model !== groq.model) {
           console.warn(
-            `[assessment-ai] Groq model ${groq.model} busy; trying ${fallbackModel}.`
+            `[assessment-ai] Trying Groq model ${model} (after ${groq.model}).`
           );
-          const content = await requestGroqChatCompletion(
-            { ...groq, model: fallbackModel },
-            options
+        }
+        const content = await requestGroqChatCompletion(
+          { ...groq, model },
+          options
+        );
+        return {
+          content,
+          provider: groq.provider,
+          model,
+        };
+      } catch (error) {
+        lastError = error;
+        if (isGroqJsonFailure(error) && getGeminiRuntimeConfig()) {
+          console.warn(
+            "[assessment-ai] Groq JSON failed; using Gemini for prompt."
           );
-          return {
-            content,
-            provider: groq.provider,
-            model: fallbackModel,
-          };
-        } catch (fallbackError) {
-          if (isGroqJsonFailure(fallbackError) && getGeminiRuntimeConfig()) {
-            console.warn(
-              "[assessment-ai] Groq fallback JSON failed; using Gemini for prompt."
-            );
-            return requestChatCompletion(options);
-          }
-          throw fallbackError;
+          return requestChatCompletion(options);
+        }
+        // Keep trying other Groq models on missing/busy models; otherwise stop Groq loop.
+        if (!isHighDemandError(error) && !isModelUnavailableError(error)) {
+          break;
         }
       }
-
-      // If Groq still cannot produce usable JSON, fall back to Gemini when available.
-      if (isGroqJsonFailure(error) && getGeminiRuntimeConfig()) {
-        console.warn(
-          "[assessment-ai] Groq JSON generation failed; falling back to Gemini for prompt."
-        );
-        return requestChatCompletion(options);
-      }
-      throw error;
     }
+
+    if (getGeminiRuntimeConfig()) {
+      console.warn(
+        "[assessment-ai] Groq unavailable; falling back to Gemini for prompt."
+      );
+      return requestChatCompletion(options);
+    }
+
+    throw lastError || new Error(formatGroqConfigError());
   }
 
   return requestChatCompletion(options);

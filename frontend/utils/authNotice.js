@@ -30,10 +30,10 @@ export function buildPendingAuthNotice(profile) {
   const isRejected = status === "rejected";
 
   return {
-    title: isRejected ? "Registration not approved" : "Account pending approval",
+    title: isRejected ? "Registration not approved" : "Account under review",
     message: isRejected
       ? "Your registration was not approved. Contact your administrator if you believe this is a mistake."
-      : "Your account is still waiting for administrator approval. You will be able to log in once an admin approves your registration.",
+      : "Your account is still under review by an administrator. You can log in after it is approved.",
     confirmLabel: "OK",
   };
 }

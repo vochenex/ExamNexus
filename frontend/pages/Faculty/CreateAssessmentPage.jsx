@@ -59,6 +59,12 @@ export default function CreateAssessment() {
   const { theme } = useTheme();
   const { warning: showWarning, success: showSuccess, error: showError, choose } = useAppModal();
 
+  useEffect(() => {
+    const mainScroller = document.querySelector("main.en-scroll-region");
+    if (mainScroller) mainScroller.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }, []);
+
   const assessmentType = location.state?.type || "exam";
   const assessmentLabel = getAssessmentCategoryLabel(assessmentType);
   const selectedSubject = location.state?.subject;
@@ -72,6 +78,7 @@ export default function CreateAssessment() {
   const [loading, setLoading] = useState(false);
   const [savingToBankId, setSavingToBankId] = useState(null);
   const [error, setError] = useState("");
+  const [fieldErrorsByIndex, setFieldErrorsByIndex] = useState({});
   const [creationMode, setCreationMode] = useState("manual");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiProgress, setAiProgress] = useState(null);
@@ -146,6 +153,32 @@ export default function CreateAssessment() {
   }, [facultyProfile.role, facultyCanManage, navigate]);
 
   const clearError = () => setError("");
+  const clearFieldErrors = (questionIndex) => {
+    if (questionIndex == null) {
+      setFieldErrorsByIndex({});
+      return;
+    }
+    setFieldErrorsByIndex((prev) => {
+      if (!prev[questionIndex]) return prev;
+      const next = { ...prev };
+      delete next[questionIndex];
+      return next;
+    });
+  };
+  const clearQuestionFeedback = (questionIndex) => {
+    clearError();
+    clearFieldErrors(questionIndex);
+  };
+
+  const handleAddQuestionToSection = (sectionId) => {
+    clearError();
+    const result = addQuestionToSection(sectionId);
+    if (!result?.ok && result?.reason === "incomplete_question") {
+      setFieldErrorsByIndex({ [result.questionIndex]: result.fields });
+      return;
+    }
+    clearFieldErrors();
+  };
 
   const handleSaveQuestionToBank = async (question) => {
     if (savingToBankId != null) return;
@@ -310,14 +343,9 @@ export default function CreateAssessment() {
       if (mergeMode === "append") {
         // Keep questionnaire (or prior) questions; only report the source failure.
         aiReplaceSnapshotRef.current = null;
-        setError(
-          payload?.meta?.warning ||
-            "AI did not return usable questions from this pass. Your existing questions were kept."
-        );
         return;
       }
       restoreAiReplaceSnapshot();
-      setError("AI did not return usable questions. Adjust your prompt or file and try again.");
       return;
     }
 
@@ -347,24 +375,20 @@ export default function CreateAssessment() {
       };
     });
     applyAiExamDetailsRef.current = false;
-
-    setError(payload?.meta?.warning || "");
   };
 
   const handleAiError = (message) => {
-    if (!message) {
-      setError("");
-      return;
-    }
-
+    // AI errors render inside AssessmentAiGenerator; only restore page state here.
+    if (!message) return;
     restoreAiReplaceSnapshot();
-    setError(message);
     setAiGenerating(false);
     setAiProgress(null);
     applyAiExamDetailsRef.current = false;
   };
 
-  const clearAiError = () => setError("");
+  const clearAiError = () => {
+    // Intentionally empty for AI panel clears — page banner is for publish/validation only.
+  };
 
   const showQuestionPanel =
     creationMode === "manual" || questions.length > 0;
@@ -400,12 +424,14 @@ export default function CreateAssessment() {
         return;
       }
 
-      const validationError = validateAllQuestions();
-      if (validationError) {
-        setError(validationError);
+      const validation = validateAllQuestions();
+      if (validation) {
+        setFieldErrorsByIndex(validation.errorsByIndex || {});
         setLoading(false);
         return;
       }
+
+      clearFieldErrors();
 
       const questionsToSave = getQuestionsForSave();
       const formattedQuestions = questionsToSave
@@ -432,8 +458,14 @@ export default function CreateAssessment() {
         formattedQuestions
       );
 
-      showSuccess(`${assessmentLabel} created successfully.`);
-      navigate("/faculty/dashboard");
+      navigate("/faculty/dashboard", {
+        state: {
+          notice: {
+            variant: "success",
+            message: `${assessmentLabel} published`,
+          },
+        },
+      });
     } catch (err) {
       setError(err.message || "Failed to publish assessment.");
     } finally {
@@ -594,31 +626,39 @@ export default function CreateAssessment() {
                   questionSections={questionSections}
                   activeSectionId={activeSectionId}
                   questions={questions}
-                  onAddQuestionToSection={(sectionId) =>
-                    addQuestionToSection(sectionId, setError, clearError)
-                  }
+                  fieldErrorsByIndex={fieldErrorsByIndex}
+                  onAddQuestionToSection={handleAddQuestionToSection}
                   onUpdateQuestion={(index, field, value) =>
-                    updateQuestion(index, field, value, clearError)
+                    updateQuestion(index, field, value, clearQuestionFeedback)
                   }
                   onUpdateChoice={(qIndex, cIndex, value) =>
-                    updateChoice(qIndex, cIndex, value, clearError)
+                    updateChoice(qIndex, cIndex, value, clearQuestionFeedback)
                   }
                   onUpdateEnumAnswer={(qIndex, aIndex, value) =>
-                    updateEnumAnswer(qIndex, aIndex, value, clearError)
+                    updateEnumAnswer(qIndex, aIndex, value, clearQuestionFeedback)
                   }
                   onAddEnumAnswer={addEnumAnswer}
                   onRemoveEnumAnswer={removeEnumAnswer}
                   onAddEnumSlotAlternative={addEnumSlotAlternative}
                   onUpdateEnumSlotAlternative={(qIndex, aIndex, altIndex, value) =>
-                    updateEnumSlotAlternative(qIndex, aIndex, altIndex, value, clearError)
+                    updateEnumSlotAlternative(
+                      qIndex,
+                      aIndex,
+                      altIndex,
+                      value,
+                      clearQuestionFeedback
+                    )
                   }
                   onRemoveEnumSlotAlternative={removeEnumSlotAlternative}
                   onAddAlternativeAnswer={addAlternativeAnswer}
                   onUpdateAlternativeAnswer={(qIndex, aIndex, value) =>
-                    updateAlternativeAnswer(qIndex, aIndex, value, clearError)
+                    updateAlternativeAnswer(qIndex, aIndex, value, clearQuestionFeedback)
                   }
                   onRemoveAlternativeAnswer={removeAlternativeAnswer}
-                  onDeleteQuestion={deleteQuestion}
+                  onDeleteQuestion={(index) => {
+                    clearFieldErrors();
+                    deleteQuestion(index);
+                  }}
                   onSelectSection={setActiveSectionId}
                   onSaveQuestionToBank={handleSaveQuestionToBank}
                   savingToBankId={savingToBankId}

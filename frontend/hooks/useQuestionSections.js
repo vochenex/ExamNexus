@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef } from "react";
-import { createEmptyQuestion, getQuestionValidationMessage } from "../utils/assessmentQuestions";
+import { createEmptyQuestion, getQuestionValidationMessage, getQuestionInvalidFields } from "../utils/assessmentQuestions";
 import {
   buildSectionsFromQuestions,
   createQuestionSection,
@@ -180,11 +180,11 @@ export default function useQuestionSections(initialType = "multiple_choice") {
     setFormatPrompt(null);
   };
 
-  const addQuestionToSection = (sectionId, setError, clearError) => {
+  const addQuestionToSection = (sectionId) => {
     const section =
       questionSections.find((item) => item.id === sectionId) || activeSection;
 
-    if (!section) return null;
+    if (!section) return { ok: false, reason: "missing_section" };
 
     const sectionQuestions = questions.filter(
       (question) => question.sectionId === section.id
@@ -192,14 +192,19 @@ export default function useQuestionSections(initialType = "multiple_choice") {
 
     if (sectionQuestions.length > 0) {
       const last = sectionQuestions[sectionQuestions.length - 1];
-      const validationMessage = getQuestionValidationMessage(last, section.type);
-      if (validationMessage) {
-        setError(validationMessage);
-        return null;
+      const fields = getQuestionInvalidFields(last, section.type);
+      if (fields.length > 0) {
+        const questionIndex = questions.findIndex((item) => item === last);
+        return {
+          ok: false,
+          reason: "incomplete_question",
+          questionIndex,
+          fields,
+          message: getQuestionValidationMessage(last, section.type),
+        };
       }
     }
 
-    clearError?.();
     setActiveSectionId(section.id);
 
     const newQuestion = createEmptyQuestion(
@@ -209,14 +214,13 @@ export default function useQuestionSections(initialType = "multiple_choice") {
     );
 
     setQuestions((prev) => [...prev, newQuestion]);
-    return newQuestion;
+    return { ok: true, question: newQuestion };
   };
 
-  const addQuestion = (setError, clearError) =>
-    addQuestionToSection(activeSectionId, setError, clearError);
+  const addQuestion = () => addQuestionToSection(activeSectionId);
 
   const updateQuestion = (index, field, value, clearError) => {
-    clearError?.();
+    clearError?.(index);
     setQuestions((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
@@ -225,7 +229,7 @@ export default function useQuestionSections(initialType = "multiple_choice") {
   };
 
   const updateChoice = (qIndex, cIndex, value, clearError) => {
-    clearError?.();
+    clearError?.(qIndex);
     setQuestions((prev) => {
       const updated = [...prev];
       updated[qIndex].choices[cIndex] = value;
@@ -234,7 +238,7 @@ export default function useQuestionSections(initialType = "multiple_choice") {
   };
 
   const updateEnumAnswer = (qIndex, aIndex, value, clearError) => {
-    clearError?.();
+    clearError?.(qIndex);
     setQuestions((prev) => {
       const updated = [...prev];
       updated[qIndex].answers[aIndex] = value;
@@ -243,7 +247,7 @@ export default function useQuestionSections(initialType = "multiple_choice") {
   };
 
   const updateGrading = (index, grading, clearError) => {
-    clearError?.();
+    clearError?.(index);
     setQuestions((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], grading };
@@ -345,7 +349,7 @@ export default function useQuestionSections(initialType = "multiple_choice") {
   };
 
   const updateEnumSlotAlternative = (qIndex, answerIndex, altIndex, value, clearError) => {
-    clearError?.();
+    clearError?.(qIndex);
     setQuestions((prev) =>
       prev.map((question, i) => {
         if (i !== qIndex) return question;
@@ -407,7 +411,7 @@ export default function useQuestionSections(initialType = "multiple_choice") {
   };
 
   const updateAlternativeAnswer = (qIndex, aIndex, value, clearError) => {
-    clearError?.();
+    clearError?.(qIndex);
     setQuestions((prev) =>
       prev.map((question, i) => {
         if (i !== qIndex) return question;
@@ -447,15 +451,32 @@ export default function useQuestionSections(initialType = "multiple_choice") {
 
   const validateAllQuestions = () => {
     const ordered = getOrderedQuestions(questions, questionSections);
+    const errorsByIndex = {};
+    let firstMessage = null;
 
     for (let i = 0; i < ordered.length; i++) {
-      const validationMessage = getQuestionValidationMessage(ordered[i]);
-      if (validationMessage) {
-        return `Question ${i + 1}: ${validationMessage}`;
+      const question = ordered[i];
+      const fields = getQuestionInvalidFields(question);
+      if (fields.length === 0) continue;
+
+      const questionIndex = questions.findIndex((item) => item === question);
+      if (questionIndex >= 0) {
+        errorsByIndex[questionIndex] = fields;
+      }
+
+      if (!firstMessage) {
+        firstMessage =
+          getQuestionValidationMessage(question) ||
+          `Complete question ${i + 1}.`;
       }
     }
 
-    return null;
+    if (Object.keys(errorsByIndex).length === 0) return null;
+
+    return {
+      message: firstMessage,
+      errorsByIndex,
+    };
   };
 
   const getQuestionsForSave = () => getOrderedQuestions(questions, questionSections);

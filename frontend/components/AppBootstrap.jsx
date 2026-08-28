@@ -28,8 +28,20 @@ function PushNavigationBridge() {
         if (data.path.startsWith("/")) navigate(data.path);
       }
       if (data?.type === "en:push-received") {
+        const payload = data.payload || {};
+        const recipient = String(
+          payload?.data?.recipient_user_id || payload?.recipient_user_id || ""
+        ).trim();
+        try {
+          const cached = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+          if (recipient && cached?.id && String(cached.id) !== recipient) {
+            return;
+          }
+        } catch {
+          // ignore parse errors
+        }
         window.dispatchEvent(
-          new CustomEvent("en:push-received", { detail: data.payload || {} })
+          new CustomEvent("en:push-received", { detail: payload })
         );
       }
     };

@@ -10,6 +10,14 @@ export default function AnimatedPage({ children, className = "" }) {
     const node = containerRef.current;
     if (!node) return;
 
+    // Keep each route starting at the top of the dashboard main scroller
+    // (otherwise long pages like Create Assessment open mid/bottom).
+    const mainScroller = document.querySelector("main.en-scroll-region");
+    if (mainScroller) {
+      mainScroller.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+
     node.classList.remove("en-route-enter-active");
     // Force reflow so the enter animation replays on each navigation
     void node.offsetWidth;

@@ -6,11 +6,19 @@ import { getQuestionType, normalizeGradingOptions, ensureEnumAlternativesForAnsw
 import Select from "./ui/Select";
 import ProgressButton from "./ui/ProgressButton";
 
-const inputClass = (theme) =>
-  `w-full p-3 rounded-xl text-sm transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+const inputClass = (theme, invalid = false) =>
+  `w-full p-3 rounded-xl text-sm transition focus:outline-none focus:ring-2 ${
+    invalid
+      ? "border border-red-500 ring-2 ring-red-400 focus:ring-red-400"
+      : "focus:ring-emerald-400"
+  } ${
     theme === "dark"
-      ? "bg-white/10 text-white placeholder:text-gray-500 border border-white/10"
-      : "en-bg-elevated text-gray-900 placeholder:text-gray-400 border border-emerald-200"
+      ? invalid
+        ? "bg-white/10 text-white placeholder:text-gray-500"
+        : "bg-white/10 text-white placeholder:text-gray-500 border border-white/10"
+      : invalid
+        ? "en-bg-elevated text-gray-900 placeholder:text-gray-400"
+        : "en-bg-elevated text-gray-900 placeholder:text-gray-400 border border-emerald-200"
   }`;
 
 const labelClass = (theme) =>
@@ -49,6 +57,7 @@ export default function QuestionBuilderCard({
   index,
   examType,
   showAlternatives = false,
+  invalidFields = [],
   onUpdate,
   onUpdateChoice,
   onUpdateEnumAnswer,
@@ -71,13 +80,20 @@ export default function QuestionBuilderCard({
     grading,
     question.answers?.length || 0
   );
+  const invalid = new Set(invalidFields);
+  const hasInvalid = invalid.size > 0;
+  const isInvalid = (key) => invalid.has(key);
 
   return (
     <div
       className={`rounded-2xl border p-4 transition ${
-        theme === "dark"
-          ? "bg-black/20 border-white/10 hover:border-emerald-500/20"
-          : "bg-gradient-to-br from-white to-emerald-50/50 border-emerald-100 shadow-sm hover:shadow-md"
+        hasInvalid
+          ? theme === "dark"
+            ? "bg-black/20 border-red-500/50 ring-1 ring-red-400/40"
+            : "bg-gradient-to-br from-white to-red-50/40 border-red-300 shadow-sm ring-1 ring-red-300/50"
+          : theme === "dark"
+            ? "bg-black/20 border-white/10 hover:border-emerald-500/20"
+            : "bg-gradient-to-br from-white to-emerald-50/50 border-emerald-100 shadow-sm hover:shadow-md"
       }`}
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -129,10 +145,11 @@ export default function QuestionBuilderCard({
           <label className={labelClass(theme)}>Question</label>
           <textarea
             rows={type === "essay" ? 3 : 2}
-            className={inputClass(theme)}
+            className={inputClass(theme, isInvalid("question"))}
             placeholder="Enter the question prompt"
             value={question.question}
             onChange={(e) => onUpdate("question", e.target.value)}
+            aria-invalid={isInvalid("question")}
           />
         </div>
 
@@ -150,10 +167,11 @@ export default function QuestionBuilderCard({
                     {choiceLabel(choiceIndex)}.
                   </span>
                   <input
-                    className={inputClass(theme)}
+                    className={inputClass(theme, isInvalid(`choice:${choiceIndex}`))}
                     placeholder={`${choiceLabel(choiceIndex)}. Answer choice`}
                     value={stripChoicePrefix(choice)}
                     onChange={(e) => onUpdateChoice(choiceIndex, e.target.value)}
+                    aria-invalid={isInvalid(`choice:${choiceIndex}`)}
                   />
                 </div>
               ))}
@@ -163,6 +181,7 @@ export default function QuestionBuilderCard({
               <Select
                 value={question.answer || ""}
                 onChange={(e) => onUpdate("answer", e.target.value)}
+                invalid={isInvalid("answer")}
               >
                 <option value="">Select correct choice</option>
                 {question.choices.map((choice, choiceIndex) => (
@@ -204,10 +223,11 @@ export default function QuestionBuilderCard({
                       {answerIndex + 1}.
                     </span>
                     <input
-                      className={inputClass(theme)}
+                      className={inputClass(theme, isInvalid(`enum:${answerIndex}`))}
                       placeholder={`Correct answer ${answerIndex + 1}`}
                       value={answer || ""}
                       onChange={(e) => onUpdateEnumAnswer(answerIndex, e.target.value)}
+                      aria-invalid={isInvalid(`enum:${answerIndex}`)}
                     />
                     {question.answers.length > 1 && (
                       <button
@@ -234,7 +254,10 @@ export default function QuestionBuilderCard({
                         {(enumAlternatives[answerIndex] || []).map((alternative, altIndex) => (
                           <div key={altIndex} className="flex items-center gap-2">
                             <input
-                              className={inputClass(theme)}
+                              className={inputClass(
+                                theme,
+                                isInvalid(`enumAlt:${answerIndex}:${altIndex}`)
+                              )}
                               placeholder={`Alternative ${altIndex + 1}`}
                               value={alternative || ""}
                               onChange={(e) =>
@@ -244,6 +267,9 @@ export default function QuestionBuilderCard({
                                   e.target.value
                                 )
                               }
+                              aria-invalid={isInvalid(
+                                `enumAlt:${answerIndex}:${altIndex}`
+                              )}
                             />
                             <button
                               type="button"
@@ -295,10 +321,11 @@ export default function QuestionBuilderCard({
             <div>
               <label className={labelClass(theme)}>Correct answer</label>
               <input
-                className={inputClass(theme)}
+                className={inputClass(theme, isInvalid("answer"))}
                 placeholder='e.g. RAM-Random Access Memory'
                 value={question.answer || ""}
                 onChange={(e) => onUpdate("answer", e.target.value)}
+                aria-invalid={isInvalid("answer")}
               />
               <p
                 className={`mt-1.5 text-xs ${
@@ -326,12 +353,13 @@ export default function QuestionBuilderCard({
                   {grading.alternatives.map((alternative, answerIndex) => (
                     <div key={answerIndex} className="flex items-center gap-2">
                       <input
-                        className={inputClass(theme)}
+                        className={inputClass(theme, isInvalid(`alt:${answerIndex}`))}
                         placeholder={`Alternative ${answerIndex + 1}`}
                         value={alternative || ""}
                         onChange={(e) =>
                           onUpdateAlternativeAnswer(answerIndex, e.target.value)
                         }
+                        aria-invalid={isInvalid(`alt:${answerIndex}`)}
                       />
                       <button
                         type="button"
@@ -367,6 +395,7 @@ export default function QuestionBuilderCard({
             <Select
               value={question.answer || ""}
               onChange={(e) => onUpdate("answer", e.target.value)}
+              invalid={isInvalid("answer")}
             >
               <option value="">Select True or False</option>
               <option value="true">True</option>
@@ -400,5 +429,5 @@ export function assessmentPanelClass(theme) {
 }
 
 export function assessmentInputClass(theme) {
-  return inputClass(theme, "box-border max-w-full min-w-0");
+  return `${inputClass(theme)} box-border max-w-full min-w-0`;
 }

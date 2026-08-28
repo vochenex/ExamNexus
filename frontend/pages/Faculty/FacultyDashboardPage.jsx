@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import {
   createSubject,
@@ -56,6 +56,7 @@ import FacultyExportPanel from "../../components/FacultyExportPanel";
 import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
 import ProgressButton from "../../components/ui/ProgressButton";
 import ModalPortal from "../../components/ui/ModalPortal";
+import AlertBanner from "../../components/ui/AlertBanner";
 
 function panelClass(theme) {
   return theme === "dark"
@@ -101,6 +102,8 @@ export default function FacultyDashboard() {
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [flashNotice, setFlashNotice] = useState(null);
   const [deletingSubjectId, setDeletingSubjectId] = useState(null);
   const [savingSubjectId, setSavingSubjectId] = useState(null);
   const [dashAnalytics, setDashAnalytics] = useState(null);
@@ -112,6 +115,14 @@ export default function FacultyDashboard() {
   const facultyCanManage = canFacultyManageSubjects(facultyProfile);
   const { theme } = useTheme();
   const { error: showError, warning: showWarning, confirm, success } = useAppModal();
+
+  useEffect(() => {
+    const notice = location.state?.notice;
+    if (!notice?.message) return;
+
+    setFlashNotice(notice);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, navigate]);
 
   const fetchSubjects = useCallback(async (silent = false) => {
     if (!teacherId) {
@@ -291,6 +302,15 @@ export default function FacultyDashboard() {
       }`}
     >
       <div className="mx-auto w-full max-w-7xl">
+      {flashNotice?.message && (
+        <AlertBanner
+          variant={flashNotice.variant || "success"}
+          className="mb-6"
+        >
+          {flashNotice.message}
+        </AlertBanner>
+      )}
+
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
