@@ -2855,6 +2855,20 @@ export async function fetchStudentAssessments(studentId) {
     ])
   );
 
+  const { data: subjects, error: subjectsError } = await supabase
+    .from("subjects")
+    .select("id, name, section_count")
+    .in("id", subjectIds);
+
+  if (subjectsError) throw subjectsError;
+
+  const sectionsBySubject = new Map(
+    (subjects || []).map((subject) => [subject.id, getSubjectSections(subject)])
+  );
+  const subjectNameById = new Map(
+    (subjects || []).map((subject) => [subject.id, subject.name])
+  );
+
   const { data: exams, error: examError } = await supabase
     .from("exams")
     .select("*, subjects:subject_id ( id, name )")
@@ -2866,7 +2880,8 @@ export async function fetchStudentAssessments(studentId) {
   const visibleExams = (exams || []).filter((exam) =>
     isVisibleToSection(
       exam.target_sections,
-      sectionBySubject.get(exam.subject_id) || "A"
+      sectionBySubject.get(exam.subject_id) || "A",
+      sectionsBySubject.get(exam.subject_id)
     )
   );
 
@@ -2900,17 +2915,6 @@ export async function fetchStudentAssessments(studentId) {
     );
   }
 
-  const { data: subjects, error: subjectsError } = await supabase
-    .from("subjects")
-    .select("id, name")
-    .in("id", subjectIds);
-
-  if (subjectsError) throw subjectsError;
-
-  const subjectNameById = new Map(
-    (subjects || []).map((subject) => [subject.id, subject.name])
-  );
-
   return visibleExams.map((exam) => {
     const retakeStatus = retakeByExamId.get(exam.id) || null;
     const submitted =
@@ -2935,11 +2939,15 @@ export async function fetchStudentAssessments(studentId) {
 export async function fetchStudentSubjectAssessments(studentId, subjectId) {
   await requireSession();
 
-  const section = await fetchStudentEnrollmentSection(studentId, subjectId);
-  const exams = await fetchSubjectAssessments(subjectId);
+  const [section, subject, exams] = await Promise.all([
+    fetchStudentEnrollmentSection(studentId, subjectId),
+    fetchSubject(subjectId).catch(() => null),
+    fetchSubjectAssessments(subjectId),
+  ]);
+  const subjectSections = getSubjectSections(subject);
 
   return (exams || []).filter((exam) =>
-    isVisibleToSection(exam.target_sections, section || "A")
+    isVisibleToSection(exam.target_sections, section || "A", subjectSections)
   );
 }
 

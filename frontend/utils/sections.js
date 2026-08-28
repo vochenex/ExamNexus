@@ -79,9 +79,13 @@ export function formatTargetSectionsLabel(sections, availableSections = getSecti
   return normalized.map((section) => formatSectionLabel(section)).join(", ");
 }
 
-export function isVisibleToSection(targetSections, studentSection, availableSections = getSectionsForCount(DEFAULT_SECTION_COUNT)) {
+export function isVisibleToSection(targetSections, studentSection, availableSections) {
   const section = String(studentSection || "A").trim().toUpperCase();
-  return normalizeTargetSections(targetSections, availableSections).includes(section);
+  const allowed =
+    Array.isArray(availableSections) && availableSections.length
+      ? availableSections
+      : getSectionsForCount(MAX_SECTION_COUNT);
+  return normalizeTargetSections(targetSections, allowed).includes(section);
 }
 
 export function formatSectionLabel(section) {

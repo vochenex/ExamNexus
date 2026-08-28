@@ -11,6 +11,45 @@ const ROOT_PATHS = new Set([
   "/admin/dashboard",
 ]);
 
+const TOP_LEVEL_BY_ROLE = {
+  student: new Set([
+    "/student/dashboard",
+    "/student/profile",
+    "/student/subjects",
+    "/student/assessments",
+    "/student/announcements",
+    "/student/results",
+    "/student/platform-announcements",
+  ]),
+  faculty: new Set([
+    "/faculty/dashboard",
+    "/faculty/profile",
+    "/faculty/question-bank",
+    "/faculty/announcements",
+    "/faculty/exports",
+    "/faculty/platform-announcements",
+  ]),
+  admin: new Set([
+    "/admin/dashboard",
+    "/admin/profile",
+    "/admin/accounts",
+    "/admin/password-resets",
+    "/admin/subjects",
+    "/admin/assigned-subjects",
+    "/admin/catalog",
+    "/admin/assessments",
+    "/admin/announcements",
+    "/admin/exam-logs",
+    "/admin/exports",
+  ]),
+};
+
+function isTopLevelAppPath(pathname, role) {
+  const normalized = String(role || "").toLowerCase();
+  const paths = TOP_LEVEL_BY_ROLE[normalized];
+  return Boolean(paths?.has(pathname));
+}
+
 export function bumpAuthNavigationEpoch() {
   try {
     const next = String(Date.now());
@@ -76,7 +115,11 @@ export function getSafeBackPath(pathname) {
     return home;
   }
 
-  if (pathname === home || ROOT_PATHS.has(pathname)) {
+  if (
+    pathname === home ||
+    ROOT_PATHS.has(pathname) ||
+    isTopLevelAppPath(pathname, user?.role)
+  ) {
     return null;
   }
 

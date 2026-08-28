@@ -1,6 +1,11 @@
 -- Extends class sections beyond A/B/C (up to section L / count 12)
--- Run in Supabase SQL Editor after subject_section_count.sql
+-- Run in Supabase Dashboard → SQL Editor after subject_section_count.sql
+--
+-- IMPORTANT: Run during low traffic. If you see "deadlock detected", run each
+-- STEP below as its own query (highlight one step → Run). Do not run the whole
+-- file at once while the live app is polling exams/announcements.
 
+-- ========== STEP 1 — subjects + enrollments ==========
 ALTER TABLE public.subjects
   DROP CONSTRAINT IF EXISTS subjects_section_count_check;
 
@@ -18,30 +23,29 @@ ALTER TABLE public.subject_students
   ADD CONSTRAINT subject_students_section_check
   CHECK (section ~ '^[A-L]$');
 
--- Section letters A through L
-DO $$
-BEGIN
-  ALTER TABLE public.exams
-    DROP CONSTRAINT IF EXISTS exams_target_sections_check;
+-- ========== STEP 2 — exams target sections (run alone if STEP 3 deadlocks) ==========
+ALTER TABLE public.exams
+  DROP CONSTRAINT IF EXISTS exams_target_sections_check;
 
-  ALTER TABLE public.exams
-    ADD CONSTRAINT exams_target_sections_check
-    CHECK (
-      target_sections <@ ARRAY['A','B','C','D','E','F','G','H','I','J','K','L']::text[]
-      AND cardinality(target_sections) >= 1
-    );
+ALTER TABLE public.exams
+  ADD CONSTRAINT exams_target_sections_check
+  CHECK (
+    target_sections <@ ARRAY['A','B','C','D','E','F','G','H','I','J','K','L']::text[]
+    AND cardinality(target_sections) >= 1
+  );
 
-  ALTER TABLE public.announcements
-    DROP CONSTRAINT IF EXISTS announcements_target_sections_check;
+-- ========== STEP 3 — announcements target sections (run alone after STEP 2 succeeds) ==========
+ALTER TABLE public.announcements
+  DROP CONSTRAINT IF EXISTS announcements_target_sections_check;
 
-  ALTER TABLE public.announcements
-    ADD CONSTRAINT announcements_target_sections_check
-    CHECK (
-      target_sections <@ ARRAY['A','B','C','D','E','F','G','H','I','J','K','L']::text[]
-      AND cardinality(target_sections) >= 1
-    );
-END $$;
+ALTER TABLE public.announcements
+  ADD CONSTRAINT announcements_target_sections_check
+  CHECK (
+    target_sections <@ ARRAY['A','B','C','D','E','F','G','H','I','J','K','L']::text[]
+    AND cardinality(target_sections) >= 1
+  );
 
+-- ========== STEP 4 — invite enrollment (optional; safe to re-run) ==========
 CREATE OR REPLACE FUNCTION public.enroll_student_by_invite_code(
   p_invite_code text,
   p_section text DEFAULT 'A'

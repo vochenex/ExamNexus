@@ -1174,15 +1174,6 @@ function getAuthInputProps(theme) {
         : "Join ExamNexus as a student or faculty member."}
   </p>
 
-          {(authView === "login" || authView === "signup") && (
-            <AuthRoleToggle
-              value={form.role}
-              onChange={handleRoleChange}
-              theme={theme}
-              className="mb-5"
-            />
-          )}
-
           <form onSubmit={handleSubmit}>
             {authView === "forgot" ? (
               <div className="space-y-4">
@@ -1411,13 +1402,21 @@ function getAuthInputProps(theme) {
             ) : (
               <>
                 {authView === "signup" && (
-                  <SignupFormFields
-                    form={form}
-                    errors={errors}
-                    theme={theme}
-                    authInputProps={authInputProps}
-                    onFieldChange={handleChange}
-                  />
+                  <>
+                    <AuthRoleToggle
+                      value={form.role}
+                      onChange={handleRoleChange}
+                      theme={theme}
+                      className="mb-5"
+                    />
+                    <SignupFormFields
+                      form={form}
+                      errors={errors}
+                      theme={theme}
+                      authInputProps={authInputProps}
+                      onFieldChange={handleChange}
+                    />
+                  </>
                 )}
 
                 {authView === "signup" && (
