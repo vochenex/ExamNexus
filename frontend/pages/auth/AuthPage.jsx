@@ -47,7 +47,6 @@ import {
   peekAuthNotice,
 } from "../../utils/authNotice";
 import SignupWizard from "../../components/auth/SignupWizard";
-import SignupStepRail from "../../components/auth/SignupStepRail";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import HomeSiteHeader from "../../components/home/HomeSiteHeader";
 import HomeBottomBar from "../../components/home/HomeBottomBar";
@@ -89,7 +88,6 @@ export default function ExamNexusAuth() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isLogin, setIsLogin] = useState(true);
   const [authView, setAuthView] = useState("login");
-  const [signupStep, setSignupStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
   const [errors, setErrors] = useState({});
@@ -126,7 +124,7 @@ export default function ExamNexusAuth() {
   useEffect(() => {
     if (authView !== "signup" || !formPanelRef.current) return;
     formPanelRef.current.scrollTop = 0;
-  }, [authView, signupStep]);
+  }, [authView]);
 
   const updateSavedScrollState = () => {
     const list = savedListRef.current;
@@ -533,7 +531,6 @@ function getAuthInputProps(theme) {
   const switchToLogin = () => {
     setAuthView("login");
     setIsLogin(true);
-    setSignupStep(1);
     setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
@@ -547,7 +544,6 @@ function getAuthInputProps(theme) {
   const switchToSignup = () => {
     setAuthView("signup");
     setIsLogin(false);
-    setSignupStep(1);
     setEmailManuallyEdited(false);
     setErrors({});
     setServerError("");
@@ -783,8 +779,6 @@ function getAuthInputProps(theme) {
   try {
     e.preventDefault();
 
-    if (authView === "signup" && signupStep < 3) return;
-
     if (!validate()) return;
 
     if (authView === "forgot") {
@@ -992,7 +986,7 @@ function getAuthInputProps(theme) {
 };
 
   const authInputProps = getAuthInputProps(theme);
-  const swapPanels = authView === "signup";
+  const signupFullWidth = authView === "signup";
   const useBlendCard = authView === "login" || authView === "signup";
 
   return (
@@ -1078,7 +1072,7 @@ function getAuthInputProps(theme) {
     w-full
     mx-auto
     ${useBlendCard ? "" : "rounded-[2rem] overflow-hidden backdrop-blur-2xl border"}
-    ${swapPanels ? "en-auth-card--signup" : ""}
+    ${signupFullWidth ? "en-auth-card--signup-columns" : ""}
     ${authView === "forgot" ? "en-auth-card--forgot" : ""}
     ${useBlendCard ? "en-auth-card--blend" : ""}
     ${savedOpen && authView === "login" ? "en-auth-card--saved-open" : ""}
@@ -1095,8 +1089,8 @@ function getAuthInputProps(theme) {
         
         {/* Branding Panel — tablet/desktop; slides to the right on sign up */}
         <div
-          className={`en-auth-panel-brand hidden md:flex flex-col p-8 md:p-10 ${
-            authView === "signup" ? "en-auth-panel-brand--signup items-start justify-start" : "items-center justify-center"
+          className={`en-auth-panel-brand hidden md:flex flex-col items-center justify-center p-8 md:p-10 ${
+            signupFullWidth ? "en-auth-panel-brand--hidden-signup" : ""
           } ${
             useBlendCard
               ? "bg-transparent"
@@ -1120,11 +1114,7 @@ function getAuthInputProps(theme) {
             </>
           )}
 
-          <div
-            className={`relative z-10 flex w-full flex-col ${
-              authView === "signup" ? "items-start" : "items-center"
-            }`}
-          >
+          <div className="relative z-10 flex w-full flex-col items-center">
             <div className="max-w-sm w-full">
               <ExamNexusBrand
                 variant="hero"
@@ -1133,7 +1123,6 @@ function getAuthInputProps(theme) {
                 panelTone={useBlendCard && theme === "light" ? "light" : "dark"}
               />
             </div>
-            {authView === "signup" ? <SignupStepRail step={signupStep} theme={theme} /> : null}
           </div>
         </div>
 
@@ -1161,7 +1150,11 @@ function getAuthInputProps(theme) {
 
   <h2
     className={`text-xl font-bold md:text-2xl ${
-      theme === "dark" ? "text-emerald-400" : "text-slate-900"
+      authView === "signup"
+        ? "text-emerald-400"
+        : theme === "dark"
+          ? "text-emerald-400"
+          : "text-slate-900"
     }`}
   >
     {authView === "forgot"
@@ -1183,7 +1176,7 @@ function getAuthInputProps(theme) {
         : "Submit a request and an administrator will reset your password."
       : isLogin
         ? "Sign in to continue to ExamNexus."
-        : "Three quick steps — account, school, then login."}
+        : "Fill in all three sections, then create your account."}
   </p>
 
           <form onSubmit={handleSubmit}>
@@ -1421,9 +1414,6 @@ function getAuthInputProps(theme) {
                     authInputProps={authInputProps}
                     onFieldChange={handleChange}
                     onRoleChange={handleRoleChange}
-                    step={signupStep}
-                    onStepChange={setSignupStep}
-                    setErrors={setErrors}
                     showPassword={showPassword}
                     setShowPassword={setShowPassword}
                     emailCopied={emailCopied}

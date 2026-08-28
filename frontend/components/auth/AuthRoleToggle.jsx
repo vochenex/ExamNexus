@@ -11,21 +11,13 @@ export default function AuthRoleToggle({
 
   return (
     <div className={className}>
-      <p
-        className={`mb-2 text-xs font-semibold uppercase tracking-wider ${
-          theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
-        }`}
-      >
+      <p className="en-signup-label mb-2 text-xs font-semibold uppercase tracking-wider">
         Account type
       </p>
       <div
         className={`${
           isStack ? "flex flex-col gap-2" : "grid grid-cols-2 gap-2"
-        } rounded-2xl border p-1.5 ${
-          theme === "dark"
-            ? "border-white/10 bg-white/[0.03]"
-            : "border-emerald-200/80 bg-emerald-50/50"
-        }`}
+        } en-signup-role-toggle rounded-2xl border p-1.5`}
       >
         {[
           { value: "Student", label: "Student", icon: GraduationCap },
@@ -41,12 +33,8 @@ export default function AuthRoleToggle({
                 isStack ? "justify-start" : "justify-center"
               } ${
                 active
-                  ? theme === "dark"
-                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
-                    : "bg-white text-teal-800 shadow-md ring-1 ring-emerald-200/80"
-                  : theme === "dark"
-                    ? "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                    : "text-gray-600 hover:bg-white/80 hover:text-teal-800"
+                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/30"
+                  : "text-emerald-200/70 hover:bg-emerald-500/10 hover:text-emerald-100"
               }`}
             >
               <Icon size={16} aria-hidden="true" />

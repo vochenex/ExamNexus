@@ -37,6 +37,98 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
   min-width: 0;
 }
 
+/* Signup — three columns, black/green gradient panels */
+.en-signup-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+@media (min-width: 900px) {
+  .en-signup-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.en-signup-column {
+  min-width: 0;
+  padding: 1.1rem 1.15rem 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: linear-gradient(
+    165deg,
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(6, 40, 30, 0.88) 45%,
+    rgba(4, 74, 55, 0.75) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(16, 185, 129, 0.12),
+    0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+html.light .en-signup-column {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(
+    165deg,
+    rgba(8, 12, 10, 0.96) 0%,
+    rgba(10, 48, 36, 0.92) 50%,
+    rgba(6, 95, 70, 0.85) 100%
+  );
+}
+
+.en-signup-section-title {
+  color: #6ee7b7;
+  border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+  padding-bottom: 0.65rem;
+}
+
+.en-signup-label {
+  color: rgba(209, 250, 229, 0.9);
+}
+
+.en-signup-hint {
+  color: rgba(167, 243, 208, 0.55);
+}
+
+.en-signup-role-toggle {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.en-signup-form .examnexus-auth-input,
+.en-signup-form .en-auth-native-select {
+  border-color: rgba(16, 185, 129, 0.2) !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  color: #ecfdf5 !important;
+}
+
+.en-signup-form .examnexus-auth-input::placeholder {
+  color: rgba(167, 243, 208, 0.4);
+}
+
+.en-signup-form .examnexus-auth-input:focus,
+.en-signup-form .en-auth-native-select:focus {
+  border-color: rgba(52, 211, 153, 0.55) !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.en-signup-submit {
+  max-width: 20rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.en-auth-native-select {
+  color-scheme: dark;
+}
+
+html:not(.light) .en-auth-native-select option,
+html.light .en-auth-native-select option {
+  background-color: #0a0f0d;
+  color: #ecfdf5;
+}
+
 /* Phone only: stacked, brand hidden — form uses full width */
 @media (max-width: 767px) {
   .en-auth-card {
@@ -83,41 +175,28 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
     isolation: auto !important;
   }
 
-  .en-auth-card--blend.en-auth-card--signup {
-    min-height: min(70vh, 580px) !important;
-    max-height: calc(100dvh - 9rem);
+  .en-auth-card--blend.en-auth-card--signup-columns {
+    min-height: min(72vh, 640px) !important;
+    max-width: min(96rem, 98vw);
   }
 
-  .en-auth-card--signup .en-auth-panel-form {
-    overflow-y: hidden !important;
+  .en-auth-card--signup-columns .en-auth-panel-brand,
+  .en-auth-card--signup-columns .en-auth-panel-brand--hidden-signup {
+    display: none !important;
   }
 
-  .en-auth-panel-brand--signup {
-    justify-content: flex-start !important;
-    padding-top: 2rem !important;
+  .en-auth-card--signup-columns .en-auth-panel-form {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    left: auto !important;
+    transform: none !important;
     overflow-y: auto !important;
+    justify-content: flex-start !important;
   }
 
-  .en-auth-card--signup .en-auth-form-inner {
-    max-width: min(24rem, 100%);
-  }
-
-  .en-auth-native-select {
-    color-scheme: dark;
-  }
-
-  html.light .en-auth-native-select {
-    color-scheme: light;
-  }
-
-  html:not(.light) .en-auth-native-select option {
-    background-color: #111827;
-    color: #f3f4f6;
-  }
-
-  html.light .en-auth-native-select option {
-    background-color: #ffffff;
-    color: #0f172a;
+  .en-auth-card--signup-columns .en-auth-form-inner {
+    max-width: 100%;
   }
 
   /* Forgot has more fields — taller card + guaranteed form scroll */
