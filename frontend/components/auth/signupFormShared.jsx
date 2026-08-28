@@ -2,7 +2,7 @@ export function SectionTitle({ children, theme }) {
   const isDark = theme === "dark";
   return (
     <h3
-      className={`en-signup-section-title mb-3 text-[11px] font-semibold uppercase tracking-wider ${
+      className={`en-signup-section-title mb-2.5 text-xs font-semibold uppercase tracking-wider ${
         isDark ? "text-emerald-400/85" : "text-emerald-700"
       }`}
     >
@@ -15,7 +15,7 @@ export function FieldLabel({ children, theme, htmlFor }) {
   return (
     <label
       htmlFor={htmlFor}
-      className={`mb-1 block text-xs font-medium ${
+      className={`mb-1.5 block text-sm font-medium ${
         theme === "dark" ? "text-gray-300" : "text-gray-700"
       }`}
     >

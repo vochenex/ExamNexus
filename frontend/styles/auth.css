@@ -48,7 +48,7 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
 @media (min-width: 768px) {
   .en-signup-columns {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.65rem 0.85rem;
+    gap: 0.85rem 1.1rem;
   }
 }
 
@@ -88,10 +88,10 @@ html.light .en-signup-hint {
 
 .en-signup-form .examnexus-auth-input,
 .en-signup-form .en-auth-native-select {
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  font-size: 0.8125rem;
-  line-height: 1.35;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .en-auth-native-select {
@@ -140,18 +140,18 @@ html.light .en-auth-native-select {
   }
 
   .en-auth-card--blend {
-    height: min(72vh, 580px) !important;
-    min-height: min(72vh, 580px) !important;
-    max-height: calc(100dvh - 9.5rem) !important;
-    max-width: min(64rem, 94vw);
+    height: min(86vh, 720px) !important;
+    min-height: min(86vh, 720px) !important;
+    max-height: calc(100dvh - 7rem) !important;
+    max-width: min(72rem, 96vw);
     overflow: hidden !important;
     isolation: isolate !important;
   }
 
   .en-auth-card--blend.en-auth-card--signup {
-    height: min(72vh, 580px) !important;
-    min-height: min(72vh, 580px) !important;
-    max-width: min(68rem, 94vw);
+    height: min(86vh, 720px) !important;
+    min-height: min(86vh, 720px) !important;
+    max-width: min(78rem, 96vw);
   }
 
   .en-auth-card--signup .en-auth-form-inner {
@@ -159,8 +159,20 @@ html.light .en-auth-native-select {
   }
 
   .en-auth-card--signup .en-auth-panel-form {
+    justify-content: center !important;
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+    overflow: hidden !important;
+  }
+
+  .en-auth-card--blend .en-auth-panel-brand,
+  .en-auth-card--blend .en-auth-panel-form {
+    overflow: hidden !important;
+  }
+
+  .en-auth-card--forgot .en-auth-panel-form {
+    overflow-y: auto !important;
     justify-content: flex-start !important;
-    padding-top: 1.25rem !important;
   }
 
   /* Forgot has more fields — taller card + guaranteed form scroll */
@@ -191,8 +203,12 @@ html.light .en-auth-native-select {
 
   .en-auth-card--blend .en-auth-panel-brand,
   .en-auth-card--blend .en-auth-panel-form {
+    overflow: hidden !important;
+  }
+
+  .en-auth-card--forgot .en-auth-panel-brand,
+  .en-auth-card--forgot .en-auth-panel-form {
     overflow-y: auto !important;
-    scrollbar-gutter: stable;
   }
 
   .en-auth-panel-brand {
@@ -212,7 +228,6 @@ html.light .en-auth-native-select {
     justify-content: flex-start !important;
     padding-top: 1.25rem !important;
     padding-bottom: 1.25rem !important;
-    overflow-y: auto !important;
     overflow-x: hidden !important;
     overscroll-behavior: contain;
     touch-action: pan-y;
@@ -223,9 +238,14 @@ html.light .en-auth-native-select {
   }
 
   .en-auth-card--blend .en-auth-panel-form {
+    overflow-y: hidden !important;
+  }
+
+  .en-auth-card--blend .en-auth-panel-form {
     justify-content: center !important;
-    padding-top: 1.5rem !important;
-    padding-bottom: 1.5rem !important;
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+    overflow: hidden !important;
   }
 
   .en-auth-panel-form::-webkit-scrollbar {
@@ -335,7 +355,11 @@ html.light .en-auth-native-select {
 
 @media (min-width: 768px) {
   .en-auth-form-inner {
-    max-width: min(22rem, 100%);
+    max-width: min(26rem, 100%);
+  }
+
+  .en-auth-card--signup .en-auth-form-inner {
+    max-width: 100%;
   }
 }
 

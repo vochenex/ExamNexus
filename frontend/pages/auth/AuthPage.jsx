@@ -1161,9 +1161,9 @@ function getAuthInputProps(theme) {
         : "Create your account"}
   </h2>
   <p
-    className={`mt-1 mb-4 text-sm leading-relaxed ${
-      theme === "dark" ? "text-gray-400" : "text-gray-600"
-    }`}
+    className={`mt-1 text-sm leading-relaxed ${
+      authView === "signup" ? "mb-3" : "mb-4"
+    } ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
   >
     {authView === "forgot"
       ? forgotMode === "update"
