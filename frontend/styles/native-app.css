@@ -115,9 +115,31 @@
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner {
-  max-width: 28rem;
+  max-width: min(28rem, 100%);
   margin-left: auto;
   margin-right: auto;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-form-inner {
+  max-width: 100%;
+}
+
+/* Phone: stacked signup columns with separators (not side borders) */
+:is(html.en-native-app, html.en-mobile-shell) .en-signup-column:not(:last-child) {
+  border-right: none;
+  padding-right: 0;
+  border-bottom: 1px solid rgba(16, 185, 129, 0.14);
+  padding-bottom: 1rem;
+}
+
+html.light.en-native-app .en-signup-column:not(:last-child),
+html.light.en-mobile-shell .en-signup-column:not(:last-child) {
+  border-bottom-color: rgba(5, 150, 105, 0.18);
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-signup-format-hint {
+  font-size: 0.8125rem;
+  line-height: 1.35;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner h2 {
@@ -133,21 +155,37 @@
   display: none !important;
 }
 
-/* Native tablet: split logo | form, centered like web */
+/* Native tablet+: split logo | form — match desktop blend card sizing */
 @media (min-width: 768px) {
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-body {
     align-items: center !important;
     justify-content: center !important;
     min-height: calc(100dvh - var(--en-native-topbar-height) - var(--en-safe-top) - 1rem);
+    overflow: hidden !important;
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {
-    max-width: min(52rem, 94vw);
+    position: relative;
+    max-width: min(56rem, 92vw);
     margin-inline: auto;
-    height: min(70dvh, 540px) !important;
+    height: min(74dvh, 560px) !important;
     max-height: calc(100dvh - 9.5rem) !important;
-    min-height: 400px !important;
+    min-height: 420px !important;
     overflow: hidden !important;
+    isolation: isolate;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend {
+    height: min(90dvh, 780px) !important;
+    min-height: min(90dvh, 780px) !important;
+    max-height: calc(100dvh - 6rem) !important;
+    max-width: min(76rem, 96vw);
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend.en-auth-card--signup {
+    height: min(90dvh, 780px) !important;
+    min-height: min(90dvh, 780px) !important;
+    max-width: min(88rem, 98vw);
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-brand {
@@ -159,6 +197,9 @@
     width: 50% !important;
     max-width: 50% !important;
     padding: 1.5rem !important;
+    overflow: hidden !important;
+    transform: translateX(0);
+    transition: transform 0.9s cubic-bezier(0.33, 1, 0.68, 1);
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-form {
@@ -169,17 +210,15 @@
     width: 50% !important;
     max-width: 50% !important;
     height: auto !important;
+    min-height: 0;
     transform: translateX(100%) !important;
     padding: 1.25rem 1.5rem !important;
-    overflow-y: auto !important;
+    overflow: hidden !important;
     overscroll-behavior: contain;
     display: flex !important;
     flex-direction: column;
-    justify-content: flex-start;
-  }
-
-  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup {
-    height: min(78dvh, 620px) !important;
+    justify-content: center !important;
+    transition: transform 0.9s cubic-bezier(0.33, 1, 0.68, 1);
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-panel-brand {
@@ -188,13 +227,71 @@
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-panel-form {
     transform: translateX(0) !important;
-    justify-content: flex-start;
+    justify-content: center !important;
+    overflow: hidden !important;
   }
 
   :is(html.en-native-app, html.en-mobile-shell) .en-auth-form-inner {
-    max-width: 22rem;
+    max-width: min(28rem, 100%);
     margin-top: 0;
     margin-bottom: 0;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--signup .en-auth-form-inner {
+    max-width: 100%;
+    padding-bottom: 1rem;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-signup-column:not(:last-child) {
+    border-bottom: none;
+    padding-bottom: 0;
+    border-right: 1px solid rgba(16, 185, 129, 0.14);
+    padding-right: 0.85rem;
+  }
+}
+
+/* Mid-width tablets: login full-width form; signup keeps split (matches auth.css) */
+@media (min-width: 768px) and (max-width: 900px) {
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend {
+    max-width: min(40rem, 94vw);
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend.en-auth-card--signup {
+    max-width: min(68rem, 96vw);
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend .en-auth-panel-brand {
+    display: none !important;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend.en-auth-card--signup .en-auth-panel-brand {
+    display: flex !important;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend .en-auth-panel-form {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+    left: auto !important;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend.en-auth-card--signup .en-auth-panel-form {
+    position: absolute !important;
+    width: 50% !important;
+    max-width: 50% !important;
+    transform: translateX(0) !important;
+  }
+
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-card--blend.en-auth-card--signup .en-auth-panel-brand {
+    transform: translateX(100%) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-brand,
+  :is(html.en-native-app, html.en-mobile-shell) .en-auth-panel-form {
+    transition: none !important;
   }
 }
 
