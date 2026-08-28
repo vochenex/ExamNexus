@@ -1705,3 +1705,30 @@ html:not(.light) .en-auth-shell .hover\:border-white\/20:hover {
     max-width: 100% !important;
   }
 }
+
+/* Keep dashboard/auth content inside containers when the viewport is resized */
+.en-page-shell,
+.en-page-header,
+.en-auth-body,
+.en-auth-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.en-page-shell h1,
+.en-page-shell h2,
+.en-page-shell h3,
+.en-page-header h1,
+.en-page-header h2,
+.en-page-header p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.en-scroll-region {
+  overflow-x: hidden;
+}
+
+.en-scroll-region .en-page-shell > * {
+  max-width: 100%;
+}

@@ -4,7 +4,7 @@
   box-sizing: border-box;
 }
 
-/* Login — no floating card; blend panels into page background */
+/* Login + sign up — no floating card; blend panels into page background */
 .en-auth-card--blend {
   background: transparent !important;
   border: none !important;
@@ -12,11 +12,14 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   overflow: visible !important;
+  isolation: auto !important;
 }
 
 .en-auth-card--blend .en-auth-panel-brand,
 .en-auth-card--blend .en-auth-panel-form {
   background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 html.light .en-auth-card--blend .en-auth-panel-brand,
@@ -28,28 +31,10 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
   background: rgba(13, 148, 136, 0.35);
 }
 
-@media (min-width: 768px) {
-  .en-auth-card--blend {
-    max-width: min(64rem, 94vw);
-    height: auto;
-    min-height: 0;
-    max-height: none;
-  }
-
-  .en-auth-card--blend .en-auth-panel-brand {
-    justify-content: center;
-  }
-
-  .en-auth-card--blend .en-auth-panel-form {
-    justify-content: center !important;
-    padding-top: 1.5rem !important;
-    padding-bottom: 1.5rem !important;
-  }
-}
-
 .en-auth-panel-brand,
 .en-auth-panel-form {
   box-sizing: border-box;
+  min-width: 0;
 }
 
 /* Phone only: stacked, brand hidden — form uses full width */
@@ -80,7 +65,6 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
 @media (min-width: 768px) {
   .en-auth-card {
     position: relative;
-    /* Leave margin under header and above viewport bottom */
     height: min(74vh, 560px);
     min-height: 420px;
     max-height: calc(100dvh - 9.5rem);
@@ -88,6 +72,19 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
     margin-inline: auto;
     overflow: hidden;
     isolation: isolate;
+  }
+
+  .en-auth-card--blend {
+    height: auto !important;
+    min-height: min(68vh, 520px) !important;
+    max-height: none !important;
+    max-width: min(72rem, 96vw);
+    overflow: visible !important;
+    isolation: auto !important;
+  }
+
+  .en-auth-card--blend.en-auth-card--signup {
+    min-height: min(72vh, 600px) !important;
   }
 
   /* Forgot has more fields — taller card + guaranteed form scroll */
@@ -116,6 +113,12 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
     will-change: transform;
   }
 
+  .en-auth-card--blend .en-auth-panel-brand,
+  .en-auth-card--blend .en-auth-panel-form {
+    overflow-y: auto !important;
+    scrollbar-gutter: auto;
+  }
+
   .en-auth-panel-brand {
     justify-content: center;
     overflow-y: auto;
@@ -141,6 +144,12 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
     scrollbar-width: thin;
     z-index: 2;
     transform: translateX(100%);
+  }
+
+  .en-auth-card--blend .en-auth-panel-form {
+    justify-content: center !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
   }
 
   .en-auth-panel-form::-webkit-scrollbar {
@@ -178,12 +187,29 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
 .en-auth-form-inner {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   margin-left: auto;
   margin-right: auto;
-  /* Do NOT use vertical auto margins — they break overflow scrolling in flex panels */
   margin-top: 0;
   margin-bottom: 0;
   flex: 0 0 auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.en-auth-form-inner input,
+.en-auth-form-inner textarea,
+.en-auth-form-inner select,
+.en-auth-form-inner button {
+  max-width: 100%;
+}
+
+.en-auth-form-inner h2,
+.en-auth-form-inner p,
+.en-auth-form-inner label,
+.en-auth-form-inner span {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .en-auth-body--saved-open {
@@ -204,6 +230,7 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
+  min-width: 0;
 }
 
 .en-saved-accounts-list {
@@ -238,7 +265,25 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
 
 @media (min-width: 768px) {
   .en-auth-form-inner {
-    max-width: 22rem;
+    max-width: min(22rem, 100%);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 900px) {
+  .en-auth-card--blend {
+    max-width: min(40rem, 94vw);
+  }
+
+  .en-auth-card--blend .en-auth-panel-brand {
+    display: none !important;
+  }
+
+  .en-auth-card--blend .en-auth-panel-form {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+    left: auto !important;
   }
 }
 

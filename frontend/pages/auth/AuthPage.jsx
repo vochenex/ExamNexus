@@ -984,6 +984,7 @@ function getAuthInputProps(theme) {
 
   const authInputProps = getAuthInputProps(theme);
   const swapPanels = authView === "signup";
+  const useBlendCard = authView === "login" || authView === "signup";
 
   return (
     <div
@@ -1067,33 +1068,33 @@ function getAuthInputProps(theme) {
     relative
     w-full
     mx-auto
-    ${authView === "login" ? "" : "rounded-[2rem] overflow-hidden backdrop-blur-2xl border"}
+    ${useBlendCard ? "" : "rounded-[2rem] overflow-hidden backdrop-blur-2xl border"}
     ${swapPanels ? "en-auth-card--signup" : ""}
     ${authView === "forgot" ? "en-auth-card--forgot" : ""}
-    ${authView === "login" ? "en-auth-card--blend" : ""}
+    ${useBlendCard ? "en-auth-card--blend" : ""}
     ${savedOpen && authView === "login" ? "en-auth-card--saved-open" : ""}
     ${
-      authView === "login"
+      useBlendCard
         ? ""
         : theme === "dark"
           ? "bg-[#0b1114]/90 border-white/10"
           : "border-slate-200/80 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.12)]"
     }
-    ${authView === "login" ? "" : "shadow-[0_0_80px_rgba(16,185,129,0.15)]"}
+    ${useBlendCard ? "" : "shadow-[0_0_80px_rgba(16,185,129,0.15)]"}
   `}
 >
         
         {/* Branding Panel — tablet/desktop; slides to the right on sign up */}
         <div
           className={`en-auth-panel-brand hidden md:flex flex-col items-center p-8 md:p-10 ${
-            authView === "login"
+            useBlendCard
               ? "bg-transparent"
               : theme === "dark"
                 ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
                 : "bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#134e4a]"
           }`}
         >
-          {!(authView === "login" && theme === "light") && (
+          {!useBlendCard && (
             <>
               <div
                 className={`pointer-events-none absolute inset-0 ${
@@ -1114,7 +1115,7 @@ function getAuthInputProps(theme) {
                 variant="hero"
                 idSuffix="auth"
                 showTagline
-                panelTone={authView === "login" && theme === "light" ? "light" : "dark"}
+                panelTone={useBlendCard && theme === "light" ? "light" : "dark"}
               />
             </div>
           </div>
@@ -1124,7 +1125,7 @@ function getAuthInputProps(theme) {
         <div
           ref={formPanelRef}
           className={`en-auth-panel-form px-6 py-5 md:px-8 md:py-6 ${
-            authView === "login"
+            useBlendCard
               ? theme === "dark"
                 ? "bg-transparent text-gray-100"
                 : "bg-transparent text-slate-900"
