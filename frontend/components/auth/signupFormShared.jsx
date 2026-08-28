@@ -1,6 +1,11 @@
 export function SectionTitle({ children, theme }) {
+  const isDark = theme === "dark";
   return (
-    <h3 className="en-signup-section-title mb-4 text-sm font-semibold uppercase tracking-wider">
+    <h3
+      className={`en-signup-section-title mb-3 text-[11px] font-semibold uppercase tracking-wider ${
+        isDark ? "text-emerald-400/85" : "text-emerald-700"
+      }`}
+    >
       {children}
     </h3>
   );
@@ -8,7 +13,12 @@ export function SectionTitle({ children, theme }) {
 
 export function FieldLabel({ children, theme, htmlFor }) {
   return (
-    <label htmlFor={htmlFor} className="en-signup-label mb-1.5 block text-sm font-medium">
+    <label
+      htmlFor={htmlFor}
+      className={`mb-1 block text-xs font-medium ${
+        theme === "dark" ? "text-gray-300" : "text-gray-700"
+      }`}
+    >
       {children}
     </label>
   );
@@ -16,5 +26,5 @@ export function FieldLabel({ children, theme, htmlFor }) {
 
 export function FieldError({ message }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-red-400">{message}</p>;
+  return <p className="mt-1 text-xs text-red-500">{message}</p>;
 }

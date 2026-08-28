@@ -20,8 +20,6 @@
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  transition: none !important;
-  will-change: auto;
 }
 
 html.light .en-auth-card--blend .en-auth-panel-brand,
@@ -39,96 +37,69 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
   min-width: 0;
 }
 
-/* Signup — three columns, black/green gradient panels */
+/* Signup — three blended columns in the left panel (no cards) */
 .en-signup-columns {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
-  align-items: stretch;
+  gap: 1.25rem;
+  align-items: start;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .en-signup-columns {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem 0.85rem;
   }
 }
 
 .en-signup-column {
   min-width: 0;
-  padding: 1.1rem 1.15rem 1.25rem;
-  border-radius: 1.25rem;
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  background: linear-gradient(
-    165deg,
-    rgba(0, 0, 0, 0.92) 0%,
-    rgba(6, 40, 30, 0.88) 45%,
-    rgba(4, 74, 55, 0.75) 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(16, 185, 129, 0.12),
-    0 12px 32px rgba(0, 0, 0, 0.35);
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
-html.light .en-signup-column {
-  border-color: rgba(16, 185, 129, 0.35);
-  background: linear-gradient(
-    165deg,
-    rgba(8, 12, 10, 0.96) 0%,
-    rgba(10, 48, 36, 0.92) 50%,
-    rgba(6, 95, 70, 0.85) 100%
-  );
+@media (min-width: 768px) {
+  .en-signup-column:not(:last-child) {
+    border-right: 1px solid rgba(16, 185, 129, 0.14);
+    padding-right: 0.85rem;
+  }
 }
 
-.en-signup-section-title {
-  color: #6ee7b7;
-  border-bottom: 1px solid rgba(16, 185, 129, 0.2);
-  padding-bottom: 0.65rem;
-}
-
-.en-signup-label {
-  color: rgba(209, 250, 229, 0.9);
+html.light .en-signup-column:not(:last-child) {
+  border-right-color: rgba(5, 150, 105, 0.18);
 }
 
 .en-signup-hint {
-  color: rgba(167, 243, 208, 0.55);
+  color: rgba(156, 163, 175, 0.95);
 }
 
-.en-signup-role-toggle {
-  border-color: rgba(16, 185, 129, 0.2);
-  background: rgba(0, 0, 0, 0.35);
+html.light .en-signup-hint {
+  color: rgba(75, 85, 99, 0.95);
+}
+
+.en-signup-submit {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .en-signup-form .examnexus-auth-input,
 .en-signup-form .en-auth-native-select {
-  border-color: rgba(16, 185, 129, 0.2) !important;
-  background: rgba(0, 0, 0, 0.45) !important;
-  color: #ecfdf5 !important;
-}
-
-.en-signup-form .examnexus-auth-input::placeholder {
-  color: rgba(167, 243, 208, 0.4);
-}
-
-.en-signup-form .examnexus-auth-input:focus,
-.en-signup-form .en-auth-native-select:focus {
-  border-color: rgba(52, 211, 153, 0.55) !important;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-}
-
-.en-signup-submit {
-  max-width: 20rem;
-  margin-left: auto;
-  margin-right: auto;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
 }
 
 .en-auth-native-select {
   color-scheme: dark;
 }
 
-html:not(.light) .en-auth-native-select option,
-html.light .en-auth-native-select option {
-  background-color: #0a0f0d;
-  color: #ecfdf5;
+html.light .en-auth-native-select {
+  color-scheme: light;
 }
 
 /* Phone only: stacked, brand hidden — form uses full width */
@@ -172,39 +143,23 @@ html.light .en-auth-native-select option {
     height: auto !important;
     min-height: min(68vh, 520px) !important;
     max-height: none !important;
-    max-width: min(72rem, 96vw);
-    overflow: visible !important;
-    isolation: auto !important;
+    max-width: min(64rem, 94vw);
+    overflow: hidden !important;
+    isolation: isolate !important;
   }
 
-  .en-auth-card--blend.en-auth-card--signup-columns {
-    min-height: min(72vh, 640px) !important;
-    max-width: min(96rem, 98vw);
+  .en-auth-card--blend.en-auth-card--signup {
+    min-height: min(72vh, 600px) !important;
+    max-width: min(68rem, 94vw);
   }
 
-  .en-auth-card--signup-columns .en-auth-panel-brand,
-  .en-auth-card--signup-columns .en-auth-panel-brand--hidden-signup {
-    display: none !important;
-  }
-
-  .en-auth-card--signup-columns .en-auth-panel-form {
-    position: relative !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    left: auto !important;
-    transform: none !important;
-    transition: none !important;
-    overflow-y: auto !important;
-    justify-content: flex-start !important;
-  }
-
-  .en-auth-card--signup-columns .en-auth-panel-brand {
-    transition: none !important;
-    transform: none !important;
-  }
-
-  .en-auth-card--signup-columns .en-auth-form-inner {
+  .en-auth-card--signup .en-auth-form-inner {
     max-width: 100%;
+  }
+
+  .en-auth-card--signup .en-auth-panel-form {
+    justify-content: flex-start !important;
+    padding-top: 1.25rem !important;
   }
 
   /* Forgot has more fields — taller card + guaranteed form scroll */
@@ -288,6 +243,14 @@ html.light .en-auth-native-select option {
     touch-action: none;
   }
 
+  /* Sign up — form left, logo right */
+  .en-auth-card--signup .en-auth-panel-brand {
+    transform: translateX(100%);
+  }
+
+  .en-auth-card--signup .en-auth-panel-form {
+    transform: translateX(0);
+  }
 }
 
 .en-auth-form-inner {
@@ -380,8 +343,16 @@ html.light .en-auth-native-select option {
     max-width: min(40rem, 94vw);
   }
 
+  .en-auth-card--blend.en-auth-card--signup {
+    max-width: min(68rem, 96vw);
+  }
+
   .en-auth-card--blend .en-auth-panel-brand {
     display: none !important;
+  }
+
+  .en-auth-card--blend.en-auth-card--signup .en-auth-panel-brand {
+    display: flex !important;
   }
 
   .en-auth-card--blend .en-auth-panel-form {
@@ -390,6 +361,17 @@ html.light .en-auth-native-select option {
     max-width: 100% !important;
     transform: none !important;
     left: auto !important;
+  }
+
+  .en-auth-card--blend.en-auth-card--signup .en-auth-panel-form {
+    position: absolute !important;
+    width: 50% !important;
+    max-width: 50% !important;
+    transform: translateX(0) !important;
+  }
+
+  .en-auth-card--blend.en-auth-card--signup .en-auth-panel-brand {
+    transform: translateX(100%) !important;
   }
 }
 

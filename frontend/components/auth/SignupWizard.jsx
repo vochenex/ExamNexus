@@ -37,10 +37,10 @@ export default function SignupWizard({
             onChange={onRoleChange}
             theme={theme}
             layout="stack"
-            className="mb-4"
+            className="mb-3"
           />
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div>
               <FieldLabel theme={theme} htmlFor="firstName">
                 First name
@@ -115,7 +115,7 @@ export default function SignupWizard({
             {isStudent ? "School & program" : "School affiliation"}
           </SectionTitle>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div>
               <FieldLabel theme={theme} htmlFor="schoolId">
                 School ID
@@ -207,7 +207,7 @@ export default function SignupWizard({
         <section className="en-signup-column">
           <SectionTitle theme={theme}>Login credentials</SectionTitle>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div>
               <FieldLabel theme={theme} htmlFor="signup-email">
                 Email
@@ -230,10 +230,14 @@ export default function SignupWizard({
                     onClick={onCopyEmail}
                     title={emailCopied ? "Copied!" : "Copy email"}
                     aria-label={emailCopied ? "Email copied" : "Copy email"}
-                    className={`absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border transition ${
+                    className={`absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg border transition ${
                       emailCopied
-                        ? "border-emerald-400/50 bg-emerald-500/25 text-emerald-300"
-                        : "border-emerald-500/25 bg-black/30 text-emerald-400 hover:border-emerald-400/50 hover:bg-emerald-500/10"
+                        ? theme === "dark"
+                          ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
+                          : "border-emerald-400 bg-emerald-50 text-emerald-700"
+                        : theme === "dark"
+                          ? "border-white/15 bg-white/5 text-emerald-400 hover:bg-white/10"
+                          : "border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400"
                     }`}
                   >
                     {emailCopied ? (
@@ -269,7 +273,9 @@ export default function SignupWizard({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400/60 transition-colors hover:text-emerald-300"
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-emerald-400 ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-500"
+                  }`}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
@@ -285,7 +291,7 @@ export default function SignupWizard({
         type="submit"
         loading={loading}
         loadingLabel="Creating account..."
-        className={`${primaryButtonFull(theme)} en-signup-submit mt-6`}
+        className={`${primaryButtonFull(theme)} en-signup-submit mt-5`}
       >
         Create account
       </ProgressButton>

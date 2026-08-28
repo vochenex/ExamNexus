@@ -986,7 +986,7 @@ function getAuthInputProps(theme) {
 };
 
   const authInputProps = getAuthInputProps(theme);
-  const signupFullWidth = authView === "signup";
+  const swapPanels = authView === "signup";
   const useBlendCard = authView === "login" || authView === "signup";
 
   return (
@@ -1072,7 +1072,7 @@ function getAuthInputProps(theme) {
     w-full
     mx-auto
     ${useBlendCard ? "" : "rounded-[2rem] overflow-hidden backdrop-blur-2xl border"}
-    ${signupFullWidth ? "en-auth-card--signup-columns" : ""}
+    ${swapPanels ? "en-auth-card--signup" : ""}
     ${authView === "forgot" ? "en-auth-card--forgot" : ""}
     ${useBlendCard ? "en-auth-card--blend" : ""}
     ${savedOpen && authView === "login" ? "en-auth-card--saved-open" : ""}
@@ -1090,8 +1090,6 @@ function getAuthInputProps(theme) {
         {/* Branding Panel — tablet/desktop; slides to the right on sign up */}
         <div
           className={`en-auth-panel-brand hidden md:flex flex-col items-center justify-center p-8 md:p-10 ${
-            signupFullWidth ? "en-auth-panel-brand--hidden-signup" : ""
-          } ${
             useBlendCard
               ? "bg-transparent"
               : theme === "dark"
@@ -1139,7 +1137,7 @@ function getAuthInputProps(theme) {
                 : "bg-white text-slate-900"
           }`}
         >
-          <div className="en-auth-form-inner" key={authView}>
+          <div className="en-auth-form-inner">
   <div className="mb-6 flex flex-col items-center gap-4 md:hidden">
     <ExamNexusBrand
       variant="panel"
@@ -1166,7 +1164,7 @@ function getAuthInputProps(theme) {
         : "Create your account"}
   </h2>
   <p
-    className={`mt-1 mb-5 text-sm leading-relaxed ${
+    className={`mt-1 mb-4 text-sm leading-relaxed ${
       theme === "dark" ? "text-gray-400" : "text-gray-600"
     }`}
   >
