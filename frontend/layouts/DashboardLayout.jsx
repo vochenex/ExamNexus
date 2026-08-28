@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -41,6 +41,8 @@ import { motion } from "../utils/motion";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const hideGlobalBackButton = /^\/faculty\/subject\/[^/]+$/.test(location.pathname);
   const { isLockdownActive, lockdown } = useAssessmentLockdown();
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
@@ -337,7 +339,7 @@ export default function DashboardLayout() {
                   idSuffix="mobile-top"
                 />
                 <div className="en-native-topbar-actions">
-                  <BackButton compact />
+                  {!hideGlobalBackButton ? <BackButton compact /> : null}
                   {!nativeApp && <InstallIconButton compact />}
                   <PushEnableButton compact />
                   <ThemeToggle compact />
@@ -348,7 +350,7 @@ export default function DashboardLayout() {
               <div
                 className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
               >
-                <BackButton compact />
+                {!hideGlobalBackButton ? <BackButton compact /> : null}
                 <InstallIconButton compact />
                 <PushEnableButton compact />
                 <ThemeToggle compact />

@@ -52,6 +52,7 @@ export default function DevicePinLock({
   const [localError, setLocalError] = useState("");
   const [pressedKey, setPressedKey] = useState(null);
   const inputRef = useRef(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -59,6 +60,7 @@ export default function DevicePinLock({
     setLocalError("");
     setShake(false);
     setPressedKey(null);
+    submittingRef.current = false;
     const frame = window.requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
@@ -70,6 +72,7 @@ export default function DevicePinLock({
     setLocalError(errorMessage);
     setShake(true);
     setDigits("");
+    submittingRef.current = false;
     const timer = window.setTimeout(() => setShake(false), 450);
     return () => window.clearTimeout(timer);
   }, [errorMessage]);
@@ -79,21 +82,35 @@ export default function DevicePinLock({
     window.setTimeout(() => setPressedKey(null), 140);
   }, []);
 
-  const submitPin = useCallback(
+  const commitPin = useCallback(
     async (next) => {
-      if (next.length !== DEVICE_PIN_LENGTH) return;
-      const result = await onComplete?.(next);
-      if (result === false) {
+      const pin = String(next || "")
+        .replace(/\D/g, "")
+        .slice(0, DEVICE_PIN_LENGTH);
+      setDigits(pin);
+      if (pin.length !== DEVICE_PIN_LENGTH || busy || submittingRef.current) return;
+
+      submittingRef.current = true;
+      try {
+        const result = await onComplete?.(pin);
+        if (result === false) {
+          setShake(true);
+          setDigits("");
+          submittingRef.current = false;
+          window.setTimeout(() => setShake(false), 450);
+        }
+      } catch {
         setShake(true);
         setDigits("");
+        submittingRef.current = false;
         window.setTimeout(() => setShake(false), 450);
       }
     },
-    [onComplete]
+    [busy, onComplete]
   );
 
-  const pushDigit = useCallback(
-    async (value) => {
+  const appendDigit = useCallback(
+    (value) => {
       if (busy) return;
       if (value === "del") {
         flashKey("del");
@@ -105,60 +122,48 @@ export default function DevicePinLock({
 
       flashKey(value);
       setLocalError("");
-
-      let completedPin = "";
       setDigits((prev) => {
         if (prev.length >= DEVICE_PIN_LENGTH) return prev;
         const next = `${prev}${value}`;
         if (next.length === DEVICE_PIN_LENGTH) {
-          completedPin = next;
+          queueMicrotask(() => commitPin(next));
         }
         return next;
       });
-
-      if (completedPin) {
-        await submitPin(completedPin);
-      }
     },
-    [busy, flashKey, submitPin]
+    [busy, commitPin, flashKey]
   );
 
-  const applyDigits = useCallback(
-    (raw) => {
-      if (busy) return;
-      const next = String(raw || "")
-        .replace(/\D/g, "")
-        .slice(0, DEVICE_PIN_LENGTH);
-      setDigits(next);
-      setLocalError("");
-      if (next.length === DEVICE_PIN_LENGTH) {
-        void submitPin(next);
-      }
-    },
-    [busy, submitPin]
-  );
+  const handleInputChange = (event) => {
+    if (busy) return;
+    setLocalError("");
+    const next = event.target.value.replace(/\D/g, "").slice(0, DEVICE_PIN_LENGTH);
+    setDigits(next);
+    if (next.length === DEVICE_PIN_LENGTH) {
+      void commitPin(next);
+    }
+  };
 
-  useEffect(() => {
-    if (!open || busy) return undefined;
+  const handleInputKeyDown = (event) => {
+    if (busy) return;
 
-    const onKeyDown = (event) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (/^\d$/.test(event.key)) {
+      event.preventDefault();
+      appendDigit(event.key);
+      return;
+    }
 
-      if (/^\d$/.test(event.key)) {
-        event.preventDefault();
-        void pushDigit(event.key);
-        return;
-      }
+    if (event.key === "Backspace" || event.key === "Delete") {
+      event.preventDefault();
+      appendDigit("del");
+      return;
+    }
 
-      if (event.key === "Backspace" || event.key === "Delete") {
-        event.preventDefault();
-        void pushDigit("del");
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, busy, pushDigit]);
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitPin(event.currentTarget.value || digits);
+    }
+  };
 
   if (!open) return null;
 
@@ -213,7 +218,8 @@ export default function DevicePinLock({
             autoComplete="one-time-code"
             maxLength={DEVICE_PIN_LENGTH}
             value={digits}
-            onChange={(event) => applyDigits(event.target.value)}
+            onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
             className="sr-only"
             aria-label="PIN entry"
           />
@@ -307,7 +313,7 @@ export default function DevicePinLock({
                       isDark={isDark}
                       disabled={busy || digits.length === 0}
                       pressed={pressedKey === "del"}
-                      onPress={() => pushDigit("del")}
+                      onPress={() => appendDigit("del")}
                     >
                       <Delete size={22} strokeWidth={1.75} />
                     </PinKey>
@@ -321,7 +327,7 @@ export default function DevicePinLock({
                     isDark={isDark}
                     disabled={busy}
                     pressed={pressedKey === key}
-                    onPress={() => pushDigit(key)}
+                    onPress={() => appendDigit(key)}
                   >
                     <span className="text-[1.65rem] font-light leading-none tracking-wide">
                       {key}

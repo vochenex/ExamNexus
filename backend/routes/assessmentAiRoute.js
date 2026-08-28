@@ -277,13 +277,23 @@ router.post("/generate-from-prompt", requireFaculty, async (req, res) => {
       });
     }
 
-    const result = await requestAiQuestionsBatched({
-      topicPrompt,
-      additionalInstructions,
-      formats: resolved.formats,
-      questionCount: resolved.questionCount,
-      difficulty: resolved.difficulty,
-    });
+    const lockQuestionCount = Boolean(req.body?.lockQuestionCount);
+    const result = lockQuestionCount
+      ? await requestAiQuestions({
+          topicPrompt,
+          additionalInstructions,
+          formats: resolved.formats,
+          questionCount: resolved.questionCount,
+          difficulty: resolved.difficulty,
+          mode: "prompt",
+        })
+      : await requestAiQuestionsBatched({
+          topicPrompt,
+          additionalInstructions,
+          formats: resolved.formats,
+          questionCount: resolved.questionCount,
+          difficulty: resolved.difficulty,
+        });
 
     res.json({
       success: true,

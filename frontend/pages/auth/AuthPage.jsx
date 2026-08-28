@@ -106,6 +106,7 @@ export default function ExamNexusAuth() {
   const [showTempPassword, setShowTempPassword] = useState(false);
   const forgotResultRef = useRef(null);
   const feedbackRef = useRef(null);
+  const draftPinRef = useRef("");
 
   useEffect(() => {
     if (!resetStatusResult && !successMessage && !serverError && !pendingReviewMessage) {
@@ -602,6 +603,7 @@ function getAuthInputProps(theme) {
   };
 
   const closePinSession = () => {
+    draftPinRef.current = "";
     setPinSession(null);
     setPinError("");
     setPinBusy(false);
@@ -612,6 +614,7 @@ function getAuthInputProps(theme) {
 
     if (pinSession.stage === "create") {
       setPinError("");
+      draftPinRef.current = pin;
       setPinSession((current) =>
         current
           ? {
@@ -625,8 +628,10 @@ function getAuthInputProps(theme) {
     }
 
     if (pinSession.stage === "confirm") {
-      if (pin !== pinSession.draftPin) {
+      const expectedPin = draftPinRef.current || pinSession.draftPin;
+      if (pin !== expectedPin) {
         setPinError("PINs did not match. Try again.");
+        draftPinRef.current = "";
         setPinSession((current) =>
           current
             ? {
