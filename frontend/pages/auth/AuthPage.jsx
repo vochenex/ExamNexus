@@ -1139,7 +1139,7 @@ function getAuthInputProps(theme) {
                 : "bg-white text-slate-900"
           }`}
         >
-          <div className="en-auth-form-inner">
+          <div className="en-auth-form-inner" key={authView}>
   <div className="mb-6 flex flex-col items-center gap-4 md:hidden">
     <ExamNexusBrand
       variant="panel"

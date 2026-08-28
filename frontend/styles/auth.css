@@ -20,6 +20,8 @@
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  transition: none !important;
+  will-change: auto;
 }
 
 html.light .en-auth-card--blend .en-auth-panel-brand,
@@ -191,8 +193,14 @@ html.light .en-auth-native-select option {
     max-width: 100% !important;
     left: auto !important;
     transform: none !important;
+    transition: none !important;
     overflow-y: auto !important;
     justify-content: flex-start !important;
+  }
+
+  .en-auth-card--signup-columns .en-auth-panel-brand {
+    transition: none !important;
+    transform: none !important;
   }
 
   .en-auth-card--signup-columns .en-auth-form-inner {
@@ -264,10 +272,6 @@ html.light .en-auth-native-select option {
     padding-bottom: 1.5rem !important;
   }
 
-  .en-auth-card--blend.en-auth-card--signup .en-auth-panel-form {
-    justify-content: flex-start !important;
-  }
-
   .en-auth-panel-form::-webkit-scrollbar {
     width: 6px;
   }
@@ -284,20 +288,6 @@ html.light .en-auth-native-select option {
     touch-action: none;
   }
 
-  /* Sign up — swap sides */
-  .en-auth-card--signup {
-    height: min(80vh, 640px);
-    min-height: 480px;
-    max-height: calc(100dvh - 9rem);
-  }
-
-  .en-auth-card--signup .en-auth-panel-brand {
-    transform: translateX(100%);
-  }
-
-  .en-auth-card--signup .en-auth-panel-form {
-    transform: translateX(0);
-  }
 }
 
 .en-auth-form-inner {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Delete } from "lucide-react";
 import ModalPortal from "./ui/ModalPortal";
 import { DEVICE_PIN_LENGTH } from "../utils/savedAccounts";
@@ -11,6 +11,9 @@ function PinKey({ label, disabled, pressed, onPress, isDark, children }) {
     <button
       type="button"
       disabled={disabled}
+      onClick={() => {
+        if (!disabled) onPress();
+      }}
       onPointerDown={(event) => {
         event.preventDefault();
         if (!disabled) onPress();
@@ -48,6 +51,7 @@ export default function DevicePinLock({
   const [shake, setShake] = useState(false);
   const [localError, setLocalError] = useState("");
   const [pressedKey, setPressedKey] = useState(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -55,7 +59,10 @@ export default function DevicePinLock({
     setLocalError("");
     setShake(false);
     setPressedKey(null);
-    return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [open, mode]);
 
   useEffect(() => {
@@ -66,6 +73,92 @@ export default function DevicePinLock({
     const timer = window.setTimeout(() => setShake(false), 450);
     return () => window.clearTimeout(timer);
   }, [errorMessage]);
+
+  const flashKey = useCallback((key) => {
+    setPressedKey(key);
+    window.setTimeout(() => setPressedKey(null), 140);
+  }, []);
+
+  const submitPin = useCallback(
+    async (next) => {
+      if (next.length !== DEVICE_PIN_LENGTH) return;
+      const result = await onComplete?.(next);
+      if (result === false) {
+        setShake(true);
+        setDigits("");
+        window.setTimeout(() => setShake(false), 450);
+      }
+    },
+    [onComplete]
+  );
+
+  const pushDigit = useCallback(
+    async (value) => {
+      if (busy) return;
+      if (value === "del") {
+        flashKey("del");
+        setDigits((prev) => prev.slice(0, -1));
+        setLocalError("");
+        return;
+      }
+      if (!/^\d$/.test(value)) return;
+
+      flashKey(value);
+      setLocalError("");
+
+      let completedPin = "";
+      setDigits((prev) => {
+        if (prev.length >= DEVICE_PIN_LENGTH) return prev;
+        const next = `${prev}${value}`;
+        if (next.length === DEVICE_PIN_LENGTH) {
+          completedPin = next;
+        }
+        return next;
+      });
+
+      if (completedPin) {
+        await submitPin(completedPin);
+      }
+    },
+    [busy, flashKey, submitPin]
+  );
+
+  const applyDigits = useCallback(
+    (raw) => {
+      if (busy) return;
+      const next = String(raw || "")
+        .replace(/\D/g, "")
+        .slice(0, DEVICE_PIN_LENGTH);
+      setDigits(next);
+      setLocalError("");
+      if (next.length === DEVICE_PIN_LENGTH) {
+        void submitPin(next);
+      }
+    },
+    [busy, submitPin]
+  );
+
+  useEffect(() => {
+    if (!open || busy) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+      if (/^\d$/.test(event.key)) {
+        event.preventDefault();
+        void pushDigit(event.key);
+        return;
+      }
+
+      if (event.key === "Backspace" || event.key === "Delete") {
+        event.preventDefault();
+        void pushDigit("del");
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, busy, pushDigit]);
 
   if (!open) return null;
 
@@ -86,37 +179,6 @@ export default function DevicePinLock({
         : accountLabel
           ? `Unlock ${accountLabel}`
           : "Verify it’s you to continue.");
-
-  const flashKey = (key) => {
-    setPressedKey(key);
-    window.setTimeout(() => setPressedKey(null), 140);
-  };
-
-  const pushDigit = async (value) => {
-    if (busy) return;
-    if (value === "del") {
-      flashKey("del");
-      setDigits((prev) => prev.slice(0, -1));
-      setLocalError("");
-      return;
-    }
-    if (!/^\d$/.test(value)) return;
-    if (digits.length >= DEVICE_PIN_LENGTH) return;
-
-    flashKey(value);
-    const next = `${digits}${value}`;
-    setDigits(next);
-    setLocalError("");
-
-    if (next.length === DEVICE_PIN_LENGTH) {
-      const result = await onComplete?.(next);
-      if (result === false) {
-        setShake(true);
-        setDigits("");
-        window.setTimeout(() => setShake(false), 450);
-      }
-    }
-  };
 
   return (
     <ModalPortal>
@@ -144,6 +206,18 @@ export default function DevicePinLock({
               : "border-emerald-300/80 en-pin-panel--light shadow-[0_24px_60px_rgba(15,23,42,0.18)]"
           }`}
         >
+          <input
+            ref={inputRef}
+            type="tel"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={DEVICE_PIN_LENGTH}
+            value={digits}
+            onChange={(event) => applyDigits(event.target.value)}
+            className="sr-only"
+            aria-label="PIN entry"
+          />
+
           <div
             className={`pointer-events-none absolute -left-12 -top-20 h-44 w-44 rounded-full blur-2xl ${
               isDark ? "bg-emerald-400/10" : "bg-emerald-300/25"
