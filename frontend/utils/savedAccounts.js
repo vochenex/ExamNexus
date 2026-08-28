@@ -3,9 +3,9 @@ const REMEMBER_KEY = "examnexus_remembered_passwords";
 const PINS_KEY = "examnexus_account_pins";
 const SCHEMA_KEY = "examnexus_saved_accounts_schema";
 /** Bump to force-clear legacy saved accounts that were not PIN-protected. */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
-export const DEVICE_PIN_LENGTH = 6;
+export const DEVICE_PIN_LENGTH = 4;
 
 function readJson(key, fallback) {
   try {

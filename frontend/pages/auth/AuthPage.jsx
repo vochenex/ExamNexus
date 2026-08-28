@@ -1067,40 +1067,46 @@ function getAuthInputProps(theme) {
     relative
     w-full
     mx-auto
-    rounded-[2rem]
-    overflow-hidden
-    backdrop-blur-2xl
-    border
+    ${authView === "login" ? "" : "rounded-[2rem] overflow-hidden backdrop-blur-2xl border"}
     ${swapPanels ? "en-auth-card--signup" : ""}
     ${authView === "forgot" ? "en-auth-card--forgot" : ""}
+    ${authView === "login" ? "en-auth-card--blend" : ""}
     ${savedOpen && authView === "login" ? "en-auth-card--saved-open" : ""}
     ${
-      theme === "dark"
-        ? "bg-[#0b1114]/90 border-white/10"
-        : "border-slate-200/80 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.12)]"
+      authView === "login"
+        ? ""
+        : theme === "dark"
+          ? "bg-[#0b1114]/90 border-white/10"
+          : "border-slate-200/80 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.12)]"
     }
-    shadow-[0_0_80px_rgba(16,185,129,0.15)]
+    ${authView === "login" ? "" : "shadow-[0_0_80px_rgba(16,185,129,0.15)]"}
   `}
 >
         
         {/* Branding Panel — tablet/desktop; slides to the right on sign up */}
         <div
           className={`en-auth-panel-brand hidden md:flex flex-col items-center p-8 md:p-10 ${
-            theme === "dark"
-              ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
-              : "bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#134e4a]"
+            authView === "login"
+              ? "bg-transparent"
+              : theme === "dark"
+                ? "bg-gradient-to-br from-[#021818] via-[#043332] to-[#052a28]"
+                : "bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#134e4a]"
           }`}
         >
-          <div
-            className={`pointer-events-none absolute inset-0 ${
-              theme === "dark"
-                ? "bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.12),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,0.08),transparent_40%)]"
-                : "bg-[radial-gradient(circle_at_25%_20%,rgba(13,148,136,0.18),transparent_50%),radial-gradient(circle_at_75%_85%,rgba(15,23,42,0.35),transparent_45%)]"
-            }`}
-          />
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:32px_32px]"
-          />
+          {!(authView === "login" && theme === "light") && (
+            <>
+              <div
+                className={`pointer-events-none absolute inset-0 ${
+                  theme === "dark"
+                    ? "bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.12),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,0.08),transparent_40%)]"
+                    : "bg-[radial-gradient(circle_at_25%_20%,rgba(13,148,136,0.18),transparent_50%),radial-gradient(circle_at_75%_85%,rgba(15,23,42,0.35),transparent_45%)]"
+                }`}
+              />
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:32px_32px]"
+              />
+            </>
+          )}
 
           <div className="relative z-10 flex w-full flex-col items-center">
             <div className="max-w-sm">
@@ -1108,7 +1114,7 @@ function getAuthInputProps(theme) {
                 variant="hero"
                 idSuffix="auth"
                 showTagline
-                panelTone="dark"
+                panelTone={authView === "login" && theme === "light" ? "light" : "dark"}
               />
             </div>
           </div>
@@ -1118,7 +1124,13 @@ function getAuthInputProps(theme) {
         <div
           ref={formPanelRef}
           className={`en-auth-panel-form px-6 py-5 md:px-8 md:py-6 ${
-            theme === "dark" ? "bg-[#101827] text-white" : "bg-white text-slate-900"
+            authView === "login"
+              ? theme === "dark"
+                ? "bg-transparent text-gray-100"
+                : "bg-transparent text-slate-900"
+              : theme === "dark"
+                ? "bg-[#101827] text-white"
+                : "bg-white text-slate-900"
           }`}
         >
           <div className="en-auth-form-inner">
@@ -1682,7 +1694,7 @@ function getAuthInputProps(theme) {
                           theme === "dark" ? "text-gray-500" : "text-gray-500"
                         }`}
                       >
-                        You’ll create a 6-digit device PIN after signing in. Saved
+                        You’ll create a 4-digit device PIN after signing in. Saved
                         accounts require that PIN to unlock.
                       </p>
                     )}
@@ -1742,21 +1754,11 @@ function getAuthInputProps(theme) {
 {successMessage && (
   <div
     ref={feedbackRef}
-    className="
-      mb-4
-      p-3
-      rounded-xl
-
-      bg-emerald-500/10
-      border
-      border-emerald-500/30
-
-      text-emerald-400
-      text-sm
-      text-center
-
-      animate-pulse
-    "
+    className={`mb-4 rounded-xl border p-3 text-center text-sm animate-pulse ${
+      theme === "dark"
+        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+        : "border-emerald-300 bg-emerald-50 text-emerald-800"
+    }`}
   >
     ✓ {successMessage}
   </div>

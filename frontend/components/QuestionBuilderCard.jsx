@@ -73,13 +73,9 @@ export default function QuestionBuilderCard({
   return (
     <div
       className={`rounded-2xl border p-4 transition ${
-        hasInvalid
-          ? theme === "dark"
-            ? "bg-black/20 border-red-500/50 ring-1 ring-red-400/40"
-            : "bg-gradient-to-br from-white to-red-50/40 border-red-300 shadow-sm ring-1 ring-red-300/50"
-          : theme === "dark"
-            ? "bg-black/20 border-white/10 hover:border-emerald-500/20"
-            : "bg-gradient-to-br from-white to-emerald-50/50 border-emerald-100 shadow-sm hover:shadow-md"
+        theme === "dark"
+          ? "bg-black/20 border-white/10 hover:border-emerald-500/20"
+          : "bg-gradient-to-br from-white to-emerald-50/50 border-emerald-100 shadow-sm hover:shadow-md"
       }`}
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -402,6 +398,17 @@ export default function QuestionBuilderCard({
           </div>
         )}
       </div>
+
+      {hasInvalid && (
+        <p
+          className={`mt-4 text-xs font-medium ${
+            theme === "dark" ? "text-red-300" : "text-red-600"
+          }`}
+          role="status"
+        >
+          All required fields must be filled out before you can publish.
+        </p>
+      )}
     </div>
   );
 }

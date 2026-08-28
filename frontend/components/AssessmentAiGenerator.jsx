@@ -186,9 +186,11 @@ export default function AssessmentAiGenerator({
   const showDocumentOptions =
     mode === "document" &&
     documentAnalysis &&
-    (documentAnalysis.isQuestionnaire === false ||
-      documentAnalysis.mixed ||
-      documentAnalysis.sourcePending);
+    documentAnalysis.isQuestionnaire === false &&
+    (!documentAnalysis.mixed || Boolean(documentAnalysis.questionnaireDone));
+
+  const mixedQuestionnaireConverting =
+    Boolean(documentAnalysis?.mixed) && !documentAnalysis?.questionnaireDone;
 
   const waitingForSourceGenerate =
     Boolean(documentAnalysis?.sourcePending) &&
@@ -426,7 +428,7 @@ export default function AssessmentAiGenerator({
           questionnaireDone: false,
         });
         setPanelNotice(
-          "Mixed upload detected. Converting questionnaire files now. Count/difficulty/formats below apply only to the study/source file afterward."
+          "Mixed upload detected. Converting questionnaire files now — study guide options will appear when this finishes."
         );
 
         const questionnaireFiles = resolveFilesByRole(
@@ -550,8 +552,8 @@ export default function AssessmentAiGenerator({
           : "border-emerald-200/80 en-bg-elevated-soft en-panel-glow"
       }`}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
-        <div className="min-w-0">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+        <div className="flex min-w-0 flex-col">
           <label className={labelClass}>Number of questions</label>
           <input
             type="number"
@@ -584,15 +586,17 @@ export default function AssessmentAiGenerator({
             }}
             aria-invalid={Boolean(countWarning)}
           />
-          {countWarning ? (
-            <p className="mt-2 text-xs font-medium text-red-500">{countWarning}</p>
-          ) : (
-            <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
-              {MIN_QUESTIONS}–{MAX_QUESTIONS} items
-            </p>
-          )}
+          <div className="mt-2 min-h-[2.25rem]">
+            {countWarning ? (
+              <p className="text-xs font-medium text-red-500">{countWarning}</p>
+            ) : (
+              <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
+                {MIN_QUESTIONS}–{MAX_QUESTIONS} items
+              </p>
+            )}
+          </div>
         </div>
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col">
           <label className={labelClass}>Difficulty</label>
           <Select
             disabled={disabled || loading}
@@ -605,12 +609,14 @@ export default function AssessmentAiGenerator({
               </option>
             ))}
           </Select>
-          <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
-            {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-            {mode === "prompt"
-              ? " · Large sets generate in small rounds so hosted API timeouts are avoided"
-              : ""}
-          </p>
+          <div className="mt-2 min-h-[2.25rem]">
+            <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
+              {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+              {mode === "prompt"
+                ? " · Large sets generate in small rounds so hosted API timeouts are avoided"
+                : ""}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -804,7 +810,7 @@ export default function AssessmentAiGenerator({
                           return waitingForSourceGenerate
                             ? "Source material — ready for options below"
                             : documentAnalysis?.sourcePending && !documentAnalysis?.questionnaireDone
-                              ? "Source material — options below (questionnaire converting…)"
+                              ? "Source material — options unlock after questionnaire conversion"
                               : `Source — ${formatDocumentKind(fileMeta.documentKind)}`;
                         }
                         if (documentAnalysis && files.length === 1) {
@@ -917,12 +923,30 @@ export default function AssessmentAiGenerator({
             (!documentAnalysis.isQuestionnaire && showDocumentOptions)) && (
             <p className={`mt-2 text-xs ${theme === "dark" ? "text-emerald-100/70" : "text-teal-800/80"}`}>
               {documentAnalysis.mixed
-                ? waitingForSourceGenerate
-                  ? "Questionnaire questions are ready. Count, difficulty, and formats below apply only to source/study files — not to questionnaire files. Click Generate from source when ready."
-                  : "Count, difficulty, and formats below apply only to source/study files and do not affect questionnaire files. Questionnaire questions are converting now; Generate will unlock again afterward for the source files."
+                ? mixedQuestionnaireConverting
+                  ? "Questionnaire files are converting first. Count, difficulty, and formats for the study guide will appear when conversion finishes."
+                  : waitingForSourceGenerate
+                    ? "Questionnaire questions are ready. Count, difficulty, and formats below apply only to source/study files — not to questionnaire files. Click Generate from source when ready."
+                    : "Count, difficulty, and formats below apply only to source/study files and do not affect questionnaire files."
                 : "Choose item count, difficulty, and formats, then click Analyze document again to generate questions."}
             </p>
           )}
+        </div>
+      )}
+
+      {mixedQuestionnaireConverting && (
+        <div
+          className={`rounded-xl border p-4 text-sm ${
+            theme === "dark"
+              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
+              : "border-emerald-200 bg-emerald-50 text-teal-900"
+          }`}
+        >
+          <p className="font-semibold">Converting questionnaire…</p>
+          <p className={`mt-1 text-xs ${theme === "dark" ? "text-emerald-100/75" : "text-teal-800/85"}`}>
+            Study guide options (count, difficulty, formats) unlock after questionnaire conversion
+            completes. You can fill them in then.
+          </p>
         </div>
       )}
 
@@ -947,7 +971,7 @@ export default function AssessmentAiGenerator({
         >
           <FileSearch size={18} />
           {loading
-            ? documentAnalysis?.mixed && !documentAnalysis?.questionnaireDone
+            ? mixedQuestionnaireConverting
               ? "Converting questionnaire…"
               : showDocumentOptions
                 ? "Generating questions…"

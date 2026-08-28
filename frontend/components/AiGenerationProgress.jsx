@@ -7,20 +7,32 @@ function formatLabel(type) {
   return AI_FORMAT_OPTIONS.find((item) => item.value === type)?.label || type;
 }
 
-function resolvePercent(progress) {
+function resolvePercent(progress, isDone, isActive) {
+  if (isDone && !isActive) return 100;
+
+  const current = Number(progress?.current);
+  const total = Number(progress?.total);
+
+  if (Number.isFinite(current) && Number.isFinite(total) && total > 0) {
+    return Math.min(99, Math.max(1, Math.round((current / total) * 99)));
+  }
+
   if (typeof progress?.percent === "number") {
-    return Math.min(100, Math.max(0, Math.round(progress.percent)));
+    return Math.min(isActive ? 85 : 99, Math.max(0, Math.round(progress.percent)));
   }
-  if (progress?.current && progress?.total) {
-    return Math.min(100, Math.round((progress.current / progress.total) * 100));
-  }
+
   return 0;
 }
 
-export default function AiGenerationProgress({ progress, questionCount = 0 }) {
+export default function AiGenerationProgress({
+  progress,
+  questionCount = 0,
+  active = false,
+}) {
   const { theme } = useTheme();
   const isLight = theme === "light";
-  const isDone = progress?.status === "done";
+  const isDone = progress?.status === "done" && !active;
+  const isActive = active || (progress && progress.status !== "done");
   const highestRef = useRef(0);
   const [displayPercent, setDisplayPercent] = useState(0);
 
@@ -30,11 +42,29 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
       setDisplayPercent(0);
       return;
     }
-    const next = resolvePercent(progress);
+
+    const next = resolvePercent(progress, isDone, isActive);
+    const current = Number(progress?.current);
+    const total = Number(progress?.total);
+    const hasLiveCounts =
+      Number.isFinite(current) && Number.isFinite(total) && total > 0 && current < total;
+
+    if (isDone) {
+      highestRef.current = 100;
+      setDisplayPercent(100);
+      return;
+    }
+
+    if (hasLiveCounts) {
+      highestRef.current = next;
+      setDisplayPercent(next);
+      return;
+    }
+
     const monotonic = Math.max(highestRef.current, next);
-    highestRef.current = isDone ? 100 : monotonic;
-    setDisplayPercent(highestRef.current);
-  }, [progress, isDone]);
+    highestRef.current = monotonic;
+    setDisplayPercent(monotonic);
+  }, [progress, isDone, isActive]);
 
   const panelClass = isLight
     ? "border-emerald-200/90 bg-gradient-to-r from-white via-emerald-50/80 to-emerald-100/90 en-panel-glow"
@@ -92,7 +122,7 @@ export default function AiGenerationProgress({ progress, questionCount = 0 }) {
                 ? "Generating from your prompt"
                 : phase === "structuring"
                   ? "Structuring questions"
-                  : "Analyzing document";
+                  : "Generating questions";
 
   const stepLabel = isDone
     ? `${questionCount} question${questionCount === 1 ? "" : "s"} ready to review below`

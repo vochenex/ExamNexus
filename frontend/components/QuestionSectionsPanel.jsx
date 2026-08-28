@@ -125,7 +125,7 @@ export default function QuestionSectionsPanel({
     });
 
     requestAnimationFrame(() => {
-      scrollTargetRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      scrollTargetRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [fieldErrorsByIndex, questions]);
 
@@ -335,8 +335,7 @@ export default function QuestionSectionsPanel({
                         expandedQuestions.has(questionKey) ||
                         (sectionQuestions.length === 1 && expandedQuestions.size === 0);
 
-                      const isLastInSection = localIndex === sectionQuestions.length - 1;
-                      const shouldScroll = hasFieldErrors || isLastInSection;
+                      const shouldScroll = hasFieldErrors;
                       const showAlternatives =
                         (section.type === "identification" ||
                           section.type === "enumeration") &&
@@ -347,13 +346,9 @@ export default function QuestionSectionsPanel({
                           key={question.id || questionKey}
                           ref={shouldScroll ? scrollTargetRef : null}
                           className={`rounded-xl border ${
-                            hasFieldErrors
-                              ? theme === "dark"
-                                ? "border-red-500/50 bg-red-500/5"
-                                : "border-red-300 en-bg-elevated"
-                              : theme === "dark"
-                                ? "border-white/10 bg-black/20"
-                                : "border-emerald-100 en-bg-elevated"
+                            theme === "dark"
+                              ? "border-white/10 bg-black/20"
+                              : "border-emerald-100 en-bg-elevated"
                           }`}
                         >
                           {!isQuestionExpanded ? (

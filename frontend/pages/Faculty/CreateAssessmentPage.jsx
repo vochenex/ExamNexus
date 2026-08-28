@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -61,11 +61,19 @@ export default function CreateAssessment() {
   const { theme } = useTheme();
   const { warning: showWarning, success: showSuccess, error: showError, choose } = useAppModal();
 
-  useEffect(() => {
-    const mainScroller = document.querySelector("main.en-scroll-region");
-    if (mainScroller) mainScroller.scrollTop = 0;
-    window.scrollTo(0, 0);
-  }, []);
+  useLayoutEffect(() => {
+    const scrollToTop = () => {
+      const mainScroller = document.querySelector("main.en-scroll-region");
+      if (mainScroller) mainScroller.scrollTop = 0;
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    scrollToTop();
+    const timer = window.setTimeout(scrollToTop, 0);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, location.key]);
 
   const assessmentType = location.state?.type || "exam";
   const assessmentLabel = getAssessmentCategoryLabel(assessmentType);
@@ -288,13 +296,21 @@ export default function CreateAssessment() {
 
     appendAiQuestion(mapped);
 
-    setAiProgress((prev) => ({
-      ...(prev || {}),
-      phase: event.phase || prev?.phase,
-      current: (event.index ?? 0) + 1,
-      total: event.total ?? prev?.total,
-      latestType: mapped.type,
-    }));
+    setAiProgress((prev) => {
+      const current = (event.index ?? 0) + 1;
+      const total = event.total ?? prev?.total;
+      const percent =
+        total > 0 ? Math.min(99, Math.round((current / total) * 99)) : prev?.percent;
+      return {
+        ...(prev || {}),
+        phase: event.phase || prev?.phase,
+        current,
+        total,
+        latestType: mapped.type,
+        percent,
+        status: "revealing",
+      };
+    });
 
     if (event.suggestedTitle || event.suggestedDescription) {
       setExam((prev) => ({
@@ -548,9 +564,9 @@ export default function CreateAssessment() {
         </div>
       )}
 
-      <div className="mx-auto max-w-[1440px]">
-        <div className="grid grid-cols-1 gap-8 xl:grid-cols-12 xl:items-start">
-          <div className="space-y-6 xl:col-span-4">
+      <div className="mx-auto w-full max-w-[min(100%,1760px)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 xl:items-start xl:gap-8">
+          <div className="space-y-6 xl:col-span-3">
             <div className={`${assessmentPanelClass(theme)} space-y-4`}>
               <div className="flex items-center gap-2">
                 <ClipboardList className="text-emerald-400" size={18} />
@@ -599,7 +615,7 @@ export default function CreateAssessment() {
             />
           </div>
 
-          <div className={`${assessmentPanelClass(theme)} min-h-[420px] xl:col-span-5`}>
+          <div className={`${assessmentPanelClass(theme)} min-h-[420px] xl:col-span-6`}>
             {creationMode !== "manual" && (
               <div className={showQuestionPanel ? "mb-6" : ""}>
                 <AssessmentAiGenerator
@@ -617,6 +633,7 @@ export default function CreateAssessment() {
                     <AiGenerationProgress
                       progress={aiProgress}
                       questionCount={questions.length}
+                      active={aiGenerating}
                     />
                   </div>
                 )}
@@ -669,7 +686,7 @@ export default function CreateAssessment() {
             )}
           </div>
 
-          <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3`}>
+          <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3 xl:sticky xl:top-6`}>
             <div className="flex items-center gap-2">
               <Settings className="text-emerald-400" size={18} />
               <h2 className="font-semibold">Settings</h2>

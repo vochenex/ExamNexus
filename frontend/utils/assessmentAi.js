@@ -222,8 +222,8 @@ async function revealQuestionsIncrementally({
     phase,
     current: total,
     total,
-    percent: 100,
-    status: "done",
+    percent: Math.min(99, Math.round(revealStart + (100 - revealStart))),
+    status: "revealing",
   });
 }
 

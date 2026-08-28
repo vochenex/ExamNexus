@@ -301,11 +301,14 @@ export default function FacultyDashboard() {
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
-      <div className="mx-auto w-full max-w-7xl">
+      <div className="mx-auto w-full max-w-[min(100%,1600px)]">
       {flashNotice?.message && (
         <AlertBanner
           variant={flashNotice.variant || "success"}
           className="mb-6"
+          scrollIntoView={false}
+          autoDismissMs={4500}
+          onDismiss={() => setFlashNotice(null)}
         >
           {flashNotice.message}
         </AlertBanner>

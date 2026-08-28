@@ -4,6 +4,49 @@
   box-sizing: border-box;
 }
 
+/* Login — no floating card; blend panels into page background */
+.en-auth-card--blend {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+.en-auth-card--blend .en-auth-panel-brand,
+.en-auth-card--blend .en-auth-panel-form {
+  background: transparent !important;
+}
+
+html.light .en-auth-card--blend .en-auth-panel-brand,
+html.light .en-auth-card--blend .en-auth-panel-form {
+  color: #0f172a;
+}
+
+html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
+  background: rgba(13, 148, 136, 0.35);
+}
+
+@media (min-width: 768px) {
+  .en-auth-card--blend {
+    max-width: min(64rem, 94vw);
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .en-auth-card--blend .en-auth-panel-brand {
+    justify-content: center;
+  }
+
+  .en-auth-card--blend .en-auth-panel-form {
+    justify-content: center !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
+}
+
 .en-auth-panel-brand,
 .en-auth-panel-form {
   box-sizing: border-box;
