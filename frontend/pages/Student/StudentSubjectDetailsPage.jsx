@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Megaphone, ClipboardCheck } from "lucide-react";
-import BackButton from "../../components/BackButton";
 import ClassmateCard from "../../components/ClassmateCard";
 import SubjectFacultyCard from "../../components/SubjectFacultyCard";
 import Button from "../../components/ui/Button";
@@ -86,7 +85,6 @@ export default function StudentSubjectDetails() {
   if (loading && !subject) {
     return (
       <div className={pageShellClass(theme)}>
-        <BackButton />
         <div className="mb-6 space-y-3" aria-hidden="true">
           <div
             className={`h-9 w-64 max-w-full rounded-xl ${
@@ -118,7 +116,6 @@ export default function StudentSubjectDetails() {
   if (error || !subject) {
     return (
       <div className={pageShellClass(theme)}>
-        <BackButton />
         <AlertBanner variant="error" className="mt-4">
           {error || "Subject not found."}
         </AlertBanner>
@@ -128,7 +125,6 @@ export default function StudentSubjectDetails() {
 
   return (
     <div className={pageShellClass(theme)}>
-      <BackButton />
 
         <PageHeader
           theme={theme}

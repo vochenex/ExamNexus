@@ -3,7 +3,6 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { fetchExamWithQuestions, fetchSubject, updateExam } from "../../utils/supabaseData";
 import { useNavigate, useParams } from "react-router-dom";
-import BackButton from "../../components/BackButton";
 import { ClipboardList, Settings } from "lucide-react";
 import AssessmentSchedule from "../../components/AssessmentSchedule";
 import SectionPicker from "../../components/SectionPicker";
@@ -307,7 +306,6 @@ export default function EditAssessment() {
 
   return (
     <div className={pageShellWithBellClass(theme)}>
-      <BackButton />
 
       <div className="mb-8">
         <h1

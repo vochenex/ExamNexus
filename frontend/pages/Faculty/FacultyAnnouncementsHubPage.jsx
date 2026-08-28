@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Megaphone } from "lucide-react";
-import BackButton from "../../components/BackButton";
 import SectionPicker from "../../components/SectionPicker";
 import PageHeader from "../../components/ui/PageHeader";
 import AlertBanner from "../../components/ui/AlertBanner";
@@ -167,7 +166,6 @@ export default function FacultyAnnouncementsHub() {
 
   return (
     <div className={pageShellClass(theme, "mx-auto max-w-5xl")}>
-      <BackButton />
 
       <PageHeader
         theme={theme}

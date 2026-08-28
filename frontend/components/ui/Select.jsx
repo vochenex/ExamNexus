@@ -133,7 +133,7 @@ export default function Select({
       </button>
       {open && (
         <ModalPortal>
-          <div className={`fixed inset-0 z-[130] flex items-end justify-center sm:items-center p-3 sm:p-4 ${motion.overlay}`}>
+          <div className={`fixed inset-0 z-[170] flex items-end justify-center sm:items-center p-3 sm:p-4 ${motion.overlay}`}>
             <button
               type="button"
               className="absolute inset-0 bg-black/70 backdrop-blur-sm"

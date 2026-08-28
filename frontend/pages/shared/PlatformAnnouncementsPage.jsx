@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Megaphone } from "lucide-react";
-import BackButton from "../../components/BackButton";
 import AnnouncementCard from "../../components/AnnouncementCard";
 import PageHeader from "../../components/ui/PageHeader";
 import AlertBanner from "../../components/ui/AlertBanner";
@@ -65,7 +64,6 @@ export default function PlatformAnnouncements() {
   return (
     <div className={pageShellClass(theme)}>
       <div className="mx-auto max-w-3xl">
-        <BackButton />
         <PageHeader
           theme={theme}
           icon={Megaphone}

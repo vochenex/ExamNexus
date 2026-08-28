@@ -21,6 +21,7 @@ import { buildPendingAuthNotice, stashAuthNotice } from "../utils/authNotice";
 import ProfileAvatar from "../components/ProfileAvatar";
 import NotificationBell from "../components/NotificationBell";
 import ThemeToggle from "../components/ThemeToggle";
+import BackButton from "../components/BackButton";
 import InstallIconButton from "../components/pwa/InstallIconButton";
 import PushEnableButton from "../components/pwa/PushEnableButton";
 import ExamNexusLogo from "../components/ExamNexusLogo";
@@ -336,6 +337,7 @@ export default function DashboardLayout() {
                   idSuffix="mobile-top"
                 />
                 <div className="en-native-topbar-actions">
+                  <BackButton compact />
                   {!nativeApp && <InstallIconButton compact />}
                   <PushEnableButton compact />
                   <ThemeToggle compact />
@@ -346,6 +348,7 @@ export default function DashboardLayout() {
               <div
                 className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
               >
+                <BackButton compact />
                 <InstallIconButton compact />
                 <PushEnableButton compact />
                 <ThemeToggle compact />

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Archive, Search, Trash2 } from "lucide-react";
-import BackButton from "../../components/BackButton";
 import PageHeader from "../../components/ui/PageHeader";
 import Select from "../../components/ui/Select";
 import { useTheme } from "../../layouts/ThemeContext";
@@ -128,7 +127,6 @@ export default function QuestionBank() {
 
   return (
     <div className={pageShellClass(theme)}>
-      <BackButton />
       <PageHeader
         theme={theme}
         icon={Archive}

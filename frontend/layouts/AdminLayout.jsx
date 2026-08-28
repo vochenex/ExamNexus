@@ -20,6 +20,7 @@ import ProfileAvatar from "../components/ProfileAvatar";
 import ExamNexusLogo from "../components/ExamNexusLogo";
 import ExamNexusBrand from "../components/ExamNexusBrand";
 import ThemeToggle from "../components/ThemeToggle";
+import BackButton from "../components/BackButton";
 import InstallIconButton from "../components/pwa/InstallIconButton";
 import PushEnableButton from "../components/pwa/PushEnableButton";
 import NotificationBell from "../components/NotificationBell";
@@ -220,6 +221,7 @@ export default function AdminLayout() {
               idSuffix="admin-mobile-top"
             />
             <div className="en-native-topbar-actions">
+              <BackButton compact />
               {!nativeApp && <InstallIconButton compact />}
               <PushEnableButton compact />
               <ThemeToggle compact />
@@ -230,6 +232,7 @@ export default function AdminLayout() {
           <div
             className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
           >
+            <BackButton compact />
             <InstallIconButton compact />
             <PushEnableButton compact />
             <ThemeToggle compact />

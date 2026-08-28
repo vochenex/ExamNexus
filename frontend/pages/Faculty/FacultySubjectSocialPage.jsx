@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Megaphone } from "lucide-react";
-import BackButton from "../../components/BackButton";
 import SectionPicker from "../../components/SectionPicker";
 import AnnouncementCard from "../../components/AnnouncementCard";
 import SubjectFacultyCard from "../../components/SubjectFacultyCard";
@@ -139,7 +138,6 @@ export default function FacultySubjectSocial() {
   return (
     <div className={pageShellClass(theme)}>
       <div className="mx-auto max-w-7xl">
-        <BackButton />
 
         <PageHeader
           theme={theme}

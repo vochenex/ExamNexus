@@ -5,7 +5,6 @@ import { supabase } from "../../supabaseClient";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAssessmentLockdown } from "../../contexts/AssessmentLockdownContext";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
-import BackButton from "../../components/BackButton";
 import AssessmentQuestionInput from "../../components/AssessmentQuestionInput";
 import AssessmentQuestionNav from "../../components/AssessmentQuestionNav";
 import AssessmentLockdownModal from "../../components/AssessmentLockdownModal";
@@ -18,7 +17,8 @@ import IntegrityAlertToast from "../../components/IntegrityAlertToast";
 import useAssessmentIntegrity from "../../hooks/useAssessmentIntegrity";
 import useQuestionTimeTracking from "../../hooks/useQuestionTimeTracking";
 import useConnectionStatus from "../../hooks/useConnectionStatus";
-import ConnectionStatusBanner from "../../components/ConnectionStatusBanner";
+import ExamNetworkRecoveryOverlay from "../../components/ExamNetworkRecoveryOverlay";
+import { isNetworkIssue } from "../../utils/networkErrors";
 import { formatSupabaseError } from "../../utils/supabaseErrors";
 import {
   submitStudentExam,
@@ -173,12 +173,15 @@ function TakeAssessmentExperience() {
   const [isRetakeAttempt, setIsRetakeAttempt] = useState(false);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [loadRetryToken, setLoadRetryToken] = useState(0);
+  const [networkRecovery, setNetworkRecovery] = useState(false);
+  const [pendingSubmitRetry, setPendingSubmitRetry] = useState(false);
   const alertTimerRef = useRef(null);
   const submitExamRef = useRef(null);
   const autoSubmittingRef = useRef(false);
   const pendingIntegrityAutoSubmitRef = useRef(false);
+  const pendingSubmitOptionsRef = useRef(null);
   const examRef = useRef(null);
-  const { status: connectionStatus, isOffline, isUnstable } = useConnectionStatus({
+  const { isOffline, isUnstable } = useConnectionStatus({
     enabled: true,
   });
 
@@ -186,6 +189,53 @@ function TakeAssessmentExperience() {
   const interactionLocked =
     submitting || confirmSubmitOpen || Boolean(resultDialog) || autoSubmitting;
   const connectionDegraded = isOffline || isUnstable;
+  const networkErrorActive = Boolean(error) && isNetworkIssue(null, error);
+  const showNetworkRecovery =
+    networkRecovery ||
+    pendingSubmitRetry ||
+    networkErrorActive ||
+    (isActive && connectionDegraded);
+
+  const recoveryDetail = pendingSubmitRetry
+    ? "Submitting your answers as soon as the connection is stable…"
+    : isActive
+      ? "Holding your place in the exam while we reconnect…"
+      : "Reconnecting to your assessment…";
+
+  useEffect(() => {
+    if (!networkRecovery && !networkErrorActive) return undefined;
+
+    const retryLoad = () => {
+      if (alreadySubmitted || exam) return;
+      setError("");
+      setPhase("loading");
+      setLoading(true);
+      setLoadRetryToken((value) => value + 1);
+    };
+
+    if (!connectionDegraded) {
+      retryLoad();
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (!connectionDegraded) {
+        retryLoad();
+      }
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [
+    alreadySubmitted,
+    connectionDegraded,
+    exam,
+    networkErrorActive,
+    networkRecovery,
+  ]);
+
+  useEffect(() => {
+    if (!pendingSubmitRetry || connectionDegraded || submitting) return;
+    submitExamRef.current?.(pendingSubmitOptionsRef.current || {});
+  }, [pendingSubmitRetry, connectionDegraded, submitting]);
 
   useEffect(() => {
     examRef.current = exam;
@@ -361,6 +411,7 @@ function TakeAssessmentExperience() {
         setExam(examData);
         setQuestions(orderedQuestions);
         setTotalSeconds(durationSeconds);
+        setNetworkRecovery(false);
 
         if (resumeSession) {
           const { saved: session, activeTotalSeconds, remaining } = resumeSession;
@@ -389,17 +440,20 @@ function TakeAssessmentExperience() {
         const friendly = formatSupabaseError(err, {
           fallback: "Failed to load assessment.",
         });
-        const networkIssue =
-          err?.name === "TypeError" ||
-          err?.name === "AuthRetryableFetchError" ||
-          /failed to fetch|networkerror|offline|internet|reach the server/i.test(
-            String(err?.message || friendly || "")
-          );
+        const networkIssue = isNetworkIssue(err, friendly);
 
         // Keep an in-progress local session visible during blackouts / offline.
         const session = loadExamSession(id);
         if (networkIssue && session?.commenced && examRef.current) {
           setError("");
+          setNetworkRecovery(false);
+          return;
+        }
+
+        if (networkIssue) {
+          setNetworkRecovery(true);
+          setError("");
+          setPhase("loading");
           return;
         }
 
@@ -750,19 +804,17 @@ function TakeAssessmentExperience() {
       if (reason === "integrity") {
         autoSubmittingRef.current = false;
         pendingIntegrityAutoSubmitRef.current = true;
-        setAutoSubmitting(false);
+        setAutoSubmitting(true);
       }
-      setResultDialog({
-        tone: "warning",
-        title: "You are offline",
-        message:
-          "Your answers are saved on this device. Reconnect to the internet, then submit again. Do not close the browser until submission succeeds.",
-      });
+      pendingSubmitOptionsRef.current = options;
+      setPendingSubmitRetry(true);
       return;
     }
 
     try {
       setSubmitting(true);
+      setPendingSubmitRetry(false);
+      pendingSubmitOptionsRef.current = null;
       flushCurrentQuestionTime();
 
       const result = await submitStudentExam({
@@ -777,6 +829,10 @@ function TakeAssessmentExperience() {
       clearExamSession(id);
       setFocusBlocked(false);
       pendingIntegrityAutoSubmitRef.current = false;
+      setPendingSubmitRetry(false);
+      pendingSubmitOptionsRef.current = null;
+      setAutoSubmitting(false);
+      autoSubmittingRef.current = false;
 
       const hasEssayQuestions = questions.some(
         (question) => getQuestionFormatType(question, exam.exam_type) === "essay"
@@ -806,10 +862,7 @@ function TakeAssessmentExperience() {
       });
     } catch (err) {
       const alreadySubmitted = /already submitted/i.test(err.message || "");
-      const networkError =
-        /failed to fetch|networkerror|network request failed|offline|timed out|timeout/i.test(
-          String(err.message || "")
-        );
+      const networkError = isNetworkIssue(err, err.message);
       if (alreadySubmitted) {
         setSubmitBlocked(true);
         clearExamSession(id);
@@ -819,22 +872,21 @@ function TakeAssessmentExperience() {
         if (reason === "integrity") {
           autoSubmittingRef.current = false;
           pendingIntegrityAutoSubmitRef.current = true;
-          setAutoSubmitting(false);
+          setAutoSubmitting(true);
         }
+        pendingSubmitOptionsRef.current = options;
+        setPendingSubmitRetry(true);
+        return;
       }
 
       setResultDialog({
         tone: "danger",
         title: alreadySubmitted
           ? "Already submitted"
-          : networkError
-            ? "Connection lost"
-            : "Submission failed",
+          : "Submission failed",
         message: alreadySubmitted
           ? "This attempt could not be saved because a submission already exists. You have been returned to your assessments list."
-          : networkError
-            ? "Could not reach the server. Your answers are still saved on this device — reconnect and tap Submit again. The exam will not auto-submit for a network outage."
-            : err.message || "Could not submit your answers. Please try again.",
+          : err.message || "Could not submit your answers. Please try again.",
         exitLockdown: alreadySubmitted,
       });
     } finally {
@@ -1041,6 +1093,10 @@ function TakeAssessmentExperience() {
     theme === "dark" ? "bg-[#031d1f] text-white" : "en-bg-page text-gray-900"
   }`;
 
+  if (showNetworkRecovery) {
+    return <ExamNetworkRecoveryOverlay detail={recoveryDetail} />;
+  }
+
   if (loading || phase === "loading") {
     return <PageLoadingSkeleton theme={theme} variant="assessment" />;
   }
@@ -1048,7 +1104,6 @@ function TakeAssessmentExperience() {
   if (alreadySubmitted || phase === "done") {
     return (
       <div className={shellClass}>
-        <BackButton />
         <p className="mt-4">You have already submitted this assessment.</p>
         <button
           type="button"
@@ -1064,8 +1119,6 @@ function TakeAssessmentExperience() {
   if (error || !exam || phase === "error") {
     return (
       <div className={shellClass}>
-        <BackButton />
-        <ConnectionStatusBanner status={connectionStatus} className="mb-4 mt-2" />
         <div
           className={`mt-4 rounded-2xl border p-5 ${
             theme === "dark"
@@ -1074,32 +1127,11 @@ function TakeAssessmentExperience() {
           }`}
         >
           <p className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-            Couldn’t load this assessment right now
+            Couldn’t load this assessment
           </p>
           <p className={`mt-2 text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
             {error || "Assessment not found."}
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={primaryButton(theme)}
-              onClick={() => {
-                setError("");
-                setPhase("loading");
-                setLoading(true);
-                setLoadRetryToken((value) => value + 1);
-              }}
-            >
-              Retry
-            </button>
-            <button
-              type="button"
-              className={secondaryButton(theme)}
-              onClick={() => navigate("/student/assessments")}
-            >
-              Back to assessments
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -1108,7 +1140,6 @@ function TakeAssessmentExperience() {
   if (!questions.length) {
     return (
       <div className={shellClass}>
-        <BackButton />
         <p className="mt-4">No questions found for this assessment.</p>
       </div>
     );
@@ -1117,8 +1148,6 @@ function TakeAssessmentExperience() {
   if (phase === "ready") {
     return (
       <div className={shellClass}>
-        <BackButton />
-        <ConnectionStatusBanner status={connectionStatus} className="mb-4 mt-2" />
         <div className="mx-auto max-w-2xl pt-8">
           <h1
             className={`text-3xl font-bold ${
@@ -1186,8 +1215,6 @@ function TakeAssessmentExperience() {
         message={integrityAlert}
         onDismiss={() => setIntegrityAlert("")}
       />
-
-      <ConnectionStatusBanner status={connectionStatus} className="mb-4" />
 
       <div className="mx-auto max-w-6xl">
         <AssessmentExamInstructionsBar

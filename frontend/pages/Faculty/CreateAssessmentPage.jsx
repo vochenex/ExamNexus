@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { useNavigate, useLocation } from "react-router-dom";
-import BackButton from "../../components/BackButton";
 import { ClipboardList, Settings } from "lucide-react";
 import AssessmentSchedule from "../../components/AssessmentSchedule";
 import SectionPicker from "../../components/SectionPicker";
@@ -493,7 +492,6 @@ export default function CreateAssessment() {
 
   return (
     <div className={pageShellWithBellClass(theme)}>
-      <BackButton />
 
       <div className="mb-8">
         <h1

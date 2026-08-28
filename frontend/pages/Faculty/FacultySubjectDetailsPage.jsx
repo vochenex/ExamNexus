@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import BackButton from "../../components/BackButton";
 import {ClipboardCheck, GraduationCap, Activity, Megaphone, Pencil, BarChart3, Search, Plus, ClipboardList} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
@@ -192,7 +191,6 @@ export default function SubjectDetails() {
     }`;
     return (
       <div className={pageShellWithBellClass(theme)}>
-        <BackButton />
         <div className="mb-8 space-y-3" aria-hidden="true">
           <div
             className={`h-9 w-64 max-w-full rounded-xl ${
@@ -297,8 +295,6 @@ export default function SubjectDetails() {
 
   return (
  <div className={pageShellWithBellClass(theme)}>
-
-    <BackButton />
 
     <div className="mb-6">
       <ExamNexusBrand variant="compact" idSuffix="subject-faculty" className="mb-5 opacity-90" />

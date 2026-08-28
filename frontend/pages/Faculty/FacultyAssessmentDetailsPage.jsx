@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import BackButton from "../../components/BackButton";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import {
@@ -239,7 +238,6 @@ export default function AssessmentDetails() {
   if (error || !exam) {
     return (
       <div className={`min-h-screen p-6 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-        <BackButton />
         <p className="mt-4 text-red-500">{error || "Assessment not found."}</p>
       </div>
     );
@@ -253,7 +251,6 @@ export default function AssessmentDetails() {
 
   return (
     <div className={pageShellWithBellClass(theme)}>
-      <BackButton />
 
       <div className={`${panelClass(theme)} mb-5 !p-0 overflow-hidden`}>
         <button

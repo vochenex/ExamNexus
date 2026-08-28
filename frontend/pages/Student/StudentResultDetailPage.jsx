@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
-import BackButton from "../../components/BackButton";
 import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
@@ -194,7 +193,6 @@ export default function StudentResults() {
   if (loadError) {
     return (
       <div className={pageShellWithBellClass(theme)}>
-        <BackButton />
         <p className="mt-4 text-red-400">{loadError}</p>
       </div>
     );
@@ -203,7 +201,6 @@ export default function StudentResults() {
   if (!exam || !result) {
     return (
       <div className={pageShellWithBellClass(theme)}>
-        <BackButton />
         <p className="mt-4">Results not found.</p>
       </div>
     );
@@ -247,7 +244,6 @@ export default function StudentResults() {
 
   return (
     <div className={pageShellWithBellClass(theme)}>
-      <BackButton />
 
       <div className="mx-auto max-w-4xl">
         <div className="mb-8">
