@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, RotateCcw, XCircle } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { panelClass } from "../utils/themeInputs";
-import { iconButton } from "../utils/themeButtons";
+import { primaryButtonSm, dangerButton } from "../utils/themeButtons";
 import ProgressButton from "./ui/ProgressButton";
 import ProfileAvatar from "./ProfileAvatar";
 import {
@@ -250,32 +250,38 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
                 }`}
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <ProgressButton
                 type="button"
                 loading={processing}
-                loadingLabel="Working…"
-                iconOnly
+                loadingLabel="Approving…"
                 disabled={selectedIds.size === 0}
                 onClick={() => handleReview("approve")}
-                className={iconButton(theme, "primary", "disabled:opacity-50")}
+                className={primaryButtonSm(
+                  theme,
+                  "w-full justify-center gap-2 px-5 py-2.5 text-sm font-semibold sm:w-auto sm:min-w-[9.5rem]"
+                )}
                 aria-label="Approve selected retake requests"
                 title="Approve selected"
               >
-                <CheckCircle2 size={16} />
+                <CheckCircle2 size={18} />
+                Approve selected
               </ProgressButton>
               <ProgressButton
                 type="button"
                 loading={processing}
-                loadingLabel="Working…"
-                iconOnly
+                loadingLabel="Denying…"
                 disabled={selectedIds.size === 0}
                 onClick={() => handleReview("deny")}
-                className={iconButton(theme, "danger", "disabled:opacity-50")}
+                className={dangerButton(
+                  theme,
+                  "w-full justify-center gap-2 px-5 py-2.5 text-sm font-semibold sm:w-auto sm:min-w-[9.5rem]"
+                )}
                 aria-label="Deny selected retake requests"
                 title="Deny selected"
               >
-                <XCircle size={16} />
+                <XCircle size={18} />
+                Deny selected
               </ProgressButton>
             </div>
           </div>

@@ -389,6 +389,7 @@ export default function SubjectDetails() {
             subject={subject}
             sectionInvites={subject.section_invites}
             defaultOpen
+            layout="grid"
           />
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
@@ -31,6 +31,7 @@ import {
 } from "../../utils/supabaseData";
 import { isStudentRole, resolveStudentId } from "../../utils/authUser";
 import { loadProfileForUser, resolveSchoolId } from "../../utils/authProfile";
+import { broadcastProfileUpdate } from "../../utils/profileEvents";
 import { isFacultyRole, hasCustomProfilePhoto } from "../../utils/avatar";
 import { isAdminUser } from "../../utils/adminData";
 import { primaryButton, secondaryButton, dangerButton } from "../../utils/themeButtons";
@@ -173,6 +174,8 @@ export default function Profile() {
   const [editProfile, setEditProfile] = useState(profile);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle");
+  const editingRef = useRef(editing);
+  const skipProfilePollUntilRef = useRef(0);
   const [loadError, setLoadError] = useState("");
   const [authUser, setAuthUser] = useState(null);
   const [studentStats, setStudentStats] = useState({
@@ -247,6 +250,9 @@ export default function Profile() {
   }, []);
 
   const loadProfile = useCallback(async (silent = false) => {
+    if (editingRef.current) return;
+    if (Date.now() < skipProfilePollUntilRef.current) return;
+
     const studentId = await resolveStudentId();
     if (!studentId) {
       setLoadError("Could not find your session. Please log out and log in again.");
@@ -286,6 +292,10 @@ export default function Profile() {
   }, [loadFacultyStats, loadStudentStats]);
 
   usePolling(loadProfile, []);
+
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
 
   useEffect(() => {
     if (!editing) {
@@ -329,6 +339,7 @@ export default function Profile() {
         "examnexus_user",
         JSON.stringify({ ...user, ...saved })
       );
+      broadcastProfileUpdate(saved);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
@@ -388,6 +399,8 @@ export default function Profile() {
         "examnexus_user",
         JSON.stringify({ ...user, ...mergedProfile })
       );
+      broadcastProfileUpdate(mergedProfile);
+      skipProfilePollUntilRef.current = Date.now() + 15000;
 
       setTimeout(() => {
         setSaveSuccess(false);

@@ -46,6 +46,39 @@ function buildLast14DayBuckets() {
 
 const ALL = "all";
 
+function dateKeyFromValue(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function FilterDateInput({ theme, label, value, onChange }) {
+  const id = `faculty-filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  return (
+    <label htmlFor={id} className="flex min-w-0 flex-1 flex-col gap-1">
+      <span
+        className={`text-[11px] font-semibold uppercase tracking-wide ${
+          theme === "dark" ? "text-gray-400" : "text-gray-500"
+        }`}
+      >
+        {label}
+      </span>
+      <input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`rounded-xl px-3 py-2 text-sm outline-none ${
+          theme === "dark"
+            ? "border border-white/10 bg-white/5 text-white"
+            : "border border-emerald-200 en-bg-input text-gray-900"
+        }`}
+      />
+    </label>
+  );
+}
+
 function FilterSelect({ theme, label, value, onChange, options }) {
   const id = `faculty-filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
@@ -82,6 +115,9 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
   const [subjectFilter, setSubjectFilter] = useState(ALL);
   const [yearFilter, setYearFilter] = useState(ALL);
   const [sectionFilter, setSectionFilter] = useState(ALL);
+  const [assessmentSubjectFilter, setAssessmentSubjectFilter] = useState(ALL);
+  const [assessmentStartDateFilter, setAssessmentStartDateFilter] = useState("");
+  const [assessmentDueDateFilter, setAssessmentDueDateFilter] = useState("");
 
   const load = useCallback(
     async (silent = false) => {
@@ -177,6 +213,60 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
       })
       .slice(0, 8);
   }, [assessments, filteredSubmissions, subjectFilter, yearFilter, sectionFilter]);
+
+  const submissionsPerAssessment = useMemo(() => {
+    const submittedPerExam = {};
+    for (const row of filteredSubmissions) {
+      submittedPerExam[row.examId] = (submittedPerExam[row.examId] || 0) + 1;
+    }
+
+    return assessments
+      .filter((row) => {
+        if (assessmentSubjectFilter !== ALL && row.subjectId !== assessmentSubjectFilter) {
+          return false;
+        }
+        if (assessmentStartDateFilter) {
+          const startKey = dateKeyFromValue(row.date);
+          if (startKey !== assessmentStartDateFilter) return false;
+        }
+        if (assessmentDueDateFilter) {
+          const dueKey = dateKeyFromValue(row.dueDate);
+          if (dueKey !== assessmentDueDateFilter) return false;
+        }
+        return true;
+      })
+      .map((row) => {
+        const submitted = submittedPerExam[row.examId] || 0;
+        const enrolled =
+          sectionFilter === ALL
+            ? row.enrolled
+            : row.enrolledBySection?.[sectionFilter] || 0;
+        return { ...row, submitted, enrolled, value: submitted };
+      })
+      .sort((left, right) => {
+        const leftDue = dateKeyFromValue(left.dueDate || left.date);
+        const rightDue = dateKeyFromValue(right.dueDate || right.date);
+        return rightDue.localeCompare(leftDue);
+      });
+  }, [
+    assessments,
+    assessmentDueDateFilter,
+    assessmentStartDateFilter,
+    assessmentSubjectFilter,
+    filteredSubmissions,
+    sectionFilter,
+  ]);
+
+  const hasAssessmentPanelFilter =
+    assessmentSubjectFilter !== ALL ||
+    Boolean(assessmentStartDateFilter) ||
+    Boolean(assessmentDueDateFilter);
+
+  const resetAssessmentPanelFilters = () => {
+    setAssessmentSubjectFilter(ALL);
+    setAssessmentStartDateFilter("");
+    setAssessmentDueDateFilter("");
+  };
 
   const subjectOptions = useMemo(() => {
     const base = [{ value: ALL, label: "All subjects" }];
@@ -332,11 +422,50 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
         defaultOpen
         className={panelClass(theme)}
       >
-        {filteredAssessments.length === 0 ? (
+        <div className="mb-4 rounded-xl border border-inherit p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Filter size={14} className="text-emerald-400" />
+            <span className={`text-xs font-semibold uppercase tracking-wide ${muted}`}>
+              Assessment filters
+            </span>
+            {hasAssessmentPanelFilter && (
+              <button
+                type="button"
+                onClick={resetAssessmentPanelFilters}
+                className={secondaryButtonSm(theme, "!px-2.5 !py-1 text-xs ml-auto")}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+            <FilterSelect
+              theme={theme}
+              label="Subject"
+              value={assessmentSubjectFilter}
+              onChange={setAssessmentSubjectFilter}
+              options={subjectOptions}
+            />
+            <FilterDateInput
+              theme={theme}
+              label="Start date"
+              value={assessmentStartDateFilter}
+              onChange={setAssessmentStartDateFilter}
+            />
+            <FilterDateInput
+              theme={theme}
+              label="Due date"
+              value={assessmentDueDateFilter}
+              onChange={setAssessmentDueDateFilter}
+            />
+          </div>
+        </div>
+
+        {submissionsPerAssessment.length === 0 ? (
           <p className={`text-sm ${muted}`}>No assessments match these filters.</p>
         ) : (
           <div className="grid gap-2 md:grid-cols-2 min-w-0">
-            {filteredAssessments.map((row) => {
+            {submissionsPerAssessment.map((row) => {
               const rate =
                 row.enrolled > 0 ? Math.round((row.submitted / row.enrolled) * 100) : 0;
 
@@ -356,7 +485,8 @@ export default function FacultyDashboardAnalyticsPanel({ teacherSchoolId }) {
                       {row.fullTitle}
                     </p>
                     <p className={`mt-0.5 truncate text-xs ${muted}`}>
-                      {row.subjectName} · {formatAssessmentDate(row.date)}
+                      {row.subjectName} · Starts {formatAssessmentDate(row.date)}
+                      {row.dueDate ? ` · Due ${formatAssessmentDate(row.dueDate)}` : ""}
                     </p>
                   </div>
                   <div className="w-[4.5rem] shrink-0 text-right">

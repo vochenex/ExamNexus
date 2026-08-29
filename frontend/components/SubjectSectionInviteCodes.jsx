@@ -11,6 +11,7 @@ export default function SubjectSectionInviteCodes({
   subject,
   sectionInvites = null,
   defaultOpen = false,
+  layout = "list",
   className = "",
 }) {
   const { theme } = useTheme();
@@ -37,6 +38,8 @@ export default function SubjectSectionInviteCodes({
       });
     }
   };
+
+  const isGrid = layout === "grid";
 
   if (!rows.length) {
     return (
@@ -104,28 +107,35 @@ export default function SubjectSectionInviteCodes({
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <ul className="space-y-1.5 border-t border-inherit px-2.5 py-2">
+          <ul
+            className={`border-t border-inherit px-2.5 py-2 ${
+              isGrid
+                ? "grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3"
+                : "space-y-1.5"
+            }`}
+          >
             {rows.map((row) => {
               const copied = copiedSection === row.section;
               return (
                 <li
                   key={row.section}
-                  className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 ${
-                    theme === "dark" ? "bg-white/[0.03]" : "bg-white/70"
-                  }`}
+                  className={`flex min-w-0 items-center justify-between gap-1.5 rounded-md ${
+                    isGrid ? "px-1.5 py-1" : "px-2 py-1.5"
+                  } ${theme === "dark" ? "bg-white/[0.03]" : "bg-white/70"}`}
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p
-                      className={`text-xs font-semibold ${
-                        theme === "dark" ? "text-emerald-300" : "text-teal-700"
-                      }`}
+                      className={`truncate font-semibold ${
+                        isGrid ? "text-[10px]" : "text-xs"
+                      } ${theme === "dark" ? "text-emerald-300" : "text-teal-700"}`}
                     >
                       {formatSectionLabel(row.section)}
                     </p>
                     <p
-                      className={`font-mono text-[11px] tracking-wide ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-800"
-                      }`}
+                      className={`truncate font-mono tracking-wide ${
+                        isGrid ? "text-[9px]" : "text-[11px]"
+                      } ${theme === "dark" ? "text-gray-300" : "text-gray-800"}`}
+                      title={row.invite_code}
                     >
                       {row.invite_code}
                     </p>
@@ -135,7 +145,9 @@ export default function SubjectSectionInviteCodes({
                     onClick={(event) => copyCode(event, row.section, row.invite_code)}
                     title={copied ? "Copied!" : "Copy invitation code"}
                     aria-label={copied ? "Invitation code copied" : "Copy invitation code"}
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ${
+                    className={`flex shrink-0 items-center justify-center rounded-lg border transition ${
+                      isGrid ? "h-6 w-6" : "h-8 w-8"
+                    } ${
                       copied
                         ? theme === "dark"
                           ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
@@ -145,7 +157,7 @@ export default function SubjectSectionInviteCodes({
                           : "border-emerald-200 text-teal-700 hover:bg-emerald-50"
                     }`}
                   >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? <Check size={isGrid ? 11 : 14} /> : <Copy size={isGrid ? 11 : 14} />}
                   </button>
                 </li>
               );

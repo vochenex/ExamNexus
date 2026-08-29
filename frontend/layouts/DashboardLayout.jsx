@@ -36,6 +36,8 @@ import useConnectionStatus from "../hooks/useConnectionStatus";
 import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
+import HeaderBackButton from "../components/HeaderBackButton";
+import { PROFILE_UPDATED_EVENT } from "../utils/profileEvents";
 import { motion } from "../utils/motion";
 
 export default function DashboardLayout() {
@@ -65,6 +67,21 @@ export default function DashboardLayout() {
       endLockdown();
     }
   }, [endLockdown, isLockdownActive, location.pathname]);
+
+  useEffect(() => {
+    const onProfileUpdated = (event) => {
+      const next = event.detail;
+      if (!next?.id) return;
+      setSessionUser((prev) => {
+        const merged = { ...prev, ...next };
+        localStorage.setItem("examnexus_user", JSON.stringify(merged));
+        return merged;
+      });
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+  }, []);
 
   useEffect(() => {
     const verifyAccess = async () => {
@@ -338,12 +355,15 @@ export default function DashboardLayout() {
           <>
             {mobileNav ? (
               <header className="en-native-topbar shrink-0">
-                <ExamNexusBrand
-                  variant="compact"
-                  logoSize={28}
-                  showTagline={false}
-                  idSuffix="mobile-top"
-                />
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <HeaderBackButton compact />
+                  <ExamNexusBrand
+                    variant="compact"
+                    logoSize={28}
+                    showTagline={false}
+                    idSuffix="mobile-top"
+                  />
+                </div>
                 <div className="en-native-topbar-actions">
                   {!nativeApp && <InstallIconButton compact />}
                   <PushEnableButton compact />
@@ -352,14 +372,21 @@ export default function DashboardLayout() {
                 </div>
               </header>
             ) : (
-              <div
-                className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
-              >
-                <InstallIconButton compact />
-                <PushEnableButton compact />
-                <ThemeToggle compact />
-                <NotificationBell compact />
-              </div>
+              <>
+                <div
+                  className={`absolute left-4 top-4 z-40 flex items-center gap-2 sm:left-6 sm:top-5 lg:left-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
+                >
+                  <HeaderBackButton compact />
+                </div>
+                <div
+                  className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
+                >
+                  <InstallIconButton compact />
+                  <PushEnableButton compact />
+                  <ThemeToggle compact />
+                  <NotificationBell compact />
+                </div>
+              </>
             )}
           </>
         )}

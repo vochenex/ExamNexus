@@ -1189,28 +1189,6 @@ export async function updateUserProfile(userId, fields) {
     return rpcData;
   }
 
-  const { data: upserted, error: upsertError } = await supabase.rpc(
-    "upsert_signup_profile",
-    {
-      p_first_name: base.first_name,
-      p_last_name: base.last_name,
-      p_email: base.email,
-      p_school_id: base.school_id,
-      p_role: base.role,
-      p_gender: fields.gender || null,
-      p_department: fields.department || null,
-      p_course: fields.course || null,
-      p_year_level: yearLevel,
-      p_age: Number.isFinite(parsedAge) ? parsedAge : null,
-      p_avatar_url: fields.avatar_url || null,
-    }
-  );
-
-  if (!upsertError && upserted) {
-    await syncAuthMetadata();
-    return upserted;
-  }
-
   const { data, error } = await supabase
     .from("users")
     .update({
@@ -1227,20 +1205,16 @@ export async function updateUserProfile(userId, fields) {
     .select("*")
     .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message || "Failed to save profile.");
+  if (!error && data) {
+    await syncAuthMetadata();
+    return data;
   }
 
-  if (!data) {
-    throw new Error(
+  throw new Error(
+    error?.message ||
       rpcError?.message ||
-        upsertError?.message ||
-        "Profile update was blocked. Run database/fix_avatar_upload.sql in Supabase."
-    );
-  }
-
-  await syncAuthMetadata();
-  return data;
+      "Failed to save profile. Run database/users_signup_policies.sql in Supabase."
+  );
 }
 
 export async function createExam(examPayload, questions) {
@@ -2865,7 +2839,7 @@ export async function fetchFacultyDashboardAnalytics(teacherSchoolId) {
 
   const { data: exams, error: examsError } = await supabase
     .from("exams")
-    .select("id, title, subject_id, start_datetime, target_sections")
+    .select("id, title, subject_id, start_datetime, end_datetime, target_sections")
     .in("subject_id", subjectIds)
     .order("start_datetime", { ascending: false })
     .limit(40);
@@ -3000,6 +2974,7 @@ export async function fetchFacultyDashboardAnalytics(teacherSchoolId) {
       enrolled: enrolledPerExam[exam.id] || 0,
       enrolledBySection: enrolledBySectionPerExam[exam.id] || {},
       date: exam.start_datetime,
+      dueDate: exam.end_datetime,
       value: submissionsPerExam[exam.id] || 0,
     };
   });
