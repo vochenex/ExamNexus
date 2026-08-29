@@ -364,7 +364,7 @@ export default function StudentSubjects() {
       )}
 
       {subjects.length > 0 && (
-        <div className={staggerGridClass("flex flex-wrap gap-4 items-start")}>
+        <div className={staggerGridClass("grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3")}>
           {subjects.map((subject) => (
             <div
               key={subject.id}
@@ -373,10 +373,8 @@ export default function StudentSubjects() {
                 group
                 en-interactive-card
                 relative
-                w-full
-                max-w-full
-                p-5
-                rounded-3xl
+                p-4
+                rounded-xl
                 backdrop-blur-md
                 cursor-pointer
                 transition-all

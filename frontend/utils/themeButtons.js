@@ -58,6 +58,18 @@ export function dangerButton(theme, extra = "") {
   `;
 }
 
+/** Semi-transparent top-bar icon button (matches Install / download control). */
+export function headerActionButtonClass(theme, { compact = false, inverted = false, extra = "" } = {}) {
+  const onDarkSurface = theme === "dark" || inverted;
+  const size = compact ? "h-9 w-9 rounded-xl sm:h-10 sm:w-10" : "rounded-2xl p-3.5";
+
+  return `en-header-action-btn flex shrink-0 items-center justify-center transition-colors duration-150 ${size} ${
+    onDarkSurface
+      ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20"
+      : "en-bg-elevated border border-emerald-700/20 text-teal-800 en-hover"
+  } ${extra}`;
+}
+
 /** Compact square button — icon only; pair with aria-label and title. */
 export function iconButton(theme, variant = "secondary", extra = "") {
   const base = `

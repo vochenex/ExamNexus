@@ -1,25 +1,20 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
+import { headerActionButtonClass } from "../utils/themeButtons";
 
 export default function ThemeToggle({ inverted = false, compact = false }) {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
-  // `inverted` = force dark-chrome styles (marketing dark header). Do not pass
-  // inverted on adaptive native topbars — those turn light in light mode.
-  const onDarkSurface = isDark || inverted;
   const iconSize = 18;
 
   return (
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={`en-header-action-btn en-theme-toggle-btn flex shrink-0 items-center justify-center transition-colors duration-150 ${
-        compact ? "h-9 w-9 rounded-xl sm:h-10 sm:w-10" : "rounded-2xl p-3.5"
-      } ${
-        onDarkSurface
-          ? "border border-white/15 bg-white/10 text-emerald-200 hover:bg-white/15"
-          : "en-bg-elevated border border-emerald-200 text-teal-700 en-hover shadow-sm"
-      }`}
+      className={`en-theme-toggle-btn ${headerActionButtonClass(theme, {
+        compact,
+        inverted,
+      })}`}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Light mode" : "Dark mode"}
     >

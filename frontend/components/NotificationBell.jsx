@@ -11,6 +11,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
+import { headerActionButtonClass } from "../utils/themeButtons";
 import { fetchUserNotifications } from "../utils/supabaseData";
 import { usePolling } from "../hooks/useRealtimeFetch";
 import { formatTargetSectionsLabel } from "../utils/sections";
@@ -283,16 +284,18 @@ export default function NotificationBell({ compact = false }) {
           setShowClearConfirm(false);
           if (!open) loadNotifications();
         }}
-        className={`relative en-notif-btn en-header-action-btn flex shrink-0 items-center justify-center transition-all duration-200 ${
-          compact ? "h-9 w-9 rounded-xl p-0 sm:h-10 sm:w-10" : "p-3.5 rounded-2xl"
-        } ${open ? "en-bell-ring" : ""} ${
+        className={`relative en-notif-btn ${
+          open ? "en-bell-ring" : ""
+        } ${
           open
-            ? theme === "dark"
-              ? "bg-emerald-500/20 ring-2 ring-emerald-500/40 text-emerald-300"
-              : "en-bg-skeleton ring-2 ring-emerald-300 text-teal-800"
-            : theme === "dark"
-              ? "border border-white/15 bg-white/10 text-emerald-200 hover:bg-white/15"
-              : "en-bg-elevated border border-emerald-200 text-teal-700 en-hover shadow-sm"
+            ? headerActionButtonClass(theme, {
+                compact,
+                extra:
+                  theme === "dark"
+                    ? "bg-emerald-500/20 ring-2 ring-emerald-500/40 text-emerald-300 transition-all duration-200"
+                    : "en-bg-skeleton ring-2 ring-emerald-300 text-teal-800 transition-all duration-200",
+              })
+            : headerActionButtonClass(theme, { compact, extra: "transition-all duration-200" })
         }`}
         aria-label="Notifications"
         aria-expanded={open}

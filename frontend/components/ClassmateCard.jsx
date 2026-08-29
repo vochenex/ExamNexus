@@ -1,5 +1,6 @@
 import ProfileAvatar from "./ProfileAvatar";
 import { useTheme } from "../layouts/ThemeContext";
+import { formatSchoolIdForViewer } from "../utils/schoolIdPrivacy";
 import { formatSectionLabel } from "../utils/sections";
 
 export default function ClassmateCard({ classmate, highlight = false }) {
@@ -40,7 +41,10 @@ export default function ClassmateCard({ classmate, highlight = false }) {
           )}
         </p>
         <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
-          {classmate.school_id ? `ID: ${classmate.school_id}` : "Student"}
+          {formatSchoolIdForViewer(classmate.school_id, {
+            viewerRole: "student",
+            isSelf: Boolean(classmate.is_you),
+          })}
         </p>
       </div>
       <span

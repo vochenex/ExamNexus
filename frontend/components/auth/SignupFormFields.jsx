@@ -1,6 +1,7 @@
 import Select from "../ui/Select";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { getSchoolIdHelpText, getSchoolIdRule } from "../../utils/schoolIdRules";
+import { buildCrmcEmail, nameUsesNonAsciiEmailChars } from "../../utils/schoolEmail";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
 
 function SectionTitle({ children, theme }) {
@@ -65,6 +66,8 @@ export default function SignupFormFields({
   const isStudent = form.role === "Student";
   const courses = getCoursesForDepartment(form.department);
   const schoolIdRule = getSchoolIdRule(form.role);
+  const showAsciiEmailHint = nameUsesNonAsciiEmailChars(form.firstName, form.lastName);
+  const suggestedAsciiEmail = buildCrmcEmail(form.lastName, form.firstName);
 
   return (
     <div className="space-y-5">
@@ -104,6 +107,17 @@ export default function SignupFormFields({
             <FieldError message={errors.lastName} />
           </div>
         </div>
+
+        {showAsciiEmailHint && suggestedAsciiEmail && (
+          <p
+            className={`mt-2 text-xs ${
+              theme === "dark" ? "text-gray-500" : "text-gray-500"
+            }`}
+          >
+            Your name can include special characters like Ñ. Suggested school email:{" "}
+            <span className="font-medium">{suggestedAsciiEmail}</span>
+          </p>
+        )}
 
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>

@@ -121,7 +121,7 @@ export default function SectionAssessmentsModal({
                           key={assessment.id}
                           type="button"
                           onClick={() => onSelectAssessment?.(assessment)}
-                          className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
+                          className={`mb-0 w-full rounded-xl border p-4 text-left transition last:mb-0 hover:-translate-y-0.5 ${
                             theme === "dark"
                               ? "border-white/10 bg-white/[0.03] hover:border-emerald-500/30 hover:bg-emerald-500/5"
                               : "border-emerald-100 bg-emerald-50/40 hover:border-teal-300"

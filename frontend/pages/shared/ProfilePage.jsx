@@ -49,6 +49,7 @@ import AvatarLightbox from "../../components/AvatarLightbox";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import useMobileNav from "../../hooks/useMobileNav";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import { ProgressLink } from "../../components/ProgressLink";
 
 function inputStyle(theme) {
   return inputClass(theme);
@@ -98,7 +99,7 @@ function ProfileSelect({ id, value, onChange, disabled, children }) {
   );
 }
 
-function StatCard({ value, label, theme, variant = "emerald" }) {
+function StatCard({ value, label, theme, variant = "emerald", to = "" }) {
   const variants = {
     emerald:
       theme === "dark"
@@ -118,16 +119,28 @@ function StatCard({ value, label, theme, variant = "emerald" }) {
         : "en-bg-elevated border-purple-200 text-purple-700",
   };
 
-  return (
-    <div
-      className={`rounded-xl border p-3 shadow-sm transition-colors sm:p-3.5 ${
-        theme === "dark" ? `bg-gradient-to-br ${variants[variant]}` : variants[variant]
-      }`}
-    >
+  const className = `block w-full rounded-xl border p-3 text-left shadow-sm transition-all sm:p-3.5 ${
+    to
+      ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
+      : ""
+  } ${theme === "dark" ? `bg-gradient-to-br ${variants[variant]}` : variants[variant]}`;
+
+  const content = (
+    <>
       <p className="text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
       <p className="mt-1 text-xs leading-snug opacity-80 sm:text-sm">{label}</p>
-    </div>
+    </>
   );
+
+  if (to) {
+    return (
+      <ProgressLink to={to} className={className}>
+        {content}
+      </ProgressLink>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }
 
 function QuickLink({ icon: Icon, label, onClick, theme }) {
@@ -504,7 +517,7 @@ export default function Profile() {
 
   return (
     <div
-      className={`en-profile-page min-h-screen w-full max-w-full min-w-0 overflow-x-hidden p-3 sm:p-5 ${
+      className={`en-profile-page min-h-screen w-full max-w-full min-w-0 overflow-x-hidden p-3 sm:p-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
@@ -587,6 +600,42 @@ export default function Profile() {
           )}
         </div>
       </div>
+
+      {(saveSuccess || saveStatus === "saving" || saveStatus === "error") && (
+        <div className="mb-4">
+          {saveSuccess && (
+            <div
+              ref={profileFeedbackRef}
+              role="status"
+              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                theme === "dark"
+                  ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-400"
+                  : "border-emerald-300 en-bg-skeleton text-emerald-700"
+              }`}
+            >
+              Successfully saved to Supabase
+            </div>
+          )}
+          {saveStatus === "saving" && (
+            <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+              Saving...
+            </p>
+          )}
+          {saveStatus === "error" && (
+            <div
+              ref={profileFeedbackRef}
+              role="status"
+              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                theme === "dark"
+                  ? "border-red-500/30 bg-red-500/20 text-red-400"
+                  : "border-red-300 bg-red-100 text-red-700"
+              }`}
+            >
+              Failed to save. Check your connection and try again.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-4 overflow-x-hidden xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-5">
         <div className={`${cardClass(theme)} min-w-0 max-w-full overflow-visible p-3.5 sm:p-5`}>
@@ -671,18 +720,21 @@ export default function Profile() {
                 label="Enrolled subjects"
                 theme={theme}
                 variant="emerald"
+                to="/student/subjects"
               />
               <StatCard
                 value={studentStats.completedAssessments}
                 label="Completed assessments"
                 theme={theme}
                 variant="cyan"
+                to="/student/results"
               />
               <StatCard
                 value={studentStats.upcomingAssessments}
                 label="Upcoming assessments"
                 theme={theme}
                 variant="amber"
+                to="/student/assessments"
               />
             </div>
           ) : (
@@ -692,23 +744,27 @@ export default function Profile() {
                 label="Total subjects"
                 theme={theme}
                 variant="emerald"
+                to={isAdmin ? "/admin/dashboard" : "/faculty/dashboard"}
               />
               <StatCard
                 value={facultyStats.totalAssessments}
                 label="Total assessments"
                 theme={theme}
                 variant="cyan"
+                to={isAdmin ? "/admin/assessments" : "/faculty/dashboard"}
               />
               <StatCard
                 value={facultyStats.totalStudents}
                 label="Total students"
                 theme={theme}
                 variant="purple"
+                to={isAdmin ? "/admin/accounts" : "/faculty/dashboard"}
               />
             </div>
           )}
 
-          <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="mx-auto w-full max-w-3xl">
+          <div className="mb-2 flex min-h-[1.75rem] items-center justify-between gap-3">
             <h3
               className={`text-lg font-semibold ${
                 theme === "dark" ? "text-emerald-400" : "text-teal-700"
@@ -716,17 +772,18 @@ export default function Profile() {
             >
               Personal information
             </h3>
-            {editing && (
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  theme === "dark"
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                editing
+                  ? theme === "dark"
                     ? "bg-amber-500/15 text-amber-300"
                     : "bg-amber-50 text-amber-700"
-                }`}
-              >
-                Editing
-              </span>
-            )}
+                  : "invisible"
+              }`}
+              aria-hidden={!editing}
+            >
+              Editing
+            </span>
           </div>
 
           {loadError && (
@@ -741,7 +798,7 @@ export default function Profile() {
             </div>
           )}
 
-          <div className="space-y-4 sm:space-y-5">
+          <div className="space-y-4 sm:space-y-5 [scrollbar-gutter:stable]">
             <div>
               <SectionTitle theme={theme}>Basic details</SectionTitle>
               <div className="grid gap-3 sm:grid-cols-2 sm:gap-3.5">
@@ -940,9 +997,9 @@ export default function Profile() {
                 )}
               </div>
 
-              {!editing && (profile.department || profile.course || profile.year_level) && (
+              {!editing && (profile.department || profile.course || profile.year_level) ? (
                 <div
-                  className={`mt-4 flex flex-wrap gap-2 rounded-xl border px-3 py-2.5 text-xs ${
+                  className={`mt-4 flex min-h-[2.75rem] flex-wrap gap-2 rounded-xl border px-3 py-2.5 text-xs ${
                     theme === "dark"
                       ? "border-white/10 bg-white/[0.03] text-gray-400"
                       : "border-emerald-100 en-bg-elevated/70 text-gray-600"
@@ -973,44 +1030,15 @@ export default function Profile() {
                     </span>
                   )}
                 </div>
+              ) : (
+                <div className="mt-4 min-h-[2.75rem]" aria-hidden="true" />
               )}
             </div>
           </div>
-
-          {saveSuccess && (
-            <div
-              ref={profileFeedbackRef}
-              role="status"
-              className={`mt-6 rounded-xl border px-4 py-3 text-sm font-medium ${
-                theme === "dark"
-                  ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-400"
-                  : "border-emerald-300 en-bg-skeleton text-emerald-700"
-              }`}
-            >
-              Successfully saved to Supabase
-            </div>
-          )}
-          {saveStatus === "saving" && (
-            <p className={`mt-6 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              Saving...
-            </p>
-          )}
-          {saveStatus === "error" && (
-            <div
-              ref={profileFeedbackRef}
-              role="status"
-              className={`mt-6 rounded-xl border px-4 py-3 text-sm font-medium ${
-                theme === "dark"
-                  ? "border-red-500/30 bg-red-500/20 text-red-400"
-                  : "border-red-300 bg-red-100 text-red-700"
-              }`}
-            >
-              Failed to save. Check your connection and try again.
-            </div>
-          )}
+          </div>
 
           {editing && (
-            <div className="mt-6 flex justify-end">
+            <div className="mx-auto mt-6 flex w-full max-w-3xl justify-end">
               <ProgressButton
                 type="button"
                 onClick={() => handleSave(editProfile)}

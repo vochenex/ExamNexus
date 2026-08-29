@@ -37,6 +37,7 @@ import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
 import HeaderBackButton from "../components/HeaderBackButton";
+import { shouldShowHeaderBack } from "../utils/headerBackNavigation";
 import { PROFILE_UPDATED_EVENT } from "../utils/profileEvents";
 import { motion } from "../utils/motion";
 
@@ -59,6 +60,7 @@ export default function DashboardLayout() {
 
   const user = sessionUser;
   const isStudent = user.role?.toLowerCase() === "student";
+  const showHeaderBack = shouldShowHeaderBack(location.pathname);
 
   // Safety net: lockdown chrome only belongs on the live take-assessment screen.
   useEffect(() => {
@@ -356,7 +358,7 @@ export default function DashboardLayout() {
             {mobileNav ? (
               <header className="en-native-topbar shrink-0">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <HeaderBackButton compact />
+                  {showHeaderBack && <HeaderBackButton compact />}
                   <ExamNexusBrand
                     variant="compact"
                     logoSize={28}
@@ -373,11 +375,13 @@ export default function DashboardLayout() {
               </header>
             ) : (
               <>
-                <div
-                  className={`absolute left-4 top-4 z-40 flex items-center gap-2 sm:left-6 sm:top-5 lg:left-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
-                >
-                  <HeaderBackButton compact />
-                </div>
+                {showHeaderBack && (
+                  <div
+                    className={`absolute left-4 top-4 z-40 flex items-center gap-2 sm:left-6 sm:top-5 lg:left-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
+                  >
+                    <HeaderBackButton compact />
+                  </div>
+                )}
                 <div
                   className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
                 >

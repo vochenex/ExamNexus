@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 export default function useQuestionTimeTracking({
   active,
@@ -53,9 +53,9 @@ export default function useQuestionTimeTracking({
 
   const getTimesSnapshot = () => ({ ...timesRef.current });
 
-  const replaceTimes = (nextTimes = {}) => {
+  const replaceTimes = useCallback((nextTimes = {}) => {
     timesRef.current = { ...nextTimes };
-  };
+  }, []);
 
   return {
     flushCurrentQuestionTime,

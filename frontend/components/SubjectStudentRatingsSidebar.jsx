@@ -6,7 +6,7 @@ import SectionTabs from "./SectionTabs";
 import { useTheme } from "../layouts/ThemeContext";
 import { buildSectionCounts, getSubjectSections } from "../utils/sections";
 import { getCourseLabel, getDepartmentLabel } from "../utils/academicOptions";
-import { formatMaskedSchoolIdLabel } from "../utils/schoolIdPrivacy";
+import { formatSchoolIdLabel } from "../utils/schoolIdPrivacy";
 import { matchesStudentSearch } from "../utils/studentSearch";
 import { inputClass } from "../utils/themeInputs";
 
@@ -240,7 +240,7 @@ export default function SubjectStudentRatingsSidebar({
                             {name}
                           </p>
                           <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
-                            {formatMaskedSchoolIdLabel(student.school_id)} · Section{" "}
+                            {formatSchoolIdLabel(student.school_id)} · Section{" "}
                             {student.section || "A"}
                           </p>
                           {(student.department || student.course) && (
@@ -310,16 +310,18 @@ export default function SubjectStudentRatingsSidebar({
                         </div>
                       )}
 
-                      <div
-                        className={`mt-3 h-1.5 overflow-hidden rounded-full ${
-                          theme === "dark" ? "bg-white/10" : "en-skeleton-bone"
-                        }`}
-                      >
+                      {!student.sectionScores?.length && (
                         <div
-                          className={`h-full rounded-full bg-gradient-to-r ${toneClass(theme, tier.tone)} transition-all duration-700`}
-                          style={{ width: `${Math.max(0, Math.min(100, overall))}%` }}
-                        />
-                      </div>
+                          className={`mt-3 h-1.5 overflow-hidden rounded-full ${
+                            theme === "dark" ? "bg-white/10" : "en-skeleton-bone"
+                          }`}
+                        >
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${toneClass(theme, tier.tone)} transition-all duration-700`}
+                            style={{ width: `${Math.max(0, Math.min(100, overall))}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}

@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -33,11 +33,13 @@ import useConnectionStatus from "../hooks/useConnectionStatus";
 import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
 import HeaderBackButton from "../components/HeaderBackButton";
+import { shouldShowHeaderBack } from "../utils/headerBackNavigation";
 import { PROFILE_UPDATED_EVENT } from "../utils/profileEvents";
 import { motion } from "../utils/motion";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
@@ -75,6 +77,7 @@ export default function AdminLayout() {
   const displayName = user.first_name
     ? `${user.first_name} ${user.last_name || ""}`.trim()
     : "Admin";
+  const showHeaderBack = shouldShowHeaderBack(location.pathname);
 
   return (
     <div
@@ -231,7 +234,7 @@ export default function AdminLayout() {
         {mobileNav ? (
           <header className="en-native-topbar shrink-0">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <HeaderBackButton compact />
+              {showHeaderBack && <HeaderBackButton compact />}
               <ExamNexusBrand
                 variant="compact"
                 logoSize={28}
@@ -248,11 +251,13 @@ export default function AdminLayout() {
           </header>
         ) : (
           <>
-            <div
-              className={`absolute left-4 top-4 z-40 flex items-center gap-2 sm:left-6 sm:top-5 lg:left-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
-            >
-              <HeaderBackButton compact />
-            </div>
+            {showHeaderBack && (
+              <div
+                className={`absolute left-4 top-4 z-40 flex items-center gap-2 sm:left-6 sm:top-5 lg:left-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
+              >
+                <HeaderBackButton compact />
+              </div>
+            )}
             <div
               className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
             >

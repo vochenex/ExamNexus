@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
+import { headerActionButtonClass } from "../../utils/themeButtons";
 import { useInstallPrompt } from "../../hooks/useInstallPrompt";
 import { useAppModal } from "../../contexts/AppModalContext";
 import InstallAppChooser, {
@@ -129,13 +130,11 @@ export default function InstallIconButton({ inverted = false, compact = false })
           type="button"
           onClick={openChooser}
           disabled={busy}
-          className={`en-install-icon-btn en-header-action-btn flex shrink-0 items-center justify-center transition-colors duration-150 ${
-            compact ? "h-9 w-9 rounded-xl sm:h-10 sm:w-10" : "rounded-2xl p-3.5"
-          } ${
-            onDarkSurface
-              ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20"
-              : "en-bg-elevated border border-emerald-700/20 text-teal-800 en-hover"
-          } disabled:opacity-60`}
+          className={`en-install-icon-btn ${headerActionButtonClass(theme, {
+            compact,
+            inverted: onDarkSurface,
+            extra: "disabled:opacity-60",
+          })}`}
           aria-label="Install ExamNexus"
         >
           <Download size={iconSize} strokeWidth={2.25} />

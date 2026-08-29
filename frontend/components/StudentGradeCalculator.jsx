@@ -37,6 +37,10 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
   const { theme } = useTheme();
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [settingsVersion, setSettingsVersion] = useState(0);
+  const [attendanceDraft, setAttendanceDraft] = useState({
+    classesMissed: null,
+    totalClasses: null,
+  });
 
   useEffect(() => {
     if (!selectedSubjectId && subjectGrades.length > 0) {
@@ -84,11 +88,48 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
 
   const bumpSettings = () => setSettingsVersion((value) => value + 1);
 
-  const handleAttendanceChange = (field, rawValue) => {
+  const parseAttendanceValue = (rawValue, { min = 0, fallback = 0 } = {}) => {
+    const trimmed = String(rawValue ?? "").trim();
+    if (trimmed === "") return fallback;
+    const parsed = Number.parseInt(trimmed, 10);
+    if (!Number.isFinite(parsed) || parsed < min) return fallback;
+    return parsed;
+  };
+
+  const commitAttendanceField = (field, rawValue) => {
     if (!studentId || !selectedSubject) return;
-    const parsed = Math.max(0, Number.parseInt(rawValue, 10) || 0);
-    updateSubjectGradeSettings(studentId, selectedSubject.subjectId, { [field]: parsed });
+
+    const current = getSubjectGradeSettings(
+      studentId,
+      selectedSubject.subjectId,
+      selectedSubject.subjectType
+    );
+
+    if (field === "classesMissed") {
+      const totalClasses = current?.totalClasses ?? 16;
+      const parsed = parseAttendanceValue(rawValue, { min: 0, fallback: 0 });
+      updateSubjectGradeSettings(studentId, selectedSubject.subjectId, {
+        classesMissed: Math.min(parsed, totalClasses),
+      });
+    } else {
+      const parsed = parseAttendanceValue(rawValue, { min: 1, fallback: 16 });
+      const classesMissed = Math.min(current?.classesMissed ?? 0, parsed);
+      updateSubjectGradeSettings(studentId, selectedSubject.subjectId, {
+        totalClasses: parsed,
+        classesMissed,
+      });
+    }
+
+    setAttendanceDraft((prev) => ({ ...prev, [field]: null }));
     bumpSettings();
+  };
+
+  const attendanceDisplayValue = (field) => {
+    if (attendanceDraft[field] != null) return attendanceDraft[field];
+    if (field === "classesMissed") {
+      return settings?.classesMissed != null ? String(settings.classesMissed) : "";
+    }
+    return settings?.totalClasses != null ? String(settings.totalClasses) : "";
   };
 
   const inputClass =
@@ -275,11 +316,20 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
                 </label>
                 <input
                   id="classes-missed"
-                  type="number"
-                  min={0}
-                  max={settings?.totalClasses ?? 99}
-                  value={settings?.classesMissed ?? 0}
-                  onChange={(event) => handleAttendanceChange("classesMissed", event.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={attendanceDisplayValue("classesMissed")}
+                  onChange={(event) =>
+                    setAttendanceDraft((prev) => ({
+                      ...prev,
+                      classesMissed: event.target.value.replace(/[^\d]/g, ""),
+                    }))
+                  }
+                  onBlur={(event) => commitAttendanceField("classesMissed", event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") event.currentTarget.blur();
+                  }}
                   className={inputClass}
                 />
               </div>
@@ -292,10 +342,20 @@ export default function StudentGradeCalculator({ studentId, subjectGrades = [] }
                 </label>
                 <input
                   id="total-classes"
-                  type="number"
-                  min={1}
-                  value={settings?.totalClasses ?? 16}
-                  onChange={(event) => handleAttendanceChange("totalClasses", event.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={attendanceDisplayValue("totalClasses")}
+                  onChange={(event) =>
+                    setAttendanceDraft((prev) => ({
+                      ...prev,
+                      totalClasses: event.target.value.replace(/[^\d]/g, ""),
+                    }))
+                  }
+                  onBlur={(event) => commitAttendanceField("totalClasses", event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") event.currentTarget.blur();
+                  }}
                   className={inputClass}
                 />
               </div>

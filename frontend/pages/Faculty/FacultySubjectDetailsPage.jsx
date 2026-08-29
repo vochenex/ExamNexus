@@ -577,7 +577,7 @@ export default function SubjectDetails() {
                   )
                 }
                 className={`
-      mb-3
+      mb-3 last:mb-0
       p-4
       rounded-xl
       cursor-pointer

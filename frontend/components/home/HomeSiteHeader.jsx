@@ -238,20 +238,14 @@ export default function HomeSiteHeader() {
                 {link.label}
               </a>
             ))}
-            {dashboardTo ? (
-              <ProgressLink to={dashboardTo} className="en-home-nav-link ml-1">
-                Dashboard
-              </ProgressLink>
-            ) : (
-              <ProgressLink
-                ref={setLinkRef("login")}
-                to="/auth"
-                className={`en-home-nav-link ml-1${location.pathname === "/auth" ? " en-home-nav-link--active" : ""}`}
-                aria-current={location.pathname === "/auth" ? "page" : undefined}
-              >
-                Login
-              </ProgressLink>
-            )}
+            <ProgressLink
+              ref={setLinkRef("login")}
+              to="/auth"
+              className={`en-home-nav-link ml-1${location.pathname === "/auth" ? " en-home-nav-link--active" : ""}`}
+              aria-current={location.pathname === "/auth" ? "page" : undefined}
+            >
+              Login
+            </ProgressLink>
           </nav>
 
           <div className="en-home-header-actions">
@@ -324,24 +318,14 @@ export default function HomeSiteHeader() {
                   {link.label}
                 </a>
               ))}
-              {dashboardTo ? (
-                <ProgressLink
-                  to={dashboardTo}
-                  className="en-home-mobile-nav-link"
-                  onClick={handleMobileNavClick}
-                >
-                  Dashboard
-                </ProgressLink>
-              ) : (
-                <ProgressLink
-                  ref={setMobileLinkRef("login")}
-                  to="/auth"
-                  className={`en-home-mobile-nav-link${location.pathname === "/auth" ? " en-home-mobile-nav-link--active" : ""}`}
-                  onClick={handleMobileNavClick}
-                >
-                  Login
-                </ProgressLink>
-              )}
+              <ProgressLink
+                ref={setMobileLinkRef("login")}
+                to="/auth"
+                className={`en-home-mobile-nav-link${location.pathname === "/auth" ? " en-home-mobile-nav-link--active" : ""}`}
+                onClick={handleMobileNavClick}
+              >
+                Login
+              </ProgressLink>
               <ProgressLink
                 to={dashboardTo || "/auth"}
                 className={primaryButton(theme, "en-home-mobile-nav-cta w-full justify-center text-sm py-2.5")}

@@ -5,7 +5,7 @@ import ProgressButton from "../ui/ProgressButton";
 import { primaryButtonFull } from "../../utils/themeButtons";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
-import { CRMCC_EMAIL_PLACEHOLDER } from "../../utils/schoolEmail";
+import { CRMCC_EMAIL_PLACEHOLDER, buildCrmcEmail, nameUsesNonAsciiEmailChars } from "../../utils/schoolEmail";
 import { getSchoolIdHelpText, getSchoolIdRule } from "../../utils/schoolIdRules";
 import { FieldError, FieldLabel, SectionTitle } from "./signupFormShared";
 
@@ -25,6 +25,8 @@ export default function SignupWizard({
   const isStudent = form.role === "Student";
   const courses = getCoursesForDepartment(form.department);
   const schoolIdRule = getSchoolIdRule(form.role);
+  const showAsciiEmailHint = nameUsesNonAsciiEmailChars(form.firstName, form.lastName);
+  const suggestedAsciiEmail = buildCrmcEmail(form.lastName, form.firstName);
 
   return (
     <div className="en-signup-form">
@@ -73,6 +75,12 @@ export default function SignupWizard({
               />
               <FieldError message={errors.lastName} />
             </div>
+            {showAsciiEmailHint && suggestedAsciiEmail && (
+              <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                Your name can include special characters like Ñ. Suggested school email:{" "}
+                <span className="font-medium">{suggestedAsciiEmail}</span>
+              </p>
+            )}
             <div>
               <FieldLabel theme={theme} htmlFor="gender">
                 Gender

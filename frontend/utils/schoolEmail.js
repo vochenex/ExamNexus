@@ -10,8 +10,15 @@ export const CRMCC_EMAIL_PLACEHOLDER = "lastname.firstname@crmc.en.com";
 function sanitizeNamePart(value) {
   return String(value || "")
     .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
+}
+
+export function nameUsesNonAsciiEmailChars(firstName, lastName) {
+  const combined = `${firstName || ""}${lastName || ""}`;
+  return [...combined].some((char) => char.charCodeAt(0) > 127);
 }
 
 export function buildCrmcEmail(lastName, firstName) {

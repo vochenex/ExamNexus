@@ -181,6 +181,10 @@ function TakeAssessmentExperience() {
   const pendingIntegrityAutoSubmitRef = useRef(false);
   const pendingSubmitOptionsRef = useRef(null);
   const examRef = useRef(null);
+  const phaseRef = useRef(phase);
+  const lastLoadRetryRef = useRef(loadRetryToken);
+  const retakeEntryClearedRef = useRef(false);
+  const replaceTimesRef = useRef(null);
   const { isOffline, isUnstable, isOnline, refresh: refreshConnection } = useConnectionStatus({
     enabled: true,
     fast: true,
@@ -270,6 +274,18 @@ function TakeAssessmentExperience() {
     currentQuestionIndex: currentQuestion,
   });
 
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  useEffect(() => {
+    replaceTimesRef.current = replaceTimes;
+  }, [replaceTimes]);
+
+  useEffect(() => {
+    retakeEntryClearedRef.current = false;
+  }, [id]);
+
   const showIntegrityAlert = useCallback((message) => {
     setIntegrityAlert(message);
     if (alertTimerRef.current) {
@@ -349,6 +365,15 @@ function TakeAssessmentExperience() {
 
   useEffect(() => {
     const loadExam = async () => {
+      const isExplicitRetry = loadRetryToken !== lastLoadRetryRef.current;
+      if (
+        (phaseRef.current === "active" || phaseRef.current === "resume") &&
+        !isExplicitRetry
+      ) {
+        return;
+      }
+      lastLoadRetryRef.current = loadRetryToken;
+
       try {
         setError("");
         setSubmitBlocked(false);
@@ -360,8 +385,9 @@ function TakeAssessmentExperience() {
         const isApprovedRetake = retakeStatus === "approved";
         setIsRetakeAttempt(isApprovedRetake);
 
-        if (isApprovedRetake) {
+        if (isApprovedRetake && !retakeEntryClearedRef.current) {
           clearExamSession(id);
+          retakeEntryClearedRef.current = true;
         }
 
         const { data: examData, error: examError } = await supabase
@@ -383,7 +409,7 @@ function TakeAssessmentExperience() {
         const uniqueQuestions = dedupeExamQuestions(questionData || []);
         const durationSeconds = getAssessmentDurationSeconds(examData);
 
-        let saved = isApprovedRetake ? null : loadExamSession(id);
+        let saved = loadExamSession(id);
 
         // If a different student previously used this browser for this exam,
         // discard that session so answers/lockdown state are never reused
@@ -466,7 +492,7 @@ function TakeAssessmentExperience() {
           setFurthestSectionIndex(Number(session.furthestSectionIndex) || 0);
           setTimeLeft(remaining);
           setTotalSeconds(activeTotalSeconds);
-          replaceTimes(session.questionTimes || {});
+          replaceTimesRef.current?.(session.questionTimes || {});
           setIntegrityStrikes(loadIntegrityStrikes(id));
           // Explicit Continue screen — do not auto-lock until the student confirms
           // (also restores a real user gesture for fullscreen after crash/blackout).
@@ -512,7 +538,7 @@ function TakeAssessmentExperience() {
     };
 
     loadExam();
-  }, [id, startLockdown, endLockdown, loadRetryToken, replaceTimes, navigate]);
+  }, [id, startLockdown, endLockdown, loadRetryToken, navigate]);
 
   useEffect(() => {
     if (!isActive || !id) return;
@@ -1116,6 +1142,7 @@ function TakeAssessmentExperience() {
       startedAt,
       totalSeconds,
       studentId,
+      isRetakeAttempt,
       answers,
       currentQuestion: 0,
       flaggedIndices: [],
