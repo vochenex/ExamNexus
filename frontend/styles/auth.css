@@ -47,7 +47,7 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
 
 @media (min-width: 768px) {
   .en-signup-columns {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(280px, 1.45fr));
     gap: 1rem 1.25rem;
   }
 }
