@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "../utils/apiBase";
 
-const SILENT_PING_MS = 12000;
-const PING_TIMEOUT_MS = 4000;
+const DEFAULT_SILENT_PING_MS = 12000;
+const DEFAULT_PING_TIMEOUT_MS = 4000;
+const FAST_SILENT_PING_MS = 2000;
+const FAST_PING_TIMEOUT_MS = 2000;
 
 function browserOffline() {
   return typeof navigator !== "undefined" && navigator.onLine === false;
@@ -11,13 +13,25 @@ function browserOffline() {
 /**
  * Tracks online / offline / unstable connection with silent health pings.
  * Does not block UI — banners only.
+ *
+ * @param {{ enabled?: boolean, fast?: boolean, pingIntervalMs?: number, pingTimeoutMs?: number }} [options]
  */
-export default function useConnectionStatus({ enabled = true } = {}) {
+export default function useConnectionStatus({
+  enabled = true,
+  fast = false,
+  pingIntervalMs,
+  pingTimeoutMs,
+} = {}) {
   const [status, setStatus] = useState(() =>
     browserOffline() ? "offline" : "online"
   );
   const failStreakRef = useRef(0);
   const mountedRef = useRef(true);
+
+  const intervalMs =
+    pingIntervalMs ?? (fast ? FAST_SILENT_PING_MS : DEFAULT_SILENT_PING_MS);
+  const timeoutMs =
+    pingTimeoutMs ?? (fast ? FAST_PING_TIMEOUT_MS : DEFAULT_PING_TIMEOUT_MS);
 
   const applyStatus = useCallback((next) => {
     if (!mountedRef.current) return;
@@ -33,7 +47,7 @@ export default function useConnectionStatus({ enabled = true } = {}) {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const res = await fetch(`${API_BASE}/health`, {
@@ -56,15 +70,17 @@ export default function useConnectionStatus({ enabled = true } = {}) {
     } finally {
       clearTimeout(timer);
     }
-  }, [applyStatus, enabled]);
+  }, [applyStatus, enabled, timeoutMs]);
 
   useEffect(() => {
     mountedRef.current = true;
     if (!enabled) return undefined;
 
     const onOnline = () => {
-      applyStatus("unstable");
-      silentPing();
+      // Restore immediately so exam UI can dismiss recovery without waiting on a ping.
+      failStreakRef.current = 0;
+      applyStatus("online");
+      void silentPing();
     };
     const onOffline = () => {
       failStreakRef.current = 0;
@@ -77,10 +93,12 @@ export default function useConnectionStatus({ enabled = true } = {}) {
     if (browserOffline()) {
       applyStatus("offline");
     } else {
-      silentPing();
+      void silentPing();
     }
 
-    const intervalId = window.setInterval(silentPing, SILENT_PING_MS);
+    const intervalId = window.setInterval(() => {
+      void silentPing();
+    }, intervalMs);
 
     return () => {
       mountedRef.current = false;
@@ -88,7 +106,7 @@ export default function useConnectionStatus({ enabled = true } = {}) {
       window.removeEventListener("offline", onOffline);
       window.clearInterval(intervalId);
     };
-  }, [applyStatus, enabled, silentPing]);
+  }, [applyStatus, enabled, intervalMs, silentPing]);
 
   return {
     status,

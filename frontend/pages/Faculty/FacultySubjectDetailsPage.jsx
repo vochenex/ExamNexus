@@ -360,12 +360,6 @@ export default function SubjectDetails() {
 >
           Each section has its own invitation code. Share the matching code with students for that section.
         </p>
-        <SubjectSectionInviteCodes
-          subject={subject}
-          sectionInvites={subject.section_invites}
-          defaultOpen
-          className="mt-3 max-w-md"
-        />
       </div>
 
       {!facultyCanManage && isFacultyRole(facultyProfile.role) && (
@@ -375,16 +369,21 @@ export default function SubjectDetails() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
         <SubjectFacultyCard faculty={faculty || facultyProfile} />
         <div
-          className={`lg:col-span-2 rounded-2xl p-5 border ${
+          className={`lg:col-span-2 rounded-2xl p-5 border min-w-0 ${
             theme === "dark"
               ? "bg-white/5 border-white/10"
               : "en-bg-surface border border-emerald-300"
           }`}
         >
-          <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-700"}`}>
+          <p className={`mb-3 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-700"}`}>
             {classmates.length} student{classmates.length === 1 ? "" : "s"} enrolled across{" "}
             {formatSubjectSectionsLabel(subject.section_count).toLowerCase()}.
           </p>
+          <SubjectSectionInviteCodes
+            subject={subject}
+            sectionInvites={subject.section_invites}
+            defaultOpen
+          />
         </div>
       </div>
 

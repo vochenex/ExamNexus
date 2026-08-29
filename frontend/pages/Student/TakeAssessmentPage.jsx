@@ -181,8 +181,9 @@ function TakeAssessmentExperience() {
   const pendingIntegrityAutoSubmitRef = useRef(false);
   const pendingSubmitOptionsRef = useRef(null);
   const examRef = useRef(null);
-  const { isOffline, isUnstable } = useConnectionStatus({
+  const { isOffline, isUnstable, isOnline, refresh: refreshConnection } = useConnectionStatus({
     enabled: true,
+    fast: true,
   });
 
   const isActive = phase === "active";
@@ -198,9 +199,16 @@ function TakeAssessmentExperience() {
 
   const recoveryDetail = pendingSubmitRetry
     ? "Submitting your answers as soon as the connection is stable…"
-    : isActive
-      ? "Retrying it now for you…"
-      : "Retrying it now for you…";
+    : "Retrying it now for you…";
+
+  // Drop recovery as soon as the browser reports online again.
+  useEffect(() => {
+    if (!isOnline) return;
+    setNetworkRecovery(false);
+    if (networkErrorActive) {
+      setError("");
+    }
+  }, [isOnline, networkErrorActive]);
 
   useEffect(() => {
     if (!showNetworkRecovery) return undefined;
@@ -208,8 +216,9 @@ function TakeAssessmentExperience() {
     const softRefresh = () => {
       if (alreadySubmitted) return;
 
+      void refreshConnection();
+
       // Active exam offline: keep answers mounted; connection hook probes in background.
-      // Soft-retry load/bootstrap every 5s when the exam is not yet available.
       if (isActive && exam && !networkErrorActive && !networkRecovery) {
         return;
       }
@@ -228,7 +237,7 @@ function TakeAssessmentExperience() {
 
     const intervalId = window.setInterval(() => {
       softRefresh();
-    }, 5000);
+    }, 2000);
 
     return () => window.clearInterval(intervalId);
   }, [
@@ -238,6 +247,7 @@ function TakeAssessmentExperience() {
     isActive,
     networkErrorActive,
     networkRecovery,
+    refreshConnection,
     showNetworkRecovery,
   ]);
 

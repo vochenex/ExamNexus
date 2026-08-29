@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
+import ModalPortal from "./ui/ModalPortal";
 
 function SadNetworkIllustration({ isDark }) {
   const ground = isDark ? "rgba(16, 185, 129, 0.16)" : "rgba(13, 148, 136, 0.2)";
@@ -15,7 +16,7 @@ function SadNetworkIllustration({ isDark }) {
       viewBox="0 0 280 220"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="mx-auto h-36 w-full max-w-[15rem] en-home-float"
+      className="mx-auto h-28 w-full max-w-[12rem] shrink-0 sm:h-36 sm:max-w-[15rem] en-home-float"
       aria-hidden="true"
     >
       <ellipse cx="140" cy="200" rx="96" ry="12" fill={ground} />
@@ -62,6 +63,7 @@ function SadNetworkIllustration({ isDark }) {
 
 /**
  * Full-screen recovery state during exams — auto-retry only, no manual actions.
+ * Portaled to body so lockdown layout / transforms cannot clip it.
  */
 export default function ExamNetworkRecoveryOverlay({
   title = "Sorry — there was an internet interruption",
@@ -72,50 +74,52 @@ export default function ExamNetworkRecoveryOverlay({
   const isDark = theme === "dark";
 
   return (
-    <div
-      className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 p-6 backdrop-blur-md"
-      role="alertdialog"
-      aria-modal="true"
-      aria-live="polite"
-      aria-busy="true"
-    >
+    <ModalPortal>
       <div
-        className={`w-full max-w-md rounded-3xl border px-6 py-8 text-center shadow-2xl ${
-          isDark
-            ? "border-emerald-500/25 bg-[#061816]"
-            : "border-emerald-200 bg-white"
-        }`}
+        className="fixed inset-0 z-[400] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/85 p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:p-6"
+        role="alertdialog"
+        aria-modal="true"
+        aria-live="polite"
+        aria-busy="true"
       >
-        <div className="mx-auto mb-4 flex max-w-[18rem] flex-col items-center">
-          <SadNetworkIllustration isDark={isDark} />
+        <div
+          className={`my-auto w-full max-w-md shrink-0 rounded-3xl border px-5 py-6 text-center shadow-2xl sm:px-6 sm:py-8 ${
+            isDark
+              ? "border-emerald-500/25 bg-[#061816]"
+              : "border-emerald-200 bg-white"
+          }`}
+        >
+          <div className="mx-auto mb-3 flex max-w-[18rem] flex-col items-center sm:mb-4">
+            <SadNetworkIllustration isDark={isDark} />
 
-          <div
-            className={`mt-2 w-full rounded-2xl px-4 py-3 text-left text-sm leading-relaxed ${
-              isDark
-                ? "border border-white/10 bg-white/[0.04] text-gray-200"
-                : "border border-emerald-100 bg-emerald-50/70 text-gray-800"
-            }`}
-          >
-            <p className="font-semibold">{title}</p>
-            <p className="mt-1.5 text-[0.92rem] opacity-90">{message}</p>
+            <div
+              className={`mt-2 w-full rounded-2xl px-4 py-3 text-left text-sm leading-relaxed ${
+                isDark
+                  ? "border border-white/10 bg-white/[0.04] text-gray-200"
+                  : "border border-emerald-100 bg-emerald-50/70 text-gray-800"
+              }`}
+            >
+              <p className="font-semibold">{title}</p>
+              <p className="mt-1.5 text-[0.92rem] opacity-90">{message}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <Loader2
+              size={34}
+              className={`animate-spin ${isDark ? "text-emerald-300" : "text-teal-600"}`}
+              strokeWidth={2.25}
+            />
+            <p
+              className={`text-sm font-medium ${
+                isDark ? "text-emerald-200/90" : "text-teal-800"
+              }`}
+            >
+              {detail}
+            </p>
           </div>
         </div>
-
-        <div className="flex flex-col items-center gap-3">
-          <Loader2
-            size={34}
-            className={`animate-spin ${isDark ? "text-emerald-300" : "text-teal-600"}`}
-            strokeWidth={2.25}
-          />
-          <p
-            className={`text-sm font-medium ${
-              isDark ? "text-emerald-200/90" : "text-teal-800"
-            }`}
-          >
-            {detail}
-          </p>
-        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
