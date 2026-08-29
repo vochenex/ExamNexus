@@ -47,7 +47,7 @@ html.light .en-auth-card--blend .en-auth-panel-form::-webkit-scrollbar-thumb {
 
 @media (min-width: 768px) {
   .en-signup-columns {
-    grid-template-columns: repeat(3, minmax(280px, 1.45fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem 1.25rem;
   }
 }
@@ -179,9 +179,9 @@ html.light .en-auth-native-select {
   }
 
   .en-auth-card--blend.en-auth-card--signup {
-    height: min(90vh, 780px) !important;
-    min-height: min(90vh, 780px) !important;
-    max-width: min(88rem, 98vw);
+    height: min(92vh, 820px) !important;
+    min-height: min(92vh, 820px) !important;
+    max-width: min(96rem, 99vw);
   }
 
   .en-auth-card--signup .en-auth-form-inner {
@@ -193,6 +193,17 @@ html.light .en-auth-native-select {
     padding-top: 1rem !important;
     padding-bottom: 1rem !important;
     overflow: hidden !important;
+    left: 0 !important;
+    width: 68% !important;
+    max-width: 68% !important;
+    transform: translateX(0) !important;
+  }
+
+  .en-auth-card--signup .en-auth-panel-brand {
+    left: 68% !important;
+    width: 32% !important;
+    max-width: 32% !important;
+    transform: translateX(0) !important;
   }
 
   .en-auth-card--blend .en-auth-panel-brand,
@@ -294,13 +305,19 @@ html.light .en-auth-native-select {
     touch-action: none;
   }
 
-  /* Sign up — form left, logo right */
+  /* Sign up — form left (wide), logo right (narrow) — positions set above */
   .en-auth-card--signup .en-auth-panel-brand {
-    transform: translateX(100%);
+    left: 68% !important;
+    width: 32% !important;
+    max-width: 32% !important;
+    transform: translateX(0) !important;
   }
 
   .en-auth-card--signup .en-auth-panel-form {
-    transform: translateX(0);
+    left: 0 !important;
+    width: 68% !important;
+    max-width: 68% !important;
+    transform: translateX(0) !important;
   }
 }
 
@@ -399,7 +416,7 @@ html.light .en-auth-native-select {
   }
 
   .en-auth-card--blend.en-auth-card--signup {
-    max-width: min(68rem, 96vw);
+    max-width: min(96rem, 99vw);
   }
 
   .en-auth-card--blend .en-auth-panel-brand {
@@ -408,6 +425,10 @@ html.light .en-auth-native-select {
 
   .en-auth-card--blend.en-auth-card--signup .en-auth-panel-brand {
     display: flex !important;
+    left: 72% !important;
+    width: 28% !important;
+    max-width: 28% !important;
+    transform: translateX(0) !important;
   }
 
   .en-auth-card--blend .en-auth-panel-form {
@@ -420,13 +441,10 @@ html.light .en-auth-native-select {
 
   .en-auth-card--blend.en-auth-card--signup .en-auth-panel-form {
     position: absolute !important;
-    width: 50% !important;
-    max-width: 50% !important;
+    left: 0 !important;
+    width: 72% !important;
+    max-width: 72% !important;
     transform: translateX(0) !important;
-  }
-
-  .en-auth-card--blend.en-auth-card--signup .en-auth-panel-brand {
-    transform: translateX(100%) !important;
   }
 }
 

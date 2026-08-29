@@ -29,7 +29,7 @@ export default function SubmissionSuccessOverlay({ open, message, onComplete }) 
   return (
     <ModalPortal>
     <div
-      className={`${motion.overlay} fixed inset-0 z-[130] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md`}
+      className={`${motion.overlay} fixed inset-0 z-[400] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md`}
       role="status"
       aria-live="polite"
       aria-label="Assessment submitted successfully"

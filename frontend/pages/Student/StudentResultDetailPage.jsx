@@ -272,7 +272,9 @@ export default function StudentResults() {
           >
             <h2 className="text-sm font-semibold uppercase tracking-wide">Score</h2>
             <p className="mt-2 text-3xl font-bold">
-              {isEssayOnly ? "—" : result.score}
+              {isEssayOnly
+                ? "—"
+                : `${result.score ?? 0}/${result.total ?? 0}`}
             </p>
           </div>
 

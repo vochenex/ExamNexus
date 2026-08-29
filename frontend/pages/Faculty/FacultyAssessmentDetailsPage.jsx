@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
@@ -28,12 +28,12 @@ import {
   fetchFacultyExportResults,
 } from "../../utils/supabaseData";
 import { getAssessmentStatus } from "../../utils/assessmentStatus";
+import { downloadCsv, downloadHtml } from "../../utils/exportCsv";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
-import { downloadCsv } from "../../utils/exportCsv";
 import { getCachedExamNexusUser } from "../../utils/authUser";
-
+import { secondaryButtonSm } from "../../utils/themeButtons";
 const TABS = [
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "integrity", label: "Integrity", icon: Shield },
@@ -118,7 +118,20 @@ export default function AssessmentDetails() {
   const [activeTab, setActiveTab] = useState("analytics");
   const [headerOpen, setHeaderOpen] = useState(true);
   const [exportingResults, setExportingResults] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef(null);
   const teacherSchoolId = getCachedExamNexusUser()?.school_id || "";
+
+  useEffect(() => {
+    if (!exportMenuOpen) return undefined;
+    const onPointer = (event) => {
+      if (!exportMenuRef.current?.contains(event.target)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [exportMenuOpen]);
 
   const reloadAnalytics = useCallback(
     async (questionList, examRecord, { silent = false } = {}) => {
@@ -164,12 +177,13 @@ export default function AssessmentDetails() {
 
   usePolling(load, [examId]);
 
-  const handleExportResults = async () => {
+  const handleExportResults = async (format = "csv") => {
     if (!teacherSchoolId) {
       showError("Missing faculty school ID. Re-login and try again.");
       return;
     }
     try {
+      setExportMenuOpen(false);
       setExportingResults(true);
       const rows = await fetchFacultyExportResults(teacherSchoolId, examId);
       if (!rows.length) {
@@ -181,26 +195,43 @@ export default function AssessmentDetails() {
           sensitivity: "base",
         })
       );
-      const result = await downloadCsv(
-        `examnexus-results-${examId}.csv`,
-        sortedRows,
-        [
-          { key: "exam_title", label: "Assessment" },
-          { key: "subject", label: "Subject" },
-          { key: "student_name", label: "Student" },
-          { key: "student_email", label: "Email" },
-          { key: "school_id", label: "School ID" },
-          { key: "score", label: "Score" },
-          { key: "total", label: "Total" },
-          { key: "percentage", label: "Percentage" },
-          { key: "submitted_at", label: "Submitted At" },
-        ]
-      );
+      const columns = [
+        { key: "exam_title", label: "Assessment" },
+        { key: "subject", label: "Subject" },
+        { key: "student_name", label: "Student" },
+        { key: "student_email", label: "Email" },
+        { key: "school_id", label: "School ID" },
+        { key: "score", label: "Score" },
+        { key: "total", label: "Total" },
+        { key: "percentage", label: "Percentage" },
+        { key: "submitted_at", label: "Submitted At" },
+      ];
+
+      let result;
+      if (format === "html") {
+        const title = exam?.title || "Assessment results";
+        const tableHead = columns.map((col) => `<th>${col.label}</th>`).join("");
+        const tableBody = sortedRows
+          .map(
+            (row) =>
+              `<tr>${columns
+                .map((col) => `<td>${row[col.key] == null ? "" : String(row[col.key])}</td>`)
+                .join("")}</tr>`
+          )
+          .join("");
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${title}</title>
+<style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#0f172a}table{border-collapse:collapse;width:100%}th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}th{background:#ecfdf5}</style>
+</head><body><h1>${title}</h1><table><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table></body></html>`;
+        result = await downloadHtml(`examnexus-results-${examId}.html`, html);
+      } else {
+        result = await downloadCsv(`examnexus-results-${examId}.csv`, sortedRows, columns);
+      }
+
       if (result?.ok) {
         await showSuccess(
           result.shared
-            ? "Export ready — you chose where to save the results CSV."
-            : "Results CSV saved to your downloads."
+            ? `Export ready — you chose where to save the results ${format.toUpperCase()}.`
+            : `Results ${format.toUpperCase()} saved to your downloads.`
         );
       }
     } catch (err) {
@@ -341,22 +372,50 @@ export default function AssessmentDetails() {
                   <span className="hidden sm:inline">Edit</span>
                 </button>
 
-                <ProgressButton
-                  type="button"
-                  onClick={handleExportResults}
-                  loading={exportingResults}
-                  loadingLabel="Exporting results"
-                  className={`${actionButtonBase} gap-1.5 px-2.5 ${
-                    theme === "dark"
-                      ? "border border-amber-400/35 bg-amber-500/15 text-amber-100"
-                      : "border border-amber-500/30 bg-amber-50 text-amber-900"
-                  }`}
-                  aria-label="Export results CSV"
-                  title="Export results CSV"
-                >
-                  <FileSpreadsheet size={16} />
-                  <span className="hidden sm:inline">Export CSV</span>
-                </ProgressButton>
+                <div className="relative" ref={exportMenuRef}>
+                  <ProgressButton
+                    type="button"
+                    onClick={() => setExportMenuOpen((open) => !open)}
+                    loading={exportingResults}
+                    loadingLabel="Exporting"
+                    className={`${actionButtonBase} gap-1.5 px-2.5 ${
+                      theme === "dark"
+                        ? "border border-amber-400/35 bg-amber-500/15 text-amber-100"
+                        : "border border-amber-500/30 bg-amber-50 text-amber-900"
+                    }`}
+                    aria-label="Export results"
+                    aria-expanded={exportMenuOpen}
+                    title="Export results"
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span className="hidden sm:inline">Export</span>
+                    <ChevronDown size={14} className={exportMenuOpen ? "rotate-180" : ""} />
+                  </ProgressButton>
+                  {exportMenuOpen && !exportingResults && (
+                    <div
+                      className={`absolute right-0 z-20 mt-2 min-w-[10rem] overflow-hidden rounded-xl border shadow-xl ${
+                        theme === "dark"
+                          ? "border-white/10 bg-[#0a1614]"
+                          : "border-emerald-200 bg-white"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        className={secondaryButtonSm(theme, "w-full !justify-start rounded-none !border-0")}
+                        onClick={() => handleExportResults("csv")}
+                      >
+                        Export CSV
+                      </button>
+                      <button
+                        type="button"
+                        className={secondaryButtonSm(theme, "w-full !justify-start rounded-none !border-0")}
+                        onClick={() => handleExportResults("html")}
+                      >
+                        Export HTML
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <button
                   type="button"

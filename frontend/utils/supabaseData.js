@@ -1897,15 +1897,17 @@ export async function submitStudentExam({
     const rawAnswer =
       answersByQuestionId?.[question.id] ?? answersByIndex?.[index];
     const questionType = question.question_type || examType;
+    const maxPoints = getQuestionMaxPoints(question, examType);
     const { isCorrect, pendingReview } = gradeStudentAnswer(
       question,
       questionType,
       rawAnswer
     );
 
-    if (!pendingReview) {
-      total += 1;
-      if (isCorrect) score += 1;
+    // Perfect score includes essay max points even while essays await review.
+    total += maxPoints;
+    if (!pendingReview && isCorrect) {
+      score += maxPoints;
     }
 
     const timeSpent = Number(timeSpentByQuestionId?.[question.id]);
@@ -1945,7 +1947,7 @@ export async function submitStudentExam({
     exam_id: examId,
     student_id: studentId,
     score,
-    total: total || questions.length,
+    total: total || questions.reduce((sum, q) => sum + getQuestionMaxPoints(q, examType), 0),
   };
 
   if (autoSubmitted) {

@@ -364,16 +364,6 @@ function TakeAssessmentExperience() {
           clearExamSession(id);
         }
 
-        const submitted = await hasStudentSubmittedExam(id);
-        if (submitted) {
-          setAlreadySubmitted(true);
-          setLoading(false);
-          setPhase("done");
-          endLockdown();
-          await exitAssessmentFullscreen();
-          return;
-        }
-
         const { data: examData, error: examError } = await supabase
           .from("exams")
           .select("*")
@@ -402,6 +392,7 @@ function TakeAssessmentExperience() {
           clearExamSession(id);
           saved = null;
         }
+
         let orderedQuestions = uniqueQuestions;
         let resumeSession = null;
 
@@ -424,6 +415,23 @@ function TakeAssessmentExperience() {
             resumeSession = { saved, activeTotalSeconds, remaining };
           } else {
             clearExamSession(id);
+          }
+        }
+
+        // Crash recovery: unfinished local attempt wins over a dead-end "already submitted" page.
+        if (resumeSession) {
+          setAlreadySubmitted(false);
+        } else {
+          const submitted = await hasStudentSubmittedExam(id);
+          if (submitted) {
+            clearExamSession(id);
+            setAlreadySubmitted(true);
+            setLoading(false);
+            setPhase("done");
+            endLockdown();
+            await exitAssessmentFullscreen();
+            navigate(`/student/results/${id}`, { replace: true });
+            return;
           }
         }
 
@@ -484,7 +492,7 @@ function TakeAssessmentExperience() {
     };
 
     loadExam();
-  }, [id, startLockdown, endLockdown, loadRetryToken, replaceTimes]);
+  }, [id, startLockdown, endLockdown, loadRetryToken, replaceTimes, navigate]);
 
   useEffect(() => {
     if (!isActive || !id) return;
@@ -652,8 +660,49 @@ function TakeAssessmentExperience() {
       }
     };
 
+    const refreshQuestions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("questions")
+          .select("*")
+          .eq("exam_id", id)
+          .order("created_at", { ascending: true });
+        if (error || !data) return;
+
+        const uniqueQuestions = dedupeExamQuestions(data);
+        setQuestions((prev) => {
+          if (prev.length === uniqueQuestions.length) {
+            const same = prev.every((question, index) => {
+              const next = uniqueQuestions[index];
+              return (
+                question?.id === next?.id &&
+                question?.question === next?.question &&
+                JSON.stringify(question?.options) === JSON.stringify(next?.options) &&
+                JSON.stringify(question?.grading_options || question?.grading) ===
+                  JSON.stringify(next?.grading_options || next?.grading)
+              );
+            });
+            if (same) return prev;
+          }
+
+          // Preserve student order when already commenced.
+          const session = loadExamSession(id);
+          if (session?.questionOrder?.length) {
+            return orderQuestionsByIds(uniqueQuestions, session.questionOrder);
+          }
+          return uniqueQuestions;
+        });
+      } catch {
+        // Ignore transient question poll failures.
+      }
+    };
+
     refreshSettings();
-    const intervalId = window.setInterval(refreshSettings, 4000);
+    refreshQuestions();
+    const intervalId = window.setInterval(() => {
+      refreshSettings();
+      refreshQuestions();
+    }, 4000);
 
     const channel = supabase
       .channel(`take-exam-settings-${id}`)
@@ -666,6 +715,18 @@ function TakeAssessmentExperience() {
           filter: `id=eq.${id}`,
         },
         (payload) => applySettings(payload?.new)
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "questions",
+          filter: `exam_id=eq.${id}`,
+        },
+        () => {
+          void refreshQuestions();
+        }
       )
       .subscribe();
 
@@ -924,6 +985,14 @@ function TakeAssessmentExperience() {
 
   submitExamRef.current = submitExam;
 
+  const handleSubmissionSuccessComplete = useCallback(async () => {
+    setResultDialog(null);
+    setSubmitBlocked(true);
+    endLockdown();
+    await exitAssessmentFullscreen();
+    navigate(`/student/results/${id}`, { replace: true });
+  }, [endLockdown, id, navigate]);
+
   const handleResultDialogClose = useCallback(async () => {
     const dialog = resultDialog;
     setResultDialog(null);
@@ -932,17 +1001,13 @@ function TakeAssessmentExperience() {
       setSubmitBlocked(true);
       endLockdown();
       await exitAssessmentFullscreen();
-      navigate("/student/assessments");
+      if (dialog?.tone === "success") {
+        navigate(`/student/results/${id}`, { replace: true });
+      } else {
+        navigate("/student/assessments");
+      }
     }
-  }, [endLockdown, navigate, resultDialog]);
-
-  const handleSubmissionSuccessComplete = useCallback(async () => {
-    setResultDialog(null);
-    setSubmitBlocked(true);
-    endLockdown();
-    await exitAssessmentFullscreen();
-    navigate("/student/assessments");
-  }, [endLockdown, navigate]);
+  }, [endLockdown, id, navigate, resultDialog]);
 
   const buildSubmitConfirmMessage = () => {
     const flagged = flaggedIndices.size;
@@ -1127,18 +1192,8 @@ function TakeAssessmentExperience() {
   }
 
   if (alreadySubmitted || phase === "done") {
-    return (
-      <div className={shellClass}>
-        <p className="mt-4">You have already submitted this assessment.</p>
-        <button
-          type="button"
-          className={`mt-4 ${secondaryButton(theme)}`}
-          onClick={() => navigate("/student/assessments")}
-        >
-          Back to assessments
-        </button>
-      </div>
-    );
+    // Submitted attempts redirect to results; keep a tiny fallback while navigating.
+    return <PageLoadingSkeleton theme={theme} variant="assessment" />;
   }
 
   if (error || !exam || phase === "error") {

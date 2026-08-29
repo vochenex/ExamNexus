@@ -1,10 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { selectChevronClass, selectClass } from "../../utils/themeInputs";
-import ModalPortal from "./ModalPortal";
-import { motion } from "../../utils/motion";
 
 function optionLabelFromChildren(children) {
   if (children == null || typeof children === "boolean") return "";
@@ -52,8 +50,7 @@ function readOptions(children) {
 }
 
 /**
- * Themed select that opens a custom dark/light sheet instead of the
- * system-white Android/iOS picker.
+ * Themed inline dropdown (visible in light/dark) — no full-screen popup modal.
  */
 export default function Select({
   id,
@@ -69,6 +66,7 @@ export default function Select({
   const { theme } = useTheme();
   const location = useLocation();
   const listId = useId();
+  const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const options = useMemo(() => readOptions(children), [children]);
@@ -81,11 +79,24 @@ export default function Select({
 
   useEffect(() => {
     if (!open) return undefined;
+
     const onKey = (event) => {
       if (event.key === "Escape") setOpen(false);
     };
+    const onPointer = (event) => {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("touchstart", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("touchstart", onPointer);
+    };
   }, [open]);
 
   const emitChange = (nextValue) => {
@@ -103,7 +114,7 @@ export default function Select({
   };
 
   return (
-    <div className="relative w-full min-w-0">
+    <div ref={rootRef} className="relative w-full min-w-0">
       <button
         ref={triggerRef}
         type="button"
@@ -114,7 +125,7 @@ export default function Select({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         onClick={() => {
-          if (!disabled) setOpen(true);
+          if (!disabled) setOpen((prev) => !prev);
         }}
         aria-invalid={invalid || undefined}
         className={`${selectClass(
@@ -128,89 +139,53 @@ export default function Select({
         <span className="block truncate pr-1">{label}</span>
         <ChevronDown
           size={16}
-          className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 ${selectChevronClass(theme)}`}
+          className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 transition-transform ${
+            open ? "rotate-180" : ""
+          } ${selectChevronClass(theme)}`}
         />
       </button>
+
       {open && (
-        <ModalPortal>
-          <div className={`fixed inset-0 z-[170] flex items-end justify-center sm:items-center p-3 sm:p-4 ${motion.overlay}`}>
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-              aria-label="Close options"
-              onClick={() => setOpen(false)}
-            />
-            <div
-              role="listbox"
-              id={listId}
-              aria-labelledby={id}
-              className={`${motion.scaleIn} en-select-sheet relative z-10 flex max-h-[min(70vh,28rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border shadow-2xl ${
-                theme === "dark"
-                  ? "border-emerald-500/25 bg-[#0a1614]"
-                  : "border-emerald-200/90 bg-white"
-              }`}
-            >
-              <div
-                className={`flex items-center justify-between gap-3 border-b px-4 py-3 ${
-                  theme === "dark" ? "border-white/10" : "border-emerald-100"
+        <div
+          role="listbox"
+          id={listId}
+          aria-labelledby={id}
+          className={`en-select-dropdown absolute left-0 right-0 top-[calc(100%+0.35rem)] z-[80] max-h-60 overflow-y-auto rounded-xl border py-1 shadow-xl ${
+            theme === "dark"
+              ? "border-emerald-500/25 bg-[#0a1614]"
+              : "border-emerald-200 bg-white"
+          }`}
+        >
+          {options.map((option) => {
+            const isSelected = option.value === String(value ?? "");
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                disabled={option.disabled}
+                onClick={() => {
+                  if (!option.disabled) pick(option.value);
+                }}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm transition ${
+                  option.disabled
+                    ? "cursor-not-allowed opacity-40"
+                    : isSelected
+                      ? theme === "dark"
+                        ? "bg-emerald-500/20 text-emerald-200"
+                        : "bg-emerald-50 text-teal-800"
+                      : theme === "dark"
+                        ? "text-gray-200 hover:bg-white/10"
+                        : "text-gray-800 hover:bg-emerald-50"
                 }`}
               >
-                <p
-                  className={`text-sm font-semibold ${
-                    theme === "dark" ? "text-emerald-300" : "text-teal-800"
-                  }`}
-                >
-                  Choose an option
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className={`rounded-lg p-1.5 ${
-                    theme === "dark"
-                      ? "text-gray-400 hover:bg-white/10 hover:text-white"
-                      : "text-gray-500 hover:bg-emerald-50 hover:text-teal-800"
-                  }`}
-                  aria-label="Close"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="en-select-sheet-list en-scroll-region flex-1 overflow-y-auto p-2">
-                {options.map((option) => {
-                  const active = option.value === String(value ?? "");
-                  return (
-                    <button
-                      key={`${option.value}-${option.label}`}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      disabled={option.disabled}
-                      onClick={() => pick(option.value)}
-                      className={`mb-1 flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium transition ${
-                        active
-                          ? theme === "dark"
-                            ? "bg-gradient-to-r from-emerald-500/25 to-teal-500/20 text-emerald-200 ring-1 ring-emerald-400/40"
-                            : "bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-900 ring-1 ring-teal-300/70"
-                          : theme === "dark"
-                            ? "text-gray-100 hover:bg-white/8"
-                            : "text-gray-800 hover:bg-emerald-50/80"
-                      } disabled:cursor-not-allowed disabled:opacity-40`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                      {active && (
-                        <Check
-                          size={18}
-                          className={theme === "dark" ? "text-emerald-300" : "text-teal-700"}
-                        />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {isSelected ? <Check size={16} className="shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );

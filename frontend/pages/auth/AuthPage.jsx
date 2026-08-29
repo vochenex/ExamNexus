@@ -454,6 +454,11 @@ function getAuthInputProps(theme) {
       if (!form.lastName) errs.lastName = "Last name is required";
       const schoolIdCheck = validateSchoolIdForRole(form.schoolId, form.role);
       if (!schoolIdCheck.valid) errs.schoolId = schoolIdCheck.message;
+      if (!form.department) errs.department = "Department is required";
+      if (form.role === "Student") {
+        if (!form.course) errs.course = "Course is required";
+        if (!form.yearLevel) errs.yearLevel = "Year level is required";
+      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;

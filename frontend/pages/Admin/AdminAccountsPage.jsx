@@ -127,6 +127,17 @@ export default function AdminAccounts() {
 
   const handleSave = async () => {
     if (!editing) return;
+
+    const role = String(editing.role || "").toLowerCase();
+    if (!editing.department) {
+      error("Department is required before saving this account.");
+      return;
+    }
+    if (role.includes("student") && !editing.course) {
+      error("Course is required for student accounts.");
+      return;
+    }
+
     try {
       setSaving(true);
       await updateAdminUser(editing.id, editing);

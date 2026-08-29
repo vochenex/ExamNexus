@@ -61,6 +61,7 @@ export default function SubjectStudentRatingsSidebar({
   const { theme } = useTheme();
   const [activeSection, setActiveSection] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState("highest");
 
   const subjectSections = getSubjectSections(subject);
   const sectionCounts = buildSectionCounts(students, subjectSections);
@@ -76,12 +77,21 @@ export default function SubjectStudentRatingsSidebar({
     if (searchQuery.trim()) {
       rows = rows.filter((student) => matchesStudentSearch(student, searchQuery));
     }
-    return [...rows].sort((a, b) => {
-      const nameA = `${a.first_name || ""} ${a.last_name || ""}`.trim();
-      const nameB = `${b.first_name || ""} ${b.last_name || ""}`.trim();
-      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
-    });
-  }, [students, activeSection, searchQuery]);
+
+    const sorted = [...rows];
+    if (sortMode === "highest") {
+      sorted.sort((a, b) => (Number(b.overallRating) || 0) - (Number(a.overallRating) || 0));
+    } else if (sortMode === "lowest") {
+      sorted.sort((a, b) => (Number(a.overallRating) || 0) - (Number(b.overallRating) || 0));
+    } else {
+      sorted.sort((a, b) => {
+        const nameA = `${a.first_name || ""} ${a.last_name || ""}`.trim();
+        const nameB = `${b.first_name || ""} ${b.last_name || ""}`.trim();
+        return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      });
+    }
+    return sorted;
+  }, [students, activeSection, searchQuery, sortMode]);
 
   if (!open) return null;
 
@@ -143,7 +153,7 @@ export default function SubjectStudentRatingsSidebar({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-5">
-            <div className="relative mb-4 min-w-0">
+            <div className="relative mb-3 min-w-0">
               <Search
                 size={16}
                 className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
@@ -158,6 +168,31 @@ export default function SubjectStudentRatingsSidebar({
                 className={inputClass(theme, "w-full min-w-0 py-2.5 pl-9 pr-3")}
                 aria-label="Search students by name or school ID"
               />
+            </div>
+
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[
+                { id: "highest", label: "Highest" },
+                { id: "lowest", label: "Lowest" },
+                { id: "alpha", label: "A–Z" },
+              ].map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setSortMode(option.id)}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                    sortMode === option.id
+                      ? theme === "dark"
+                        ? "bg-emerald-500 text-black"
+                        : "bg-teal-600 text-white"
+                      : theme === "dark"
+                        ? "border border-white/10 bg-white/5 text-gray-300"
+                        : "border border-emerald-200 bg-white text-teal-800"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
 
             <SectionTabs

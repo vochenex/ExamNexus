@@ -77,6 +77,7 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
   const [subjects, setSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState("");
   const [sectionFilter, setSectionFilter] = useState("all");
+  const [sortMode, setSortMode] = useState("highest");
   const [rows, setRows] = useState([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [loadingRanks, setLoadingRanks] = useState(false);
@@ -183,7 +184,16 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
   // Unique ordinal ranks (1..n). Ties broken by name so numbers never repeat.
   const ranked = useMemo(() => {
     const list = [...(Array.isArray(rows) ? rows : [])].sort((a, b) => {
-      const scoreDiff = (b.overallRating ?? -1) - (a.overallRating ?? -1);
+      if (sortMode === "alpha") {
+        const nameA = `${a.last_name || ""} ${a.first_name || ""}`.trim().toLowerCase();
+        const nameB = `${b.last_name || ""} ${b.first_name || ""}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+
+      const scoreDiff =
+        sortMode === "lowest"
+          ? (a.overallRating ?? Number.POSITIVE_INFINITY) - (b.overallRating ?? Number.POSITIVE_INFINITY)
+          : (b.overallRating ?? -1) - (a.overallRating ?? -1);
       if (scoreDiff !== 0) return scoreDiff;
       const nameA = `${a.last_name || ""} ${a.first_name || ""}`.trim().toLowerCase();
       const nameB = `${b.last_name || ""} ${b.first_name || ""}`.trim().toLowerCase();
@@ -199,7 +209,7 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
       nextRank += 1;
       return { ...student, rank };
     });
-  }, [rows]);
+  }, [rows, sortMode]);
 
   const muted = theme === "dark" ? "text-gray-400" : "text-gray-600";
   const scoredCount = ranked.filter((row) => row.overallRating != null).length;
@@ -260,6 +270,17 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
               onChange={setSectionFilter}
               options={sectionOptions}
               disabled={!selectedSubject}
+            />
+            <FilterSelect
+              theme={theme}
+              label="Sort"
+              value={sortMode}
+              onChange={setSortMode}
+              options={[
+                { value: "highest", label: "Highest rating" },
+                { value: "lowest", label: "Lowest rating" },
+                { value: "alpha", label: "Alphabetical" },
+              ]}
             />
           </div>
         </div>
