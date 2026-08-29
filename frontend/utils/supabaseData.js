@@ -49,6 +49,18 @@ function isMissingRpcError(error) {
   );
 }
 
+function isTargetSectionsConstraintError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  const details = String(error?.details || "").toLowerCase();
+  const code = String(error?.code || "");
+  return (
+    code === "23514" ||
+    message.includes("target_sections") ||
+    message.includes("exams_target_sections_check") ||
+    details.includes("target_sections")
+  );
+}
+
 function dedupeSubjectsById(subjects) {
   const seen = new Map();
   for (const subject of subjects || []) {
@@ -112,6 +124,80 @@ async function enrichSubjectsWithFaculty(subjects) {
 export function generateInviteCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(4));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function ensureSubjectSectionInvites(subjectId) {
+  if (!subjectId) return [];
+
+  const { data, error } = await supabase.rpc("ensure_subject_section_invites", {
+    p_subject_id: subjectId,
+  });
+
+  if (error) {
+    if (isMissingRpcError(error)) return [];
+    throw error;
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+export async function fetchSubjectSectionInvites(subjectId) {
+  if (!subjectId) return [];
+
+  const { data, error } = await supabase
+    .from("subject_section_invites")
+    .select("section, invite_code")
+    .eq("subject_id", subjectId)
+    .order("section", { ascending: true });
+
+  if (error) {
+    if (
+      error.message?.includes("subject_section_invites") ||
+      error.code === "42P01" ||
+      error.code === "PGRST205"
+    ) {
+      return [];
+    }
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function attachSectionInvites(subjects = []) {
+  const list = Array.isArray(subjects) ? subjects.filter((s) => s?.id) : [];
+  if (!list.length) return [];
+
+  const ids = list.map((s) => s.id);
+  const { data, error } = await supabase
+    .from("subject_section_invites")
+    .select("subject_id, section, invite_code")
+    .in("subject_id", ids);
+
+  if (error) {
+    if (
+      error.message?.includes("subject_section_invites") ||
+      error.code === "42P01" ||
+      error.code === "PGRST205"
+    ) {
+      return list.map((subject) => ({ ...subject, section_invites: [] }));
+    }
+    throw error;
+  }
+
+  const bySubject = new Map();
+  for (const row of data || []) {
+    if (!bySubject.has(row.subject_id)) bySubject.set(row.subject_id, []);
+    bySubject.get(row.subject_id).push({
+      section: row.section,
+      invite_code: row.invite_code,
+    });
+  }
+
+  return list.map((subject) => ({
+    ...subject,
+    section_invites: bySubject.get(subject.id) || [],
+  }));
 }
 
 export async function requireSession() {
@@ -293,7 +379,18 @@ export async function createSubject(name, teacherSchoolId, yearLevel, sectionCou
   }
 
   if (error) throw error;
-  return data;
+
+  let sectionInvites = [];
+  try {
+    sectionInvites = await ensureSubjectSectionInvites(data.id);
+  } catch (ensureError) {
+    console.warn("Could not ensure section invite codes:", ensureError);
+  }
+
+  return {
+    ...data,
+    section_invites: sectionInvites,
+  };
 }
 
 export async function updateSubject(subjectId, updates) {
@@ -323,7 +420,23 @@ export async function updateSubject(subjectId, updates) {
   }
 
   if (error) throw error;
-  return data;
+
+  let sectionInvites = [];
+  if (payload.section_count !== undefined) {
+    try {
+      sectionInvites = await ensureSubjectSectionInvites(subjectId);
+    } catch (ensureError) {
+      console.warn("Could not ensure section invite codes:", ensureError);
+      sectionInvites = await fetchSubjectSectionInvites(subjectId);
+    }
+  } else {
+    sectionInvites = await fetchSubjectSectionInvites(subjectId);
+  }
+
+  return {
+    ...data,
+    section_invites: sectionInvites,
+  };
 }
 
 export async function deleteSubjectById(subjectId) {
@@ -347,7 +460,33 @@ export async function fetchTeacherSubjects(teacherSchoolId) {
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return data || [];
+
+  const withInvites = await attachSectionInvites(data || []);
+
+  // Backfill missing per-section codes for older subjects (no-op once migrated).
+  const ensured = [];
+  for (const subject of withInvites) {
+    const expected = normalizeSectionCount(subject.section_count);
+    const have = (subject.section_invites || []).length;
+    if (have >= expected) {
+      ensured.push(subject);
+      continue;
+    }
+    try {
+      const sectionInvites = await ensureSubjectSectionInvites(subject.id);
+      ensured.push({
+        ...subject,
+        section_invites: sectionInvites.length ? sectionInvites : subject.section_invites,
+        invite_code:
+          sectionInvites.find((row) => row.section === "A")?.invite_code ||
+          subject.invite_code,
+      });
+    } catch {
+      ensured.push(subject);
+    }
+  }
+
+  return ensured;
 }
 
 export async function fetchSubject(subjectId) {
@@ -360,7 +499,9 @@ export async function fetchSubject(subjectId) {
     .single();
 
   if (error) throw error;
-  return data;
+
+  const [withInvites] = await attachSectionInvites([data]);
+  return withInvites || data;
 }
 
 async function resolveAvailableSections(examLike = {}) {
@@ -2391,7 +2532,7 @@ export async function getStudentEnrolledSubjects(studentId) {
   if (!result.length) {
     const { data: links, error: linkError } = await supabase
       .from("subject_students")
-      .select("subject_id")
+      .select("subject_id, section")
       .eq("student_id", studentId);
 
     if (linkError) throw linkError;
@@ -2399,15 +2540,23 @@ export async function getStudentEnrolledSubjects(studentId) {
     const subjectIds = [
       ...new Set((links || []).map((row) => row.subject_id)),
     ];
+    const sectionBySubject = new Map(
+      (links || []).map((row) => [row.subject_id, row.section || "A"])
+    );
 
     if (subjectIds.length > 0) {
       const { data: subjects, error: subjectsError } = await supabase
         .from("subjects")
-        .select("id, name, invite_code, teacher_school_id, year_level, subject_type")
+        .select("id, name, invite_code, teacher_school_id, year_level, subject_type, section_count")
         .in("id", subjectIds);
 
       if (subjectsError) throw subjectsError;
-      result = dedupeSubjectsById(subjects || []);
+      result = dedupeSubjectsById(
+        (subjects || []).map((subject) => ({
+          ...subject,
+          section: sectionBySubject.get(subject.id) || "A",
+        }))
+      );
     }
   }
 
@@ -2425,7 +2574,19 @@ export async function getStudentEnrolledSubjects(studentId) {
     }
   }
 
-  return enrichSubjectsWithFaculty(result);
+  const withInvites = await attachSectionInvites(result);
+  const enriched = withInvites.map((subject) => {
+    const section = String(subject.section || "A").toUpperCase();
+    const sectionCode = (subject.section_invites || []).find(
+      (row) => String(row.section).toUpperCase() === section
+    )?.invite_code;
+    return {
+      ...subject,
+      invite_code: sectionCode || subject.invite_code,
+    };
+  });
+
+  return enrichSubjectsWithFaculty(enriched);
 }
 
 export async function isStudentEnrolledInSubject(studentId, subjectId) {
@@ -2444,14 +2605,46 @@ export async function findSubjectByInviteCode(inviteCode) {
   const normalized = String(inviteCode || "").trim().toLowerCase();
   if (!normalized) return null;
 
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "lookup_subject_by_invite_code",
+    { p_invite_code: normalized }
+  );
+
+  if (!rpcError && rpcData) {
+    return rpcData;
+  }
+
+  if (rpcError && !isMissingRpcError(rpcError)) {
+    if (!rpcError.message?.includes("lookup_subject_by_invite_code")) {
+      throw rpcError;
+    }
+  }
+
+  const { data: sectionHit, error: sectionError } = await supabase
+    .from("subject_section_invites")
+    .select(
+      "section, invite_code, subjects ( id, name, invite_code, teacher_school_id, section_count, year_level )"
+    )
+    .eq("invite_code", normalized)
+    .maybeSingle();
+
+  if (!sectionError && sectionHit?.subjects) {
+    return {
+      ...sectionHit.subjects,
+      invite_code: sectionHit.invite_code,
+      section: sectionHit.section,
+    };
+  }
+
   const { data, error } = await supabase
     .from("subjects")
-    .select("id, name, invite_code, teacher_school_id, section_count")
+    .select("id, name, invite_code, teacher_school_id, section_count, year_level")
     .eq("invite_code", normalized)
     .maybeSingle();
 
   if (error) throw error;
-  return data;
+  if (!data) return null;
+  return { ...data, section: "A" };
 }
 
 export async function getStudentDashboardStats(studentId) {

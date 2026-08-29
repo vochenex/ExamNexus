@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import { requireSession, generateInviteCode } from "./supabaseData";
+import { requireSession, generateInviteCode, ensureSubjectSectionInvites } from "./supabaseData";
 import { normalizeSectionCount } from "./sections";
 import { normalizeYearLevelForStorage as normalizeYearLevel } from "./yearLevels";
 import {
@@ -165,6 +165,13 @@ export async function adminCreateSubject({
 
   const { data, error } = await supabase.from("subjects").insert([row]).select().single();
   if (error) throw error;
+
+  try {
+    await ensureSubjectSectionInvites(data.id);
+  } catch {
+    // Trigger / RPC may create codes once SQL migration is applied.
+  }
+
   return data;
 }
 

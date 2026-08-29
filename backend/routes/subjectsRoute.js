@@ -106,13 +106,8 @@ router.get("/:subjectId", async (req, res) => {
 //
 const joinSubject = async (req, res) => {
   try {
-    const { invite_code, student_id, section = "A" } = req.body;
+    const { invite_code, student_id, section = null } = req.body;
     const normalizedCode = String(invite_code || "").trim().toLowerCase();
-    const enrollSection = String(section || "A").trim().toUpperCase();
-
-    if (!["A", "B", "C"].includes(enrollSection)) {
-      return res.status(400).json({ error: "Section must be A, B, or C" });
-    }
     const authHeader = req.headers.authorization;
 
     if (!normalizedCode) {
@@ -146,19 +141,61 @@ const joinSubject = async (req, res) => {
       return res.status(403).json({ error: "Invalid student session." });
     }
 
-    const { data: subject, error: subError } = await getAnon()
-      .from("subjects")
-      .select("id, name, invite_code, teacher_school_id")
+    const dbClient = getSupabaseAdmin() || userSupabase;
+    let enrollSection = String(section || "").trim().toUpperCase();
+    let subject = null;
+
+    const { data: sectionInvite, error: sectionInviteError } = await dbClient
+      .from("subject_section_invites")
+      .select(
+        "section, invite_code, subject_id, subjects ( id, name, invite_code, teacher_school_id, section_count )"
+      )
       .eq("invite_code", normalizedCode)
       .maybeSingle();
 
-    if (subError) throw subError;
+    if (
+      sectionInviteError &&
+      !String(sectionInviteError.message || "").includes("subject_section_invites")
+    ) {
+      throw sectionInviteError;
+    }
+
+    if (sectionInvite?.subjects) {
+      subject = {
+        id: sectionInvite.subjects.id,
+        name: sectionInvite.subjects.name,
+        invite_code: sectionInvite.invite_code,
+        teacher_school_id: sectionInvite.subjects.teacher_school_id,
+        section_count: sectionInvite.subjects.section_count,
+      };
+      enrollSection = String(sectionInvite.section || "A").toUpperCase();
+    } else {
+      const { data: legacySubject, error: subError } = await dbClient
+        .from("subjects")
+        .select("id, name, invite_code, teacher_school_id, section_count")
+        .eq("invite_code", normalizedCode)
+        .maybeSingle();
+
+      if (subError) throw subError;
+      subject = legacySubject;
+      if (!enrollSection) enrollSection = "A";
+    }
 
     if (!subject) {
       return res.status(404).json({ error: "Invalid invitation code" });
     }
 
-    const dbClient = getSupabaseAdmin() || userSupabase;
+    if (!/^[A-L]$/.test(enrollSection)) {
+      return res.status(400).json({ error: "Section must be a letter from A to L" });
+    }
+
+    const maxSections = Math.min(12, Math.max(1, Number(subject.section_count) || 3));
+    const sectionIndex = enrollSection.charCodeAt(0) - 64;
+    if (sectionIndex > maxSections) {
+      return res.status(400).json({
+        error: `Section ${enrollSection} is not available for this subject (only ${maxSections} section(s)).`,
+      });
+    }
 
     const { data: existingEnrollment, error: existingError } = await dbClient
       .from("subject_students")
@@ -172,7 +209,7 @@ const joinSubject = async (req, res) => {
     if (existingEnrollment) {
       return res.status(409).json({
         error: `You are already enrolled in ${subject.name}.`,
-        subject,
+        subject: { ...subject, section: enrollSection, invite_code: normalizedCode },
       });
     }
 
@@ -198,7 +235,7 @@ const joinSubject = async (req, res) => {
       if (error.code === "23505") {
         return res.status(409).json({
           error: `You are already enrolled in ${subject.name}.`,
-          subject,
+          subject: { ...subject, section: enrollSection, invite_code: normalizedCode },
         });
       }
       throw error;
@@ -213,9 +250,14 @@ const joinSubject = async (req, res) => {
     res.json({
       success: true,
       message: `Successfully enrolled in ${subject.name}.`,
-      subject,
+      subject: {
+        ...subject,
+        section: enrollSection,
+        invite_code: normalizedCode,
+      },
     });
   } catch (err) {
+    console.error("JOIN SUBJECT ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -8,7 +8,6 @@ import {
   UserRound,
   X,
   Copy,
-  Check,
 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { primaryButtonFull } from "../../utils/themeButtons";

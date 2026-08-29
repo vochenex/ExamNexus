@@ -136,3 +136,27 @@ export function getSectionsForSubjects(subjects = []) {
 
 /** Default A–C list for legacy callers */
 export const SUBJECT_SECTIONS = ["A", "B", "C"];
+
+/**
+ * Build per-section invite rows for display.
+ * Prefers subject_section_invites; falls back to subjects.invite_code for Section A.
+ */
+export function buildSectionInviteRows(subject, sectionInvites = null) {
+  const sections = getSubjectSections(subject);
+  const invites = Array.isArray(sectionInvites)
+    ? sectionInvites
+    : Array.isArray(subject?.section_invites)
+      ? subject.section_invites
+      : [];
+  const bySection = new Map(
+    invites
+      .filter((row) => row?.section && row?.invite_code)
+      .map((row) => [String(row.section).toUpperCase(), String(row.invite_code).toLowerCase()])
+  );
+  const legacy = String(subject?.invite_code || "").trim().toLowerCase();
+
+  return sections.map((section) => ({
+    section,
+    invite_code: bySection.get(section) || (section === "A" ? legacy : "") || "",
+  }));
+}

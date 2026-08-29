@@ -15,7 +15,7 @@ import {
 } from "../../utils/avatar";
 import FacultyAvatarRequiredBanner from "../../components/FacultyAvatarRequiredBanner";
 import FacultyProfileChip from "../../components/FacultyProfileChip";
-import CopyInviteCodeButton from "../../components/CopyInviteCodeButton";
+import SubjectSectionInviteCodes from "../../components/SubjectSectionInviteCodes";
 import YearLevelBadge, {
   YearLevelFilter,
 } from "../../components/YearLevelBadge";
@@ -387,27 +387,6 @@ export default function FacultyDashboard() {
         />
       </div>
 
-      <div className="mb-6">
-        <FacultyExportPanel teacherSchoolId={teacherId} />
-      </div>
-
-      <div className="mb-6">
-        <div className="mb-3 flex items-center gap-2">
-          <LayoutDashboard
-            size={16}
-            className={theme === "dark" ? "text-emerald-400" : "text-teal-600"}
-          />
-          <h2 className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-teal-800"}`}>
-            Submission insights
-          </h2>
-        </div>
-        <FacultyDashboardAnalyticsPanel teacherSchoolId={teacherId} />
-      </div>
-
-      <div className="mb-6">
-        <FacultyStudentRankingPanel teacherSchoolId={teacherId} />
-      </div>
-
       {subjects.length > 0 && (
         <div className="mb-4">
           <YearLevelFilter
@@ -420,7 +399,7 @@ export default function FacultyDashboard() {
 
       <CollapsiblePanel
         title={`Your subjects (${filteredSubjects.length})`}
-        subtitle="Invite codes, assessments, and subject pages"
+        subtitle="Section invite codes, assessments, and subject pages"
         defaultOpen
         className={`mb-6 ${panelClass(theme)}`}
       >
@@ -434,7 +413,7 @@ export default function FacultyDashboard() {
           >
             <BookOpen size={28} className="mx-auto mb-2 opacity-60" />
             <p className="font-medium text-sm">No subjects yet</p>
-            <p className="mt-1 text-xs">Use the panel on the right to create your first subject.</p>
+            <p className="mt-1 text-xs">Use New subject above to create your first subject.</p>
           </div>
         ) : filteredSubjects.length === 0 ? (
           <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-700"}`}>
@@ -451,8 +430,6 @@ export default function FacultyDashboard() {
                   : "en-bg-elevated border border-emerald-200 shadow-md hover:border-teal-300"
               }`}
             >
-              <CopyInviteCodeButton inviteCode={subject.invite_code} side="right" />
-
               <ProgressButton
                 type="button"
                 onClick={() => deleteSubject(subject)}
@@ -511,28 +488,11 @@ export default function FacultyDashboard() {
                 </span>
               </div>
 
-              <div
-                className={`mb-3 rounded-lg border px-2.5 py-2 ${
-                  theme === "dark"
-                    ? "border-white/10 bg-black/20"
-                    : "border-emerald-100 bg-emerald-50/60"
-                }`}
-              >
-                <p
-                  className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    theme === "dark" ? "text-gray-500" : "text-gray-500"
-                  }`}
-                >
-                  Invite code
-                </p>
-                <p
-                  className={`mt-0.5 font-mono text-xs font-semibold tracking-wide ${
-                    theme === "dark" ? "text-emerald-300" : "text-teal-700"
-                  }`}
-                >
-                  {subject.invite_code}
-                </p>
-              </div>
+              <SubjectSectionInviteCodes
+                subject={subject}
+                sectionInvites={subject.section_invites}
+                className="mb-3"
+              />
 
               <div className="flex flex-wrap gap-2">
                 <button
@@ -559,6 +519,27 @@ export default function FacultyDashboard() {
           </div>
         )}
       </CollapsiblePanel>
+
+      <div className="mb-6">
+        <FacultyExportPanel teacherSchoolId={teacherId} />
+      </div>
+
+      <div className="mb-6">
+        <div className="mb-3 flex items-center gap-2">
+          <LayoutDashboard
+            size={16}
+            className={theme === "dark" ? "text-emerald-400" : "text-teal-600"}
+          />
+          <h2 className={`text-sm font-semibold ${theme === "dark" ? "text-white" : "text-teal-800"}`}>
+            Submission insights
+          </h2>
+        </div>
+        <FacultyDashboardAnalyticsPanel teacherSchoolId={teacherId} />
+      </div>
+
+      <div className="mb-6">
+        <FacultyStudentRankingPanel teacherSchoolId={teacherId} />
+      </div>
       </div>
 
       {showAssessmentModal && (

@@ -199,37 +199,46 @@ function TakeAssessmentExperience() {
   const recoveryDetail = pendingSubmitRetry
     ? "Submitting your answers as soon as the connection is stable…"
     : isActive
-      ? "Holding your place in the exam while we reconnect…"
-      : "Reconnecting to your assessment…";
+      ? "Retrying it now for you…"
+      : "Retrying it now for you…";
 
   useEffect(() => {
-    if (!networkRecovery && !networkErrorActive) return undefined;
+    if (!showNetworkRecovery) return undefined;
 
-    const retryLoad = () => {
-      if (alreadySubmitted || exam) return;
-      setError("");
-      setPhase("loading");
-      setLoading(true);
-      setLoadRetryToken((value) => value + 1);
+    const softRefresh = () => {
+      if (alreadySubmitted) return;
+
+      // Active exam offline: keep answers mounted; connection hook probes in background.
+      // Soft-retry load/bootstrap every 5s when the exam is not yet available.
+      if (isActive && exam && !networkErrorActive && !networkRecovery) {
+        return;
+      }
+
+      if (!exam || networkErrorActive || networkRecovery) {
+        setError("");
+        setPhase("loading");
+        setLoading(true);
+        setLoadRetryToken((value) => value + 1);
+      }
     };
 
     if (!connectionDegraded) {
-      retryLoad();
+      softRefresh();
     }
 
     const intervalId = window.setInterval(() => {
-      if (!connectionDegraded) {
-        retryLoad();
-      }
-    }, 4000);
+      softRefresh();
+    }, 5000);
 
     return () => window.clearInterval(intervalId);
   }, [
     alreadySubmitted,
     connectionDegraded,
     exam,
+    isActive,
     networkErrorActive,
     networkRecovery,
+    showNetworkRecovery,
   ]);
 
   useEffect(() => {
@@ -1094,7 +1103,13 @@ function TakeAssessmentExperience() {
   }`;
 
   if (showNetworkRecovery) {
-    return <ExamNetworkRecoveryOverlay detail={recoveryDetail} />;
+    return (
+      <ExamNetworkRecoveryOverlay
+        title="Sorry — there was an internet interruption"
+        message="We're retrying the connection for you now. Please stay on this page; your answers are safe on this device."
+        detail={recoveryDetail}
+      />
+    );
   }
 
   if (loading || phase === "loading") {

@@ -35,6 +35,7 @@ import {
 } from "../../utils/sections";
 import YearLevelBadge from "../../components/YearLevelBadge";
 import EditSubjectModal from "../../components/EditSubjectModal";
+import SubjectSectionInviteCodes from "../../components/SubjectSectionInviteCodes";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPanel";
 import SectionAssessmentsModal from "../../components/SectionAssessmentsModal";
@@ -357,23 +358,14 @@ export default function SubjectDetails() {
       : "text-black"
   }`}
 >
-          Invite Code:
-                    <span
-            className={`
-                ml-2
-                font-mono
-                font-semibold
-
-                ${
-                theme === "dark"
-                    ? "text-emerald-400"
-                    : "text-emerald-700"
-                }
-            `}
-            >
-            {subject.invite_code}
-            </span>
+          Each section has its own invitation code. Share the matching code with students for that section.
         </p>
+        <SubjectSectionInviteCodes
+          subject={subject}
+          sectionInvites={subject.section_invites}
+          defaultOpen
+          className="mt-3 max-w-md"
+        />
       </div>
 
       {!facultyCanManage && isFacultyRole(facultyProfile.role) && (

@@ -16,7 +16,7 @@ import FacultyProfileChip from "../../components/FacultyProfileChip";
 import YearLevelBadge from "../../components/YearLevelBadge";
 import ActionDialog from "../../components/ui/ActionDialog";
 import ModalPortal from "../../components/ui/ModalPortal";
-import { getSectionsForCount, formatSectionLabel } from "../../utils/sections";
+import { formatSectionLabel } from "../../utils/sections";
 import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
 import ExamNexusBrand from "../../components/ExamNexusBrand";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
@@ -44,8 +44,9 @@ export default function StudentSubjects() {
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
-  const [enrollSection, setEnrollSection] = useState("A");
-  const [enrollSectionCount, setEnrollSectionCount] = useState(3);
+  const [enrollSection, setEnrollSection] = useState("");
+  const [enrollSubjectPreview, setEnrollSubjectPreview] = useState(null);
+  const [enrollLookupPending, setEnrollLookupPending] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [unenrollTarget, setUnenrollTarget] = useState(null);
   const [unenrolling, setUnenrolling] = useState(false);
@@ -109,29 +110,36 @@ export default function StudentSubjects() {
 
     const normalizedCode = inviteCode.trim().toLowerCase();
     if (!normalizedCode) {
-      setEnrollSectionCount(3);
-      setEnrollSection("A");
+      setEnrollSubjectPreview(null);
+      setEnrollSection("");
+      setEnrollLookupPending(false);
       return undefined;
     }
 
     let cancelled = false;
+    setEnrollLookupPending(true);
 
-    findSubjectByInviteCode(normalizedCode)
-      .then((subject) => {
-        if (cancelled) return;
-        const count = subject?.section_count ?? 3;
-        setEnrollSectionCount(count);
-        const sections = getSectionsForCount(count);
-        setEnrollSection((prev) => (sections.includes(prev) ? prev : "A"));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setEnrollSectionCount(3);
-        }
-      });
+    const timer = window.setTimeout(() => {
+      findSubjectByInviteCode(normalizedCode)
+        .then((subject) => {
+          if (cancelled) return;
+          setEnrollSubjectPreview(subject || null);
+          setEnrollSection(subject?.section ? String(subject.section).toUpperCase() : "");
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setEnrollSubjectPreview(null);
+            setEnrollSection("");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setEnrollLookupPending(false);
+        });
+    }, 250);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [inviteCode, showEnrollModal]);
 
@@ -142,13 +150,11 @@ export default function StudentSubjects() {
     return () => clearTimeout(timer);
   }, [enrollSuccess]);
 
-  const enrollSections = getSectionsForCount(enrollSectionCount);
-
   const enrollViaRpc = async (normalizedCode, section) => {
-    const { data, error } = await supabase.rpc("enroll_student_by_invite_code", {
-      p_invite_code: normalizedCode,
-      p_section: section,
-    });
+    const payload = { p_invite_code: normalizedCode };
+    if (section) payload.p_section = section;
+
+    const { data, error } = await supabase.rpc("enroll_student_by_invite_code", payload);
 
     if (error) {
       if (error.message?.includes("Could not find the function")) {
@@ -247,8 +253,13 @@ export default function StudentSubjects() {
       }
 
       let enrolledSubject =
-        (await enrollViaRpc(normalizedCode, enrollSection)) ||
-        (await enrollViaBackend(normalizedCode, studentId, accessToken, enrollSection));
+        (await enrollViaRpc(normalizedCode, enrollSection || targetSubject?.section)) ||
+        (await enrollViaBackend(
+          normalizedCode,
+          studentId,
+          accessToken,
+          enrollSection || targetSubject?.section || "A"
+        ));
 
       setSubjects((prev) => {
         if (prev.some((s) => s.id === enrolledSubject.id)) return prev;
@@ -258,8 +269,8 @@ export default function StudentSubjects() {
       setEnrollSuccess(`Successfully enrolled in ${enrolledSubject.name}!`);
       setShowEnrollModal(false);
       setInviteCode("");
-      setEnrollSection("A");
-      setEnrollSectionCount(3);
+      setEnrollSection("");
+      setEnrollSubjectPreview(null);
       await loadSubjects();
     } catch (err) {
       console.error(err);
@@ -272,8 +283,8 @@ export default function StudentSubjects() {
   const closeModal = () => {
     setShowEnrollModal(false);
     setInviteCode("");
-    setEnrollSection("A");
-    setEnrollSectionCount(3);
+    setEnrollSection("");
+    setEnrollSubjectPreview(null);
     setEnrollError("");
   };
 
@@ -523,8 +534,8 @@ export default function StudentSubjects() {
                 theme === "dark" ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              Enter the invitation code from your instructor. You can join subjects from any
-              year level (for example, a 1st year class while you are in 3rd year).
+              Enter the section invitation code from your instructor. Each section has its own
+              unique code — you will join that section automatically.
             </p>
 
             <input
@@ -545,32 +556,37 @@ export default function StudentSubjects() {
               }`}
             />
 
-            <p
-              className={`text-sm mb-2 ${
-                theme === "dark" ? "text-gray-400" : "text-gray-600"
+            <div
+              className={`mb-4 rounded-xl border px-3 py-3 text-sm ${
+                theme === "dark"
+                  ? "border-white/10 bg-white/[0.03] text-gray-300"
+                  : "border-emerald-100 bg-emerald-50/70 text-gray-700"
               }`}
             >
-              Select your section
-            </p>
-            <div className="flex gap-2 mb-4">
-              {enrollSections.map((section) => (
-                <button
-                  key={section}
-                  type="button"
-                  onClick={() => setEnrollSection(section)}
-                  className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    enrollSection === section
-                      ? theme === "dark"
-                        ? "bg-emerald-500 text-black"
-                        : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
-                      : theme === "dark"
-                        ? "bg-white/5 border border-white/10 text-gray-300"
-                        : "en-bg-elevated border border-emerald-200 text-gray-700"
-                  }`}
-                >
-                  Section {section}
-                </button>
-              ))}
+              {!inviteCode.trim() ? (
+                <p>Number of sections will show when an invitation code is added.</p>
+              ) : enrollLookupPending ? (
+                <p>Looking up invitation code…</p>
+              ) : enrollSubjectPreview ? (
+                <div className="space-y-1">
+                  <p>
+                    Subject:{" "}
+                    <span className="font-semibold">{enrollSubjectPreview.name}</span>
+                  </p>
+                  <p>
+                    Joining:{" "}
+                    <span className="font-semibold">
+                      {formatSectionLabel(enrollSection || enrollSubjectPreview.section)}
+                    </span>
+                  </p>
+                  <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
+                    This subject has {enrollSubjectPreview.section_count || "—"} section
+                    {(enrollSubjectPreview.section_count || 0) === 1 ? "" : "s"}.
+                  </p>
+                </div>
+              ) : (
+                <p>No subject found for this invitation code yet.</p>
+              )}
             </div>
 
             {enrollError && (
@@ -620,7 +636,7 @@ export default function StudentSubjects() {
         onCancel={() => setUnenrollTarget(null)}
       >
         {unenrollTarget
-          ? `You will leave ${unenrollTarget.name}. You can re-enroll later with the invite code and choose your section again.`
+          ? `You will leave ${unenrollTarget.name}. You can re-enroll later with your section invitation code.`
           : ""}
       </ActionDialog>
     </div>
