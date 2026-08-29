@@ -1,52 +1,68 @@
 const ACCOUNT_CACHE_KEYS = ["examnexus_user", "examnexus_subjects"];
+const AUTH_STORAGE_KEY = "examnexus-auth-token";
 
 function storageKeyLooksLikeAuthToken(key) {
   if (!key) return false;
-  return key.includes("auth-token") || key === "examnexus-auth-token";
+  return key.includes("auth-token") || key === AUTH_STORAGE_KEY;
 }
 
-function sessionHasAuthToken() {
+function readAuthFrom(storage) {
   try {
-    for (let index = 0; index < sessionStorage.length; index += 1) {
-      if (storageKeyLooksLikeAuthToken(sessionStorage.key(index))) {
-        return true;
-      }
-    }
+    return storage.getItem(AUTH_STORAGE_KEY);
   } catch {
-    return false;
+    return null;
   }
-  return false;
 }
 
-// Older builds persisted the Supabase session in localStorage, which kept users
-// logged in across tab/browser closes. Remove any of those leftovers so they
-// can't silently restore an account.
-function purgeLegacyLocalAuthTokens() {
+function clearAuthKeysFrom(storage) {
   try {
     const staleKeys = [];
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
       if (storageKeyLooksLikeAuthToken(key)) {
         staleKeys.push(key);
       }
     }
-    staleKeys.forEach((key) => localStorage.removeItem(key));
+    staleKeys.forEach((key) => storage.removeItem(key));
   } catch {
     /* ignore storage access errors */
   }
 }
 
 /**
- * Run once at startup. The Supabase session now lives in sessionStorage (per
- * tab), so a freshly opened tab that has no session means the previous tab was
- * closed — in that case we clear the cached account profile so nobody stays
- * "logged in" after closing the tab. In-tab refreshes keep the session, so they
- * are unaffected.
+ * Older builds kept auth in sessionStorage (per tab). That broke multi-tab use
+ * because refresh-token rotation in one tab invalidated the other. Move any
+ * leftover sessionStorage token into localStorage once, then clear it.
+ */
+function migrateSessionAuthToLocalStorage() {
+  try {
+    const fromSession = readAuthFrom(sessionStorage);
+    const fromLocal = readAuthFrom(localStorage);
+
+    if (fromSession && !fromLocal) {
+      localStorage.setItem(AUTH_STORAGE_KEY, fromSession);
+    }
+
+    // Always drop per-tab auth leftovers so tabs don't diverge.
+    clearAuthKeysFrom(sessionStorage);
+  } catch {
+    /* ignore storage access errors */
+  }
+}
+
+function localHasAuthToken() {
+  return Boolean(readAuthFrom(localStorage));
+}
+
+/**
+ * Run once at startup. Auth lives in localStorage (shared across tabs).
+ * If there is no auth token, clear cached profile leftovers so the UI does not
+ * look signed-in without a real session.
  */
 export function clearStaleAccountCacheOnLoad() {
-  purgeLegacyLocalAuthTokens();
+  migrateSessionAuthToLocalStorage();
 
-  if (sessionHasAuthToken()) return;
+  if (localHasAuthToken()) return;
 
   try {
     ACCOUNT_CACHE_KEYS.forEach((key) => localStorage.removeItem(key));

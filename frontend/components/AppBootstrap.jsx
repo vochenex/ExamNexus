@@ -8,6 +8,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { syncPushTokenForCurrentUser } from "../utils/pushNotifications";
 import { isNativeApp } from "../utils/platform";
 import { isNativeEntryPath, getNativeEntryPath } from "../utils/nativeRoutes";
+import { getCachedExamNexusUser } from "../utils/authUser";
+import { sanitizeAppPath } from "../utils/notificationRoutes";
 
 function PushNavigationBridge() {
   const navigate = useNavigate();
@@ -15,17 +17,29 @@ function PushNavigationBridge() {
   useEffect(() => {
     syncPushTokenForCurrentUser();
 
+    const resolveRoleStudent = () => {
+      const role = String(getCachedExamNexusUser()?.role || "").toLowerCase();
+      return role !== "faculty" && role !== "teacher" && role !== "admin";
+    };
+
+    const go = (rawPath) => {
+      const path = sanitizeAppPath(rawPath, {
+        isStudent: resolveRoleStudent(),
+      });
+      navigate(path);
+    };
+
     const onPushNavigate = (event) => {
       const path = event?.detail?.path;
       if (typeof path === "string" && path.startsWith("/")) {
-        navigate(path);
+        go(path);
       }
     };
 
     const onSwMessage = (event) => {
       const data = event?.data;
       if (data?.type === "en:push-navigate" && typeof data.path === "string") {
-        if (data.path.startsWith("/")) navigate(data.path);
+        if (data.path.startsWith("/")) go(data.path);
       }
       if (data?.type === "en:push-received") {
         const payload = data.payload || {};

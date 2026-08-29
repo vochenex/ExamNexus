@@ -43,8 +43,11 @@ export default function AssessmentExamInstructionsBar({
                 theme === "dark" ? "text-amber-100/70" : "text-amber-900/80"
               }`}
             >
-              Stay on this tab. Violations 1–{Math.max(0, maxStrikes - 1)} are warnings; on
-              violation #{maxStrikes} the exam auto-submits. Going offline does not auto-submit.
+              Stay on this tab. Only major violations count toward auto-submit (tab switch, leave
+              fullscreen, external app / Alt+Tab, second exam tab). Minor events like right-click
+              or blocked shortcuts are logged but do not use your {maxStrikes} alerts. Violations
+              1–{Math.max(0, maxStrikes - 1)} warn; #{maxStrikes} auto-submits. Going offline does
+              not auto-submit.
             </p>
           </div>
         </div>

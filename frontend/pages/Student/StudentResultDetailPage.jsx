@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
+import { useAssessmentLockdown } from "../../contexts/AssessmentLockdownContext";
 import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
@@ -16,6 +17,8 @@ import {
 } from "../../utils/assessmentTake";
 import { fetchStudentExamResultReview } from "../../utils/supabaseData";
 import { isStudentResultsFlagEnabled } from "../../utils/assessmentStatus";
+import { resolveStudentId } from "../../utils/authUser";
+import { exitAssessmentFullscreen } from "../../utils/examIntegrity";
 
 function QuestionResultCard({
   question,
@@ -101,9 +104,10 @@ function QuestionResultCard({
 }
 
 export default function StudentResults() {
-  const { examId, studentId } = useParams();
+  const { examId, studentId: studentIdParam } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { endLockdown } = useAssessmentLockdown();
 
   const [exam, setExam] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -114,13 +118,35 @@ export default function StudentResults() {
   const [questionFilter, setQuestionFilter] = useState("all");
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [resolvedStudentId, setResolvedStudentId] = useState(studentIdParam || null);
+
+  // Never keep exam lockdown chrome on the results page.
+  useEffect(() => {
+    endLockdown();
+    void exitAssessmentFullscreen();
+  }, [endLockdown]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (studentIdParam) {
+      setResolvedStudentId(studentIdParam);
+      return undefined;
+    }
+    resolveStudentId().then((id) => {
+      if (!cancelled) setResolvedStudentId(id || null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [studentIdParam]);
 
   const load = useCallback(async (silent = false) => {
+    if (!examId || !resolvedStudentId) return;
     try {
       if (!silent) setLoading(true);
       setLoadError("");
 
-      const data = await fetchStudentExamResultReview(examId, studentId);
+      const data = await fetchStudentExamResultReview(examId, resolvedStudentId);
 
       setExam(data.exam);
       setResult(data.result);
@@ -144,9 +170,9 @@ export default function StudentResults() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [examId, studentId]);
+  }, [examId, resolvedStudentId]);
 
-  usePolling(load, [examId, studentId]);
+  usePolling(load, [examId, resolvedStudentId]);
 
   const examType = exam?.exam_type || "multiple_choice";
 
@@ -186,7 +212,7 @@ export default function StudentResults() {
     return parsed;
   };
 
-  if (loading && !exam && !result) {
+  if ((loading || !resolvedStudentId) && !exam && !result) {
     return <PageLoadingSkeleton theme={theme} variant="detail" />;
   }
 

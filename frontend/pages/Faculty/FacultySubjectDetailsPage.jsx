@@ -12,6 +12,7 @@ import {
   fetchSubjectClassmates,
   fetchSubjectFaculty,
   fetchSubjectStudentAnalytics,
+  fetchPendingRetakeCountsByExamIds,
 } from "../../utils/supabaseData";
 import { supabase } from "../../supabaseClient";
 import {
@@ -36,7 +37,6 @@ import {
 import YearLevelBadge from "../../components/YearLevelBadge";
 import EditSubjectModal from "../../components/EditSubjectModal";
 import SubjectSectionInviteCodes from "../../components/SubjectSectionInviteCodes";
-import ExamNexusBrand from "../../components/ExamNexusBrand";
 import SubjectClassAnalyticsPanel from "../../components/SubjectClassAnalyticsPanel";
 import SectionAssessmentsModal from "../../components/SectionAssessmentsModal";
 import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
@@ -92,6 +92,7 @@ export default function SubjectDetails() {
   const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
   const [facultyProfile, setFacultyProfile] = useState(cachedUser);
   const [loading, setLoading] = useState(true);
+  const [pendingRetakeCounts, setPendingRetakeCounts] = useState({});
   const facultyCanManage = canFacultyManageSubjects(facultyProfile);
 
   useEffect(() => {
@@ -136,6 +137,15 @@ export default function SubjectDetails() {
       setFaculty(facultyData);
       setClassmates(classmatesData);
       setAssessments(assessmentData);
+
+      try {
+        const counts = await fetchPendingRetakeCountsByExamIds(
+          (assessmentData || []).map((row) => row.id)
+        );
+        setPendingRetakeCounts(counts);
+      } catch {
+        setPendingRetakeCounts({});
+      }
     } catch (err) {
       console.error(err);
       if (!silent) showError(err.message || "Failed to load subject");
@@ -319,10 +329,6 @@ export default function SubjectDetails() {
         {flashNotice.message}
       </AlertBanner>
     )}
-
-    <div className="mb-6">
-      <ExamNexusBrand variant="compact" idSuffix="subject-faculty" className="mb-5 opacity-90" />
-    </div>
 
     {/* HEADER */}
     <div className="mb-8">
@@ -562,7 +568,13 @@ export default function SubjectDetails() {
             visibleAssessments.map((assessment) => (
               <div
                 key={assessment.id}
-                onClick={() => navigate(`/faculty/assessment/${assessment.id}`)}
+                onClick={() =>
+                  navigate(
+                    pendingRetakeCounts[assessment.id]
+                      ? `/faculty/assessment/${assessment.id}?tab=retakes`
+                      : `/faculty/assessment/${assessment.id}`
+                  )
+                }
                 className={`
       mb-3
       p-4
@@ -586,7 +598,7 @@ export default function SubjectDetails() {
       duration-300
     `}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <h3
                     className={`font-semibold ${
                       theme === "dark" ? "text-emerald-400" : "text-[#0f766e]"
@@ -594,6 +606,19 @@ export default function SubjectDetails() {
                   >
                     {assessment.title}
                   </h3>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    {pendingRetakeCounts[assessment.id] > 0 && (
+                      <span
+                        className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                          theme === "dark"
+                            ? "bg-amber-500/15 text-amber-300"
+                            : "bg-amber-100 text-amber-900"
+                        }`}
+                      >
+                        {pendingRetakeCounts[assessment.id]} retake
+                        {pendingRetakeCounts[assessment.id] === 1 ? "" : "s"}
+                      </span>
+                    )}
                   {getAssessmentStatus(assessment) === "active" && (
                     <span className="text-emerald-400 font-bold text-xs font-medium">
                       🟢 Active
@@ -611,6 +636,7 @@ export default function SubjectDetails() {
                       🔴 Closed
                     </span>
                   )}
+                  </div>
                 </div>
 
                 <p

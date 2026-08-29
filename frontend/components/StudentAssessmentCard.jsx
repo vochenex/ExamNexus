@@ -24,6 +24,12 @@ import {
 import { getFormatLabel } from "../utils/questionSections";
 
 function getStudentStatusBadgeClass(status, theme) {
+  if (status === "excluded") {
+    return theme === "dark"
+      ? "bg-slate-500/20 text-slate-200"
+      : "bg-slate-200 text-slate-800";
+  }
+
   if (status === "retake_approved") {
     return theme === "dark"
       ? "bg-cyan-500/20 text-cyan-300"

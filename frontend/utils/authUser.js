@@ -102,10 +102,10 @@ export function getCachedExamNexusUser() {
 export function hasLikelyAuthSession() {
   if (getCachedExamNexusUser()) return true;
 
-  // The Supabase session now lives in sessionStorage (per tab).
+  // Supabase session is shared across tabs in localStorage.
   try {
-    for (let index = 0; index < sessionStorage.length; index += 1) {
-      const key = sessionStorage.key(index);
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
       if (key && (key.includes("auth-token") || key === "examnexus-auth-token")) {
         return true;
       }

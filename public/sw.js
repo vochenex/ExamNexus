@@ -98,10 +98,14 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
-  const path =
+  let path =
     typeof data.path === "string" && data.path.startsWith("/")
       ? data.path
       : "/";
+  // Legacy account-approval pushes used /login, which was never a real route.
+  if (path === "/login" || path.startsWith("/login?")) {
+    path = "/auth" + (path.includes("?") ? path.slice(path.indexOf("?")) : "");
+  }
   const targetUrl = new URL(path, self.location.origin).href;
 
   event.waitUntil(

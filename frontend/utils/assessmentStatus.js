@@ -25,6 +25,10 @@ export function getAssessmentStatusLabel(status) {
 }
 
 export function getStudentAssessmentStatus(assessment) {
+  if (assessment?.excluded) {
+    return "excluded";
+  }
+
   if (assessment?.retake_status === "approved") {
     return "retake_approved";
   }
@@ -43,6 +47,7 @@ export function getStudentAssessmentStatus(assessment) {
 }
 
 export function getStudentAssessmentStatusLabel(status) {
+  if (status === "excluded") return "Excluded";
   if (status === "retake_approved") return "Retake approved";
   if (status === "completed") return "Completed";
   if (status === "missed") return "Missed";
@@ -50,6 +55,8 @@ export function getStudentAssessmentStatusLabel(status) {
 }
 
 export function canStudentTakeAssessment(assessment) {
+  if (assessment?.excluded) return false;
+
   if (assessment?.retake_status === "approved") {
     return getAssessmentStatus(assessment) !== "scheduled";
   }
@@ -70,7 +77,8 @@ export function canStudentAccessResults(exam) {
 }
 
 export function canStudentViewResultsFromCard(assessment) {
-  if (getStudentAssessmentStatus(assessment) !== "completed") return false;
+  const status = getStudentAssessmentStatus(assessment);
+  if (status !== "completed" && status !== "excluded") return false;
   return canStudentAccessResults(assessment);
 }
 
@@ -85,6 +93,7 @@ export function getStudentResultsReleaseLabel(exam) {
 
 export function canRequestRetake(assessment) {
   if (!assessment) return false;
+  if (assessment.excluded) return false;
   if (assessment.retake_status === "pending") return false;
   if (assessment.retake_status === "approved") return false;
 

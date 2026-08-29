@@ -79,15 +79,16 @@ export default function AssessmentLockdownModal({
               <strong>disabled</strong> during the exam.
             </li>
             <li>
-              Copying, pasting, switching tabs, Alt+Tab, and other tampering are{" "}
-              <strong>prohibited</strong>.
+              Copying, pasting, right-click, and blocked keyboard shortcuts are{" "}
+              <strong>prohibited</strong> and are logged as <strong>minor</strong> alerts (they do{" "}
+              <strong>not</strong> count toward auto-submit).
             </li>
             <li>
-              Switching tabs, leaving fullscreen, or opening another assessment tab counts as an
-              integrity <strong>violation</strong>. The first{" "}
-              <strong>{Math.max(0, maxStrikes - 1)}</strong> are warnings; on violation{" "}
-              <strong>#{maxStrikes}</strong> your exam is{" "}
-              <strong>submitted automatically</strong>, even if you have not finished.
+              <strong>Major</strong> integrity violations that count toward auto-submit: switching
+              tabs, leaving fullscreen, Alt+Tab / another app covering the exam, or opening a second
+              assessment tab. The first <strong>{Math.max(0, maxStrikes - 1)}</strong> major
+              violations are warnings; on major violation <strong>#{maxStrikes}</strong> your exam
+              is <strong>submitted automatically</strong>, even if you have not finished.
             </li>
             <li>
               Losing internet does <strong>not</strong> auto-submit. Stay on this page — answers

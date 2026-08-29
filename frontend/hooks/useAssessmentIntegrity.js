@@ -4,6 +4,7 @@ import {
   exitAssessmentFullscreen,
   getExamTabLockKey,
   getIntegrityEventMessage,
+  getIntegrityStudentToastMessage,
   INTEGRITY_EVENT_TYPES,
   isAltTabAttempt,
   isRestrictedShortcut,
@@ -18,7 +19,8 @@ const LOG_DEBOUNCE_MS = 5000;
 const STRIKE_DEBOUNCE_MS = 1500;
 const STARTUP_GRACE_MS = 3500;
 const RETURN_GRACE_MS = 2500;
-const EXTERNAL_APP_CHECK_MS = 700;
+const EXTERNAL_APP_CHECK_MS = 1200;
+const MINOR_UI_GRACE_MS = 2000;
 
 export default function useAssessmentIntegrity({
   examId,
@@ -36,6 +38,7 @@ export default function useAssessmentIntegrity({
   const autoSubmitTriggeredRef = useRef(false);
   const leftPageRef = useRef(false);
   const graceUntilRef = useRef(0);
+  const minorUiUntilRef = useRef(0);
   const externalAppTimerRef = useRef(null);
   const suppressAlertsRef = useRef(suppressAlerts);
   const isOfflineRef = useRef(isOffline);
@@ -44,9 +47,16 @@ export default function useAssessmentIntegrity({
   isOfflineRef.current = isOffline;
 
   const isInGracePeriod = useCallback(() => Date.now() < graceUntilRef.current, []);
+  const isInMinorUiGrace = useCallback(() => Date.now() < minorUiUntilRef.current, []);
 
   const extendGracePeriod = useCallback((ms) => {
     graceUntilRef.current = Date.now() + ms;
+  }, []);
+
+  const markMinorUiInteraction = useCallback(() => {
+    // Right-click / blocked shortcuts can briefly blur the window on some OS/browsers.
+    // Don't let that escalate into a major "external app" strike.
+    minorUiUntilRef.current = Date.now() + MINOR_UI_GRACE_MS;
   }, []);
 
   const shouldIgnoreEvent = useCallback(() => {
@@ -68,7 +78,8 @@ export default function useAssessmentIntegrity({
       }
       lastLoggedRef.current[eventType] = now;
 
-      const message = description || getIntegrityEventMessage(eventType);
+      const message =
+        description || getIntegrityStudentToastMessage(eventType);
       if (!silentAlert) {
         onAlert?.(message);
       }
@@ -77,9 +88,10 @@ export default function useAssessmentIntegrity({
         await logExamIntegrityEvent({
           examId,
           eventType,
-          description: message,
+          description: getIntegrityEventMessage(eventType),
           metadata: {
             ...metadata,
+            severity: isStrikeWorthyEvent(eventType) ? "major" : "minor",
             attempt: isRetakeAttempt ? "retake" : "initial",
           },
         });
@@ -192,10 +204,12 @@ export default function useAssessmentIntegrity({
 
     const scheduleExternalAppCheck = () => {
       if (shouldIgnoreEvent()) return;
+      if (isInMinorUiGrace()) return;
 
       clearTimeout(externalAppTimerRef.current);
       externalAppTimerRef.current = setTimeout(() => {
         if (shouldIgnoreEvent()) return;
+        if (isInMinorUiGrace()) return;
         if (document.hidden) return;
         if (!document.hasFocus()) {
           flagFocusViolation(INTEGRITY_EVENT_TYPES.EXTERNAL_APP_OVERLAY);
@@ -241,33 +255,37 @@ export default function useAssessmentIntegrity({
 
     const handleCopy = (event) => {
       event.preventDefault();
+      markMinorUiInteraction();
       recordEvent(
         INTEGRITY_EVENT_TYPES.COPY_ATTEMPT,
-        getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.COPY_ATTEMPT)
+        getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.COPY_ATTEMPT)
       );
     };
 
     const handlePaste = (event) => {
       event.preventDefault();
+      markMinorUiInteraction();
       recordEvent(
         INTEGRITY_EVENT_TYPES.PASTE_ATTEMPT,
-        getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.PASTE_ATTEMPT)
+        getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.PASTE_ATTEMPT)
       );
     };
 
     const handleCut = (event) => {
       event.preventDefault();
+      markMinorUiInteraction();
       recordEvent(
         INTEGRITY_EVENT_TYPES.CUT_ATTEMPT,
-        getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.CUT_ATTEMPT)
+        getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.CUT_ATTEMPT)
       );
     };
 
     const handleContextMenu = (event) => {
       event.preventDefault();
+      markMinorUiInteraction();
       recordEvent(
         INTEGRITY_EVENT_TYPES.CONTEXT_MENU,
-        getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.CONTEXT_MENU)
+        getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.CONTEXT_MENU)
       );
     };
 
@@ -278,9 +296,10 @@ export default function useAssessmentIntegrity({
     const handleBeforeInput = (event) => {
       if (event.inputType === "insertFromPaste" || event.inputType === "insertFromDrop") {
         event.preventDefault();
+        markMinorUiInteraction();
         recordEvent(
           INTEGRITY_EVENT_TYPES.PASTE_ATTEMPT,
-          getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.PASTE_ATTEMPT)
+          getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.PASTE_ATTEMPT)
         );
       }
     };
@@ -297,9 +316,10 @@ export default function useAssessmentIntegrity({
 
       if (isRestrictedShortcut(event)) {
         event.preventDefault();
+        markMinorUiInteraction();
         recordEvent(
           INTEGRITY_EVENT_TYPES.DEVTOOLS_SHORTCUT,
-          getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.DEVTOOLS_SHORTCUT),
+          getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.DEVTOOLS_SHORTCUT),
           { key: event.key }
         );
       }
@@ -308,7 +328,7 @@ export default function useAssessmentIntegrity({
     const handleBeforeUnload = (event) => {
       recordEvent(
         INTEGRITY_EVENT_TYPES.NAVIGATION_ATTEMPT,
-        getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.NAVIGATION_ATTEMPT),
+        getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.NAVIGATION_ATTEMPT),
         { trigger: "beforeunload" }
       );
       event.preventDefault();
@@ -319,7 +339,7 @@ export default function useAssessmentIntegrity({
       trapHistory();
       recordEvent(
         INTEGRITY_EVENT_TYPES.NAVIGATION_ATTEMPT,
-        getIntegrityEventMessage(INTEGRITY_EVENT_TYPES.NAVIGATION_ATTEMPT),
+        getIntegrityStudentToastMessage(INTEGRITY_EVENT_TYPES.NAVIGATION_ATTEMPT),
         { trigger: "popstate" }
       );
     };
@@ -367,6 +387,8 @@ export default function useAssessmentIntegrity({
     examId,
     extendGracePeriod,
     flagFocusViolation,
+    isInMinorUiGrace,
+    markMinorUiInteraction,
     onFocusViolation,
     recordEvent,
     recordStrike,

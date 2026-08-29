@@ -8,12 +8,13 @@ import {
   X,
   ArrowRight,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { fetchUserNotifications } from "../utils/supabaseData";
 import { usePolling } from "../hooks/useRealtimeFetch";
 import { formatTargetSectionsLabel } from "../utils/sections";
-import { getNotificationDestination } from "../utils/notificationRoutes";
+import { getNotificationDestination, sanitizeAppPath } from "../utils/notificationRoutes";
 import { canTakeAssessmentOnThisDevice } from "../utils/platform";
 import { useAppModal } from "../contexts/AppModalContext";
 import {
@@ -31,6 +32,7 @@ function statusLabel(item) {
   if (item.kind === "comment") return "Comment";
   if (item.kind === "reaction") return "Reaction";
   if (item.kind === "account") return "Account";
+  if (item.kind === "retake") return "Retake request";
   if (item.status === "scheduled") return "Scheduled assessment";
   if (item.status === "active") return "Active assessment";
   if (item.status === "closed") return "Closed assessment";
@@ -43,6 +45,9 @@ function statusColor(item, theme) {
   }
   if (item.kind === "announcement" || item.status === "posted") {
     return theme === "dark" ? "text-purple-400" : "text-purple-700";
+  }
+  if (item.kind === "retake") {
+    return theme === "dark" ? "text-amber-400" : "text-amber-600";
   }
   if (item.status === "active") {
     return theme === "dark" ? "text-emerald-400" : "text-emerald-700";
@@ -88,6 +93,11 @@ function kindIconStyles(item, theme) {
       ? "bg-teal-500/10 text-teal-300"
       : "bg-teal-100 text-teal-800";
   }
+  if (item.kind === "retake") {
+    return theme === "dark"
+      ? "bg-amber-500/10 text-amber-400"
+      : "bg-amber-100 text-amber-700";
+  }
   if (item.status === "active") {
     return theme === "dark"
       ? "bg-emerald-500/10 text-emerald-400"
@@ -110,6 +120,7 @@ function kindIcon(item) {
   if (item.kind === "comment") return MessageCircle;
   if (item.kind === "reaction") return Bell;
   if (item.kind === "account") return Bell;
+  if (item.kind === "retake") return RotateCcw;
   return ClipboardCheck;
 }
 
@@ -230,10 +241,11 @@ export default function NotificationBell({ compact = false }) {
 
   const handleItemClick = async (item) => {
     closePanel();
-    const { path } = getNotificationDestination(item, {
+    const { path: rawPath } = getNotificationDestination(item, {
       isStudent,
       userId: user.id,
     });
+    const path = sanitizeAppPath(rawPath, { isStudent });
 
     if (path.includes("/take-assessment/") && !canTakeAssessmentOnThisDevice()) {
       await warning(

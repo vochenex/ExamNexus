@@ -1662,7 +1662,7 @@ export async function fetchStudentExamResultReview(examId, studentId) {
       .select("*")
       .eq("exam_id", examId)
       .eq("student_id", studentId)
-      .single(),
+      .maybeSingle(),
     supabase
       .from("questions")
       .select("*")
@@ -1679,6 +1679,9 @@ export async function fetchStudentExamResultReview(examId, studentId) {
   if (resultError) throw resultError;
   if (questionError) throw questionError;
   if (answerError) throw answerError;
+  if (!resultData) {
+    throw new Error("Results not found for this assessment.");
+  }
 
   const showScore = examData?.allow_student_view !== false;
   const showQuestionReview =
@@ -3083,37 +3086,61 @@ export async function fetchStudentAssessments(studentId) {
   const examIds = visibleExams.map((exam) => exam.id);
   let submittedExamIds = new Set();
   let retakeByExamId = new Map();
+  let excludedExamIds = new Set();
 
   if (examIds.length > 0) {
-    const [{ data: results, error: resultsError }, { data: retakeRows, error: retakeError }] =
-      await Promise.all([
-        supabase
-          .from("exam_results")
-          .select("exam_id")
-          .eq("student_id", studentId)
-          .in("exam_id", examIds),
-        supabase
-          .from("exam_retake_requests")
-          .select("exam_id, status")
-          .eq("student_id", studentId)
-          .in("exam_id", examIds),
-      ]);
+    const [
+      { data: results, error: resultsError },
+      { data: retakeRows, error: retakeError },
+      { data: exclusionRows, error: exclusionError },
+    ] = await Promise.all([
+      supabase
+        .from("exam_results")
+        .select("exam_id")
+        .eq("student_id", studentId)
+        .in("exam_id", examIds),
+      supabase
+        .from("exam_retake_requests")
+        .select("exam_id, status")
+        .eq("student_id", studentId)
+        .in("exam_id", examIds),
+      supabase
+        .from("exam_student_exclusions")
+        .select("exam_id")
+        .eq("student_id", studentId)
+        .in("exam_id", examIds),
+    ]);
 
     if (resultsError) throw resultsError;
     if (retakeError && !retakeError.message?.includes("exam_retake_requests")) {
       throw retakeError;
     }
+    if (exclusionError && !exclusionError.message?.includes("exam_student_exclusions")) {
+      throw exclusionError;
+    }
 
     submittedExamIds = new Set((results || []).map((row) => row.exam_id));
-    retakeByExamId = new Map(
-      (retakeRows || []).map((row) => [row.exam_id, row.status])
-    );
+    excludedExamIds = new Set((exclusionRows || []).map((row) => row.exam_id));
+    // Prefer the most actionable status if duplicate rows ever appear.
+    const statusRank = { pending: 0, approved: 1, denied: 2, fulfilled: 3 };
+    retakeByExamId = new Map();
+    for (const row of retakeRows || []) {
+      const prev = retakeByExamId.get(row.exam_id);
+      if (
+        prev == null ||
+        (statusRank[row.status] ?? 99) < (statusRank[prev] ?? 99)
+      ) {
+        retakeByExamId.set(row.exam_id, row.status);
+      }
+    }
   }
 
   return visibleExams.map((exam) => {
     const retakeStatus = retakeByExamId.get(exam.id) || null;
+    const excluded = excludedExamIds.has(exam.id);
     const submitted =
-      submittedExamIds.has(exam.id) && retakeStatus !== "approved";
+      excluded ||
+      (submittedExamIds.has(exam.id) && retakeStatus !== "approved");
     const studentSection = sectionBySubject.get(exam.subject_id) || "A";
 
     return enrichExamRecord({
@@ -3125,8 +3152,9 @@ export async function fetchStudentAssessments(studentId) {
       student_section: studentSection,
       student_section_label: `Section ${studentSection}`,
       submitted,
-      retake_status: retakeStatus,
-      retake_approved: retakeStatus === "approved",
+      excluded,
+      retake_status: excluded ? null : retakeStatus,
+      retake_approved: !excluded && retakeStatus === "approved",
     });
   });
 }
@@ -3480,14 +3508,19 @@ export async function deleteAnnouncementComment(commentId) {
 
 function normalizeJsonList(data) {
   if (Array.isArray(data)) return data;
+  if (data == null) return [];
   if (typeof data === "string") {
     try {
       const parsed = JSON.parse(data);
-      return Array.isArray(parsed) ? parsed : [];
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && typeof parsed === "object") return [parsed];
+      return [];
     } catch {
       return [];
     }
   }
+  // Some PostgREST jsonb responses unwrap a 1-item array into a bare object.
+  if (typeof data === "object") return [data];
   return [];
 }
 
@@ -3542,6 +3575,64 @@ export async function fetchUserNotifications(limit = 40) {
     for (const item of adminItems) {
       if (!seen.has(String(item.id))) items.push(item);
     }
+
+    // Faculty: surface every pending retake as its own notification so
+    // requesting retakes on multiple assessments never collapses to one item.
+    if (role === "faculty" || role === "teacher") {
+      const { data: pendingRetakes } = await supabase
+        .from("exam_retake_requests")
+        .select(
+          `
+          id,
+          exam_id,
+          status,
+          student_message,
+          created_at,
+          updated_at,
+          exams:exam_id (
+            id,
+            title,
+            subject_id,
+            subjects:subject_id ( id, name )
+          ),
+          students:student_id ( first_name, last_name )
+        `
+        )
+        .eq("status", "pending")
+        .order("updated_at", { ascending: false })
+        .limit(limit);
+
+      const seenRetakes = new Set(
+        items
+          .filter((item) => item.kind === "retake")
+          .map((item) => String(item.id))
+      );
+
+      for (const row of pendingRetakes || []) {
+        const requestId = String(row.id);
+        if (seenRetakes.has(requestId)) continue;
+        const exam = row.exams || {};
+        const student = row.students || {};
+        const studentName =
+          `${student.first_name || ""} ${student.last_name || ""}`.trim() ||
+          "A student";
+        items.push({
+          kind: "retake",
+          id: row.id,
+          exam_id: row.exam_id || exam.id,
+          title: exam.title || "Assessment",
+          body: row.student_message
+            ? `${studentName}: ${String(row.student_message).slice(0, 120)}`
+            : `${studentName} requested a retake.`,
+          created_at: row.updated_at || row.created_at,
+          subject_id: exam.subject_id || exam.subjects?.id || null,
+          subject_name: exam.subjects?.name || "",
+          status: "pending",
+          student_name: studentName,
+        });
+        seenRetakes.add(requestId);
+      }
+    }
   } catch {
     // ignore if table/policy unavailable
   }
@@ -3583,7 +3674,9 @@ export async function toggleAnnouncementHeart(announcementId) {
           body: `Someone reacted to "${announcement.title}"`,
           data: {
             kind: "reaction",
-            path: `/faculty/subject/${announcement.subject_id}/social?highlight=${announcement.id}`,
+            path: announcement.subject_id
+              ? `/faculty/subject/${announcement.subject_id}/social?highlight=${announcement.id}`
+              : "/faculty/announcements",
             announcement_id: announcement.id,
             subject_id: announcement.subject_id || "",
           },
@@ -3666,8 +3759,12 @@ export async function postAnnouncementComment(announcementId, body) {
       ),
     ];
 
-    const facultyPath = `/faculty/subject/${announcement?.subject_id}/social?highlight=${announcementId}&comments=1`;
-    const studentPath = `/student/subject/${announcement?.subject_id}/social?highlight=${announcementId}&comments=1`;
+    const facultyPath = announcement?.subject_id
+      ? `/faculty/subject/${announcement.subject_id}/social?highlight=${announcementId}&comments=1`
+      : "/faculty/announcements";
+    const studentPath = announcement?.subject_id
+      ? `/student/subject/${announcement.subject_id}/social?highlight=${announcementId}&comments=1`
+      : "/student/announcements";
 
     if (authorId) {
       await dispatchPushToUsers({
@@ -3795,6 +3892,38 @@ export async function requestExamRetake(examId, message = "") {
   });
 
   if (error) throw error;
+
+  // Notify the assigned faculty for THIS assessment so each request surfaces
+  // separately (students often request retakes on several exams in a row).
+  try {
+    const { data: exam } = await supabase
+      .from("exams")
+      .select("id, title, subject_id, subjects:subject_id ( id, name, teacher_school_id )")
+      .eq("id", examId)
+      .maybeSingle();
+
+    const subject = exam?.subjects || null;
+    const faculty = subject ? await fetchSubjectFaculty(subject) : null;
+    if (faculty?.id) {
+      const title = exam?.title || "assessment";
+      await dispatchPushToUsers({
+        userIds: [faculty.id],
+        title: "Retake request",
+        body: `A student requested a retake for "${title}".`,
+        subjectName: subject?.name || "",
+        data: {
+          kind: "retake",
+          path: `/faculty/assessment/${examId}?tab=retakes`,
+          exam_id: examId,
+          request_id: data?.id || "",
+          subject_id: exam?.subject_id || "",
+        },
+      });
+    }
+  } catch (err) {
+    console.warn("Retake push skipped:", err?.message || err);
+  }
+
   return data;
 }
 
@@ -3806,7 +3935,32 @@ export async function fetchExamRetakeRequests(examId) {
   });
 
   if (error) throw error;
-  return Array.isArray(data) ? data : data ? JSON.parse(JSON.stringify(data)) : [];
+  return normalizeJsonList(data);
+}
+
+/** Pending retake counts keyed by exam id (faculty subject list badges). */
+export async function fetchPendingRetakeCountsByExamIds(examIds = []) {
+  await requireSession();
+  const ids = [...new Set((examIds || []).filter(Boolean))];
+  if (!ids.length) return {};
+
+  const { data, error } = await supabase
+    .from("exam_retake_requests")
+    .select("exam_id")
+    .eq("status", "pending")
+    .in("exam_id", ids);
+
+  if (error) {
+    if (error.message?.includes("exam_retake_requests")) return {};
+    throw error;
+  }
+
+  const counts = {};
+  for (const row of data || []) {
+    const key = row.exam_id;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
 }
 
 export async function reviewExamRetakeRequests(examId, requestIds, action, note = "") {
@@ -3819,6 +3973,35 @@ export async function reviewExamRetakeRequests(examId, requestIds, action, note 
     p_note: note || null,
   });
 
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchExamExclusions(examId) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("get_exam_exclusions", {
+    p_exam_id: examId,
+  });
+  if (error) throw error;
+  return normalizeJsonList(data);
+}
+
+export async function excludeStudentFromExam(examId, studentId) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("exclude_student_from_exam", {
+    p_exam_id: examId,
+    p_student_id: studentId,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function includeStudentInExam(examId, studentId) {
+  await requireSession();
+  const { data, error } = await supabase.rpc("include_student_in_exam", {
+    p_exam_id: examId,
+    p_student_id: studentId,
+  });
   if (error) throw error;
   return data;
 }

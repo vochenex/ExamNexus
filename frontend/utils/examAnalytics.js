@@ -5,6 +5,7 @@ import {
   getOverallAverageQuestionTime,
   groupQuestionTimeByFormat,
 } from "./questionTimeAnalytics";
+import { isStrikeWorthyEvent } from "./examIntegrity";
 
 export function percentage(score, total) {
   if (!total || total <= 0) return 0;
@@ -168,7 +169,11 @@ export function buildSubmissionAlertRankings(results = [], integrityEvents = [])
         user.school_id ||
         "Student";
       const alerts = eventsByStudent[row.student_id] || [];
-      const alertCount = alerts.length;
+      const majorAlertCount = alerts.filter((event) =>
+        isStrikeWorthyEvent(event.event_type)
+      ).length;
+      const minorAlertCount = Math.max(0, alerts.length - majorAlertCount);
+      const alertCount = majorAlertCount;
 
       return {
         studentId: row.student_id,
@@ -177,6 +182,9 @@ export function buildSubmissionAlertRankings(results = [], integrityEvents = [])
         total: Number(row.total) || 0,
         scorePct: percentage(row.score, row.total),
         alertCount,
+        majorAlertCount,
+        minorAlertCount,
+        totalAlertCount: alerts.length,
         alertTier: getAlertTier(alertCount),
         alerts,
       };

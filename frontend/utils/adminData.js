@@ -102,7 +102,8 @@ export async function reviewAdminAccount(userId, action) {
       : "Your ExamNexus registration was not approved. Contact an administrator if you need help.",
     data: {
       kind: "account",
-      path: "/login",
+      // Must match a real App route. /login was never registered and opened a blank page.
+      path: "/auth",
       status: approved ? "approved" : "rejected",
     },
   });

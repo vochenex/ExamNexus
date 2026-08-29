@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { fetchExamIntegrityEvents } from "../utils/supabaseData";
-import { formatIntegrityEventLabel } from "../utils/examIntegrity";
+import { formatIntegrityEventLabel, isStrikeWorthyEvent } from "../utils/examIntegrity";
 import { usePolling } from "../hooks/useRealtimeFetch";
 
 function studentName(row) {
@@ -97,6 +97,10 @@ export default function ExamIntegrityPanel({ examId }) {
         <ShieldAlert size={18} className="text-amber-500" />
         <h3 className="font-semibold">Integrity alerts ({events.length})</h3>
       </div>
+      <p className={`mb-4 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+        Major = tab switch, leave fullscreen, external app / Alt+Tab, second exam tab (counts toward
+        auto-submit). Minor = right-click, blocked shortcuts, copy/paste (logged only).
+      </p>
 
       <div className="space-y-4">
         {Object.entries(grouped).map(([studentId, group]) => (
@@ -110,7 +114,11 @@ export default function ExamIntegrityPanel({ examId }) {
           >
             <p className="font-semibold text-sm mb-3">{group.student}</p>
             <ul className="space-y-2">
-              {group.events.map((event) => (
+              {group.events.map((event) => {
+                const major =
+                  event.metadata?.severity === "major" ||
+                  isStrikeWorthyEvent(event.event_type);
+                return (
                 <li
                   key={event.id}
                   className={`text-sm ${
@@ -119,6 +127,19 @@ export default function ExamIntegrityPanel({ examId }) {
                 >
                   <span className="font-medium">
                     {formatIntegrityEventLabel(event.event_type)}
+                  </span>
+                  <span
+                    className={`ml-2 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                      major
+                        ? theme === "dark"
+                          ? "bg-red-500/20 text-red-200"
+                          : "bg-red-100 text-red-800"
+                        : theme === "dark"
+                          ? "bg-white/10 text-gray-400"
+                          : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {major ? "Major" : "Minor"}
                   </span>
                   <span className={`ml-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
                     {new Date(event.created_at).toLocaleString()}
@@ -129,7 +150,8 @@ export default function ExamIntegrityPanel({ examId }) {
                     </p>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
         ))}

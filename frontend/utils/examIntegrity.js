@@ -57,6 +57,32 @@ export function isStrikeWorthyEvent(eventType) {
   return STRIKE_WORTHY_EVENT_TYPES.has(eventType);
 }
 
+/** Major = counts toward the 3-strike auto-submit. Minor = logged only. */
+export function getIntegritySeverity(eventType) {
+  return isStrikeWorthyEvent(eventType) ? "major" : "minor";
+}
+
+export function getIntegrityEventMessage(eventType) {
+  return (
+    INTEGRITY_EVENT_MESSAGES[eventType] ||
+    "Suspicious activity detected. This incident has been recorded and sent to your teacher."
+  );
+}
+
+export function getIntegrityStudentToastMessage(eventType) {
+  const base = getIntegrityEventMessage(eventType);
+  if (isStrikeWorthyEvent(eventType)) {
+    return base;
+  }
+  return `${base} (Minor — logged for your teacher; does not count toward auto-submit.)`;
+}
+
+export function formatIntegrityEventLabel(eventType) {
+  return String(eventType || "unknown")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export function getIntegrityStrikesKey(examId) {
   return `examnexus_integrity_strikes_${examId}`;
 }
@@ -103,19 +129,6 @@ export function saveIntegrityStrikes(examId, strikes) {
 
 export function getIntegrityStrikesRemaining(examId) {
   return Math.max(0, MAX_INTEGRITY_STRIKES - loadIntegrityStrikes(examId));
-}
-
-export function getIntegrityEventMessage(eventType) {
-  return (
-    INTEGRITY_EVENT_MESSAGES[eventType] ||
-    "Suspicious activity detected. This incident has been recorded and sent to your teacher."
-  );
-}
-
-export function formatIntegrityEventLabel(eventType) {
-  return String(eventType || "unknown")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function getExamSessionKey(examId) {

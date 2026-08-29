@@ -98,8 +98,9 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
         </div>
 
         <p className={`mb-4 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-          Students who submitted (including retakes), ranked by total integrity alerts from the
-          first attempt plus any retake. Click a row to see each alert with timestamps.
+          Ranked by <strong>major</strong> integrity alerts (tab switch, leave fullscreen, external
+          app / Alt+Tab, second exam tab). Minor events (right-click, shortcuts, copy/paste) are
+          logged but do not change this ranking. Click a row for the full timeline.
         </p>
 
         {submissions.length === 0 ? (
@@ -133,7 +134,10 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${tier.badge}`}
                       >
-                        {student.alertCount} alert{student.alertCount === 1 ? "" : "s"}
+                        {student.majorAlertCount ?? student.alertCount} major
+                        {(student.minorAlertCount || 0) > 0
+                          ? ` · ${student.minorAlertCount} minor`
+                          : ""}
                       </span>
                       <ChevronRight size={14} className="opacity-50" />
                     </div>

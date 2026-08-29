@@ -28,6 +28,20 @@ export async function clearLocalSessionAndLogout({
 
   localStorage.removeItem("examnexus_user");
 
+  // Clear any leftover per-tab auth keys from older builds.
+  try {
+    const staleKeys = [];
+    for (let index = 0; index < sessionStorage.length; index += 1) {
+      const key = sessionStorage.key(index);
+      if (key && (key.includes("auth-token") || key === "examnexus-auth-token")) {
+        staleKeys.push(key);
+      }
+    }
+    staleKeys.forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // ignore
+  }
+
   const useReplace = replace || isNativeApp();
   if (typeof navigate === "function") {
     navigate(navigateTo, useReplace ? { replace: true } : undefined);

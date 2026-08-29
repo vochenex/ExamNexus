@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import {
@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Shield,
   Trash2,
+  UserMinus,
 } from "lucide-react";
 import AssessmentQuestionsReview from "../../components/AssessmentQuestionsReview";
 import QuestionBankSaveModal from "../../components/QuestionBankSaveModal";
@@ -20,6 +21,7 @@ import ExamAnalyticsPanel from "../../components/ExamAnalyticsPanel";
 import ExamSubmissionAlertsPanel from "../../components/ExamSubmissionAlertsPanel";
 import ExamAutoSubmittedPanel from "../../components/ExamAutoSubmittedPanel";
 import ExamRetakeRequestsPanel from "../../components/ExamRetakeRequestsPanel";
+import ExamExclusionsPanel from "../../components/ExamExclusionsPanel";
 import { pageShellWithBellClass, panelClass } from "../../utils/themeInputs";
 import {
   deleteExam,
@@ -31,13 +33,14 @@ import { getAssessmentStatus } from "../../utils/assessmentStatus";
 import { downloadCsv, downloadHtml } from "../../utils/exportCsv";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import ProgressButton from "../../components/ui/ProgressButton";
+import ModalPortal from "../../components/ui/ModalPortal";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { getCachedExamNexusUser } from "../../utils/authUser";
-import { secondaryButtonSm } from "../../utils/themeButtons";
 const TABS = [
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "integrity", label: "Integrity", icon: Shield },
   { id: "retakes", label: "Retakes", icon: RotateCcw },
+  { id: "exclusions", label: "Exclude", icon: UserMinus },
   { id: "questions", label: "Questions", icon: ClipboardList },
 ];
 
@@ -104,6 +107,7 @@ function MetaChip({ children, theme }) {
 export default function AssessmentDetails() {
   const { examId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { theme } = useTheme();
   const { error: showError, success: showSuccess, confirm } = useAppModal();
 
@@ -115,22 +119,65 @@ export default function AssessmentDetails() {
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [bankSaveOpen, setBankSaveOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("analytics");
+  const initialTab = TABS.some((tab) => tab.id === searchParams.get("tab"))
+    ? searchParams.get("tab")
+    : "analytics";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [headerOpen, setHeaderOpen] = useState(true);
   const [exportingResults, setExportingResults] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef(null);
+  const exportButtonRef = useRef(null);
+  const [exportMenuPos, setExportMenuPos] = useState(null);
   const teacherSchoolId = getCachedExamNexusUser()?.school_id || "";
 
   useEffect(() => {
-    if (!exportMenuOpen) return undefined;
+    const tab = searchParams.get("tab");
+    if (TABS.some((entry) => entry.id === tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const selectTab = (id) => {
+    setActiveTab(id);
+    const next = new URLSearchParams(searchParams);
+    if (id === "analytics") next.delete("tab");
+    else next.set("tab", id);
+    setSearchParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if (!exportMenuOpen) {
+      setExportMenuPos(null);
+      return undefined;
+    }
+
+    const updatePos = () => {
+      const rect = exportButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setExportMenuPos({
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    };
+
+    updatePos();
     const onPointer = (event) => {
-      if (!exportMenuRef.current?.contains(event.target)) {
+      if (
+        !exportMenuRef.current?.contains(event.target) &&
+        !exportButtonRef.current?.contains(event.target)
+      ) {
         setExportMenuOpen(false);
       }
     };
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
     document.addEventListener("mousedown", onPointer);
-    return () => document.removeEventListener("mousedown", onPointer);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+      document.removeEventListener("mousedown", onPointer);
+    };
   }, [exportMenuOpen]);
 
   const reloadAnalytics = useCallback(
@@ -372,8 +419,9 @@ export default function AssessmentDetails() {
                   <span className="hidden sm:inline">Edit</span>
                 </button>
 
-                <div className="relative" ref={exportMenuRef}>
+                <div className="relative">
                   <ProgressButton
+                    ref={exportButtonRef}
                     type="button"
                     onClick={() => setExportMenuOpen((open) => !open)}
                     loading={exportingResults}
@@ -391,29 +439,47 @@ export default function AssessmentDetails() {
                     <span className="hidden sm:inline">Export</span>
                     <ChevronDown size={14} className={exportMenuOpen ? "rotate-180" : ""} />
                   </ProgressButton>
-                  {exportMenuOpen && !exportingResults && (
-                    <div
-                      className={`absolute right-0 z-20 mt-2 min-w-[10rem] overflow-hidden rounded-xl border shadow-xl ${
-                        theme === "dark"
-                          ? "border-white/10 bg-[#0a1614]"
-                          : "border-emerald-200 bg-white"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        className={secondaryButtonSm(theme, "w-full !justify-start rounded-none !border-0")}
-                        onClick={() => handleExportResults("csv")}
+                  {exportMenuOpen && !exportingResults && exportMenuPos && (
+                    <ModalPortal lockScroll={false}>
+                      <div
+                        ref={exportMenuRef}
+                        role="menu"
+                        className={`fixed z-[80] min-w-[11.5rem] overflow-hidden rounded-xl border py-1 shadow-xl ${
+                          theme === "dark"
+                            ? "border-white/15 bg-[#0c1a17] text-emerald-50"
+                            : "border-emerald-200 bg-white text-gray-900"
+                        }`}
+                        style={{
+                          top: exportMenuPos.top,
+                          right: exportMenuPos.right,
+                        }}
                       >
-                        Export CSV
-                      </button>
-                      <button
-                        type="button"
-                        className={secondaryButtonSm(theme, "w-full !justify-start rounded-none !border-0")}
-                        onClick={() => handleExportResults("html")}
-                      >
-                        Export HTML
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className={`block w-full px-3.5 py-2.5 text-left text-sm font-medium transition ${
+                            theme === "dark"
+                              ? "hover:bg-white/10"
+                              : "hover:bg-emerald-50"
+                          }`}
+                          onClick={() => handleExportResults("csv")}
+                        >
+                          Export CSV
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className={`block w-full px-3.5 py-2.5 text-left text-sm font-medium transition ${
+                            theme === "dark"
+                              ? "hover:bg-white/10"
+                              : "hover:bg-emerald-50"
+                          }`}
+                          onClick={() => handleExportResults("html")}
+                        >
+                          Export HTML
+                        </button>
+                      </div>
+                    </ModalPortal>
                   )}
                 </div>
 
@@ -462,7 +528,7 @@ export default function AssessmentDetails() {
             <button
               key={id}
               type="button"
-              onClick={() => setActiveTab(id)}
+              onClick={() => selectTab(id)}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 isActive
                   ? theme === "dark"
@@ -477,6 +543,16 @@ export default function AssessmentDetails() {
               {label}
               {id === "questions" && (
                 <span className="opacity-80">({questions.length})</span>
+              )}
+              {id === "retakes" && analytics?.retakeRequests?.length > 0 && (
+                <span className="opacity-80">
+                  (
+                  {
+                    analytics.retakeRequests.filter((row) => row.status === "pending")
+                      .length
+                  }
+                  )
+                </span>
               )}
             </button>
           );
@@ -505,6 +581,14 @@ export default function AssessmentDetails() {
         {activeTab === "retakes" && (
           <ExamRetakeRequestsPanel
             examId={examId}
+            onUpdated={() => reloadAnalytics(undefined, undefined, { silent: true })}
+          />
+        )}
+
+        {activeTab === "exclusions" && (
+          <ExamExclusionsPanel
+            examId={examId}
+            subjectId={exam.subject_id}
             onUpdated={() => reloadAnalytics(undefined, undefined, { silent: true })}
           />
         )}

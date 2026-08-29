@@ -39,6 +39,7 @@ const AdminExamLogsPage = lazy(() => import("./pages/Admin/AdminExamLogsPage"));
 const AdminExportsPage = lazy(() => import("./pages/Admin/AdminExportsPage"));
 const AdminPasswordResetsPage = lazy(() => import("./pages/Admin/AdminPasswordResetsPage"));
 const PlatformAnnouncementsPage = lazy(() => import("./pages/shared/PlatformAnnouncementsPage"));
+const UnknownRouteRedirect = lazy(() => import("./components/UnknownRouteRedirect"));
 
 export default function App() {
   return (
@@ -53,6 +54,8 @@ export default function App() {
           }
         />
         <Route path="/auth" element={<AuthPage />} />
+        {/* Legacy notification / push target — never existed as a real page. */}
+        <Route path="/login" element={<UnknownRouteRedirect />} />
 
         <Route element={<AdminRouteGuard />}>
           <Route element={<AdminLayout />}>
@@ -81,6 +84,7 @@ export default function App() {
             <Route path="/student/platform-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/student/assessments" element={<StudentAssessmentsPage />} />
             <Route path="/student/results" element={<StudentResultsListPage />} />
+            <Route path="/student/results/:examId" element={<StudentResultDetailPage />} />
             <Route path="/student/results/:examId/:studentId" element={<StudentResultDetailPage />} />
             <Route path="/student/take-assessment/:id" element={<TakeAssessmentPage />} />
             <Route path="/student/subjects" element={<StudentSubjectsPage />} />
@@ -96,6 +100,8 @@ export default function App() {
             <Route path="/faculty/assessment/:examId" element={<FacultyAssessmentDetailsPage />} />
           </Route>
         </Route>
+
+        <Route path="*" element={<UnknownRouteRedirect />} />
       </Routes>
     </Suspense>
   );

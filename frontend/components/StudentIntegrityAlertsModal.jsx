@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { secondaryButtonSm } from "../utils/themeButtons";
-import { formatIntegrityEventLabel } from "../utils/examIntegrity";
+import { formatIntegrityEventLabel, isStrikeWorthyEvent } from "../utils/examIntegrity";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 import ModalPortal from "./ui/ModalPortal";
 
@@ -56,7 +56,8 @@ export default function StudentIntegrityAlertsModal({
             </h2>
             <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
               {alerts.length} alert{alerts.length === 1 ? "" : "s"} recorded across all attempts
-              (first try and retakes)
+              (first try and retakes). Major alerts count toward auto-submit; minor alerts are
+              logged only.
             </p>
           </div>
           <button
@@ -80,13 +81,21 @@ export default function StudentIntegrityAlertsModal({
             </p>
           ) : (
             <ul className="space-y-3">
-              {alerts.map((alert, index) => (
+              {alerts.map((alert, index) => {
+                const major =
+                  alert.metadata?.severity === "major" ||
+                  isStrikeWorthyEvent(alert.event_type);
+                return (
                 <li
                   key={alert.id || `${alert.event_type}-${index}`}
                   className={`rounded-xl border px-4 py-3 ${
-                    theme === "dark"
-                      ? "border-amber-500/20 bg-amber-500/5"
-                      : "border-amber-200 bg-amber-50/60"
+                    major
+                      ? theme === "dark"
+                        ? "border-red-500/25 bg-red-500/5"
+                        : "border-red-200 bg-red-50/70"
+                      : theme === "dark"
+                        ? "border-white/10 bg-white/[0.03]"
+                        : "border-gray-200 bg-gray-50/80"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -94,9 +103,22 @@ export default function StudentIntegrityAlertsModal({
                       <p className={`font-semibold text-sm ${theme === "dark" ? "text-amber-200" : "text-amber-900"}`}>
                         {formatIntegrityEventLabel(alert.event_type)}
                       </p>
+                      <span
+                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          major
+                            ? theme === "dark"
+                              ? "bg-red-500/20 text-red-200"
+                              : "bg-red-100 text-red-800"
+                            : theme === "dark"
+                              ? "bg-white/10 text-gray-300"
+                              : "bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        {major ? "Major" : "Minor"}
+                      </span>
                       {alert.metadata?.attempt === "retake" && (
                         <span
-                          className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          className={`mt-1 ml-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                             theme === "dark"
                               ? "bg-purple-500/20 text-purple-300"
                               : "bg-purple-100 text-purple-800"
@@ -121,7 +143,8 @@ export default function StudentIntegrityAlertsModal({
                     </p>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

@@ -396,6 +396,39 @@ function TakeAssessmentExperience() {
         let orderedQuestions = uniqueQuestions;
         let resumeSession = null;
 
+        // Server submission always wins — never resume lockdown after submit
+        // (stale local session / back-button / refresh must go to results).
+        const submitted = await hasStudentSubmittedExam(id);
+
+        let excluded = false;
+        try {
+          const { data: exclusionRow } = await supabase
+            .from("exam_student_exclusions")
+            .select("id")
+            .eq("exam_id", id)
+            .eq("student_id", currentStudentId)
+            .maybeSingle();
+          excluded = Boolean(exclusionRow?.id);
+        } catch {
+          excluded = false;
+        }
+
+        if ((submitted || excluded) && !isApprovedRetake) {
+          clearExamSession(id);
+          setAlreadySubmitted(true);
+          setLoading(false);
+          setPhase("done");
+          endLockdown();
+          await exitAssessmentFullscreen();
+          navigate(
+            currentStudentId
+              ? `/student/results/${id}/${currentStudentId}`
+              : `/student/results/${id}`,
+            { replace: true }
+          );
+          return;
+        }
+
         if (saved?.commenced && saved.startedAt) {
           const sessionTotalSeconds = Number(saved.totalSeconds);
           const activeTotalSeconds =
@@ -418,22 +451,7 @@ function TakeAssessmentExperience() {
           }
         }
 
-        // Crash recovery: unfinished local attempt wins over a dead-end "already submitted" page.
-        if (resumeSession) {
-          setAlreadySubmitted(false);
-        } else {
-          const submitted = await hasStudentSubmittedExam(id);
-          if (submitted) {
-            clearExamSession(id);
-            setAlreadySubmitted(true);
-            setLoading(false);
-            setPhase("done");
-            endLockdown();
-            await exitAssessmentFullscreen();
-            navigate(`/student/results/${id}`, { replace: true });
-            return;
-          }
-        }
+        setAlreadySubmitted(false);
 
         setExam(examData);
         setQuestions(orderedQuestions);
@@ -450,9 +468,11 @@ function TakeAssessmentExperience() {
           setTotalSeconds(activeTotalSeconds);
           replaceTimes(session.questionTimes || {});
           setIntegrityStrikes(loadIntegrityStrikes(id));
-          setPhase("active");
+          // Explicit Continue screen — do not auto-lock until the student confirms
+          // (also restores a real user gesture for fullscreen after crash/blackout).
+          setPhase("resume");
           setShowLockdownModal(false);
-          startLockdown(id, examData.title);
+          endLockdown();
         } else {
           const readySeconds = Math.min(
             durationSeconds,
@@ -913,6 +933,9 @@ function TakeAssessmentExperience() {
       pendingSubmitOptionsRef.current = null;
       setAutoSubmitting(false);
       autoSubmittingRef.current = false;
+      // Drop lockdown immediately so post-submit navigation never keeps the banner.
+      endLockdown();
+      void exitAssessmentFullscreen();
 
       const hasEssayQuestions = questions.some(
         (question) => getQuestionFormatType(question, exam.exam_type) === "essay"
@@ -938,14 +961,26 @@ function TakeAssessmentExperience() {
         tone: autoSubmitted ? "danger" : "success",
         title: autoSubmitted ? "Assessment auto-submitted" : undefined,
         message,
-        exitLockdown: autoSubmitted,
+        exitLockdown: true,
       });
     } catch (err) {
       const alreadySubmitted = /already submitted/i.test(err.message || "");
       const networkError = isNetworkIssue(err, err.message);
+
       if (alreadySubmitted) {
         setSubmitBlocked(true);
         clearExamSession(id);
+        endLockdown();
+        void exitAssessmentFullscreen();
+        setResultDialog({
+          tone: "danger",
+          title: "Already submitted",
+          message:
+            "This attempt could not be saved because a submission already exists. Opening your results.",
+          exitLockdown: true,
+          goToResults: true,
+        });
+        return;
       }
 
       if (networkError) {
@@ -961,19 +996,16 @@ function TakeAssessmentExperience() {
 
       setResultDialog({
         tone: "danger",
-        title: alreadySubmitted
-          ? "Already submitted"
-          : "Submission failed",
-        message: alreadySubmitted
-          ? "This attempt could not be saved because a submission already exists. You have been returned to your assessments list."
-          : err.message || "Could not submit your answers. Please try again.",
-        exitLockdown: alreadySubmitted,
+        title: "Submission failed",
+        message: err.message || "Could not submit your answers. Please try again.",
+        exitLockdown: false,
       });
     } finally {
       setSubmitting(false);
     }
   }, [
     answers,
+    endLockdown,
     exam,
     flushCurrentQuestionTime,
     getTimesSnapshot,
@@ -985,29 +1017,37 @@ function TakeAssessmentExperience() {
 
   submitExamRef.current = submitExam;
 
+  const goToResults = useCallback(async () => {
+    const sid = studentId || (await resolveStudentId());
+    endLockdown();
+    await exitAssessmentFullscreen();
+    const target = sid
+      ? `/student/results/${id}/${sid}`
+      : `/student/results/${id}`;
+    navigate(target, { replace: true });
+  }, [endLockdown, id, navigate, studentId]);
+
   const handleSubmissionSuccessComplete = useCallback(async () => {
     setResultDialog(null);
     setSubmitBlocked(true);
-    endLockdown();
-    await exitAssessmentFullscreen();
-    navigate(`/student/results/${id}`, { replace: true });
-  }, [endLockdown, id, navigate]);
+    await goToResults();
+  }, [goToResults]);
 
   const handleResultDialogClose = useCallback(async () => {
     const dialog = resultDialog;
     setResultDialog(null);
 
-    if (dialog?.tone === "success" || dialog?.exitLockdown) {
+    if (dialog?.tone === "success" || dialog?.exitLockdown || dialog?.goToResults) {
       setSubmitBlocked(true);
-      endLockdown();
-      await exitAssessmentFullscreen();
-      if (dialog?.tone === "success") {
-        navigate(`/student/results/${id}`, { replace: true });
+      if (dialog?.tone === "success" || dialog?.goToResults) {
+        await goToResults();
       } else {
-        navigate("/student/assessments");
+        endLockdown();
+        await exitAssessmentFullscreen();
+        navigate("/student/assessments", { replace: true });
       }
     }
-  }, [endLockdown, id, navigate, resultDialog]);
+  }, [endLockdown, goToResults, navigate, resultDialog]);
 
   const buildSubmitConfirmMessage = () => {
     const flagged = flaggedIndices.size;
@@ -1051,6 +1091,10 @@ function TakeAssessmentExperience() {
   }, [isActive, timeLeft, questions.length, submitting, submitBlocked, interactionLocked, submitExam]);
 
   const commenceExam = async () => {
+    // Request fullscreen immediately while still inside the click gesture.
+    // Any await before this can cause browsers to reject fullscreen.
+    const fullscreenOk = await enterAssessmentFullscreen();
+
     let orderedQuestions = questions;
 
     if (exam?.shuffle_questions) {
@@ -1084,7 +1128,22 @@ function TakeAssessmentExperience() {
       Math.min(totalSeconds, secondsUntilEndDatetime(exam?.end_datetime))
     );
     startLockdown(id, exam?.title || "Assessment");
-    await enterAssessmentFullscreen();
+
+    if (!fullscreenOk && !document.fullscreenElement) {
+      // Second attempt right after lockdown UI settles (still tied to begin click).
+      void enterAssessmentFullscreen();
+    }
+  };
+
+  const continueExam = async () => {
+    // Resume after crash / blackout / closed tab — user must click Continue.
+    const fullscreenOk = await enterAssessmentFullscreen();
+    setShowLockdownModal(false);
+    setPhase("active");
+    startLockdown(id, exam?.title || "Assessment");
+    if (!fullscreenOk && !document.fullscreenElement) {
+      void enterAssessmentFullscreen();
+    }
   };
 
   const handleCancelLockdown = () => {
@@ -1269,6 +1328,67 @@ function TakeAssessmentExperience() {
           onConfirm={commenceExam}
           onCancel={handleCancelLockdown}
         />
+      </div>
+    );
+  }
+
+  if (phase === "resume") {
+    const answered = Object.keys(answers || {}).length;
+    return (
+      <div className={shellClass}>
+        <div className="mx-auto max-w-2xl pt-8">
+          <h1
+            className={`text-3xl font-bold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
+            Continue assessment
+          </h1>
+          <p className={`mt-2 text-lg font-semibold ${theme === "dark" ? "text-emerald-300" : "text-teal-800"}`}>
+            {exam.title}
+          </p>
+          <p className={`mt-4 text-sm leading-relaxed ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+            Your previous attempt was saved on this device (browser crash, blackout, closed tab,
+            or connection loss). Your timer is still running. Continue to restore lockdown and
+            fullscreen, then pick up where you left off.
+          </p>
+          <div
+            className={`mt-6 grid gap-3 rounded-2xl border p-4 text-sm sm:grid-cols-3 ${
+              theme === "dark"
+                ? "border-white/10 bg-white/5 text-gray-200"
+                : "border-emerald-200 en-bg-elevated text-gray-800"
+            }`}
+          >
+            <div>
+              <p className="text-xs uppercase tracking-wide opacity-70">Time left</p>
+              <p className="mt-1 font-semibold">{formatTime()}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide opacity-70">Answers saved</p>
+              <p className="mt-1 font-semibold">
+                {answered} / {questions.length}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide opacity-70">Integrity alerts used</p>
+              <p className="mt-1 font-semibold">
+                {integrityStrikes} / {MAX_INTEGRITY_STRIKES}
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => navigate("/student/assessments")}
+              className={secondaryButton(theme)}
+            >
+              Back to assessments
+            </button>
+            <button type="button" onClick={continueExam} className={primaryButton(theme)}>
+              Continue assessment
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

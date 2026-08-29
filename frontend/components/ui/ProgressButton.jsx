@@ -1,21 +1,26 @@
+import { forwardRef } from "react";
 import { Loader2 } from "lucide-react";
 
 /**
  * Button that shows a spinner and blocks repeat clicks while `loading` is true.
  */
-export default function ProgressButton({
-  loading = false,
-  loadingLabel = "Please wait…",
-  iconOnly = false,
-  children,
-  className = "",
-  disabled,
-  type = "button",
-  "aria-label": ariaLabel,
-  ...rest
-}) {
+const ProgressButton = forwardRef(function ProgressButton(
+  {
+    loading = false,
+    loadingLabel = "Please wait…",
+    iconOnly = false,
+    children,
+    className = "",
+    disabled,
+    type = "button",
+    "aria-label": ariaLabel,
+    ...rest
+  },
+  ref
+) {
   return (
     <button
+      ref={ref}
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
@@ -37,4 +42,6 @@ export default function ProgressButton({
       )}
     </button>
   );
-}
+});
+
+export default ProgressButton;

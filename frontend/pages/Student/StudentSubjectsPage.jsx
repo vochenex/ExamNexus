@@ -18,7 +18,6 @@ import ActionDialog from "../../components/ui/ActionDialog";
 import ModalPortal from "../../components/ui/ModalPortal";
 import { formatSectionLabel } from "../../utils/sections";
 import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
-import ExamNexusBrand from "../../components/ExamNexusBrand";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { API_BASE } from "../../utils/apiBase.js";
@@ -313,12 +312,6 @@ export default function StudentSubjects() {
   return (
     <div className={pageShellWithBellClass(theme)}>
       <div className="mx-auto max-w-7xl">
-      <ExamNexusBrand
-        variant="compact"
-        idSuffix="student-subjects"
-        className="mb-5 opacity-90"
-        showTagline={false}
-      />
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold">

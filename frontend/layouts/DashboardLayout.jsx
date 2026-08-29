@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -40,7 +40,8 @@ import { motion } from "../utils/motion";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
-  const { isLockdownActive, lockdown } = useAssessmentLockdown();
+  const location = useLocation();
+  const { isLockdownActive, lockdown, endLockdown } = useAssessmentLockdown();
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
@@ -56,6 +57,14 @@ export default function DashboardLayout() {
 
   const user = sessionUser;
   const isStudent = user.role?.toLowerCase() === "student";
+
+  // Safety net: lockdown chrome only belongs on the live take-assessment screen.
+  useEffect(() => {
+    if (!isLockdownActive) return;
+    if (!location.pathname.startsWith("/student/take-assessment/")) {
+      endLockdown();
+    }
+  }, [endLockdown, isLockdownActive, location.pathname]);
 
   useEffect(() => {
     const verifyAccess = async () => {
