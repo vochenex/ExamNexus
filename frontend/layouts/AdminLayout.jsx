@@ -43,7 +43,7 @@ export default function AdminLayout() {
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
-  const { status: connectionStatus } = useConnectionStatus();
+  const { status: connectionStatus } = useConnectionStatus({ fast: true });
   const nativeApp = isNativeApp();
   const [user, setUser] = useState(() =>
     JSON.parse(localStorage.getItem("examnexus_user") || "{}")

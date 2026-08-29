@@ -113,9 +113,16 @@ export default function useRealtimeFetch(
     run(silent);
     const stop = schedulePoll(() => run(true), intervalMs, REALTIME_POLL_HIDDEN_MS);
 
+    const onOnline = () => {
+      if (cancelled) return;
+      void run(true);
+    };
+    window.addEventListener("online", onOnline);
+
     return () => {
       cancelled = true;
       stop();
+      window.removeEventListener("online", onOnline);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, intervalMs]);
@@ -153,9 +160,16 @@ export function usePolling(loadFn, deps = [], intervalMs = REALTIME_POLL_MS) {
     run(silent);
     const stop = schedulePoll(() => run(true), intervalMs, REALTIME_POLL_HIDDEN_MS);
 
+    const onOnline = () => {
+      if (cancelled) return;
+      void run(true);
+    };
+    window.addEventListener("online", onOnline);
+
     return () => {
       cancelled = true;
       stop();
+      window.removeEventListener("online", onOnline);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, intervalMs]);

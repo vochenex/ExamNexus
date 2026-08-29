@@ -198,8 +198,8 @@ function TakeAssessmentExperience() {
   const showNetworkRecovery =
     networkRecovery ||
     pendingSubmitRetry ||
-    networkErrorActive ||
-    (isActive && connectionDegraded);
+    (networkErrorActive && !exam) ||
+    (isActive && isOffline);
 
   const recoveryDetail = pendingSubmitRetry
     ? "Submitting your answers as soon as the connection is stable…"
@@ -212,38 +212,39 @@ function TakeAssessmentExperience() {
     if (networkErrorActive) {
       setError("");
     }
+    if (phaseRef.current === "loading" && !examRef.current) {
+      setLoading(true);
+      setLoadRetryToken((value) => value + 1);
+    }
   }, [isOnline, networkErrorActive]);
 
   useEffect(() => {
     if (!showNetworkRecovery) return undefined;
 
-    const softRefresh = () => {
-      if (alreadySubmitted) return;
-
+    if (connectionDegraded) {
       void refreshConnection();
-
-      // Active exam offline: keep answers mounted; connection hook probes in background.
-      if (isActive && exam && !networkErrorActive && !networkRecovery) {
-        return;
-      }
-
-      if (!exam || networkErrorActive || networkRecovery) {
-        setError("");
-        setPhase("loading");
-        setLoading(true);
-        setLoadRetryToken((value) => value + 1);
-      }
-    };
-
-    if (!connectionDegraded) {
-      softRefresh();
+      const intervalId = window.setInterval(() => {
+        void refreshConnection();
+      }, 1000);
+      return () => window.clearInterval(intervalId);
     }
 
-    const intervalId = window.setInterval(() => {
-      softRefresh();
-    }, 2000);
+    if (alreadySubmitted) return undefined;
 
-    return () => window.clearInterval(intervalId);
+    void refreshConnection();
+
+    if (isActive && exam && !networkErrorActive && !networkRecovery) {
+      return undefined;
+    }
+
+    if (!exam || networkErrorActive || networkRecovery) {
+      setError("");
+      setPhase("loading");
+      setLoading(true);
+      setLoadRetryToken((value) => value + 1);
+    }
+
+    return undefined;
   }, [
     alreadySubmitted,
     connectionDegraded,
@@ -526,7 +527,6 @@ function TakeAssessmentExperience() {
         if (networkIssue) {
           setNetworkRecovery(true);
           setError("");
-          setPhase("loading");
           return;
         }
 

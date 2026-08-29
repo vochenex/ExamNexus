@@ -50,6 +50,7 @@ export default function DashboardLayout() {
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
   const { status: connectionStatus } = useConnectionStatus({
     enabled: !isLockdownActive,
+    fast: true,
   });
   const nativeApp = isNativeApp();
   const cachedUser = getCachedExamNexusUser();
