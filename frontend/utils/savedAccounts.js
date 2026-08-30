@@ -2,8 +2,8 @@ const ACCOUNTS_KEY = "examnexus_saved_accounts";
 const REMEMBER_KEY = "examnexus_remembered_passwords";
 const PINS_KEY = "examnexus_account_pins";
 const SCHEMA_KEY = "examnexus_saved_accounts_schema";
-/** Bump to force-clear legacy saved accounts that were not PIN-protected. */
-const SCHEMA_VERSION = 4;
+/** Bump to force-clear legacy plaintext remembered passwords. */
+const SCHEMA_VERSION = 5;
 
 export const DEVICE_PIN_LENGTH = 4;
 
@@ -26,9 +26,27 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+function readRememberedPasswords() {
+  const map = readJson(REMEMBER_KEY, {});
+  return map && typeof map === "object" ? map : {};
+}
+
+function writeRememberedPasswords(map) {
+  writeJson(REMEMBER_KEY, map);
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToBytes(hex) {
+  const pairs = String(hex || "").match(/.{1,2}/g) || [];
+  return new Uint8Array(pairs.map((pair) => parseInt(pair, 16)));
+}
+
 /**
- * One-time wipe: older "remember me" entries had no device PIN.
- * Users must opt in again and set a PIN.
+ * One-time wipe: older "remember me" entries had no device PIN or stored
+ * passwords in plaintext. Users must opt in again and set a PIN.
  */
 function migrateSavedAccountsSchema() {
   try {
@@ -57,16 +75,17 @@ export function getSavedAccounts() {
   const list = readJson(ACCOUNTS_KEY, []);
   if (!Array.isArray(list)) return [];
 
-  // Never expose remembered accounts that have no device PIN — those could
-  // unlock with a password fill and skip the PIN gate.
   const pins = readPins();
+  const passwords = readRememberedPasswords();
   const secured = [];
   const droppedEmails = [];
 
   for (const account of list) {
     const email = normalizeEmail(account?.email);
     if (!email) continue;
-    if (pins[email]?.hash && pins[email]?.salt) {
+    const pinEntry = pins[email];
+    const passwordEntry = passwords[email];
+    if (pinEntry?.hash && pinEntry?.salt && passwordEntry?.data && passwordEntry?.iv) {
       secured.push(account);
     } else {
       droppedEmails.push(email);
@@ -75,13 +94,10 @@ export function getSavedAccounts() {
 
   if (droppedEmails.length) {
     writeJson(ACCOUNTS_KEY, secured);
-    const passwords = readJson(REMEMBER_KEY, {});
     for (const email of droppedEmails) {
-      delete passwords[email];
-      delete pins[email];
+      clearRememberedPassword(email);
+      clearAccountPin(email);
     }
-    writeJson(REMEMBER_KEY, passwords);
-    writePins(pins);
   }
 
   return secured;
@@ -154,9 +170,38 @@ async function hashPin(pin, salt) {
   ).join("");
 }
 
+async function deriveKeyFromPin(pin, salt) {
+  const enc = new TextEncoder();
+  const digits = String(pin || "").replace(/\D/g, "");
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(`${salt}:${digits}`),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode(salt),
+      iterations: 120000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
 export function hasAccountPin(email) {
   const entry = readPins()[normalizeEmail(email)];
   return Boolean(entry?.hash && entry?.salt);
+}
+
+export function hasRememberedPassword(email) {
+  const entry = readRememberedPasswords()[normalizeEmail(email)];
+  return Boolean(entry?.data && entry?.iv && entry?.salt);
 }
 
 export async function setAccountPin(email, pin) {
@@ -208,23 +253,58 @@ export function removeSavedAccount(email) {
   );
   writeJson(ACCOUNTS_KEY, next);
   clearAccountPin(normalizedEmail);
+  clearRememberedPassword(normalizedEmail);
   return { accounts: next, removed };
 }
 
-export function getRememberedPassword(email) {
+export async function encryptRememberedPassword(email, password, pin) {
   const normalizedEmail = normalizeEmail(email);
-  const map = readJson(REMEMBER_KEY, {});
-  return map[normalizedEmail] || "";
+  const value = String(password || "");
+  if (!normalizedEmail || !value) {
+    throw new Error("Email and password are required to save credentials.");
+  }
+
+  const salt = randomSalt();
+  const key = await deriveKeyFromPin(pin, salt);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(value)
+  );
+
+  const map = readRememberedPasswords();
+  map[normalizedEmail] = {
+    salt,
+    iv: bytesToHex(iv),
+    data: bytesToHex(new Uint8Array(cipher)),
+    updatedAt: new Date().toISOString(),
+  };
+  writeRememberedPasswords(map);
 }
 
-export function setRememberedPassword(email, password, remember) {
+export async function decryptRememberedPassword(email, pin) {
   const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) return;
-  const map = readJson(REMEMBER_KEY, {});
-  if (remember && password) {
-    map[normalizedEmail] = password;
-  } else {
-    delete map[normalizedEmail];
+  const entry = readRememberedPasswords()[normalizedEmail];
+  if (!entry?.data || !entry?.iv || !entry?.salt) return "";
+
+  try {
+    const key = await deriveKeyFromPin(pin, entry.salt);
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: hexToBytes(entry.iv) },
+      key,
+      hexToBytes(entry.data)
+    );
+    return new TextDecoder().decode(plain);
+  } catch {
+    return "";
   }
-  writeJson(REMEMBER_KEY, map);
+}
+
+export function clearRememberedPassword(email) {
+  const normalizedEmail = normalizeEmail(email);
+  const map = readRememberedPasswords();
+  if (!map[normalizedEmail]) return;
+  delete map[normalizedEmail];
+  writeRememberedPasswords(map);
 }

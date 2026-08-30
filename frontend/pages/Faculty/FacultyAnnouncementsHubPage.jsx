@@ -135,7 +135,9 @@ export default function FacultyAnnouncementsHub() {
       setTargetSections([...announcementSections]);
       setSelectedSubjectIds([]);
       setSuccess(
-        `Announcement posted to ${count} subject${count === 1 ? "" : "s"}. Students will see it in notifications.`
+        scope === "all"
+          ? `Announcement published to all subjects (${count} class${count === 1 ? "" : "es"}).`
+          : `Announcement published to ${count} selected subject${count === 1 ? "" : "s"}.`
       );
 
       if (createdRows.length) {
@@ -152,7 +154,7 @@ export default function FacultyAnnouncementsHub() {
         });
       }
 
-      await load(true);
+      void load(true);
     } catch (err) {
       setError(err.message || "Failed to post announcement.");
     } finally {
@@ -174,9 +176,20 @@ export default function FacultyAnnouncementsHub() {
         subtitle="Notify students across all subjects, one subject, or specific sections."
       />
 
+      {success && (
+        <AlertBanner
+          variant="success"
+          inline
+          autoDismissMs={5000}
+          onDismiss={() => setSuccess("")}
+          className="px-4 py-2.5 text-sm"
+        >
+          {success}
+        </AlertBanner>
+      )}
+
       <form onSubmit={handlePost} className={`${panelClass(theme)} mb-6 space-y-4`}>
-        {error && <AlertBanner variant="error">{error}</AlertBanner>}
-        {success && <AlertBanner variant="success">{success}</AlertBanner>}
+        {error && <AlertBanner variant="error" inline className="px-4 py-2.5 text-sm">{error}</AlertBanner>}
 
         <div>
           <label

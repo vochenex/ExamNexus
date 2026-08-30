@@ -21,16 +21,24 @@ import {
   adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
+import AlertBanner from "../../components/ui/AlertBanner";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { primaryButton } from "../../utils/themeButtons";
 
+function formatAdminPublishBanner(audience) {
+  if (audience === "faculty") return "Announcement published to faculty.";
+  if (audience === "students") return "Announcement published to students.";
+  return "Announcement published to students & faculty.";
+}
+
 export default function AdminAnnouncements() {
   const { theme } = useTheme();
-  const { success, error, confirm } = useAppModal();
+  const { error, confirm } = useAppModal();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [publishBanner, setPublishBanner] = useState("");
   const [form, setForm] = useState({ title: "", body: "", audience: "all" });
 
   const load = useCallback(async (silent = false) => {
@@ -58,10 +66,12 @@ export default function AdminAnnouncements() {
     }
     try {
       setSaving(true);
+      setPublishBanner("");
+      const audience = form.audience;
       await createAdminBroadcast(form);
-      await success("Announcement published.");
       setForm({ title: "", body: "", audience: "all" });
-      await load(true);
+      setPublishBanner(formatAdminPublishBanner(audience));
+      void load(true);
     } catch (err) {
       error(err.message || "Failed to publish announcement.");
     } finally {
@@ -80,7 +90,7 @@ export default function AdminAnnouncements() {
     if (!ok) return;
     try {
       await deleteAdminBroadcast(row.id);
-      await success("Announcement deleted.");
+      setPublishBanner("");
       await load(true);
     } catch (err) {
       error(err.message || "Could not delete announcement.");
@@ -100,6 +110,18 @@ export default function AdminAnnouncements() {
 
       {loadError && (
         <AdminPageError theme={theme} message={loadError} onRetry={() => load()} />
+      )}
+
+      {publishBanner && (
+        <AlertBanner
+          variant="success"
+          inline
+          autoDismissMs={5000}
+          onDismiss={() => setPublishBanner("")}
+          className="px-4 py-2.5 text-sm"
+        >
+          {publishBanner}
+        </AlertBanner>
       )}
 
       <form onSubmit={handleSubmit} className={`${panelClass(theme)} mb-6 space-y-4`}>

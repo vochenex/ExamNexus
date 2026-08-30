@@ -57,12 +57,14 @@ import { useAppModal } from "../../contexts/AppModalContext";
 import useMobileNav from "../../hooks/useMobileNav";
 import { isNativeApp } from "../../utils/platform";
 import {
-  getRememberedPassword,
+  clearRememberedPassword,
+  decryptRememberedPassword,
+  encryptRememberedPassword,
   getSavedAccounts,
   hasAccountPin,
+  hasRememberedPassword,
   removeSavedAccount,
   setAccountPin,
-  setRememberedPassword,
   upsertSavedAccount,
   verifyAccountPin,
 } from "../../utils/savedAccounts";
@@ -107,6 +109,11 @@ export default function ExamNexusAuth() {
   const forgotResultRef = useRef(null);
   const feedbackRef = useRef(null);
   const draftPinRef = useRef("");
+
+  useEffect(() => {
+    setForm((current) => ({ ...current, password: "" }));
+    setShowPassword(false);
+  }, []);
 
   useEffect(() => {
     if (!resetStatusResult && !successMessage && !serverError && !pendingReviewMessage) {
@@ -629,6 +636,7 @@ function getAuthInputProps(theme) {
     pin,
   }) => {
     await setAccountPin(email, pin);
+    await encryptRememberedPassword(email, password, pin);
     upsertSavedAccount({
       email,
       role: profile.role,
@@ -637,7 +645,6 @@ function getAuthInputProps(theme) {
       avatar_url: profile.avatar_url,
       user_id: profile.id || userId,
     });
-    setRememberedPassword(email, password, true);
     setSavedAccounts(getSavedAccounts());
   };
 
@@ -714,7 +721,8 @@ function getAuthInputProps(theme) {
           return false;
         }
 
-        const password = pinSession.password || getRememberedPassword(pinSession.email);
+        const password =
+          pinSession.password || (await decryptRememberedPassword(pinSession.email, pin));
         if (!password) {
           setPinError("Saved credentials are missing. Sign in with your password.");
           setPinBusy(false);
@@ -787,7 +795,7 @@ function getAuthInputProps(theme) {
           avatar_url: profile.avatar_url,
           user_id: profile.id || data.user.id,
         });
-        setRememberedPassword(unlockEmail, password, true);
+        await encryptRememberedPassword(unlockEmail, password, pin);
         setSavedAccounts(getSavedAccounts());
         finishAuthenticatedSession(profile);
         return true;
@@ -912,7 +920,7 @@ function getAuthInputProps(theme) {
       localStorage.setItem("examnexus_user", JSON.stringify(profile));
 
       const { removed } = removeSavedAccount(form.email);
-      setRememberedPassword(form.email, form.password, false);
+      clearRememberedPassword(form.email);
       if (removed?.user_id) {
         import("../../utils/pushNotifications")
           .then(({ removePushBindingForSavedAccount }) =>
@@ -1526,13 +1534,12 @@ function getAuthInputProps(theme) {
                                     const email = String(account.email || "")
                                       .trim()
                                       .toLowerCase();
-                                    const rememberedPassword = getRememberedPassword(email);
-                                    if (!rememberedPassword || !hasAccountPin(email)) {
+                                    if (!hasRememberedPassword(email) || !hasAccountPin(email)) {
                                       // Remove insecure / incomplete saves so they cannot
                                       // silently fill passwords and skip the PIN gate.
                                       const { accounts } = removeSavedAccount(email);
                                       setSavedAccounts(accounts);
-                                      setRememberedPassword(email, "", false);
+                                      clearRememberedPassword(email);
                                       setServerError(
                                         "That saved account had no device PIN, so it was removed. Sign in with your password and turn on Remember me to set a PIN."
                                       );
@@ -1552,7 +1559,6 @@ function getAuthInputProps(theme) {
                                       stage: "unlock",
                                       email,
                                       label,
-                                      password: rememberedPassword,
                                     });
                                     setSavedOpen(false);
                                   }}
@@ -1579,7 +1585,7 @@ function getAuthInputProps(theme) {
                                       account.email
                                     );
                                     setSavedAccounts(accounts);
-                                    setRememberedPassword(account.email, "", false);
+                                    clearRememberedPassword(account.email);
                                     if (removed?.user_id) {
                                       import("../../utils/pushNotifications")
                                         .then(({ removePushBindingForSavedAccount }) =>
@@ -1656,7 +1662,16 @@ function getAuthInputProps(theme) {
                         name="password"
                         value={form.password}
                         onChange={handleChange}
-                        autoComplete={isLogin ? "current-password" : "new-password"}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        readOnly
+                        onFocus={(event) => {
+                          event.target.readOnly = false;
+                        }}
                         placeholder={isLogin ? "Enter your password" : "Create a password"}
                         {...authInputProps}
                         className={`${authInputProps.className} pr-12`}
@@ -1686,7 +1701,7 @@ function getAuthInputProps(theme) {
                             if (!checked && form.email) {
                               const { accounts, removed } = removeSavedAccount(form.email);
                               setSavedAccounts(accounts);
-                              setRememberedPassword(form.email, "", false);
+                              clearRememberedPassword(form.email);
                               if (removed?.user_id) {
                                 import("../../utils/pushNotifications")
                                   .then(({ removePushBindingForSavedAccount }) =>

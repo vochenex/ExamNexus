@@ -82,37 +82,6 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
     if (!stillVisible) setSelectedExamId("");
   }, [filteredAssessments, selectedExamId]);
 
-  const exportAssessments = async () => {
-    try {
-      setExporting("assessments");
-      const rows = await fetchFacultyExportAssessments(teacherSchoolId);
-      if (!rows.length) {
-        warning("No assessments to export.");
-        return;
-      }
-      const result = await downloadCsv("examnexus-my-assessments.csv", rows, [
-        { key: "assessment_id", label: "Assessment ID" },
-        { key: "title", label: "Title" },
-        { key: "type", label: "Type" },
-        { key: "subject", label: "Subject" },
-        { key: "start", label: "Start" },
-        { key: "end", label: "End" },
-        { key: "submissions", label: "Submissions" },
-      ]);
-      await finishExport(
-        result,
-        success,
-        warning,
-        "Export ready — you chose where to save the assessments CSV.",
-        "Assessments CSV saved to your downloads."
-      );
-    } catch (err) {
-      error(err.message || "Export failed.");
-    } finally {
-      setExporting("");
-    }
-  };
-
   const exportAssessmentReport = async (examId) => {
     if (!examId) {
       warning("Select a specific assessment first.");
@@ -138,23 +107,33 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
     }
   };
 
-  const exportResultsCsv = async (examId = null) => {
-    const exportKey = examId ? `results-${examId}` : "all-results";
+  const exportResultsCsv = async (examId = null, subjectId = null) => {
+    const exportKey = examId
+      ? `results-${examId}`
+      : subjectId
+        ? `subject-results-${subjectId}`
+        : "all-results";
     try {
       setExporting(exportKey);
       const rows = await fetchFacultyExportResults(teacherSchoolId, examId || null);
-      if (!rows.length) {
-        warning("No results to export.");
+      const subjectLabel = subjectOptions.find((option) => option.value === subjectId)?.label;
+      const scopedRows = subjectLabel
+        ? rows.filter((row) => row.subject === subjectLabel)
+        : rows;
+      if (!scopedRows.length) {
+        warning(subjectLabel ? "No results for that subject." : "No results to export.");
         return;
       }
-      const sortedRows = [...rows].sort((a, b) =>
+      const sortedRows = [...scopedRows].sort((a, b) =>
         String(a.student_name || "").localeCompare(String(b.student_name || ""), undefined, {
           sensitivity: "base",
         })
       );
       const filename = examId
         ? `examnexus-results-${examId}.csv`
-        : "examnexus-my-results.csv";
+        : subjectLabel
+          ? `examnexus-results-${slugifyFilename(subjectLabel)}.csv`
+          : "examnexus-my-results.csv";
       const result = await downloadCsv(filename, sortedRows, [
         { key: "exam_title", label: "Assessment" },
         { key: "subject", label: "Subject" },
@@ -180,6 +159,10 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
     }
   };
 
+  const bulkResultsExportKey = selectedSubject
+    ? `subject-results-${selectedSubject}`
+    : "all-results";
+
   return (
     <CollapsiblePanel
       title="Export data"
@@ -192,29 +175,10 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
         </p>
 
         <div className={`min-w-0 overflow-hidden rounded-xl border p-4 ${theme === "dark" ? "border-white/10 bg-white/[0.02]" : "border-emerald-100 bg-white/70"}`}>
-          <h3 className="font-semibold">Your assessments list</h3>
-          <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-            CSV of all assessments across your subjects.
-          </p>
-          <ProgressButton
-            type="button"
-            onClick={exportAssessments}
-            loading={exporting === "assessments"}
-            loadingLabel="Exporting assessments"
-            disabled={Boolean(exporting) && exporting !== "assessments"}
-            className={iconButton(theme, "primary", "mt-3 gap-2 px-3")}
-            aria-label="Export assessments CSV"
-            title="Export assessments CSV"
-          >
-            <Download size={18} />
-            <span className="text-sm font-semibold">Export assessments CSV</span>
-          </ProgressButton>
-        </div>
-
-        <div className={`min-w-0 overflow-hidden rounded-xl border p-4 ${theme === "dark" ? "border-white/10 bg-white/[0.02]" : "border-emerald-100 bg-white/70"}`}>
           <h3 className="font-semibold">Assessment report / results</h3>
           <p className={`mt-1 text-sm break-words ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
             Filter by subject, then pick an assessment for a full HTML report or results CSV.
+            Export results for one assessment, for every assessment in a subject, or across all subjects.
           </p>
           {loading && assessments.length === 0 ? (
             <div className="mt-3">
@@ -303,16 +267,20 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
             </ProgressButton>
             <ProgressButton
               type="button"
-              onClick={() => exportResultsCsv(null)}
-              loading={exporting === "all-results"}
-              loadingLabel="Exporting all results"
-              disabled={Boolean(exporting) && exporting !== "all-results"}
+              onClick={() => exportResultsCsv(null, selectedSubject || null)}
+              loading={exporting === bulkResultsExportKey}
+              loadingLabel="Exporting results"
+              disabled={Boolean(exporting) && exporting !== bulkResultsExportKey}
               className={iconButton(theme, "secondary", "gap-2 px-3")}
-              aria-label="Export all my results CSV"
-              title="Export all results CSV"
+              aria-label={
+                selectedSubject ? "Export all results for subject CSV" : "Export all results CSV"
+              }
+              title={selectedSubject ? "Export all results for subject" : "Export all results CSV"}
             >
               <FileSpreadsheet size={18} />
-              <span className="text-sm font-semibold">Export all results</span>
+              <span className="text-sm font-semibold">
+                {selectedSubject ? "Export all subject results" : "Export all results"}
+              </span>
             </ProgressButton>
           </div>
         </div>

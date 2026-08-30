@@ -9,6 +9,7 @@ export default function AlertBanner({
   scrollIntoView = true,
   autoDismissMs = 0,
   onDismiss,
+  inline = false,
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -45,7 +46,7 @@ export default function AlertBanner({
     <div
       ref={ref}
       role="status"
-      className={`mb-4 rounded-xl border px-5 py-4 text-base font-semibold leading-snug ${styles[variant] || styles.error} ${className}`}
+      className={`${inline ? "inline-flex w-fit max-w-full" : ""} mb-4 rounded-xl border px-5 py-4 text-base font-semibold leading-snug ${styles[variant] || styles.error} ${className}`}
     >
       {children}
     </div>
