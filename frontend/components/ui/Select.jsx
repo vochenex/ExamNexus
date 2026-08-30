@@ -1,8 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { selectChevronClass, selectClass } from "../../utils/themeInputs";
+
+const MENU_MAX_HEIGHT = 240;
+const MENU_GAP = 6;
 
 function optionLabelFromChildren(children) {
   if (children == null || typeof children === "boolean") return "";
@@ -50,7 +54,7 @@ function readOptions(children) {
 }
 
 /**
- * Themed inline dropdown (visible in light/dark) — no full-screen popup modal.
+ * Themed dropdown — menu is portaled so it is not clipped by overflow containers.
  */
 export default function Select({
   id,
@@ -68,14 +72,54 @@ export default function Select({
   const listId = useId();
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
+  const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
   const options = useMemo(() => readOptions(children), [children]);
   const selected = options.find((option) => option.value === String(value ?? ""));
   const label = selected?.label || "Select…";
 
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP;
+    const spaceAbove = rect.top - MENU_GAP;
+    const openUpward = spaceBelow < 120 && spaceAbove > spaceBelow;
+    const available = openUpward ? spaceAbove - MENU_GAP : spaceBelow - MENU_GAP;
+    const maxHeight = Math.max(120, Math.min(MENU_MAX_HEIGHT, available));
+
+    setMenuStyle({
+      position: "fixed",
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+      zIndex: 9999,
+      ...(openUpward
+        ? { bottom: window.innerHeight - rect.top + MENU_GAP }
+        : { top: rect.bottom + MENU_GAP }),
+    });
+  }, []);
+
   useEffect(() => {
     setOpen(false);
   }, [location.pathname]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -84,9 +128,9 @@ export default function Select({
       if (event.key === "Escape") setOpen(false);
     };
     const onPointer = (event) => {
-      if (!rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
+      const target = event.target;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
 
     window.addEventListener("keydown", onKey);
@@ -112,6 +156,55 @@ export default function Select({
     setOpen(false);
     triggerRef.current?.focus();
   };
+
+  const menu =
+    open && menuStyle && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role="listbox"
+            id={listId}
+            aria-labelledby={id}
+            style={menuStyle}
+            className={`en-select-dropdown overflow-y-auto overscroll-contain rounded-xl border py-1 shadow-xl ${
+              theme === "dark"
+                ? "border-emerald-500/25 bg-[#0a1614]"
+                : "border-emerald-200 bg-white"
+            }`}
+          >
+            {options.map((option) => {
+              const isSelected = option.value === String(value ?? "");
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  disabled={option.disabled}
+                  onClick={() => {
+                    if (!option.disabled) pick(option.value);
+                  }}
+                  className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm transition ${
+                    option.disabled
+                      ? "cursor-not-allowed opacity-40"
+                      : isSelected
+                        ? theme === "dark"
+                          ? "bg-emerald-500/20 text-emerald-200"
+                          : "bg-emerald-50 text-teal-800"
+                        : theme === "dark"
+                          ? "text-gray-200 hover:bg-white/10"
+                          : "text-gray-800 hover:bg-emerald-50"
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                  {isSelected ? <Check size={16} className="shrink-0" /> : null}
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div ref={rootRef} className="relative w-full min-w-0">
@@ -144,49 +237,7 @@ export default function Select({
           } ${selectChevronClass(theme)}`}
         />
       </button>
-
-      {open && (
-        <div
-          role="listbox"
-          id={listId}
-          aria-labelledby={id}
-          className={`en-select-dropdown absolute left-0 right-0 top-[calc(100%+0.35rem)] z-[80] max-h-60 overflow-y-auto rounded-xl border py-1 shadow-xl ${
-            theme === "dark"
-              ? "border-emerald-500/25 bg-[#0a1614]"
-              : "border-emerald-200 bg-white"
-          }`}
-        >
-          {options.map((option) => {
-            const isSelected = option.value === String(value ?? "");
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                disabled={option.disabled}
-                onClick={() => {
-                  if (!option.disabled) pick(option.value);
-                }}
-                className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm transition ${
-                  option.disabled
-                    ? "cursor-not-allowed opacity-40"
-                    : isSelected
-                      ? theme === "dark"
-                        ? "bg-emerald-500/20 text-emerald-200"
-                        : "bg-emerald-50 text-teal-800"
-                      : theme === "dark"
-                        ? "text-gray-200 hover:bg-white/10"
-                        : "text-gray-800 hover:bg-emerald-50"
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                {isSelected ? <Check size={16} className="shrink-0" /> : null}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {menu}
     </div>
   );
 }

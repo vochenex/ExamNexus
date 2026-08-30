@@ -1,7 +1,7 @@
 import { panelClass } from "../../utils/themeInputs";
 
 export function adminTableWrapClass(theme) {
-  return `${panelClass(theme, "min-w-0 max-w-full overflow-x-auto p-0")} en-table-scroll`;
+  return `${panelClass(theme, "min-w-0 max-w-full overflow-x-auto overflow-y-visible p-0")} en-table-scroll`;
 }
 
 export function adminTableClass(theme) {

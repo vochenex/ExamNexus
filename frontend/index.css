@@ -493,6 +493,12 @@ html:not(.light) .en-tabbar-label--active {
   max-width: 100%;
 }
 
+.en-select-dropdown {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
 :is(html.en-native-app, html.en-mobile-shell) .en-table-scroll,
 :is(html.en-native-app, html.en-mobile-shell) .en-inner-scroll {
   overflow-x: auto !important;

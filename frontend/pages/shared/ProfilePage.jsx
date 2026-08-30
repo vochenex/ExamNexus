@@ -517,7 +517,7 @@ export default function Profile() {
 
   return (
     <div
-      className={`en-profile-page min-h-screen w-full max-w-full min-w-0 overflow-x-hidden p-3 sm:p-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+      className={`en-profile-page w-full max-w-full min-w-0 overflow-x-hidden p-3 sm:p-5 ${
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
@@ -637,8 +637,8 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="grid min-w-0 grid-cols-1 items-start gap-4 overflow-x-hidden xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-5">
-        <div className={`${cardClass(theme)} min-w-0 max-w-full overflow-visible p-3.5 sm:p-5`}>
+      <div className="flex min-w-0 flex-col gap-5">
+        <div className={`${cardClass(theme)} min-w-0 max-w-full p-3.5 sm:p-5`}>
           <div className="mb-5 flex min-w-0 flex-col gap-4 overflow-visible border-b pb-5 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:pb-6 border-inherit">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
               <div className="shrink-0 overflow-visible p-0.5">
@@ -763,7 +763,7 @@ export default function Profile() {
             </div>
           )}
 
-          <div className="mx-auto w-full max-w-3xl">
+          <div className="w-full">
           <div className="mb-2 flex min-h-[1.75rem] items-center justify-between gap-3">
             <h3
               className={`text-lg font-semibold ${
@@ -1038,7 +1038,7 @@ export default function Profile() {
           </div>
 
           {editing && (
-            <div className="mx-auto mt-6 flex w-full max-w-3xl justify-end">
+            <div className="mt-6 flex w-full justify-end">
               <ProgressButton
                 type="button"
                 onClick={() => handleSave(editProfile)}
@@ -1052,8 +1052,8 @@ export default function Profile() {
           )}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-6">
-          <div className={`${cardClass(theme)} p-3.5 sm:p-4`}>
+        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
+          <div className={`${cardClass(theme)} p-3.5 sm:p-5`}>
             <form onSubmit={handleChangePassword}>
               <div className="mb-3 flex items-center gap-2">
                 <Lock
@@ -1147,14 +1147,14 @@ export default function Profile() {
               <button
                 type="submit"
                 disabled={passwordStatus === "saving"}
-                className={`mt-4 w-full ${primaryButton(theme, "px-4 py-2.5 text-sm")}`}
+                className={`mt-4 w-full sm:w-auto ${primaryButton(theme, "px-4 py-2.5 text-sm")}`}
               >
                 {passwordStatus === "saving" ? "Updating..." : "Update password"}
               </button>
             </form>
           </div>
 
-          <div className={cardClass(theme)}>
+          <div className={`${cardClass(theme)} p-3.5 sm:p-5`}>
             <div className="mb-4 flex items-center gap-2">
               <BadgeCheck
                 size={18}
@@ -1165,7 +1165,7 @@ export default function Profile() {
                   theme === "dark" ? "text-emerald-400" : "text-teal-700"
                 }`}
               >
-                Account overview
+                Account & shortcuts
               </h3>
             </div>
 
@@ -1205,24 +1205,28 @@ export default function Profile() {
                 </div>
               )}
             </dl>
-          </div>
 
-          <div className={cardClass(theme)}>
-            <div className="mb-4 flex items-center gap-2">
+            <div
+              className={`my-5 border-t ${
+                theme === "dark" ? "border-white/10" : "border-emerald-100"
+              }`}
+            />
+
+            <div className="mb-3 flex items-center gap-2">
               <Compass
-                size={18}
+                size={16}
                 className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
               />
-              <h3
-                className={`text-base font-semibold ${
+              <h4
+                className={`text-sm font-semibold ${
                   theme === "dark" ? "text-emerald-400" : "text-teal-700"
                 }`}
               >
                 Quick links
-              </h3>
+              </h4>
             </div>
 
-            <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {isAdmin ? (
                 <>
                   <QuickLink
@@ -1270,42 +1274,46 @@ export default function Profile() {
                 </>
               )}
             </div>
-          </div>
 
-          <div className={cardClass(theme)}>
-            <div className="mb-3 flex items-center gap-2">
-              <Shield
-                size={18}
-                className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
-              />
-              <h3
-                className={`text-base font-semibold ${
-                  theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                }`}
-              >
-                Security tips
-              </h3>
-            </div>
-            <ul
-              className={`space-y-2.5 text-sm leading-relaxed ${
-                theme === "dark" ? "text-gray-400" : "text-gray-600"
+            <div
+              className={`mt-5 border-t pt-4 ${
+                theme === "dark" ? "border-white/10" : "border-emerald-100"
               }`}
             >
-              <li className="flex gap-2">
-                <Mail size={14} className="mt-0.5 shrink-0 opacity-70" />
-                Use a unique password you do not reuse on other sites.
-              </li>
-              <li className="flex gap-2">
-                <Lock size={14} className="mt-0.5 shrink-0 opacity-70" />
-                Update your password if you signed in on a shared device.
-              </li>
-              <li className="flex gap-2">
-                <BadgeCheck size={14} className="mt-0.5 shrink-0 opacity-70" />
-                Keep your profile details accurate for class enrollment.
-              </li>
-            </ul>
+              <div className="mb-2 flex items-center gap-2">
+                <Shield
+                  size={16}
+                  className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
+                />
+                <h4
+                  className={`text-sm font-semibold ${
+                    theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                  }`}
+                >
+                  Security tips
+                </h4>
+              </div>
+              <ul
+                className={`space-y-2 text-sm leading-relaxed ${
+                  theme === "dark" ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                <li className="flex gap-2">
+                  <Mail size={14} className="mt-0.5 shrink-0 opacity-70" />
+                  Use a unique password you do not reuse on other sites.
+                </li>
+                <li className="flex gap-2">
+                  <Lock size={14} className="mt-0.5 shrink-0 opacity-70" />
+                  Update your password if you signed in on a shared device.
+                </li>
+                <li className="flex gap-2">
+                  <BadgeCheck size={14} className="mt-0.5 shrink-0 opacity-70" />
+                  Keep your profile details accurate for class enrollment.
+                </li>
+              </ul>
+            </div>
           </div>
-        </aside>
+        </div>
       </div>
     </div>
   );
