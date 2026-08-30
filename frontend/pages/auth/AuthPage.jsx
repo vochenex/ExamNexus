@@ -26,6 +26,7 @@ import {
   clearPasswordResetTemporaryPassword,
   submitPasswordResetRequest,
   updatePasswordResetRequest,
+  verifyPasswordResetAccount,
 } from "../../utils/passwordReset";
 import {
   buildCrmcEmail,
@@ -480,6 +481,15 @@ function getAuthInputProps(theme) {
       const message = form.resetMessage.trim();
 
       if (forgotMode === "update") {
+        const verification = await verifyPasswordResetAccount({ email, schoolId });
+        if (!verification?.found) {
+          setServerError(
+            verification?.message ||
+              "No account matches this email and school ID. Check both fields and try again."
+          );
+          return;
+        }
+
         // Update pending message when provided, then always check status for reveal.
         if (message) {
           const updateResult = await updatePasswordResetRequest({
@@ -505,11 +515,36 @@ function getAuthInputProps(theme) {
         return;
       }
 
+      const verification = await verifyPasswordResetAccount({ email, schoolId });
+      if (!verification?.found) {
+        setServerError(
+          verification?.message ||
+            "No account matches this email and school ID. Check both fields and try again."
+        );
+        return;
+      }
+
+      if (verification?.has_pending) {
+        setSuccessMessage(
+          verification.message ||
+            "You already have a pending password reset request. An administrator will contact you soon."
+        );
+        return;
+      }
+
       const result = await submitPasswordResetRequest({
         email,
         schoolId,
         message,
       });
+
+      if (result?.success === false) {
+        setServerError(
+          result.message ||
+            "No account matches this email and school ID. Check both fields and try again."
+        );
+        return;
+      }
 
       setSuccessMessage(
         result.message ||

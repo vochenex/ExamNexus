@@ -5,8 +5,11 @@ const DEFAULT_SILENT_PING_MS = 6000;
 const DEFAULT_PING_TIMEOUT_MS = 2500;
 const FAST_SILENT_PING_MS = 1500;
 const FAST_PING_TIMEOUT_MS = 1500;
+const SENSITIVE_SILENT_PING_MS = 500;
+const SENSITIVE_PING_TIMEOUT_MS = 900;
 const UNSTABLE_FAIL_THRESHOLD = 2;
 const ONLINE_GRACE_MS = 3000;
+const SENSITIVE_ONLINE_GRACE_MS = 800;
 const RECOVERY_BURST_DELAYS_MS = [0, 250, 600, 1100, 1800, 2800];
 
 function browserOffline() {
@@ -21,11 +24,12 @@ function inOnlineGracePeriod(untilMs) {
  * Tracks online / offline / unstable connection with silent health pings.
  * Does not block UI — banners only.
  *
- * @param {{ enabled?: boolean, fast?: boolean, pingIntervalMs?: number, pingTimeoutMs?: number }} [options]
+ * @param {{ enabled?: boolean, fast?: boolean, sensitive?: boolean, pingIntervalMs?: number, pingTimeoutMs?: number }} [options]
  */
 export default function useConnectionStatus({
   enabled = true,
   fast = false,
+  sensitive = false,
   pingIntervalMs,
   pingTimeoutMs,
 } = {}) {
@@ -38,9 +42,12 @@ export default function useConnectionStatus({
   const burstTimerIdsRef = useRef([]);
 
   const intervalMs =
-    pingIntervalMs ?? (fast ? FAST_SILENT_PING_MS : DEFAULT_SILENT_PING_MS);
+    pingIntervalMs ??
+    (sensitive ? SENSITIVE_SILENT_PING_MS : fast ? FAST_SILENT_PING_MS : DEFAULT_SILENT_PING_MS);
   const timeoutMs =
-    pingTimeoutMs ?? (fast ? FAST_PING_TIMEOUT_MS : DEFAULT_PING_TIMEOUT_MS);
+    pingTimeoutMs ??
+    (sensitive ? SENSITIVE_PING_TIMEOUT_MS : fast ? FAST_PING_TIMEOUT_MS : DEFAULT_PING_TIMEOUT_MS);
+  const failThreshold = sensitive ? 1 : UNSTABLE_FAIL_THRESHOLD;
 
   const applyStatus = useCallback((next) => {
     if (!mountedRef.current) return;
@@ -88,17 +95,17 @@ export default function useConnectionStatus({
 
       if (
         inOnlineGracePeriod(onlineGraceUntilRef.current) ||
-        failStreakRef.current < UNSTABLE_FAIL_THRESHOLD
+        failStreakRef.current < failThreshold
       ) {
         applyStatus("online");
         return;
       }
 
-      applyStatus("unstable");
+      applyStatus(sensitive ? "offline" : "unstable");
     } finally {
       window.clearTimeout(timer);
     }
-  }, [applyStatus, enabled, timeoutMs]);
+  }, [applyStatus, enabled, failThreshold, sensitive, timeoutMs]);
 
   const scheduleRecoveryBurst = useCallback(() => {
     clearRecoveryBurst();
@@ -116,7 +123,8 @@ export default function useConnectionStatus({
 
     const onOnline = () => {
       failStreakRef.current = 0;
-      onlineGraceUntilRef.current = Date.now() + ONLINE_GRACE_MS;
+      onlineGraceUntilRef.current =
+        Date.now() + (sensitive ? SENSITIVE_ONLINE_GRACE_MS : ONLINE_GRACE_MS);
       applyStatus("online");
       scheduleRecoveryBurst();
     };
@@ -153,6 +161,7 @@ export default function useConnectionStatus({
     enabled,
     intervalMs,
     scheduleRecoveryBurst,
+    sensitive,
     silentPing,
   ]);
 

@@ -185,21 +185,29 @@ function TakeAssessmentExperience() {
   const lastLoadRetryRef = useRef(loadRetryToken);
   const retakeEntryClearedRef = useRef(false);
   const replaceTimesRef = useRef(null);
+  const connectionDegradedRef = useRef(false);
+  const examConnectionSensitive =
+    phase === "active" ||
+    phase === "resume" ||
+    phase === "ready" ||
+    phase === "loading";
   const { isOffline, isUnstable, isOnline, refresh: refreshConnection } = useConnectionStatus({
     enabled: true,
-    fast: true,
+    sensitive: examConnectionSensitive,
+    fast: !examConnectionSensitive,
   });
 
   const isActive = phase === "active";
   const interactionLocked =
     submitting || confirmSubmitOpen || Boolean(resultDialog) || autoSubmitting;
   const connectionDegraded = isOffline || isUnstable;
+  connectionDegradedRef.current = connectionDegraded;
   const networkErrorActive = Boolean(error) && isNetworkIssue(null, error);
   const showNetworkRecovery =
     networkRecovery ||
     pendingSubmitRetry ||
     (networkErrorActive && !exam) ||
-    (isActive && isOffline);
+    (isActive && connectionDegraded);
 
   const recoveryDetail = pendingSubmitRetry
     ? "Submitting your answers as soon as the connection is stable…"
@@ -217,6 +225,22 @@ function TakeAssessmentExperience() {
       setLoadRetryToken((value) => value + 1);
     }
   }, [isOnline, networkErrorActive]);
+
+  useEffect(() => {
+    if (!isActive) return undefined;
+
+    const probe = () => {
+      void refreshConnection();
+    };
+
+    document.addEventListener("visibilitychange", probe);
+    window.addEventListener("focus", probe);
+
+    return () => {
+      document.removeEventListener("visibilitychange", probe);
+      window.removeEventListener("focus", probe);
+    };
+  }, [isActive, refreshConnection]);
 
   useEffect(() => {
     if (!showNetworkRecovery) return undefined;
@@ -925,7 +949,10 @@ function TakeAssessmentExperience() {
     const { reason } = options;
     if (submitting || submitBlocked) return;
 
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    if (
+      connectionDegradedRef.current ||
+      (typeof navigator !== "undefined" && navigator.onLine === false)
+    ) {
       // Integrity auto-submit must not force a submit while offline.
       if (reason === "integrity") {
         autoSubmittingRef.current = false;
@@ -1010,6 +1037,7 @@ function TakeAssessmentExperience() {
       }
 
       if (networkError) {
+        void refreshConnection();
         if (reason === "integrity") {
           autoSubmittingRef.current = false;
           pendingIntegrityAutoSubmitRef.current = true;
@@ -1037,6 +1065,7 @@ function TakeAssessmentExperience() {
     getTimesSnapshot,
     id,
     questions,
+    refreshConnection,
     submitBlocked,
     submitting,
   ]);

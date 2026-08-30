@@ -349,7 +349,14 @@ export default function AdminPasswordResets() {
               {!visibleRows.length ? (
                 <tr>
                   <td colSpan={6} className={`${adminTdClass(theme)} py-8 text-center`}>
-                    No password reset requests match this filter.
+                    {statusFilter === "pending" ? (
+                      <span>
+                        No pending password reset requests. Requests only reach admins when the
+                        user&apos;s email and school ID match an existing account.
+                      </span>
+                    ) : (
+                      "No password reset requests match this filter."
+                    )}
                   </td>
                 </tr>
               ) : (

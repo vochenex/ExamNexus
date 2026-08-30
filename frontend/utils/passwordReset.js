@@ -42,6 +42,22 @@ function missingPasswordResetSetupError() {
   );
 }
 
+export async function verifyPasswordResetAccount({ email, schoolId }) {
+  const { data, error } = await supabase.rpc("verify_password_reset_account", {
+    p_email: email,
+    p_school_id: schoolId,
+  });
+
+  if (error) {
+    if (isMissingRpcError(error)) {
+      throw missingPasswordResetSetupError();
+    }
+    throw error;
+  }
+
+  return data || {};
+}
+
 export async function submitPasswordResetRequest({ email, schoolId, message }) {
   const { data, error } = await supabase.rpc("submit_password_reset_request", {
     p_email: email,
