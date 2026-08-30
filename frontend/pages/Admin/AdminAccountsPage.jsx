@@ -17,6 +17,8 @@ import {
   adminToolbarClass,
   adminSearchWrapClass,
   adminToolbarActionsClass,
+  adminFilterSelectClass,
+  adminToolbarButtonClass,
   adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
@@ -309,7 +311,7 @@ export default function AdminAccounts() {
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full min-w-[9rem] sm:w-auto sm:max-w-[11rem]"
+          className={adminFilterSelectClass()}
         >
           {STATUSES.map((status) => (
             <option key={status.value || "all"} value={status.value}>
@@ -320,7 +322,7 @@ export default function AdminAccounts() {
         <Select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="w-full min-w-[9rem] sm:w-auto sm:max-w-[11rem]"
+          className={adminFilterSelectClass()}
         >
           <option value="">All roles</option>
           {ROLES.map((role) => (
@@ -337,7 +339,7 @@ export default function AdminAccounts() {
               loading={bulkApproving}
               loadingLabel="Approving..."
               disabled={bulkRejecting || reviewingId !== null}
-              className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+              className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
               aria-label="Approve all pending accounts"
               title="Approve all pending accounts"
             >
@@ -350,7 +352,7 @@ export default function AdminAccounts() {
               loading={bulkRejecting}
               loadingLabel="Rejecting..."
               disabled={bulkApproving || reviewingId !== null}
-              className={dangerButton(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+              className={dangerButton(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
               aria-label="Reject all pending accounts"
               title="Reject all pending accounts"
             >

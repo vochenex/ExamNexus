@@ -1735,6 +1735,19 @@ html:not(.light) .en-auth-shell .hover\:border-white\/20:hover {
   overflow-x: hidden;
 }
 
+.en-sidebar-shell .en-scroll-region,
+.en-sidebar-shell .overflow-y-auto {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.en-sidebar-shell .en-scroll-region::-webkit-scrollbar,
+.en-sidebar-shell .overflow-y-auto::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .en-scroll-region .en-page-shell > * {
   max-width: 100%;
 }

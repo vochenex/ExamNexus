@@ -136,7 +136,7 @@ export default function AdminExports() {
 
   const exportResultsCsv = async (examId = null) => {
     try {
-      setExporting(examId || "all-results");
+      setExporting(examId ? `results-${examId}` : "all-results");
       const rows = await fetchAdminExportResults(examId || null);
       if (!rows.length) {
         warning("No results to export.");
@@ -281,9 +281,12 @@ export default function AdminExports() {
           <ProgressButton
             type="button"
             onClick={() => exportResultsCsv(selectedExamId || null)}
-            loading={exporting === selectedExamId}
+            loading={Boolean(selectedExamId) && exporting === `results-${selectedExamId}`}
             loadingLabel="Exporting results"
-            disabled={!selectedExamId || (Boolean(exporting) && exporting !== selectedExamId)}
+            disabled={
+              !selectedExamId ||
+              (Boolean(exporting) && exporting !== `results-${selectedExamId}`)
+            }
             className={iconButton(theme, "secondary", "gap-2 px-3")}
             aria-label="Export selected results CSV"
             title="Export selected results CSV"

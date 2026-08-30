@@ -153,11 +153,14 @@ export default function AdminExamLogs() {
                 {open && (
                   <div className={`${adminTableWrapClass(theme)} rounded-none border-0 border-t`}>
                     <div className={adminTableInnerClass()}>
-                      <table className={`${adminTableClass(theme)} min-w-[36rem]`}>
+                      <table className={`${adminTableClass(theme)} min-w-[48rem]`}>
                         <thead>
                           <tr>
                             <th className={adminThClass(theme)}>Time</th>
                             <th className={adminThClass(theme)}>Student</th>
+                            <th className={adminThClass(theme)}>Dept.</th>
+                            <th className={adminThClass(theme)}>Course</th>
+                            <th className={adminThClass(theme)}>Faculty</th>
                             <th className={adminThClass(theme)}>Event</th>
                             <th className={adminThClass(theme)}>Details</th>
                           </tr>
@@ -172,6 +175,15 @@ export default function AdminExamLogs() {
                               </td>
                               <td className={adminTdClass(theme)}>
                                 {row.student_name || row.student_id}
+                              </td>
+                              <td className={adminTdClass(theme)}>
+                                {row.student_department || "—"}
+                              </td>
+                              <td className={adminTdClass(theme)}>
+                                {row.student_course || "—"}
+                              </td>
+                              <td className={adminTdClass(theme)}>
+                                {row.faculty_name || "—"}
                               </td>
                               <td className={adminTdClass(theme)}>{row.event_type}</td>
                               <td className={adminTdClass(theme)}>

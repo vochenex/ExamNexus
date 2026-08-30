@@ -34,15 +34,23 @@ export function adminNoticeClass(theme) {
 }
 
 export function adminToolbarClass(_theme) {
-  return "mb-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start";
+  return "mb-5 flex min-w-0 flex-col gap-2 sm:gap-2.5 lg:flex-row lg:items-center lg:gap-3";
 }
 
 export function adminSearchWrapClass() {
-  return "relative min-w-0 w-full max-w-md lg:max-w-sm xl:max-w-md";
+  return "relative min-w-0 w-full lg:w-[min(100%,16rem)] lg:max-w-xs lg:shrink-0";
 }
 
 export function adminToolbarActionsClass() {
-  return "flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5 lg:justify-end";
+  return "flex min-w-0 w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:flex-nowrap lg:shrink-0";
+}
+
+export function adminFilterSelectClass() {
+  return "w-full min-w-0 sm:w-[9.25rem] sm:max-w-[9.25rem] shrink-0";
+}
+
+export function adminToolbarButtonClass() {
+  return "w-full shrink-0 sm:w-auto whitespace-nowrap";
 }
 
 export function adminTableInnerClass() {

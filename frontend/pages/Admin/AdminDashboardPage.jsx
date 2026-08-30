@@ -138,15 +138,49 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async (silent = false) => {
+    const fetchWithRetry = async (fn, attempts = 3) => {
+      let lastError;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastError = err;
+          const message = String(err?.message || err);
+          const retriable =
+            message.includes("fetch failed") || message.includes("Failed to fetch");
+          if (!retriable || attempt === attempts - 1) throw err;
+          await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)));
+        }
+      }
+      throw lastError;
+    };
+
     try {
       if (!silent) setLoading(true);
       setLoadError("");
-      const [statsData, analyticsData] = await Promise.all([
-        fetchAdminDashboardStats(),
-        fetchAdminDashboardAnalytics(),
+      const [statsResult, analyticsResult] = await Promise.allSettled([
+        fetchWithRetry(() => fetchAdminDashboardStats()),
+        fetchWithRetry(() => fetchAdminDashboardAnalytics()),
       ]);
-      setStats(statsData);
-      setAnalytics(analyticsData);
+
+      if (statsResult.status === "fulfilled") {
+        setStats(statsResult.value);
+      } else {
+        setStats({});
+        setLoadError(formatAdminError(statsResult.reason));
+      }
+
+      if (analyticsResult.status === "fulfilled") {
+        setAnalytics(analyticsResult.value);
+      } else {
+        setAnalytics({
+          teachers_active_today: [],
+          exams_per_day: [],
+          teachers_active_today_total: 0,
+          exams_today: 0,
+          unavailable: true,
+        });
+      }
     } catch (err) {
       console.error(err);
       setStats({});

@@ -30,7 +30,6 @@ import ProgressButton from "../../components/ui/ProgressButton";
 const TABS = [
   { id: "department", label: "Departments" },
   { id: "course", label: "Courses" },
-  { id: "section", label: "Sections" },
 ];
 
 const EMPTY_FORM = { code: "", label: "", parent_code: "" };
@@ -42,11 +41,10 @@ export default function AdminCatalog() {
   const [tab, setTab] = useState("department");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  // Separate draft per tab so values never bleed across Departments/Courses/Sections.
+  // Separate draft per tab so values never bleed across Departments/Courses.
   const [forms, setForms] = useState({
     department: { ...EMPTY_FORM },
     course: { ...EMPTY_FORM },
-    section: { ...EMPTY_FORM },
   });
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -167,8 +165,8 @@ export default function AdminCatalog() {
       <PageHeader
         theme={theme}
         icon={Building2}
-        title="Departments, courses & sections"
-        subtitle="Manage the academic catalog used during signup and enrollment."
+        title="Departments & courses"
+        subtitle="Manage departments and courses used during signup and enrollment. Set class sections on Manage subjects."
       />
 
       {loadError && (

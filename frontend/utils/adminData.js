@@ -287,9 +287,30 @@ export async function deleteAdminBroadcast(id) {
 
 export async function fetchAdminAssessments() {
   await requireSession();
-  const { data, error } = await supabase.rpc("admin_list_assessments");
+  const [{ data, error }, facultyList] = await Promise.all([
+    supabase.rpc("admin_list_assessments"),
+    fetchAdminFaculty(),
+  ]);
   if (error) throw error;
-  return normalizeJson(data);
+  const rows = normalizeJson(data);
+  const facultyBySchoolId = new Map(
+    (facultyList || []).map((faculty) => [
+      String(faculty.school_id || ""),
+      {
+        name: [faculty.first_name, faculty.last_name].filter(Boolean).join(" ") || "—",
+        department: faculty.department || "—",
+      },
+    ])
+  );
+
+  return rows.map((row) => {
+    const faculty = facultyBySchoolId.get(String(row.teacher_school_id || ""));
+    return {
+      ...row,
+      faculty_name: faculty?.name || "—",
+      faculty_department: faculty?.department || "—",
+    };
+  });
 }
 
 export async function fetchAdminExamLogs(limit = 200) {
@@ -298,7 +319,74 @@ export async function fetchAdminExamLogs(limit = 200) {
     p_limit: limit,
   });
   if (error) throw error;
-  return normalizeJson(data);
+  const rows = normalizeJson(data);
+  if (!rows.length) return rows;
+
+  const examIds = [...new Set(rows.map((row) => row.exam_id).filter(Boolean))];
+  const studentIds = [...new Set(rows.map((row) => row.student_id).filter(Boolean))];
+
+  const examMeta = new Map();
+  if (examIds.length) {
+    const { data: exams } = await supabase
+      .from("exams")
+      .select("id, subjects(teacher_school_id)")
+      .in("id", examIds);
+
+    const teacherIds = [
+      ...new Set(
+        (exams || [])
+          .map((exam) => exam.subjects?.teacher_school_id)
+          .filter(Boolean)
+      ),
+    ];
+
+    const facultyBySchoolId = new Map();
+    if (teacherIds.length) {
+      const { data: facultyRows } = await supabase
+        .from("users")
+        .select("school_id, first_name, last_name, department")
+        .in("school_id", teacherIds);
+      for (const faculty of facultyRows || []) {
+        facultyBySchoolId.set(faculty.school_id, faculty);
+      }
+    }
+
+    for (const exam of exams || []) {
+      const teacherId = exam.subjects?.teacher_school_id;
+      const faculty = facultyBySchoolId.get(teacherId);
+      examMeta.set(exam.id, {
+        faculty_name:
+          [faculty?.first_name, faculty?.last_name].filter(Boolean).join(" ") || "—",
+        faculty_department: faculty?.department || "—",
+      });
+    }
+  }
+
+  const studentMeta = new Map();
+  if (studentIds.length) {
+    const { data: students } = await supabase
+      .from("users")
+      .select("id, department, course")
+      .in("id", studentIds);
+    for (const student of students || []) {
+      studentMeta.set(student.id, {
+        department: student.department || "—",
+        course: student.course || "—",
+      });
+    }
+  }
+
+  return rows.map((row) => {
+    const exam = examMeta.get(row.exam_id) || {};
+    const student = studentMeta.get(row.student_id) || {};
+    return {
+      ...row,
+      faculty_name: exam.faculty_name || "—",
+      faculty_department: exam.faculty_department || "—",
+      student_department: student.department || "—",
+      student_course: student.course || "—",
+    };
+  });
 }
 
 export async function fetchAdminExportAssessments() {

@@ -18,6 +18,8 @@ import {
   adminToolbarClass,
   adminSearchWrapClass,
   adminToolbarActionsClass,
+  adminFilterSelectClass,
+  adminToolbarButtonClass,
   adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import {
@@ -288,7 +290,7 @@ export default function AdminPasswordResets() {
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full min-w-[9rem] sm:w-auto sm:max-w-[11rem]"
+          className={adminFilterSelectClass()}
         >
           {STATUSES.map((item) => (
             <option key={item.value || "all"} value={item.value}>
@@ -304,7 +306,7 @@ export default function AdminPasswordResets() {
               loading={bulkCompleting}
               loadingLabel="Approving..."
               disabled={bulkRejecting || actingId !== null || submitting}
-              className={primaryButtonSm(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+              className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
               aria-label="Approve all pending resets"
               title="Approve all pending resets"
             >
@@ -317,7 +319,7 @@ export default function AdminPasswordResets() {
               loading={bulkRejecting}
               loadingLabel="Rejecting..."
               disabled={bulkCompleting || actingId !== null || submitting}
-              className={dangerButton(theme, "text-xs px-3 py-1.5 whitespace-nowrap")}
+              className={dangerButton(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
               aria-label="Reject all pending resets"
               title="Reject all pending resets"
             >
