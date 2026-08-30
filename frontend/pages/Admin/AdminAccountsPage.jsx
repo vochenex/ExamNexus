@@ -13,7 +13,11 @@ import {
   adminTableWrapClass,
   adminTdClass,
   adminThClass,
+  adminNoticeClass,
   adminToolbarClass,
+  adminSearchWrapClass,
+  adminToolbarActionsClass,
+  adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import {
@@ -279,19 +283,13 @@ export default function AdminAccounts() {
       )}
 
       {statusFilter === "pending" && pendingCount > 0 && (
-        <div
-          className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-            theme === "dark"
-              ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
-              : "border-amber-200 bg-amber-50 text-amber-900"
-          }`}
-        >
+        <div className={adminNoticeClass(theme)}>
           {pendingCount} account{pendingCount === 1 ? "" : "s"} waiting for your approval.
         </div>
       )}
 
-      <div className={`${adminToolbarClass(theme)} flex flex-col gap-3`}>
-        <div className="relative min-w-0 w-full max-w-md">
+      <div className={adminToolbarClass(theme)}>
+        <div className={adminSearchWrapClass()}>
           <Search
             size={16}
             className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
@@ -307,11 +305,11 @@ export default function AdminAccounts() {
             aria-label="Search accounts by name, school ID, or email"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className={adminToolbarActionsClass()}>
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="max-w-xs"
+          className="w-full min-w-[9rem] sm:w-auto sm:max-w-[11rem]"
         >
           {STATUSES.map((status) => (
             <option key={status.value || "all"} value={status.value}>
@@ -322,7 +320,7 @@ export default function AdminAccounts() {
         <Select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="max-w-xs"
+          className="w-full min-w-[9rem] sm:w-auto sm:max-w-[11rem]"
         >
           <option value="">All roles</option>
           {ROLES.map((role) => (
@@ -374,7 +372,7 @@ export default function AdminAccounts() {
           No accounts match the current filters.
         </div>
       ) : (
-        <div className="en-inner-scroll en-table-scroll w-full max-w-full overflow-x-auto overflow-y-visible overscroll-x-contain touch-pan-x touch-pan-y">
+        <div className={adminTableInnerClass()}>
           <table className={`${adminTableClass(theme)} min-w-[76rem]`}>
             <thead>
               <tr>

@@ -24,6 +24,27 @@ export function adminTdClass(theme) {
   }`;
 }
 
+/** Compact inline notice — width fits content, not full bleed. */
+export function adminNoticeClass(theme) {
+  return `mb-4 inline-flex max-w-full items-center rounded-lg border px-3 py-2 text-sm ${
+    theme === "dark"
+      ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
+      : "border-amber-200 bg-amber-50 text-amber-900"
+  }`;
+}
+
 export function adminToolbarClass(_theme) {
-  return `mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`;
+  return "mb-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start";
+}
+
+export function adminSearchWrapClass() {
+  return "relative min-w-0 w-full max-w-md lg:max-w-sm xl:max-w-md";
+}
+
+export function adminToolbarActionsClass() {
+  return "flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5 lg:justify-end";
+}
+
+export function adminTableInnerClass() {
+  return "w-full max-w-full overflow-x-auto overflow-y-visible overscroll-x-contain";
 }

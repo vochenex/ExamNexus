@@ -18,6 +18,7 @@ import {
   adminTableWrapClass,
   adminTdClass,
   adminThClass,
+  adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
@@ -140,7 +141,7 @@ export default function AdminAnnouncements() {
       </form>
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="en-inner-scroll max-h-[28rem] overflow-auto">
+        <div className={adminTableInnerClass()}>
           <table className={adminTableClass(theme)}>
             <thead>
               <tr>

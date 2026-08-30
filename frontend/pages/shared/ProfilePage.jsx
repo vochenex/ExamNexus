@@ -4,18 +4,9 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import {
   Pencil,
-  Lock,
-  Mail,
-  Shield,
-  Users,
-  BookOpen,
-  ClipboardList,
-  Megaphone,
   Calendar,
-  BadgeCheck,
   GraduationCap,
   UserRound,
-  Compass,
   LogOut,
   Eye,
   EyeOff,
@@ -119,7 +110,7 @@ function StatCard({ value, label, theme, variant = "emerald", to = "" }) {
         : "en-bg-elevated border-purple-200 text-purple-700",
   };
 
-  const className = `block w-full rounded-xl border p-3 text-left shadow-sm transition-all sm:p-3.5 ${
+  const className = `block w-full rounded-xl border p-2.5 text-left shadow-sm transition-all sm:p-3 ${
     to
       ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
       : ""
@@ -127,8 +118,8 @@ function StatCard({ value, label, theme, variant = "emerald", to = "" }) {
 
   const content = (
     <>
-      <p className="text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
-      <p className="mt-1 text-xs leading-snug opacity-80 sm:text-sm">{label}</p>
+      <p className="text-lg font-bold tabular-nums sm:text-xl">{value}</p>
+      <p className="mt-0.5 text-[11px] leading-snug opacity-80 sm:text-xs">{label}</p>
     </>
   );
 
@@ -141,26 +132,6 @@ function StatCard({ value, label, theme, variant = "emerald", to = "" }) {
   }
 
   return <div className={className}>{content}</div>;
-}
-
-function QuickLink({ icon: Icon, label, onClick, theme }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-xs font-medium transition sm:text-sm ${
-        theme === "dark"
-          ? "border-white/10 bg-white/[0.03] text-gray-200 hover:border-emerald-500/30 hover:bg-emerald-500/5"
-          : "border-emerald-100 en-bg-elevated text-gray-700 hover:border-teal-300 en-hover"
-      }`}
-    >
-      <Icon
-        size={15}
-        className={theme === "dark" ? "text-emerald-400" : "text-teal-600"}
-      />
-      {label}
-    </button>
-  );
 }
 
 export default function Profile() {
@@ -517,11 +488,11 @@ export default function Profile() {
 
   return (
     <div
-      className={`en-profile-page w-full max-w-full min-w-0 overflow-x-hidden p-3 sm:p-5 ${
+      className={`en-profile-page w-full max-w-full min-w-0 overflow-x-hidden p-2 sm:p-4 ${
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
-      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-3 flex flex-col gap-2 sm:mb-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
@@ -546,14 +517,14 @@ export default function Profile() {
             )}
           </div>
           <h1
-            className={`mt-2 text-2xl font-bold sm:text-3xl ${
+            className={`mt-1.5 text-xl font-bold sm:text-2xl ${
               theme === "dark" ? "text-white" : "text-slate-900"
             }`}
           >
             Welcome back, {profile.first_name || "there"}
           </h1>
-          <p className={`mt-0.5 text-xs sm:text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-            Manage your account details, security, and academic information.
+          <p className={`mt-0.5 hidden text-xs sm:block sm:text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+            Manage your account details and security.
           </p>
         </div>
 
@@ -637,9 +608,9 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="flex min-w-0 flex-col gap-5">
-        <div className={`${cardClass(theme)} min-w-0 max-w-full p-3.5 sm:p-5`}>
-          <div className="mb-5 flex min-w-0 flex-col gap-4 overflow-visible border-b pb-5 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:pb-6 border-inherit">
+      <div className="min-w-0">
+        <div className={`${cardClass(theme)} min-w-0 max-w-full p-3 sm:p-4`}>
+          <div className="mb-3 flex min-w-0 flex-col gap-3 border-b pb-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pb-4 border-inherit">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
               <div className="shrink-0 overflow-visible p-0.5">
                 <ProfileAvatar
@@ -714,7 +685,7 @@ export default function Profile() {
           )}
 
           {isStudent ? (
-            <div className="mb-5 grid gap-2.5 sm:mb-6 sm:grid-cols-3 sm:gap-3">
+            <div className="mb-3 grid gap-2 sm:mb-4 sm:grid-cols-3">
               <StatCard
                 value={studentStats.enrolledSubjects}
                 label="Enrolled subjects"
@@ -738,7 +709,7 @@ export default function Profile() {
               />
             </div>
           ) : (
-            <div className="mb-5 grid gap-2.5 sm:mb-6 sm:grid-cols-3 sm:gap-3">
+            <div className="mb-3 grid gap-2 sm:mb-4 sm:grid-cols-3">
               <StatCard
                 value={facultyStats.totalSubjects}
                 label="Total subjects"
@@ -798,10 +769,10 @@ export default function Profile() {
             </div>
           )}
 
-          <div className="space-y-4 sm:space-y-5 [scrollbar-gutter:stable]">
+          <div className="space-y-3 sm:space-y-4">
             <div>
               <SectionTitle theme={theme}>Basic details</SectionTitle>
-              <div className="grid gap-3 sm:grid-cols-2 sm:gap-3.5">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <FieldLabel theme={theme} htmlFor="first_name">
                     First name
@@ -878,7 +849,7 @@ export default function Profile() {
 
             <div>
               <SectionTitle theme={theme}>Account</SectionTitle>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <FieldLabel theme={theme} htmlFor="email" hint="Read-only">
                     Email
@@ -914,8 +885,8 @@ export default function Profile() {
               <SectionTitle theme={theme}>
                 {isStudent ? "School & program" : "School affiliation"}
               </SectionTitle>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className={isStudent ? "" : "sm:col-span-2"}>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className={isStudent ? "" : "lg:col-span-2"}>
                   <FieldLabel theme={theme} htmlFor="department">
                     Department / college
                   </FieldLabel>
@@ -999,7 +970,7 @@ export default function Profile() {
 
               {!editing && (profile.department || profile.course || profile.year_level) ? (
                 <div
-                  className={`mt-4 flex min-h-[2.75rem] flex-wrap gap-2 rounded-xl border px-3 py-2.5 text-xs ${
+                  className={`mt-2 flex flex-wrap gap-2 rounded-lg border px-2.5 py-2 text-[11px] sm:text-xs ${
                     theme === "dark"
                       ? "border-white/10 bg-white/[0.03] text-gray-400"
                       : "border-emerald-100 en-bg-elevated/70 text-gray-600"
@@ -1030,46 +1001,19 @@ export default function Profile() {
                     </span>
                   )}
                 </div>
-              ) : (
-                <div className="mt-4 min-h-[2.75rem]" aria-hidden="true" />
-              )}
+              ) : null}
             </div>
           </div>
           </div>
 
-          {editing && (
-            <div className="mt-6 flex w-full justify-end">
-              <ProgressButton
-                type="button"
-                onClick={() => handleSave(editProfile)}
-                loading={saveStatus === "saving"}
-                loadingLabel="Saving…"
-                className={primaryButton(theme)}
-              >
-                Save changes
-              </ProgressButton>
-            </div>
-          )}
-        </div>
-
-        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
-          <div className={`${cardClass(theme)} p-3.5 sm:p-5`}>
+          <div
+            className={`mt-4 border-t pt-4 ${
+              theme === "dark" ? "border-white/10" : "border-emerald-100"
+            }`}
+          >
             <form onSubmit={handleChangePassword}>
-              <div className="mb-3 flex items-center gap-2">
-                <Lock
-                  size={16}
-                  className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
-                />
-                <h3
-                  className={`text-sm font-semibold ${
-                    theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                  }`}
-                >
-                  Change password
-                </h3>
-              </div>
-
-              <div className="space-y-2.5">
+              <SectionTitle theme={theme}>Change password</SectionTitle>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
                 {[
                   {
                     key: "current",
@@ -1083,11 +1027,11 @@ export default function Profile() {
                   },
                   {
                     key: "confirm",
-                    placeholder: "Confirm new password",
+                    placeholder: "Confirm password",
                     autoComplete: "new-password",
                   },
                 ].map((field) => (
-                  <div key={field.key} className="relative">
+                  <div key={field.key} className="relative min-w-0">
                     <input
                       type={showPasswordFields[field.key] ? "text" : "password"}
                       value={passwordForm[field.key]}
@@ -1099,7 +1043,7 @@ export default function Profile() {
                       }
                       placeholder={field.placeholder}
                       autoComplete={field.autoComplete}
-                      className={`${inputStyle(theme)} pr-12`}
+                      className={`${inputStyle(theme)} py-2 pr-10 text-sm`}
                     />
                     <button
                       type="button"
@@ -1109,28 +1053,30 @@ export default function Profile() {
                           [field.key]: !prev[field.key],
                         }))
                       }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-emerald-400"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-emerald-400"
                       aria-label={
                         showPasswordFields[field.key]
                           ? `Hide ${field.placeholder.toLowerCase()}`
                           : `Show ${field.placeholder.toLowerCase()}`
                       }
                     >
-                      {showPasswordFields[field.key] ? (
-                        <Eye size={18} />
-                      ) : (
-                        <EyeOff size={18} />
-                      )}
+                      {showPasswordFields[field.key] ? <Eye size={16} /> : <EyeOff size={16} />}
                     </button>
                   </div>
                 ))}
+                <button
+                  type="submit"
+                  disabled={passwordStatus === "saving"}
+                  className={`${primaryButton(theme, "px-4 py-2 text-sm")} w-full xl:w-auto`}
+                >
+                  {passwordStatus === "saving" ? "Updating..." : "Update password"}
+                </button>
               </div>
-
               {passwordMessage && (
                 <p
                   ref={passwordFeedbackRef}
                   role="status"
-                  className={`mt-3 text-sm ${
+                  className={`mt-2 text-xs sm:text-sm ${
                     passwordStatus === "success"
                       ? theme === "dark"
                         ? "text-emerald-400"
@@ -1143,176 +1089,22 @@ export default function Profile() {
                   {passwordMessage}
                 </p>
               )}
-
-              <button
-                type="submit"
-                disabled={passwordStatus === "saving"}
-                className={`mt-4 w-full sm:w-auto ${primaryButton(theme, "px-4 py-2.5 text-sm")}`}
-              >
-                {passwordStatus === "saving" ? "Updating..." : "Update password"}
-              </button>
             </form>
           </div>
 
-          <div className={`${cardClass(theme)} p-3.5 sm:p-5`}>
-            <div className="mb-4 flex items-center gap-2">
-              <BadgeCheck
-                size={18}
-                className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
-              />
-              <h3
-                className={`text-base font-semibold ${
-                  theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                }`}
+          {editing && (
+            <div className="mt-4 flex w-full justify-end">
+              <ProgressButton
+                type="button"
+                onClick={() => handleSave(editProfile)}
+                loading={saveStatus === "saving"}
+                loadingLabel="Saving…"
+                className={primaryButton(theme, "px-4 py-2 text-sm")}
               >
-                Account & shortcuts
-              </h3>
+                Save changes
+              </ProgressButton>
             </div>
-
-            <dl className="space-y-3 text-sm">
-              <div className="flex items-start justify-between gap-3">
-                <dt className={theme === "dark" ? "text-gray-500" : "text-gray-500"}>Role</dt>
-                <dd className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
-                  {roleLabel}
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <dt className={theme === "dark" ? "text-gray-500" : "text-gray-500"}>Email</dt>
-                <dd className={`truncate text-right font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
-                  {profile.email || "—"}
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <dt className={theme === "dark" ? "text-gray-500" : "text-gray-500"}>School ID</dt>
-                <dd className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
-                  {displaySchoolId || "—"}
-                </dd>
-              </div>
-              {profile.department && (
-                <div className="flex items-start justify-between gap-3">
-                  <dt className={theme === "dark" ? "text-gray-500" : "text-gray-500"}>Department</dt>
-                  <dd className={`text-right font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
-                    {getDepartmentLabel(profile.department)}
-                  </dd>
-                </div>
-              )}
-              {memberSince && (
-                <div className="flex items-start justify-between gap-3">
-                  <dt className={theme === "dark" ? "text-gray-500" : "text-gray-500"}>Joined</dt>
-                  <dd className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
-                    {memberSince}
-                  </dd>
-                </div>
-              )}
-            </dl>
-
-            <div
-              className={`my-5 border-t ${
-                theme === "dark" ? "border-white/10" : "border-emerald-100"
-              }`}
-            />
-
-            <div className="mb-3 flex items-center gap-2">
-              <Compass
-                size={16}
-                className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
-              />
-              <h4
-                className={`text-sm font-semibold ${
-                  theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                }`}
-              >
-                Quick links
-              </h4>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              {isAdmin ? (
-                <>
-                  <QuickLink
-                    icon={Shield}
-                    label="Admin dashboard"
-                    onClick={() => navigate("/admin/dashboard")}
-                    theme={theme}
-                  />
-                  <QuickLink
-                    icon={Users}
-                    label="Manage accounts"
-                    onClick={() => navigate("/admin/accounts")}
-                    theme={theme}
-                  />
-                </>
-              ) : isStudent ? (
-                <>
-                  <QuickLink
-                    icon={BookOpen}
-                    label="My subjects"
-                    onClick={() => navigate("/student/subjects")}
-                    theme={theme}
-                  />
-                  <QuickLink
-                    icon={ClipboardList}
-                    label="My assessments"
-                    onClick={() => navigate("/student/assessments")}
-                    theme={theme}
-                  />
-                </>
-              ) : (
-                <>
-                  <QuickLink
-                    icon={BookOpen}
-                    label="My subjects"
-                    onClick={() => navigate("/faculty/dashboard")}
-                    theme={theme}
-                  />
-                  <QuickLink
-                    icon={Megaphone}
-                    label="Announcements"
-                    onClick={() => navigate("/faculty/announcements")}
-                    theme={theme}
-                  />
-                </>
-              )}
-            </div>
-
-            <div
-              className={`mt-5 border-t pt-4 ${
-                theme === "dark" ? "border-white/10" : "border-emerald-100"
-              }`}
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <Shield
-                  size={16}
-                  className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
-                />
-                <h4
-                  className={`text-sm font-semibold ${
-                    theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                  }`}
-                >
-                  Security tips
-                </h4>
-              </div>
-              <ul
-                className={`space-y-2 text-sm leading-relaxed ${
-                  theme === "dark" ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
-                <li className="flex gap-2">
-                  <Mail size={14} className="mt-0.5 shrink-0 opacity-70" />
-                  Use a unique password you do not reuse on other sites.
-                </li>
-                <li className="flex gap-2">
-                  <Lock size={14} className="mt-0.5 shrink-0 opacity-70" />
-                  Update your password if you signed in on a shared device.
-                </li>
-                <li className="flex gap-2">
-                  <BadgeCheck size={14} className="mt-0.5 shrink-0 opacity-70" />
-                  Keep your profile details accurate for class enrollment.
-                </li>
-              </ul>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

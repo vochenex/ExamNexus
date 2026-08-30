@@ -10,6 +10,7 @@ import {
   adminTableWrapClass,
   adminTdClass,
   adminThClass,
+  adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import { pageShellClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
@@ -53,7 +54,7 @@ export default function AdminAssessments() {
       )}
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="overflow-x-auto">
+        <div className={adminTableInnerClass()}>
           <table className={adminTableClass(theme)}>
             <thead>
               <tr>

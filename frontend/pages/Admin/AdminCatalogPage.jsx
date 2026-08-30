@@ -16,6 +16,7 @@ import {
   adminTableWrapClass,
   adminTdClass,
   adminThClass,
+  adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
@@ -252,7 +253,7 @@ export default function AdminCatalog() {
       </div>
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="en-inner-scroll max-h-[28rem] overflow-auto">
+        <div className={adminTableInnerClass()}>
           <table className={`${adminTableClass(theme)} min-w-[40rem]`}>
             <thead>
               <tr>

@@ -14,7 +14,11 @@ import {
   adminTableWrapClass,
   adminTdClass,
   adminThClass,
+  adminNoticeClass,
   adminToolbarClass,
+  adminSearchWrapClass,
+  adminToolbarActionsClass,
+  adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import {
   completeAdminPasswordResetRequest,
@@ -258,19 +262,13 @@ export default function AdminPasswordResets() {
       )}
 
       {statusFilter === "pending" && pendingCount > 0 && (
-        <div
-          className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-            theme === "dark"
-              ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
-              : "border-amber-200 bg-amber-50 text-amber-900"
-          }`}
-        >
+        <div className={adminNoticeClass(theme)}>
           {pendingCount} password reset request{pendingCount === 1 ? "" : "s"} waiting for action.
         </div>
       )}
 
-      <div className={`${adminToolbarClass(theme)} flex flex-col gap-3`}>
-        <div className="relative min-w-0 w-full max-w-md">
+      <div className={adminToolbarClass(theme)}>
+        <div className={adminSearchWrapClass()}>
           <Search
             size={16}
             className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
@@ -286,11 +284,11 @@ export default function AdminPasswordResets() {
             aria-label="Search password reset requests by name, school ID, or email"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className={adminToolbarActionsClass()}>
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="max-w-xs"
+          className="w-full min-w-[9rem] sm:w-auto sm:max-w-[11rem]"
         >
           {STATUSES.map((item) => (
             <option key={item.value || "all"} value={item.value}>
@@ -332,7 +330,7 @@ export default function AdminPasswordResets() {
       </div>
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="overflow-x-auto">
+        <div className={adminTableInnerClass()}>
           <table className={adminTableClass(theme)}>
             <thead>
               <tr>

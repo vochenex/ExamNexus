@@ -10,6 +10,7 @@ import {
   adminTableWrapClass,
   adminTdClass,
   adminThClass,
+  adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
@@ -151,7 +152,7 @@ export default function AdminExamLogs() {
 
                 {open && (
                   <div className={`${adminTableWrapClass(theme)} rounded-none border-0 border-t`}>
-                    <div className="en-inner-scroll max-h-[22rem] overflow-auto">
+                    <div className={adminTableInnerClass()}>
                       <table className={`${adminTableClass(theme)} min-w-[36rem]`}>
                         <thead>
                           <tr>

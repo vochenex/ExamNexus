@@ -19,6 +19,7 @@ import { usePolling } from "../../hooks/useRealtimeFetch";
 import { fetchAdminDashboardAnalytics, fetchAdminDashboardStats } from "../../utils/adminData";
 import { primaryButtonSm } from "../../utils/themeButtons";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
+import { adminNoticeClass } from "../../components/admin/adminTableStyles";
 import { AdminStatBadge, AdminVerticalBarChart } from "../../components/admin/AdminBarChart";
 
 const ADMIN_TOOLS = [
@@ -208,13 +209,7 @@ export default function AdminDashboard() {
         </div>
 
         {analytics?.unavailable && (
-          <div
-            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-              theme === "dark"
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
-                : "border-amber-200 bg-amber-50 text-amber-900"
-            }`}
-          >
+          <div className={adminNoticeClass(theme)}>
             Chart analytics are not set up yet. Run{" "}
             <code className="text-xs">database/admin_dashboard_analytics.sql</code> in Supabase to
             enable graphs.

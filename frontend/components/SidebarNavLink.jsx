@@ -67,9 +67,9 @@ export default function SidebarNavLink({
             )}`}
           >
             <Icon size={18} strokeWidth={2.1} />
-            {badge ? (
+            {badge && collapsed ? (
               <span
-                className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ${
+                className={`absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-red-500 ${
                   theme === "dark" ? "ring-2 ring-[#0b1114]" : "ring-2 ring-white"
                 }`}
                 aria-hidden="true"

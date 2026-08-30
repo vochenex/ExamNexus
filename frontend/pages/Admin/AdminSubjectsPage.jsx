@@ -20,6 +20,7 @@ import {
   adminTableWrapClass,
   adminTdClass,
   adminThClass,
+  adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
@@ -175,30 +176,25 @@ export default function AdminSubjects() {
         <AdminPageError theme={theme} message={loadError} onRetry={() => load()} />
       )}
 
-      <div className={`${panelClass(theme)} mb-6 overflow-hidden`}>
+      <div className={`${panelClass(theme)} mb-6`}>
         <div
-          className={`border-b px-5 py-4 ${
-            theme === "dark" ? "border-white/10 bg-white/[0.02]" : "border-emerald-100 bg-emerald-50/40"
+          className={`border-b px-4 py-3 sm:px-5 ${
+            theme === "dark" ? "border-white/10" : "border-emerald-100"
           }`}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                theme === "dark" ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-100 text-teal-700"
-              }`}
-            >
-              <Plus size={20} />
-            </div>
-            <div>
-              <h2 className="font-semibold">Create subject</h2>
-              <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                Set up a new course and assign an approved faculty member.
-              </p>
-            </div>
-          </div>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Plus
+              size={18}
+              className={theme === "dark" ? "text-emerald-400" : "text-teal-700"}
+            />
+            Create subject
+          </h2>
+          <p className={`mt-0.5 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+            Set up a new course and assign an approved faculty member.
+          </p>
         </div>
 
-        <div className="space-y-5 p-5">
+        <div className="space-y-4 p-4 sm:p-5">
           <div>
             <FieldLabel theme={theme} htmlFor="admin-subject-name">
               Subject name
@@ -272,7 +268,7 @@ export default function AdminSubjects() {
       </div>
 
       <div className={adminTableWrapClass(theme)}>
-        <div className="overflow-x-auto en-scroll-region">
+        <div className={adminTableInnerClass()}>
           <table className={`${adminTableClass(theme)} min-w-[64rem]`}>
             <thead>
               <tr>
