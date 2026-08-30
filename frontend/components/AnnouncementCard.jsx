@@ -28,6 +28,7 @@ function formatCommentTime(value) {
 export default function AnnouncementCard({
   announcement,
   canDelete = false,
+  canModerateComments,
   allowInteract = true,
   highlighted = false,
   autoExpandComments = false,
@@ -47,6 +48,7 @@ export default function AnnouncementCard({
   const myUserId = cachedUser.id || cachedUser.user_id || "";
   const isModerator =
     canDelete ||
+    canModerateComments ||
     String(cachedUser.role || "").toLowerCase() === "admin" ||
     announcement.created_by === myUserId;
 

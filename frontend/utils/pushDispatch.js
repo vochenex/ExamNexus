@@ -66,9 +66,9 @@ export async function dispatchBroadcastPush({
   audience = "all",
   title,
   body = "",
-  path = "/student/platform-announcements",
-  facultyPath = "/faculty/platform-announcements",
-  studentPath = "/student/platform-announcements",
+  path = "/student/admin-announcements",
+  facultyPath = "/faculty/admin-announcements",
+  studentPath = "/student/admin-announcements",
 }) {
   try {
     const headers = await authHeaders();

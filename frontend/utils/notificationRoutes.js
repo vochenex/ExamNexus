@@ -37,6 +37,10 @@ export function sanitizeAppPath(path, { isStudent = true } = {}) {
     return `/auth${query}`;
   }
 
+  if (path.includes("/platform-announcements")) {
+    return path.replace("/platform-announcements", "/admin-announcements");
+  }
+
   if (/\/subject\/(undefined|null)(\/|\?|$)/i.test(path)) {
     return roleAnnouncementsHub(isStudent);
   }
@@ -52,6 +56,14 @@ export function sanitizeAppPath(path, { isStudent = true } = {}) {
   return path;
 }
 
+function isAdminPlatformNotification(item) {
+  if (!item) return false;
+  if (item.kind === "admin_announcement") return true;
+  if (item.platform === true || item.platform === "1" || item.platform === 1) return true;
+  if (item.subject_name === "ExamNexus" && !item.subject_id) return true;
+  return false;
+}
+
 export function getNotificationDestination(item, { isStudent, userId } = {}) {
   if (!item) {
     return {
@@ -60,49 +72,20 @@ export function getNotificationDestination(item, { isStudent, userId } = {}) {
     };
   }
 
-  if (item.kind === "admin_announcement") {
+  if (isAdminPlatformNotification(item)) {
     const id = item.id || item.announcement_id;
     const base = isStudent
-      ? "/student/platform-announcements"
-      : "/faculty/platform-announcements";
+      ? "/student/admin-announcements"
+      : "/faculty/admin-announcements";
+    const openComments = item.kind === "comment";
     return {
       path: sanitizeAppPath(
-        isValidRouteId(id) ? `${base}?highlight=${id}&comments=1` : base,
-        { isStudent }
-      ),
-      label: "View platform announcement",
-    };
-  }
-
-  if (item.kind === "comment" && (item.platform || !item.subject_id)) {
-    const announcementId = item.announcement_id || item.id;
-    const base = isStudent
-      ? "/student/platform-announcements"
-      : "/faculty/platform-announcements";
-    return {
-      path: sanitizeAppPath(
-        isValidRouteId(announcementId)
-          ? `${base}?highlight=${announcementId}&comments=1`
+        isValidRouteId(id)
+          ? `${base}?highlight=${id}${openComments ? "&comments=1" : ""}`
           : base,
         { isStudent }
       ),
-      label: "View platform comment",
-    };
-  }
-
-  if (item.kind === "reaction" && (item.platform || !item.subject_id)) {
-    const announcementId = item.announcement_id || item.id;
-    const base = isStudent
-      ? "/student/platform-announcements"
-      : "/faculty/platform-announcements";
-    return {
-      path: sanitizeAppPath(
-        isValidRouteId(announcementId)
-          ? `${base}?highlight=${announcementId}`
-          : base,
-        { isStudent }
-      ),
-      label: "View platform announcement",
+      label: openComments ? "View admin announcement comment" : "View admin announcement",
     };
   }
 

@@ -78,9 +78,11 @@ export default function App() {
             <Route path="/faculty/profile" element={<ProfilePage />} />
             <Route path="/faculty/dashboard" element={<FacultyDashboardPage />} />
             <Route path="/faculty/exports" element={<FacultyExportsPage />} />
+            <Route path="/faculty/admin-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/faculty/platform-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/student/dashboard" element={<StudentDashboardPage />} />
             <Route path="/student/profile" element={<ProfilePage />} />
+            <Route path="/student/admin-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/student/platform-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/student/assessments" element={<StudentAssessmentsPage />} />
             <Route path="/student/results" element={<StudentResultsListPage />} />

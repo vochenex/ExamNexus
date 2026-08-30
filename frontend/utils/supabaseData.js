@@ -1135,6 +1135,28 @@ export async function updateUserProfile(userId, fields) {
 
   await ensureUserProfileRow();
 
+  const { data: existingProfile, error: existingError } = await supabase
+    .from("users")
+    .select("role, year_level, department, course")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+
+  const role = String(existingProfile?.role || fields.role || "").toLowerCase();
+  const isStudent = role === "student";
+  const department = String(fields.department || "").trim() || null;
+  const course = String(fields.course || "").trim() || null;
+
+  if (isStudent) {
+    if (!department) {
+      throw new Error("Department is required.");
+    }
+    if (!course) {
+      throw new Error("Course is required for your department.");
+    }
+  }
+
   const base = profileFieldsFromSession(session, fields);
   const ageValue = fields.age;
   const parsedAge =
@@ -1142,14 +1164,16 @@ export async function updateUserProfile(userId, fields) {
       ? null
       : Number(ageValue);
 
-  const yearLevel = normalizeYearLevelForStorage(fields.year_level);
+  const yearLevel = isStudent
+    ? existingProfile?.year_level || null
+    : normalizeYearLevelForStorage(fields.year_level);
 
   const payload = {
     p_first_name: base.first_name,
     p_last_name: base.last_name,
     p_gender: fields.gender || null,
-    p_department: fields.department || null,
-    p_course: fields.course || null,
+    p_department: department,
+    p_course: course,
     p_year_level: yearLevel,
     p_age:
       ageValue === "" || ageValue === null || ageValue === undefined
@@ -1160,21 +1184,16 @@ export async function updateUserProfile(userId, fields) {
     p_avatar_url: fields.avatar_url || null,
   };
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc(
-    "update_user_editable_profile",
-    payload
-  );
-
-  const syncAuthMetadata = async () => {
+  const syncAuthMetadata = async (savedProfile) => {
     try {
       await supabase.auth.updateUser({
         data: {
           first_name: base.first_name || null,
           last_name: base.last_name || null,
           gender: fields.gender || null,
-          department: fields.department || null,
-          course: fields.course || null,
-          year_level: yearLevel,
+          department: savedProfile?.department || department,
+          course: savedProfile?.course || course,
+          year_level: savedProfile?.year_level || yearLevel,
           age: Number.isFinite(parsedAge) ? parsedAge : null,
           avatar_url: fields.avatar_url || null,
         },
@@ -1184,19 +1203,14 @@ export async function updateUserProfile(userId, fields) {
     }
   };
 
-  if (!rpcError && rpcData) {
-    await syncAuthMetadata();
-    return rpcData;
-  }
-
   const { data, error } = await supabase
     .from("users")
     .update({
       first_name: base.first_name || null,
       last_name: base.last_name || null,
       gender: fields.gender || null,
-      department: fields.department || null,
-      course: fields.course || null,
+      department,
+      course,
       year_level: yearLevel,
       age: Number.isFinite(parsedAge) ? parsedAge : null,
       avatar_url: fields.avatar_url || null,
@@ -1206,8 +1220,24 @@ export async function updateUserProfile(userId, fields) {
     .maybeSingle();
 
   if (!error && data) {
-    await syncAuthMetadata();
+    await syncAuthMetadata(data);
     return data;
+  }
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "update_user_editable_profile",
+    payload
+  );
+
+  if (!rpcError && rpcData) {
+    const merged = {
+      ...rpcData,
+      department: rpcData.department || department,
+      course: isStudent ? course : rpcData.course || course,
+      year_level: isStudent ? yearLevel : rpcData.year_level || yearLevel,
+    };
+    await syncAuthMetadata(merged);
+    return merged;
   }
 
   throw new Error(
@@ -3424,7 +3454,7 @@ export async function postAdminAnnouncementComment(announcementId, body) {
         data: {
           kind: "comment",
           platform: "1",
-          path: `/student/platform-announcements?highlight=${announcementId}&comments=1`,
+          path: `/student/admin-announcements?highlight=${announcementId}&comments=1`,
           announcement_id: announcementId,
         },
       });
@@ -3540,6 +3570,7 @@ export async function fetchUserNotifications(limit = 40) {
         audience: row.audience,
         status: "posted",
         subject_name: "ExamNexus",
+        platform: true,
       }));
 
     const seen = new Set(

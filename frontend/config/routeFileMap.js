@@ -91,8 +91,8 @@ export const ROUTE_FILE_MAP = [
     file: "frontend/pages/shared/ProfilePage.jsx",
   },
   {
-    match: /^\/faculty\/platform-announcements$/,
-    label: "Platform announcements",
+    match: /^\/faculty\/(?:admin|platform)-announcements$/,
+    label: "Admin announcements",
     file: "frontend/pages/shared/PlatformAnnouncementsPage.jsx",
   },
   {
@@ -143,8 +143,8 @@ export const ROUTE_FILE_MAP = [
     file: "frontend/pages/shared/ProfilePage.jsx",
   },
   {
-    match: /^\/student\/platform-announcements$/,
-    label: "Platform announcements",
+    match: /^\/student\/(?:admin|platform)-announcements$/,
+    label: "Admin announcements",
     file: "frontend/pages/shared/PlatformAnnouncementsPage.jsx",
   },
   {

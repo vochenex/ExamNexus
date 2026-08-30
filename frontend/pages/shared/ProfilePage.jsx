@@ -200,6 +200,9 @@ export default function Profile() {
   const isFaculty = isFacultyRole(profile.role);
   const isAdmin = isAdminUser(profile);
   const courses = getCoursesForDepartment(editProfile.department);
+  const selectedCourseValue = courses.some((course) => course.value === editProfile.course)
+    ? editProfile.course
+    : "";
   const displaySchoolId =
     resolveSchoolId(authUser, editProfile) || editProfile.school_id || "";
 
@@ -357,11 +360,34 @@ export default function Profile() {
 
   const handleSave = async (updatedProfile) => {
     if (saveStatus === "saving") return;
+
+    if (isStudent) {
+      if (!updatedProfile.department) {
+        showError("Select your department before saving.");
+        return;
+      }
+      const allowedCourses = getCoursesForDepartment(updatedProfile.department);
+      if (
+        !updatedProfile.course ||
+        !allowedCourses.some((course) => course.value === updatedProfile.course)
+      ) {
+        showError("Select a course that matches your department before saving.");
+        return;
+      }
+    }
+
     try {
       setSaveStatus("saving");
 
       const studentId = (await resolveStudentId()) || user.id;
-      const saved = await updateUserProfile(studentId, updatedProfile);
+      const payload = isStudent
+        ? {
+            ...updatedProfile,
+            course: updatedProfile.course,
+            year_level: profile.year_level,
+          }
+        : updatedProfile;
+      const saved = await updateUserProfile(studentId, payload);
 
       const mergedProfile = {
         ...profile,
@@ -920,7 +946,7 @@ export default function Profile() {
                       </FieldLabel>
                       <ProfileSelect
                         id="course"
-                        value={editProfile.course}
+                        value={selectedCourseValue}
                         disabled={!editing || !editProfile.department}
                         onChange={(e) =>
                           setEditProfile({ ...editProfile, course: e.target.value })
@@ -940,7 +966,7 @@ export default function Profile() {
                       </ProfileSelect>
                     </div>
                     <div>
-                      <FieldLabel theme={theme} htmlFor="year_level">
+                      <FieldLabel theme={theme} htmlFor="year_level" hint="Admin only">
                         Year level
                       </FieldLabel>
                       <ProfileSelect
@@ -950,13 +976,14 @@ export default function Profile() {
                             ? normalizeYearLevel(editProfile.year_level)
                             : ""
                         }
-                        disabled={!editing}
-                        onChange={(e) =>
-                          setEditProfile({ ...editProfile, year_level: e.target.value })
-                        }
+                        disabled
                         theme={theme}
                       >
-                        <option value="">Select year level</option>
+                        <option value="">
+                          {editProfile.year_level
+                            ? getYearLevelLabel(editProfile.year_level)
+                            : "Not set"}
+                        </option>
                         {YEAR_LEVELS.map((level) => (
                           <option key={level.value} value={level.value}>
                             {level.label}

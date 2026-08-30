@@ -231,6 +231,12 @@ export default function DashboardLayout() {
                   collapsed={collapsed}
                 />
                 <SidebarNavLink
+                  to="/faculty/admin-announcements"
+                  icon={Megaphone}
+                  label="Admin announcements"
+                  collapsed={collapsed}
+                />
+                <SidebarNavLink
                   to="/faculty/exports"
                   icon={Download}
                   label="Export data"
@@ -263,6 +269,12 @@ export default function DashboardLayout() {
                   to="/student/announcements"
                   icon={Megaphone}
                   label="Announcements"
+                  collapsed={collapsed}
+                />
+                <SidebarNavLink
+                  to="/student/admin-announcements"
+                  icon={Megaphone}
+                  label="Admin announcements"
                   collapsed={collapsed}
                 />
               </SidebarSection>

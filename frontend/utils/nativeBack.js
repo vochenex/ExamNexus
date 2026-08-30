@@ -19,6 +19,7 @@ const TOP_LEVEL_BY_ROLE = {
     "/student/assessments",
     "/student/announcements",
     "/student/results",
+    "/student/admin-announcements",
     "/student/platform-announcements",
   ]),
   faculty: new Set([
@@ -27,6 +28,7 @@ const TOP_LEVEL_BY_ROLE = {
     "/faculty/question-bank",
     "/faculty/announcements",
     "/faculty/exports",
+    "/faculty/admin-announcements",
     "/faculty/platform-announcements",
   ]),
   admin: new Set([

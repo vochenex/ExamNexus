@@ -8,6 +8,7 @@ import { useTheme } from "../../layouts/ThemeContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import { isAdminUser } from "../../utils/adminData";
 import {
   fetchPlatformAnnouncements,
   fetchAdminAnnouncementComments,
@@ -18,14 +19,15 @@ import {
 } from "../../utils/supabaseData";
 
 /**
- * Shared student/faculty view for admin platform announcements.
- * Supports react + comment like class announcements.
+ * Shared student/faculty view for admin announcements.
  */
 export default function PlatformAnnouncements() {
   const { theme } = useTheme();
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const openComments = searchParams.get("comments") === "1";
+  const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+  const canModerateComments = isAdminUser(cachedUser);
 
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ export default function PlatformAnnouncements() {
       setAnnouncements(rows);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to load platform announcements.");
+      setError(err.message || "Failed to load admin announcements.");
     } finally {
       if (!silent) setLoading(false);
     }
@@ -67,8 +69,8 @@ export default function PlatformAnnouncements() {
         <PageHeader
           theme={theme}
           icon={Megaphone}
-          title="Platform announcements"
-          subtitle="Messages from ExamNexus admin. React and comment freely."
+          title="Admin announcements"
+          subtitle="Messages from ExamNexus administrators. React and comment freely."
         />
 
         <div className={panelClass(theme)}>
@@ -76,7 +78,7 @@ export default function PlatformAnnouncements() {
 
           {announcements.length === 0 ? (
             <p className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
-              No platform announcements yet.
+              No admin announcements yet.
             </p>
           ) : (
             <div className="space-y-4">
@@ -86,6 +88,7 @@ export default function PlatformAnnouncements() {
                   announcement={announcement}
                   allowInteract
                   hideSections
+                  canModerateComments={canModerateComments}
                   highlighted={highlightId === String(announcement.id)}
                   autoExpandComments={
                     openComments && highlightId === String(announcement.id)

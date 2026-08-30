@@ -66,7 +66,7 @@ export default function StudentAnnouncementsHubPage() {
         theme={theme}
         icon={Megaphone}
         title="Announcements"
-        subtitle="Read-only class and platform updates for your enrolled subjects."
+        subtitle="Read-only class announcements for your enrolled subjects, plus admin announcements."
       />
 
       {error ? (
@@ -97,13 +97,13 @@ export default function StudentAnnouncementsHubPage() {
         </Select>
       </div>
 
-      {!subjectFilter && platform.length > 0 ? (
+      {!platform.length ? null : (
         <div className={`${panelClass(theme)} mb-5 space-y-3`}>
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">Platform announcements</h2>
+            <h2 className="font-semibold">Admin announcements</h2>
             <button
               type="button"
-              onClick={() => navigate("/student/platform-announcements")}
+              onClick={() => navigate("/student/admin-announcements")}
               className={`text-xs font-semibold underline-offset-2 hover:underline ${
                 theme === "dark" ? "text-emerald-300" : "text-teal-700"
               }`}
@@ -117,7 +117,7 @@ export default function StudentAnnouncementsHubPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(`/student/platform-announcements?highlight=${item.id}`)
+                    navigate(`/student/admin-announcements?highlight=${item.id}`)
                   }
                   className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                     theme === "dark"
@@ -140,7 +140,7 @@ export default function StudentAnnouncementsHubPage() {
             ))}
           </ul>
         </div>
-      ) : null}
+      )}
 
       <div className={`${panelClass(theme)} space-y-3`}>
         <h2 className="font-semibold">Class announcements</h2>

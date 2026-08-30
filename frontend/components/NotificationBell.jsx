@@ -28,7 +28,7 @@ import { motion } from "../utils/motion";
 import ModalPortal from "./ui/ModalPortal";
 
 function statusLabel(item) {
-  if (item.kind === "admin_announcement") return "Platform announcement";
+  if (item.kind === "admin_announcement") return "Admin announcement";
   if (item.kind === "announcement") return "Announcement";
   if (item.kind === "comment") return "Comment";
   if (item.kind === "reaction") return "Reaction";

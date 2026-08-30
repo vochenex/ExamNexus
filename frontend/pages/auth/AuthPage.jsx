@@ -61,6 +61,7 @@ import {
   decryptRememberedPassword,
   encryptRememberedPassword,
   getSavedAccounts,
+  findSavedAccount,
   hasAccountPin,
   hasRememberedPassword,
   removeSavedAccount,
@@ -1046,6 +1047,18 @@ function getAuthInputProps(theme) {
   const authInputProps = getAuthInputProps(theme);
   const swapPanels = authView === "signup";
   const useBlendCard = authView === "login" || authView === "signup";
+  const normalizedLoginEmail = form.email.trim().toLowerCase();
+  const accountAlreadySaved = Boolean(
+    normalizedLoginEmail &&
+      (findSavedAccount(normalizedLoginEmail) ||
+        savedAccounts.some((account) => account.email === normalizedLoginEmail))
+  );
+
+  useEffect(() => {
+    if (accountAlreadySaved && rememberMe) {
+      setRememberMe(false);
+    }
+  }, [accountAlreadySaved, rememberMe]);
 
   return (
     <div
@@ -1691,11 +1704,17 @@ function getAuthInputProps(theme) {
                       <p className="text-red-500 text-xs mt-1">{errors.password}</p>
                     )}
                     {authView === "login" && (
-                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs">
+                      <label
+                        className={`mt-3 flex items-center gap-2 text-xs ${
+                          accountAlreadySaved ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                        }`}
+                      >
                         <input
                           type="checkbox"
                           checked={rememberMe}
+                          disabled={accountAlreadySaved}
                           onChange={(e) => {
+                            if (accountAlreadySaved) return;
                             const checked = e.target.checked;
                             setRememberMe(checked);
                             if (!checked && form.email) {
@@ -1714,11 +1733,13 @@ function getAuthInputProps(theme) {
                           className="h-3.5 w-3.5 shrink-0 rounded border-emerald-400 text-emerald-500 focus:ring-emerald-500"
                         />
                         <span className={`break-words leading-snug ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                          Remember me on this device
+                          {accountAlreadySaved
+                            ? "This account is already saved on this device"
+                            : "Remember me on this device"}
                         </span>
                       </label>
                     )}
-                    {authView === "login" && rememberMe && (
+                    {authView === "login" && rememberMe && !accountAlreadySaved && (
                       <p
                         className={`mt-1.5 text-[11px] leading-snug ${
                           theme === "dark" ? "text-gray-500" : "text-gray-500"

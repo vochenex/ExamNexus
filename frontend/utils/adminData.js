@@ -261,16 +261,16 @@ export async function createAdminBroadcast({ title, body, audience }) {
   const audienceValue = audience || data?.audience || "all";
   const announcementId = data?.id || "";
   const facultyPath = announcementId
-    ? `/faculty/platform-announcements?highlight=${announcementId}&comments=1`
-    : "/faculty/platform-announcements";
+    ? `/faculty/admin-announcements?highlight=${announcementId}&comments=1`
+    : "/faculty/admin-announcements";
   const studentPath = announcementId
-    ? `/student/platform-announcements?highlight=${announcementId}&comments=1`
-    : "/student/platform-announcements";
+    ? `/student/admin-announcements?highlight=${announcementId}&comments=1`
+    : "/student/admin-announcements";
 
   await dispatchBroadcastPush({
     audience: audienceValue,
     title: title || "ExamNexus announcement",
-    body: body || "You have a new platform announcement.",
+    body: body || "You have a new admin announcement.",
     path: studentPath,
     facultyPath,
     studentPath,
