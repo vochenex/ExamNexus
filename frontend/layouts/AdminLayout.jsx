@@ -29,6 +29,7 @@ import SidebarCollapseToggle from "../components/SidebarCollapseToggle";
 import MobileTabBar from "../components/mobile/MobileTabBar";
 import useMobileNav from "../hooks/useMobileNav";
 import useSidebarCollapsed from "../hooks/useSidebarCollapsed";
+import useSidebarPendingBadges from "../hooks/useSidebarPendingBadges";
 import useConnectionStatus from "../hooks/useConnectionStatus";
 import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
@@ -43,6 +44,7 @@ export default function AdminLayout() {
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
+  const pendingBadges = useSidebarPendingBadges("admin");
   const { status: connectionStatus } = useConnectionStatus({ fast: true });
   const nativeApp = isNativeApp();
   const [user, setUser] = useState(() =>
@@ -137,8 +139,8 @@ export default function AdminLayout() {
           </SidebarSection>
 
           <SidebarSection title="People" theme={theme} collapsed={collapsed}>
-            <SidebarNavLink to="/admin/accounts" icon={Users} label="Manage accounts" collapsed={collapsed} />
-            <SidebarNavLink to="/admin/password-resets" icon={KeyRound} label="Password resets" collapsed={collapsed} />
+            <SidebarNavLink to="/admin/accounts" icon={Users} label="Manage accounts" collapsed={collapsed} badge={pendingBadges["/admin/accounts"]} />
+            <SidebarNavLink to="/admin/password-resets" icon={KeyRound} label="Password resets" collapsed={collapsed} badge={pendingBadges["/admin/password-resets"]} />
           </SidebarSection>
 
           <SidebarSection title="Academics" theme={theme} collapsed={collapsed}>
@@ -287,6 +289,7 @@ export default function AdminLayout() {
           user={user}
           displayName={displayName}
           onLogout={handleLogout}
+          pendingBadges={pendingBadges}
         />
       )}
     </div>

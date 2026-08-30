@@ -266,7 +266,6 @@ export default function AdminPasswordResets() {
           }`}
         >
           {pendingCount} password reset request{pendingCount === 1 ? "" : "s"} waiting for action.
-          Ensure the backend is running with <code className="text-xs">SUPABASE_SERVICE_ROLE_KEY</code> to apply new passwords.
         </div>
       )}
 

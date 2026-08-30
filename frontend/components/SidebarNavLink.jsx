@@ -40,6 +40,7 @@ export default function SidebarNavLink({
   label,
   end = false,
   collapsed = false,
+  badge = false,
 }) {
   const { theme } = useTheme();
 
@@ -60,12 +61,20 @@ export default function SidebarNavLink({
       {({ isActive }) => (
         <>
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-[colors,transform] duration-300 ${iconWrapClass(
+            className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-[colors,transform] duration-300 ${iconWrapClass(
               theme,
               isActive
             )}`}
           >
             <Icon size={18} strokeWidth={2.1} />
+            {badge ? (
+              <span
+                className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ${
+                  theme === "dark" ? "ring-2 ring-[#0b1114]" : "ring-2 ring-white"
+                }`}
+                aria-hidden="true"
+              />
+            ) : null}
           </span>
           <span
             className={`en-sidebar-label truncate ${collapsed ? "is-collapsed" : ""}`}
@@ -73,6 +82,12 @@ export default function SidebarNavLink({
           >
             {label}
           </span>
+          {!collapsed && badge ? (
+            <span
+              className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
+              aria-hidden="true"
+            />
+          ) : null}
         </>
       )}
     </ProgressNavLink>

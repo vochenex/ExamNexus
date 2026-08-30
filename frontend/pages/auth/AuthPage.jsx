@@ -829,9 +829,16 @@ function getAuthInputProps(theme) {
       return;
     }
 
-    setLoading(true);
-    setPendingReviewMessage("");
     setServerError("");
+    setSuccessMessage("");
+    setResetStatusResult(null);
+    setShowTempPassword(false);
+
+    const skipSplashLoading = isLogin && rememberMe;
+    if (!skipSplashLoading) {
+      setLoading(true);
+    }
+    setPendingReviewMessage("");
 
     // LOGIN
     if (isLogin) {

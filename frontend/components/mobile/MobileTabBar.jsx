@@ -27,7 +27,7 @@ function readStoredFlexibleTo(defaultTo, flexibleItems) {
   return defaultTo;
 }
 
-function TabButton({ item, active, theme, onClick }) {
+function TabButton({ item, active, theme, onClick, badge = false }) {
   const Icon = item.icon;
   return (
     <ProgressNavLink
@@ -38,7 +38,7 @@ function TabButton({ item, active, theme, onClick }) {
       aria-current={active ? "page" : undefined}
     >
       <span
-        className={`en-tabbar-icon ${
+        className={`relative en-tabbar-icon ${
           active
             ? theme === "dark"
               ? "en-tabbar-icon--active-dark"
@@ -47,6 +47,12 @@ function TabButton({ item, active, theme, onClick }) {
         }`}
       >
         <Icon size={18} strokeWidth={active ? 2.4 : 2} />
+        {badge ? (
+          <span
+            className="absolute right-0 top-0 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white/90"
+            aria-hidden="true"
+          />
+        ) : null}
       </span>
       <span className={`en-tabbar-label ${active ? "en-tabbar-label--active" : ""}`}>
         {item.label}
@@ -55,7 +61,7 @@ function TabButton({ item, active, theme, onClick }) {
   );
 }
 
-export default function MobileTabBar({ role, user, displayName, onLogout }) {
+export default function MobileTabBar({ role, user, displayName, onLogout, pendingBadges = {} }) {
   const { theme } = useTheme();
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -147,6 +153,7 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
               active={isPathActive(location.pathname, item.to, item.end)}
               theme={theme}
               onClick={() => setSheetOpen(false)}
+              badge={Boolean(pendingBadges[item.to])}
             />
           ))}
 
@@ -154,10 +161,18 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
             <button
               type="button"
               onClick={() => setSheetOpen((open) => !open)}
-              className="en-tabbar-item"
+              className="en-tabbar-item relative"
               aria-expanded={sheetOpen}
               aria-label="More menu"
             >
+              {Object.keys(pendingBadges).some((path) =>
+                more.some((item) => item.to === path && pendingBadges[path])
+              ) ? (
+                <span
+                  className="absolute right-3 top-1.5 h-2 w-2 rounded-full bg-red-500"
+                  aria-hidden="true"
+                />
+              ) : null}
               <span
                 className={`en-tabbar-icon ${
                   moreActive || sheetOpen
@@ -224,8 +239,14 @@ export default function MobileTabBar({ role, user, displayName, onLogout }) {
                       }
                       setSheetOpen(false);
                     }}
-                    className={`en-sheet-tile ${active ? "en-sheet-tile--active" : ""}`}
+                    className={`en-sheet-tile relative ${active ? "en-sheet-tile--active" : ""}`}
                   >
+                    {pendingBadges[item.to] ? (
+                      <span
+                        className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500"
+                        aria-hidden="true"
+                      />
+                    ) : null}
                     <Icon size={22} strokeWidth={2.1} />
                     <span>{item.label}</span>
                   </ProgressNavLink>

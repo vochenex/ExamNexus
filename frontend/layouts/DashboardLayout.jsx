@@ -32,6 +32,7 @@ import AnimatedPage from "../components/ui/AnimatedPage";
 import MobileTabBar from "../components/mobile/MobileTabBar";
 import useMobileNav from "../hooks/useMobileNav";
 import useSidebarCollapsed from "../hooks/useSidebarCollapsed";
+import useSidebarPendingBadges from "../hooks/useSidebarPendingBadges";
 import useConnectionStatus from "../hooks/useConnectionStatus";
 import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
@@ -48,10 +49,6 @@ export default function DashboardLayout() {
   const { theme } = useTheme();
   const mobileNav = useMobileNav();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
-  const { status: connectionStatus } = useConnectionStatus({
-    enabled: !isLockdownActive,
-    fast: true,
-  });
   const nativeApp = isNativeApp();
   const cachedUser = getCachedExamNexusUser();
   const [accessState, setAccessState] = useState(cachedUser ? "allowed" : "checking");
@@ -60,6 +57,11 @@ export default function DashboardLayout() {
   );
 
   const user = sessionUser;
+  const pendingBadges = useSidebarPendingBadges(user.role);
+  const { status: connectionStatus } = useConnectionStatus({
+    enabled: !isLockdownActive,
+    fast: true,
+  });
   const isStudent = user.role?.toLowerCase() === "student";
   const showHeaderBack = shouldShowHeaderBack(location.pathname);
 
@@ -204,6 +206,7 @@ export default function DashboardLayout() {
                 label={isStudent ? "Student Dashboard" : "Faculty Dashboard"}
                 end
                 collapsed={collapsed}
+                badge={!isStudent && pendingBadges["/faculty/dashboard"]}
               />
               <SidebarNavLink
                 to={isStudent ? "/student/profile" : "/faculty/profile"}
@@ -416,6 +419,7 @@ export default function DashboardLayout() {
           user={user}
           displayName={displayName}
           onLogout={handleLogout}
+          pendingBadges={pendingBadges}
         />
       )}
     </div>
