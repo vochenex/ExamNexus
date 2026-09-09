@@ -1,10 +1,23 @@
 const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
 const { resolveUserIdFromAccessToken } = require("../lib/verifyAccessToken");
 
+function normalizeRole(profile) {
+  return String(profile?.role || "").trim().toLowerCase();
+}
+
+function normalizeStatus(profile) {
+  const raw = profile?.account_status;
+  if (raw == null || String(raw).trim() === "") return "approved";
+  return String(raw).trim().toLowerCase();
+}
+
 function isApprovedFaculty(profile) {
-  const role = String(profile?.role || "").toLowerCase();
-  const status = profile?.account_status;
-  const approved = status == null || status === "approved";
+  const role = normalizeRole(profile);
+  const status = normalizeStatus(profile);
+  const approved = status === "approved";
+
+  // Admins can manage assessments / AI the same way faculty can.
+  if (role === "admin") return true;
   return role === "faculty" && approved;
 }
 
@@ -34,8 +47,20 @@ async function requireFaculty(req, res, next) {
     }
 
     if (!isApprovedFaculty(profile)) {
+      const role = normalizeRole(profile);
+      const status = normalizeStatus(profile);
+
+      if (role === "faculty" && status !== "approved") {
+        return res.status(403).json({
+          error:
+            status === "pending"
+              ? "Your faculty account is still pending approval. Ask an admin to approve it, then try AI generation again."
+              : "Your faculty account is not approved for AI assessment generation. Contact an administrator.",
+        });
+      }
+
       return res.status(403).json({
-        error: "Only approved faculty accounts can use AI assessment generation.",
+        error: "Only approved faculty or admin accounts can use AI assessment generation.",
       });
     }
 
