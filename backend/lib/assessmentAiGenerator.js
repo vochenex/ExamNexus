@@ -55,6 +55,10 @@ function getChunkSize() {
   if (Number.isFinite(configured) && configured >= 1) {
     return Math.min(10, configured);
   }
+  // Groq truncates large JSON payloads; keep prompt batches small.
+  if (String(process.env.GROQ_API_KEY || "").trim()) {
+    return 3;
+  }
   return DEFAULT_CHUNK_SIZE;
 }
 
@@ -254,10 +258,84 @@ function tryParseJson(text) {
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
     if (start !== -1 && end > start) {
-      return JSON.parse(cleaned.slice(start, end + 1));
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        // fall through to salvage
+      }
     }
+
+    const salvaged = salvageTruncatedQuestionsJson(cleaned);
+    if (salvaged) return salvaged;
+
     throw new Error("Invalid JSON");
   }
+}
+
+/** Recover complete question objects when the model cuts off mid-JSON. */
+function salvageTruncatedQuestionsJson(text) {
+  const markerMatch = String(text || "").match(/"questions"\s*:\s*\[/);
+  if (!markerMatch || markerMatch.index == null) return null;
+
+  const arrayStart = markerMatch.index + markerMatch[0].length;
+  const chunk = String(text).slice(arrayStart);
+  const questions = [];
+  let depth = 0;
+  let objectStart = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < chunk.length; i += 1) {
+    const ch = chunk[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") {
+      if (depth === 0) objectStart = i;
+      depth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      depth -= 1;
+      if (depth === 0 && objectStart >= 0) {
+        const rawObject = chunk.slice(objectStart, i + 1);
+        try {
+          questions.push(JSON.parse(rawObject));
+        } catch {
+          // skip incomplete / invalid object
+        }
+        objectStart = -1;
+      }
+      if (depth < 0) break;
+    }
+  }
+
+  if (!questions.length) return null;
+
+  const titleMatch = String(text).match(/"suggestedTitle"\s*:\s*"((?:\\.|[^"\\])*)"/);
+  const descriptionMatch = String(text).match(
+    /"suggestedDescription"\s*:\s*"((?:\\.|[^"\\])*)"/
+  );
+
+  return {
+    suggestedTitle: titleMatch ? titleMatch[1].replace(/\\"/g, '"') : "",
+    suggestedDescription: descriptionMatch
+      ? descriptionMatch[1].replace(/\\"/g, '"')
+      : "",
+    questions,
+  };
 }
 
 function normalizeTrueFalseAnswer(value) {
@@ -645,7 +723,7 @@ async function requestAiQuestionsBatched({
     absorbQuestions(result.questions);
     if (questions.length === before) {
       emptyStreak += 1;
-      if (emptyStreak >= 2) {
+      if (emptyStreak >= 4) {
         break;
       }
     } else {
@@ -740,7 +818,8 @@ Generate assessment questions that can be saved directly to a database.
 Rules:
 - Return ONLY valid JSON. No markdown fences or commentary.
 - Use only these question types:\n${formatList}
-- Generate exactly ${questionCount} questions unless the source material is too short; never exceed ${questionCount}.
+- Generate exactly ${questionCount} questions. The "questions" array MUST contain exactly ${questionCount} items — never fewer, never more.
+- Do not stop early. Incomplete sets are invalid.
 - Mix formats naturally when multiple types are allowed.
 - multiple_choice: exactly 4 non-empty choices; answer must be A, B, C, or D. Choice strings must NOT include letter prefixes like "A." or "B)".
 - enumeration: provide an "answers" array with every required item in order.
@@ -1235,7 +1314,60 @@ async function requestAiQuestions({
   const content = response.content;
   const normalized = await parseAiResponse(content, allowedFormats);
 
-  if (!normalized.questions.length) {
+  const questions = [...(normalized.questions || [])];
+  const seen = new Set(questions.map((item) => questionDedupeKey(item)).filter(Boolean));
+
+  // Fill shortfalls (common when Groq truncates a large JSON array).
+  let fillStep = 0;
+  const maxFillSteps = Math.max(0, count - questions.length) + 3;
+  while (questions.length < count && fillStep < maxFillSteps) {
+    fillStep += 1;
+    try {
+      const fill = await requestSingleAiQuestion({
+        sourceText,
+        topicPrompt,
+        additionalInstructions: [
+          additionalInstructions,
+          `Already have ${questions.length} of ${count}. Create 1 NEW distinct question.`,
+          questions
+            .slice(-8)
+            .map((item) => item.question)
+            .filter(Boolean)
+            .join(" | ")
+            ? `Do not repeat: ${questions
+                .slice(-8)
+                .map((item) => item.question)
+                .filter(Boolean)
+                .join(" | ")}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        format: pickFormatForStep(allowedFormats, questions.length),
+        difficulty,
+        stepIndex: questions.length,
+        totalSteps: count,
+        mode,
+      });
+
+      const key = questionDedupeKey(fill.question);
+      if (!key || seen.has(key) || isDuplicateQuestion(fill.question, seen)) {
+        continue;
+      }
+      seen.add(key);
+      questions.push(fill.question);
+      if (!normalized.suggestedTitle && fill.suggestedTitle) {
+        normalized.suggestedTitle = fill.suggestedTitle;
+      }
+      if (!normalized.suggestedDescription && fill.suggestedDescription) {
+        normalized.suggestedDescription = fill.suggestedDescription;
+      }
+    } catch {
+      break;
+    }
+  }
+
+  if (!questions.length) {
     const error = new Error(
       "AI could not produce valid questions for the selected formats. Adjust your prompt or formats and try again."
     );
@@ -1244,13 +1376,16 @@ async function requestAiQuestions({
   }
 
   return {
-    ...normalized,
+    suggestedTitle: normalized.suggestedTitle,
+    suggestedDescription: normalized.suggestedDescription,
+    questions: questions.slice(0, count),
     meta: {
       requestedCount: count,
-      generatedCount: normalized.questions.length,
+      generatedCount: Math.min(questions.length, count),
       formats: allowedFormats,
       provider: response.provider,
       model: response.model,
+      filledShortfall: fillStep > 0,
     },
   };
 }

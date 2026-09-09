@@ -517,10 +517,13 @@ async function requestGroqChatCompletion(
   { messages, temperature, jsonMode, timeoutMs, allowJsonFallback = true }
 ) {
   const effectiveTimeout = timeoutMs || getChatTimeoutMs();
+  const maxTokens = Number.parseInt(process.env.GROQ_MAX_TOKENS, 10);
   const body = {
     model: config.model,
     messages,
     temperature,
+    // Without this, Groq often cuts mid-JSON and only a few questions parse.
+    max_tokens: Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : 8192,
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
   };
 

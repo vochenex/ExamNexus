@@ -4,8 +4,8 @@ import { resolvePromptGenerationSettings } from "./promptPreferences";
 import { API_BASE, isLocalApiBase } from "./apiBase.js";
 
 const AI_REQUEST_TIMEOUT_MS = 600000;
-/** Keep each hosted API round small so Vercel's 60s limit is not exceeded. */
-const PROMPT_CLIENT_ROUND_SIZE = 8;
+/** Keep each hosted API round small so Groq/Vercel do not truncate mid-JSON. */
+const PROMPT_CLIENT_ROUND_SIZE = 4;
 const DOCUMENT_CLIENT_ROUND_SIZE = 8;
 
 function backendUnreachableMessage() {
@@ -313,6 +313,7 @@ export async function generateAssessmentFromPrompt({
   let meta = {};
   let lastError = null;
   let highestPercent = 2;
+  let consecutiveSoftFailures = 0;
 
   const emitProgress = (payload) => {
     const nextPercent = Math.max(
@@ -371,21 +372,100 @@ export async function generateAssessmentFromPrompt({
     });
 
     let res;
+    let roundAttempts = 0;
+    const maxRoundAttempts = 2;
     try {
-      const headers = await getAuthHeaders(true, { forceRefresh: allQuestions.length === 0 });
-      res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/generate-from-prompt`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          prompt: trimmed,
-          formats: resolved.formats,
-          questionCount: need,
-          difficulty: resolved.difficulty,
-          additionalInstructions,
-          lockQuestionCount: true,
-        }),
-        signal,
-      });
+      while (roundAttempts < maxRoundAttempts) {
+        roundAttempts += 1;
+        const headers = await getAuthHeaders(true, {
+          forceRefresh: allQuestions.length === 0 && roundAttempts === 1,
+        });
+        res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/generate-from-prompt`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            prompt: trimmed,
+            formats: resolved.formats,
+            questionCount: need,
+            difficulty: resolved.difficulty,
+            additionalInstructions,
+            lockQuestionCount: true,
+          }),
+          signal,
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          lastError = new Error(formatApiError(payload, "Failed to generate questions"));
+          if (roundAttempts < maxRoundAttempts) {
+            await sleep(700 * roundAttempts);
+            continue;
+          }
+          break;
+        }
+
+        const batch = Array.isArray(payload.questions) ? payload.questions : [];
+        if (!batch.length) {
+          lastError = new Error("AI did not return any usable questions.");
+          if (roundAttempts < maxRoundAttempts) {
+            await sleep(700 * roundAttempts);
+            continue;
+          }
+          break;
+        }
+
+        if (!suggestedTitle && payload.suggestedTitle) {
+          suggestedTitle = payload.suggestedTitle;
+        }
+        if (!suggestedDescription && payload.suggestedDescription) {
+          suggestedDescription = payload.suggestedDescription;
+        }
+        meta = {
+          ...(payload.meta || {}),
+          ...(meta || {}),
+          requestedCount: total,
+          generatedCount: allQuestions.length + batch.length,
+          rounds: (meta.rounds || 0) + 1,
+        };
+
+        let addedThisRound = 0;
+        for (const question of batch) {
+          if (allQuestions.length >= total) break;
+          allQuestions.push(question);
+          addedThisRound += 1;
+          const current = allQuestions.length;
+          emitProgress({
+            phase: "prompt",
+            current,
+            total,
+            percent: Math.round(78 + (current / total) * 22),
+            status: "revealing",
+          });
+          emitQuestionReady({
+            onQuestionGenerated,
+            question,
+            step: current - 1,
+            total,
+            phase: "prompt",
+            payload: {
+              suggestedTitle,
+              suggestedDescription,
+            },
+          });
+          if (current < total) {
+            await sleep(40);
+          }
+        }
+
+        // Short rounds are OK — keep looping until we hit the requested total.
+        if (addedThisRound === 0 && roundAttempts < maxRoundAttempts) {
+          await sleep(700 * roundAttempts);
+          continue;
+        }
+        if (addedThisRound === 0) break;
+        lastError = null;
+        break;
+      }
     } catch (error) {
       if (error?.name === "AbortError") throw error;
       lastError = isBackendUnreachable(error)
@@ -394,63 +474,15 @@ export async function generateAssessmentFromPrompt({
       break;
     }
 
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      lastError = new Error(formatApiError(payload, "Failed to generate questions"));
-      break;
+    if (lastError && allQuestions.length === 0) break;
+    if (lastError && allQuestions.length > 0 && allQuestions.length < total) {
+      consecutiveSoftFailures += 1;
+      if (consecutiveSoftFailures >= 3) break;
+      lastError = null;
+      await sleep(500);
+      continue;
     }
-
-    const batch = Array.isArray(payload.questions) ? payload.questions : [];
-    if (!batch.length) {
-      lastError = new Error("AI did not return any usable questions.");
-      break;
-    }
-
-    if (!suggestedTitle && payload.suggestedTitle) {
-      suggestedTitle = payload.suggestedTitle;
-    }
-    if (!suggestedDescription && payload.suggestedDescription) {
-      suggestedDescription = payload.suggestedDescription;
-    }
-    meta = {
-      ...(payload.meta || {}),
-      ...(meta || {}),
-      requestedCount: total,
-      generatedCount: allQuestions.length + batch.length,
-      rounds: (meta.rounds || 0) + 1,
-    };
-
-    let addedThisRound = 0;
-    for (const question of batch) {
-      if (allQuestions.length >= total) break;
-      allQuestions.push(question);
-      addedThisRound += 1;
-      const current = allQuestions.length;
-      emitProgress({
-        phase: "prompt",
-        current,
-        total,
-        percent: Math.round(78 + (current / total) * 22),
-        status: "revealing",
-      });
-      emitQuestionReady({
-        onQuestionGenerated,
-        question,
-        step: current - 1,
-        total,
-        phase: "prompt",
-        payload: {
-          suggestedTitle,
-          suggestedDescription,
-        },
-      });
-      if (current < total) {
-        await sleep(40);
-      }
-    }
-
-    // Avoid infinite loops if the model keeps returning only duplicates/empty progress.
-    if (addedThisRound === 0) break;
+    consecutiveSoftFailures = 0;
   }
 
   const finalQuestions = allQuestions.slice(0, total);
