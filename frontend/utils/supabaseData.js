@@ -2614,46 +2614,77 @@ export async function findSubjectByInviteCode(inviteCode) {
   const normalized = String(inviteCode || "").trim().toLowerCase();
   if (!normalized) return null;
 
+  let subject = null;
+
   const { data: rpcData, error: rpcError } = await supabase.rpc(
     "lookup_subject_by_invite_code",
     { p_invite_code: normalized }
   );
 
   if (!rpcError && rpcData) {
-    return rpcData;
-  }
-
-  if (rpcError && !isMissingRpcError(rpcError)) {
+    subject = rpcData;
+  } else if (rpcError && !isMissingRpcError(rpcError)) {
     if (!rpcError.message?.includes("lookup_subject_by_invite_code")) {
       throw rpcError;
     }
   }
 
-  const { data: sectionHit, error: sectionError } = await supabase
-    .from("subject_section_invites")
-    .select(
-      "section, invite_code, subjects ( id, name, invite_code, teacher_school_id, section_count, year_level )"
-    )
-    .eq("invite_code", normalized)
-    .maybeSingle();
+  if (!subject) {
+    const { data: sectionHit, error: sectionError } = await supabase
+      .from("subject_section_invites")
+      .select(
+        "section, invite_code, subjects ( id, name, invite_code, teacher_school_id, section_count, year_level )"
+      )
+      .eq("invite_code", normalized)
+      .maybeSingle();
 
-  if (!sectionError && sectionHit?.subjects) {
-    return {
-      ...sectionHit.subjects,
-      invite_code: sectionHit.invite_code,
-      section: sectionHit.section,
-    };
+    if (!sectionError && sectionHit?.subjects) {
+      subject = {
+        ...sectionHit.subjects,
+        invite_code: sectionHit.invite_code,
+        section: sectionHit.section,
+      };
+    }
   }
 
-  const { data, error } = await supabase
-    .from("subjects")
-    .select("id, name, invite_code, teacher_school_id, section_count, year_level")
-    .eq("invite_code", normalized)
-    .maybeSingle();
+  if (!subject) {
+    const { data, error } = await supabase
+      .from("subjects")
+      .select("id, name, invite_code, teacher_school_id, section_count, year_level")
+      .eq("invite_code", normalized)
+      .maybeSingle();
 
-  if (error) throw error;
-  if (!data) return null;
-  return { ...data, section: "A" };
+    if (error) throw error;
+    if (!data) return null;
+    subject = { ...data, section: "A" };
+  }
+
+  // Attach assigned faculty so enroll preview can show who owns the subject.
+  if (
+    subject.teacher_school_id &&
+    !subject.faculty_first_name &&
+    !subject.faculty_name
+  ) {
+    try {
+      const faculty = await fetchSubjectFaculty(subject);
+      if (faculty) {
+        subject = {
+          ...subject,
+          faculty_first_name: faculty.first_name,
+          faculty_last_name: faculty.last_name,
+          faculty_avatar_url: faculty.avatar_url,
+          faculty_name: [faculty.first_name, faculty.last_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim(),
+        };
+      }
+    } catch {
+      // Preview can still show the subject without faculty details.
+    }
+  }
+
+  return subject;
 }
 
 export async function getStudentDashboardStats(studentId) {

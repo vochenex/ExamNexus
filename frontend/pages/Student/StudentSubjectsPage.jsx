@@ -134,7 +134,7 @@ export default function StudentSubjects() {
         .finally(() => {
           if (!cancelled) setEnrollLookupPending(false);
         });
-    }, 250);
+    }, 120);
 
     return () => {
       cancelled = true;
@@ -559,11 +559,12 @@ export default function StudentSubjects() {
               ) : enrollLookupPending ? (
                 <p>Looking up invitation code…</p>
               ) : enrollSubjectPreview ? (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <p>
                     Subject:{" "}
                     <span className="font-semibold">{enrollSubjectPreview.name}</span>
                   </p>
+                  <FacultyProfileChip subject={enrollSubjectPreview} compact />
                   <p>
                     Joining:{" "}
                     <span className="font-semibold">
