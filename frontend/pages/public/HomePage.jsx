@@ -124,8 +124,8 @@ export default function HomePage() {
   }, [location.pathname, location.hash]);
 
   const shellClass = isDark
-    ? "en-home-shell min-h-screen w-full max-w-[100vw] overflow-x-clip bg-[#031d1f] text-white"
-    : "en-home-shell min-h-screen w-full max-w-[100vw] overflow-x-clip";
+    ? "en-home-shell min-h-screen w-full max-w-full overflow-x-clip bg-[#031d1f] text-white"
+    : "en-home-shell min-h-screen w-full max-w-full overflow-x-clip";
 
   const mutedText = isDark ? "text-gray-400" : "en-home-muted";
   const cardClass = isDark ? "border-white/10 bg-white/[0.04]" : "en-home-card";

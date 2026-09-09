@@ -1305,25 +1305,29 @@ html:not(.light) .en-install-step-num {
   }
 }
 
-/* Keep fixed/absolute header chrome aligned when ModalPortal locks scroll.
-   Body padding alone does not move viewport-fixed or overlay headers. */
+/* Keep fixed header chrome aligned when body scroll is locked.
+   Body padding covers in-flow/absolute app chrome; fixed headers need an
+   explicit right inset via --en-scroll-lock-offset. */
 :root {
   --en-scroll-lock-offset: 0px;
 }
 
+/* Desktop: reserve classic scrollbar space so lock/unlock never shifts layout. */
+@media (pointer: fine) {
+  html:not(.en-native-app):not(.en-mobile-shell) {
+    scrollbar-gutter: stable;
+  }
+}
+
 html.en-scroll-locked .en-home-site-header {
-  padding-right: var(--en-scroll-lock-offset, 0px);
+  width: auto;
+  right: var(--en-scroll-lock-offset, 0px);
 }
 
 html.en-scroll-locked .en-native-topbar {
   padding-right: calc(
     var(--en-native-px, 0.75rem) + var(--en-scroll-lock-offset, 0px)
   );
-}
-
-html.en-scroll-locked .en-app-header-actions {
-  /* Absolute right-* clusters use margin so responsive right-* stays intact. */
-  margin-right: var(--en-scroll-lock-offset, 0px);
 }
 
 /* Header install icon button + hover tooltip */

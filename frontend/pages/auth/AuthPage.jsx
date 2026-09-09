@@ -70,6 +70,10 @@ import {
   verifyAccountPin,
 } from "../../utils/savedAccounts";
 import DevicePinLock from "../../components/DevicePinLock";
+import {
+  acquireScrollLock,
+  releaseScrollLock,
+} from "../../utils/bodyScrollLock";
 import "../../styles/home.css";
 
 export default function ExamNexusAuth() {
@@ -114,6 +118,13 @@ export default function ExamNexusAuth() {
   useEffect(() => {
     setForm((current) => ({ ...current, password: "" }));
     setShowPassword(false);
+  }, []);
+
+  // Keep the auth page from scrolling under the fixed header when fields focus.
+  useEffect(() => {
+    acquireScrollLock();
+    window.scrollTo(0, 0);
+    return () => releaseScrollLock();
   }, []);
 
   useEffect(() => {
@@ -285,21 +296,37 @@ export default function ExamNexusAuth() {
 
     const authBody = authBodyRef.current;
     const formPanel = formPanelRef.current;
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
 
     authBody?.classList.add("en-auth-body--saved-open");
     formPanel?.classList.add("en-auth-panel-form--saved-open");
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+    acquireScrollLock();
 
     return () => {
       authBody?.classList.remove("en-auth-body--saved-open");
       formPanel?.classList.remove("en-auth-panel-form--saved-open");
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
+      releaseScrollLock();
     };
   }, [savedOpen, authView]);
+
+  // Focusing inputs can make the browser scroll the page/card — freeze scroll instead.
+  useEffect(() => {
+    const root = formPanelRef.current;
+    const authBody = authBodyRef.current;
+    if (!root) return undefined;
+
+    const onFocusIn = () => {
+      const bodyTop = authBody?.scrollTop ?? 0;
+      const windowX = window.scrollX;
+      const windowY = window.scrollY;
+      requestAnimationFrame(() => {
+        if (authBody) authBody.scrollTop = bodyTop;
+        window.scrollTo(windowX, windowY);
+      });
+    };
+
+    root.addEventListener("focusin", onFocusIn);
+    return () => root.removeEventListener("focusin", onFocusIn);
+  }, [authView]);
 
   useEffect(() => {
     if (!savedOpen || authView !== "login") return undefined;

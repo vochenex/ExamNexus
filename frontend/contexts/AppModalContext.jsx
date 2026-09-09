@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import AppModal from "../components/ui/AppModal";
-import { forceUnlockBodyScroll } from "../components/ui/ModalPortal";
+import { forceUnlockBodyScroll } from "../../utils/bodyScrollLock";
 
 const AppModalContext = createContext(null);
 

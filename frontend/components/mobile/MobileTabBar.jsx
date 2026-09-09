@@ -8,7 +8,7 @@ import {
   getMobileNav,
   STUDENT_FLEX_SLOT_STORAGE_KEY,
 } from "./mobileNav";
-import { forceUnlockBodyScroll } from "../ui/ModalPortal";
+import { forceUnlockBodyScroll } from "../../utils/bodyScrollLock";
 
 function isPathActive(pathname, to, end) {
   if (end) return pathname === to;

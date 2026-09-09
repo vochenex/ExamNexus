@@ -12,6 +12,10 @@ import { isNativeApp } from "../../utils/platform";
 import { getCachedExamNexusUser } from "../../utils/authUser";
 import { primaryButton } from "../../utils/themeButtons";
 import { homeNavSectionFromHref, useHomeActiveSection } from "../../hooks/useHomeActiveSection";
+import {
+  acquireScrollLock,
+  releaseScrollLock,
+} from "../../utils/bodyScrollLock";
 
 const NAV_LINKS = [
   { label: "Home", href: "#home" },
@@ -55,8 +59,7 @@ export default function HomeSiteHeader() {
   useEffect(() => {
     if (!menuOpen) return undefined;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    acquireScrollLock();
 
     const onKeyDown = (event) => {
       if (event.key === "Escape") closeMenu();
@@ -64,7 +67,7 @@ export default function HomeSiteHeader() {
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScrollLock();
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [menuOpen]);
