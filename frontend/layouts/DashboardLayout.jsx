@@ -399,7 +399,7 @@ export default function DashboardLayout() {
                   </div>
                 )}
                 <div
-                  className={`absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
+                  className={`en-app-header-actions absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-5 sm:gap-2.5 lg:right-8 lg:top-6 ${motion.fadeInDown} en-delay-2`}
                 >
                   <InstallIconButton compact />
                   <PushEnableButton compact />

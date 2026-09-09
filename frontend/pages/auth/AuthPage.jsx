@@ -748,7 +748,13 @@ function getAuthInputProps(theme) {
         });
 
         if (error) {
-          setServerError(formatSupabaseError(error, { context: "login" }));
+          const { accounts } = removeSavedAccount(unlockEmail);
+          setSavedAccounts(accounts);
+          setServerError(
+            /invalid login credentials/i.test(error.message || "")
+              ? "No account registered. Try signing up."
+              : formatSupabaseError(error, { context: "login" })
+          );
           setLoading(false);
           return false;
         }
@@ -771,8 +777,7 @@ function getAuthInputProps(theme) {
           setServerError(
             formatSupabaseError(profileError, {
               context: "profile",
-              fallback:
-                "Your account exists but the profile could not be loaded. Run database/users_signup_policies.sql in Supabase, then try again.",
+              fallback: "Could not load your profile. Try again later.",
             })
           );
           setLoading(false);
@@ -881,8 +886,7 @@ function getAuthInputProps(theme) {
         setServerError(
           formatSupabaseError(profileError, {
             context: "profile",
-            fallback:
-              "Your account exists but the profile could not be loaded. Run database/users_signup_policies.sql in Supabase, then try again.",
+            fallback: "Could not load your profile. Try again later.",
           })
         );
         setLoading(false);

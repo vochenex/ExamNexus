@@ -29,6 +29,7 @@ import {
   reviewAdminAccount,
   updateAdminUser,
 } from "../../utils/adminData";
+import { removeSavedAccountMatch } from "../../utils/savedAccounts";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
 import { iconButton, primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
@@ -70,6 +71,14 @@ function statusBadge(theme, status) {
   );
 }
 
+function isAdminRole(user) {
+  return String(user?.role || "").toLowerCase() === "admin";
+}
+
+function clearLocalSavedLogin(user) {
+  removeSavedAccountMatch({ email: user?.email, userId: user?.id });
+}
+
 export default function AdminAccounts() {
   const { theme } = useTheme();
   const { success, error, confirm } = useAppModal();
@@ -83,15 +92,20 @@ export default function AdminAccounts() {
   const [reviewingId, setReviewingId] = useState(null);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkRejecting, setBulkRejecting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
+  const currentUser = useMemo(
+    () => JSON.parse(localStorage.getItem("examnexus_user") || "{}"),
+    []
+  );
 
   const pendingUsers = useMemo(
     () =>
       users.filter(
-        (user) =>
-          getAccountStatus(user) === "pending" &&
-          String(user.role || "").toLowerCase() !== "admin"
+        (user) => getAccountStatus(user) === "pending" && !isAdminRole(user)
       ),
     [users]
   );
@@ -109,12 +123,52 @@ export default function AdminAccounts() {
     });
   }, [users, searchQuery]);
 
+  const selectableVisibleUsers = useMemo(
+    () =>
+      visibleUsers.filter(
+        (user) => !isAdminRole(user) && user.id !== currentUser.id
+      ),
+    [visibleUsers, currentUser.id]
+  );
+
+  const selectedVisibleUsers = useMemo(
+    () => selectableVisibleUsers.filter((user) => selectedIds.has(user.id)),
+    [selectableVisibleUsers, selectedIds]
+  );
+
+  const selectedPendingUsers = useMemo(
+    () =>
+      selectedVisibleUsers.filter(
+        (user) => getAccountStatus(user) === "pending"
+      ),
+    [selectedVisibleUsers]
+  );
+
+  const allVisibleSelected =
+    selectableVisibleUsers.length > 0 &&
+    selectableVisibleUsers.every((user) => selectedIds.has(user.id));
+
+  const busy =
+    bulkApproving ||
+    bulkRejecting ||
+    bulkDeleting ||
+    reviewingId !== null ||
+    deletingId !== null ||
+    saving;
+
   const load = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
       setLoadError("");
       const rows = await fetchAdminUsers(roleFilter || null, statusFilter || null);
       setUsers(rows);
+      setSelectedIds((prev) => {
+        const next = new Set();
+        for (const id of prev) {
+          if (rows.some((row) => row.id === id)) next.add(id);
+        }
+        return next;
+      });
     } catch (err) {
       console.error(err);
       setUsers([]);
@@ -130,6 +184,27 @@ export default function AdminAccounts() {
     () => getCoursesForDepartment(editing?.department),
     [editing?.department]
   );
+
+  const toggleSelected = (userId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const user of selectableVisibleUsers) next.delete(user.id);
+      } else {
+        for (const user of selectableVisibleUsers) next.add(user.id);
+      }
+      return next;
+    });
+  };
 
   const handleSave = async () => {
     if (!editing) return;
@@ -147,13 +222,13 @@ export default function AdminAccounts() {
     try {
       setSaving(true);
       await updateAdminUser(editing.id, editing);
-      await success("Account updated successfully.");
       setEditing(null);
       await load(true);
-    } catch (err) {
-      error(err.message || "Failed to update account.");
-    } finally {
       setSaving(false);
+      await success("Account updated successfully.");
+    } catch (err) {
+      setSaving(false);
+      error(err.message || "Failed to update account.");
     }
   };
 
@@ -173,12 +248,12 @@ export default function AdminAccounts() {
     try {
       setReviewingId(user.id);
       await reviewAdminAccount(user.id, action);
-      await success(action === "approve" ? "Account approved." : "Account rejected.");
       await load(true);
-    } catch (err) {
-      error(err.message || `Failed to ${action} account.`);
-    } finally {
       setReviewingId(null);
+      await success(action === "approve" ? "Account approved." : "Account rejected.");
+    } catch (err) {
+      setReviewingId(null);
+      error(err.message || `Failed to ${action} account.`);
     }
   };
 
@@ -201,14 +276,45 @@ export default function AdminAccounts() {
       for (const user of pendingUsers) {
         await reviewAdminAccount(user.id, "approve");
       }
-      await success(
-        `Approved ${pendingUsers.length} account${pendingUsers.length === 1 ? "" : "s"}.`
-      );
+      const count = pendingUsers.length;
       await load(true);
-    } catch (err) {
-      error(err.message || "Failed to approve all accounts.");
-    } finally {
       setBulkApproving(false);
+      await success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
+    } catch (err) {
+      setBulkApproving(false);
+      error(err.message || "Failed to approve all accounts.");
+    }
+  };
+
+  const handleApproveSelected = async () => {
+    if (!selectedPendingUsers.length) {
+      error("Select at least one pending account to approve.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: "Approve selected accounts?",
+      message: `Approve ${selectedPendingUsers.length} selected account${
+        selectedPendingUsers.length === 1 ? "" : "s"
+      }?`,
+      tone: "success",
+      confirmLabel: "Approve selected",
+    });
+    if (!ok) return;
+
+    try {
+      setBulkApproving(true);
+      for (const user of selectedPendingUsers) {
+        await reviewAdminAccount(user.id, "approve");
+      }
+      const count = selectedPendingUsers.length;
+      setSelectedIds(new Set());
+      await load(true);
+      setBulkApproving(false);
+      await success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
+    } catch (err) {
+      setBulkApproving(false);
+      error(err.message || "Failed to approve selected accounts.");
     }
   };
 
@@ -231,19 +337,56 @@ export default function AdminAccounts() {
       for (const user of pendingUsers) {
         await reviewAdminAccount(user.id, "reject");
       }
-      await success(
-        `Rejected ${pendingUsers.length} account${pendingUsers.length === 1 ? "" : "s"}.`
-      );
+      const count = pendingUsers.length;
       await load(true);
-    } catch (err) {
-      error(err.message || "Failed to reject all accounts.");
-    } finally {
       setBulkRejecting(false);
+      await success(`Rejected ${count} account${count === 1 ? "" : "s"}.`);
+    } catch (err) {
+      setBulkRejecting(false);
+      error(err.message || "Failed to reject all accounts.");
+    }
+  };
+
+  const deleteUsers = async (targets, { title, message, confirmLabel, successLabel }) => {
+    if (!targets.length) {
+      error("No accounts available to delete.");
+      return;
+    }
+
+    const ok = await confirm({
+      title,
+      message,
+      tone: "danger",
+      confirmLabel,
+    });
+    if (!ok) return;
+
+    const ids = new Set(targets.map((user) => user.id));
+    try {
+      setBulkDeleting(true);
+      for (const user of targets) {
+        setDeletingId(user.id);
+        await deleteAdminUser(user.id);
+        clearLocalSavedLogin(user);
+      }
+      setUsers((prev) => prev.filter((user) => !ids.has(user.id)));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setDeletingId(null);
+      await load(true);
+      setBulkDeleting(false);
+      await success(successLabel);
+    } catch (err) {
+      setDeletingId(null);
+      setBulkDeleting(false);
+      error(err.message || "Failed to delete account.");
     }
   };
 
   const handleDelete = async (user) => {
-    const currentUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
     if (user.id === currentUser.id) {
       error("You cannot delete your own admin account while signed in.");
       return;
@@ -260,13 +403,45 @@ export default function AdminAccounts() {
     try {
       setDeletingId(user.id);
       await deleteAdminUser(user.id);
-      await success("Account deleted.");
-      await load(true);
-    } catch (err) {
-      error(err.message || "Failed to delete account.");
-    } finally {
+      clearLocalSavedLogin(user);
+      setUsers((prev) => prev.filter((row) => row.id !== user.id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(user.id);
+        return next;
+      });
       setDeletingId(null);
+      await load(true);
+      await success("Account deleted.");
+    } catch (err) {
+      setDeletingId(null);
+      error(err.message || "Failed to delete account.");
     }
+  };
+
+  const handleDeleteSelected = async () => {
+    await deleteUsers(selectedVisibleUsers, {
+      title: "Delete selected accounts?",
+      message: `Permanently delete ${selectedVisibleUsers.length} selected account${
+        selectedVisibleUsers.length === 1 ? "" : "s"
+      }? This cannot be undone.`,
+      confirmLabel: "Delete selected",
+      successLabel: `Deleted ${selectedVisibleUsers.length} account${
+        selectedVisibleUsers.length === 1 ? "" : "s"
+      }.`,
+    });
+  };
+
+  const handleDeleteAll = async () => {
+    const targets = selectableVisibleUsers;
+    await deleteUsers(targets, {
+      title: "Delete all listed accounts?",
+      message: `Permanently delete all ${targets.length} non-admin account${
+        targets.length === 1 ? "" : "s"
+      } in the current list? This cannot be undone.`,
+      confirmLabel: "Delete all",
+      successLabel: `Deleted ${targets.length} account${targets.length === 1 ? "" : "s"}.`,
+    });
   };
 
   if (loading && users.length === 0) return <PageLoadingSkeleton theme={theme} variant="list" />;
@@ -338,7 +513,7 @@ export default function AdminAccounts() {
               onClick={handleApproveAll}
               loading={bulkApproving}
               loadingLabel="Approving..."
-              disabled={bulkRejecting || reviewingId !== null}
+              disabled={busy && !bulkApproving}
               className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
               aria-label="Approve all pending accounts"
               title="Approve all pending accounts"
@@ -351,7 +526,7 @@ export default function AdminAccounts() {
               onClick={handleRejectAll}
               loading={bulkRejecting}
               loadingLabel="Rejecting..."
-              disabled={bulkApproving || reviewingId !== null}
+              disabled={busy && !bulkRejecting}
               className={dangerButton(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
               aria-label="Reject all pending accounts"
               title="Reject all pending accounts"
@@ -360,6 +535,51 @@ export default function AdminAccounts() {
               Reject all
             </ProgressButton>
           </>
+        )}
+        {selectedPendingUsers.length > 0 && (
+          <ProgressButton
+            type="button"
+            onClick={handleApproveSelected}
+            loading={bulkApproving}
+            loadingLabel="Approving..."
+            disabled={busy && !bulkApproving}
+            className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
+            aria-label="Approve selected accounts"
+            title="Approve selected accounts"
+          >
+            <Check size={14} />
+            Approve selected ({selectedPendingUsers.length})
+          </ProgressButton>
+        )}
+        {selectedVisibleUsers.length > 0 && (
+          <ProgressButton
+            type="button"
+            onClick={handleDeleteSelected}
+            loading={bulkDeleting}
+            loadingLabel="Deleting..."
+            disabled={busy && !bulkDeleting}
+            className={dangerButton(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
+            aria-label="Delete selected accounts"
+            title="Delete selected accounts"
+          >
+            <Trash2 size={14} />
+            Delete selected ({selectedVisibleUsers.length})
+          </ProgressButton>
+        )}
+        {selectableVisibleUsers.length > 0 && (
+          <ProgressButton
+            type="button"
+            onClick={handleDeleteAll}
+            loading={bulkDeleting}
+            loadingLabel="Deleting..."
+            disabled={busy && !bulkDeleting}
+            className={dangerButton(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
+            aria-label="Delete all listed accounts"
+            title="Delete all listed non-admin accounts"
+          >
+            <Trash2 size={14} />
+            Delete all
+          </ProgressButton>
         )}
         </div>
       </div>
@@ -378,6 +598,16 @@ export default function AdminAccounts() {
           <table className={`${adminTableClass(theme)} min-w-[76rem]`}>
             <thead>
               <tr>
+                <th className={`${adminThClass(theme)} w-10`}>
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    disabled={selectableVisibleUsers.length === 0 || busy}
+                    aria-label="Select all listed accounts"
+                    className="h-4 w-4 rounded border-emerald-400/40"
+                  />
+                </th>
                 <th className={`${adminThClass(theme)} w-12`}>#</th>
                 <th className={`${adminThClass(theme)} min-w-[11rem]`}>Name</th>
                 <th className={`${adminThClass(theme)} min-w-[14rem]`}>Email</th>
@@ -392,10 +622,21 @@ export default function AdminAccounts() {
               {visibleUsers.map((user, index) => {
                   const status = getAccountStatus(user);
                   const isPending = status === "pending";
-                  const isAdmin = String(user.role || "").toLowerCase() === "admin";
+                  const isAdmin = isAdminRole(user);
+                  const canSelect = !isAdmin && user.id !== currentUser.id;
 
                   return (
                     <tr key={user.id}>
+                      <td className={adminTdClass(theme)}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(user.id)}
+                          onChange={() => toggleSelected(user.id)}
+                          disabled={!canSelect || busy}
+                          aria-label={`Select ${user.email}`}
+                          className="h-4 w-4 rounded border-emerald-400/40"
+                        />
+                      </td>
                       <td className={`${adminTdClass(theme)} tabular-nums text-gray-500`}>
                         {index + 1}
                       </td>
@@ -425,7 +666,7 @@ export default function AdminAccounts() {
                               loading={reviewingId === user.id}
                               loadingLabel="Approving account"
                               iconOnly
-                              disabled={bulkApproving || bulkRejecting || (reviewingId !== null && reviewingId !== user.id)}
+                              disabled={busy && reviewingId !== user.id}
                               onClick={() => handleReview(user, "approve")}
                               className={iconButton(theme, "primary")}
                               aria-label={`Approve ${user.email}`}
@@ -440,6 +681,7 @@ export default function AdminAccounts() {
                             className={iconButton(theme, "secondary")}
                             aria-label={`Edit ${user.email}`}
                             title="Edit"
+                            disabled={busy}
                           >
                             <Pencil size={16} />
                           </button>
@@ -449,7 +691,7 @@ export default function AdminAccounts() {
                               loading={deletingId === user.id}
                               loadingLabel="Deleting account"
                               iconOnly
-                              disabled={bulkApproving || bulkRejecting || reviewingId !== null || saving || (deletingId !== null && deletingId !== user.id)}
+                              disabled={busy && deletingId !== user.id}
                               onClick={() => handleDelete(user)}
                               className={iconButton(theme, "danger")}
                               aria-label={`Delete ${user.email}`}

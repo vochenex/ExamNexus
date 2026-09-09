@@ -85,23 +85,29 @@ export function formatSupabaseError(error, options = {}) {
     return "This email is already registered. Log in or reset your password.";
   }
 
-  if (/invalid login credentials/i.test(message)) {
+  if (
+    /invalid login credentials/i.test(message) ||
+    includesAny(lower, ["user not found", "email not found", "no user found"])
+  ) {
     if (context === "login") {
-      return "Incorrect email or password. If your email was recently changed in Supabase, sign in with the new school email (lastname.firstname@crmc.en.com), not your old Gmail address.";
+      if (includesAny(lower, ["user not found", "email not found", "no user found"])) {
+        return "No account registered. Try signing up.";
+      }
+      return "Review your email and password.";
     }
-    return "Incorrect email or password.";
+    return "Review your email and password.";
   }
 
   if (/email not confirmed/i.test(message)) {
-    return "Confirm your email address before logging in.";
+    return "Confirm your email before logging in.";
   }
 
   if (isMissingRpcError(error)) {
     if (context === "signup" || context === "profile") {
-      return "Account setup is incomplete. Run database/users_signup_policies.sql in Supabase, then reload the API schema.";
+      return "Account setup is incomplete. Contact an administrator.";
     }
     if (context === "forgot-password") {
-      return "Password reset is not set up yet. Run database/admin_platform_fixes.sql in Supabase, then reload the API schema.";
+      return "Password reset is not available yet. Contact an administrator.";
     }
   }
 

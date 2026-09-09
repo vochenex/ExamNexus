@@ -257,6 +257,45 @@ export function removeSavedAccount(email) {
   return { accounts: next, removed };
 }
 
+/** Drop a remembered login by auth/user id and/or email (e.g. after admin delete). */
+export function removeSavedAccountMatch({ email, userId } = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  const id = String(userId || "").trim();
+  if (!normalizedEmail && !id) {
+    return { accounts: getSavedAccounts(), removed: null };
+  }
+
+  const accounts = getSavedAccounts();
+  const removed = accounts.find((account) => {
+    const accountEmail = String(account.email || "").toLowerCase();
+    const accountId = String(account.user_id || "").trim();
+    return (
+      (normalizedEmail && accountEmail === normalizedEmail) ||
+      (id && accountId && accountId === id)
+    );
+  });
+
+  if (!removed) {
+    return { accounts, removed: null };
+  }
+
+  const next = accounts.filter((account) => {
+    const accountEmail = String(account.email || "").toLowerCase();
+    const accountId = String(account.user_id || "").trim();
+    const emailHit = normalizedEmail && accountEmail === normalizedEmail;
+    const idHit = id && accountId && accountId === id;
+    return !(emailHit || idHit);
+  });
+
+  writeJson(ACCOUNTS_KEY, next);
+  const clearEmail = normalizedEmail || normalizeEmail(removed.email);
+  if (clearEmail) {
+    clearAccountPin(clearEmail);
+    clearRememberedPassword(clearEmail);
+  }
+  return { accounts: next, removed };
+}
+
 export async function encryptRememberedPassword(email, password, pin) {
   const normalizedEmail = normalizeEmail(email);
   const value = String(password || "");
