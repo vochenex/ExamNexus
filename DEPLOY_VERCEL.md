@@ -40,11 +40,10 @@ Add **all** of these (Production). Copy values from your local `.env` and `backe
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` (secret) |
 | `SUPABASE_JWT_SECRET` | `backend/.env` |
 | `GEMINI_API_KEY` | `backend/.env` |
-| `GEMINI_MODEL` | `gemini-2.5-flash` (optional) |
-| `GROQ_API_KEY` | `backend/.env` (prompt generation) |
-| `GROQ_MODEL` | `openai/gpt-oss-20b` (required `openai/` prefix; llama-3.1 retired Aug 2026) |
-| `GROQ_FALLBACK_MODEL` | `openai/gpt-oss-120b` (optional) |
-| `GROQ_SECONDARY_FALLBACK_MODEL` | `qwen/qwen3.6-27b` (optional) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` (documents) |
+| `GEMINI_PROMPT_MODEL` | `gemini-2.0-flash` (topic/prompt generation) |
+| `GROQ_API_KEY` | optional fallback only |
+| `AI_PROMPT_PROVIDER` | leave unset (Gemini) or `groq` to force Groq |
 
 Optional push:
 

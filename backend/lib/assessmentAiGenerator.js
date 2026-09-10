@@ -43,8 +43,8 @@ function getBatchDelayMs() {
   if (Number.isFinite(configured) && configured >= 0) {
     return configured;
   }
-  // Groq free tier allows higher RPM than Gemini free; keep only a short gap.
-  if (String(process.env.GROQ_API_KEY || "").trim()) {
+  // Groq is only used when AI_PROMPT_PROVIDER=groq.
+  if (String(process.env.AI_PROMPT_PROVIDER || "").trim().toLowerCase() === "groq") {
     return DEFAULT_GROQ_BATCH_DELAY_MS;
   }
   return DEFAULT_BATCH_DELAY_MS;
@@ -54,10 +54,6 @@ function getChunkSize() {
   const configured = Number.parseInt(process.env.GEMINI_CHUNK_SIZE, 10);
   if (Number.isFinite(configured) && configured >= 1) {
     return Math.min(10, configured);
-  }
-  // Groq truncates large JSON payloads; keep prompt batches small.
-  if (String(process.env.GROQ_API_KEY || "").trim()) {
-    return 3;
   }
   return DEFAULT_CHUNK_SIZE;
 }

@@ -1,6 +1,8 @@
 const { Agent, fetch: undiciFetch } = require("undici");
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+// Prompt generation uses a separate Flash model from document analysis.
+const DEFAULT_GEMINI_PROMPT_MODEL = "gemini-2.0-flash";
 // llama-3.1-8b-instant / llama-3.3-70b-versatile were retired for free/developer
 // tiers on 2026-08-16. gpt-oss ids MUST include the openai/ prefix.
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
@@ -143,6 +145,17 @@ function getGeminiModel() {
   return String(
     process.env.GEMINI_MODEL || process.env.GEMINI_ASSESSMENT_MODEL || DEFAULT_GEMINI_MODEL
   ).trim();
+}
+
+/** Flash model used for teacher topic/prompt generation (separate from documents). */
+function getGeminiPromptModel() {
+  return String(
+    process.env.GEMINI_PROMPT_MODEL || DEFAULT_GEMINI_PROMPT_MODEL
+  ).trim() || DEFAULT_GEMINI_PROMPT_MODEL;
+}
+
+function preferGroqForPrompts() {
+  return String(process.env.AI_PROMPT_PROVIDER || "").trim().toLowerCase() === "groq";
 }
 
 function getGeminiApiKey() {
@@ -317,11 +330,20 @@ function assertGeminiConfigured() {
 }
 
 function assertPromptAiConfigured() {
+  const gemini = getGeminiRuntimeConfig();
+  if (gemini) {
+    return {
+      ...gemini,
+      model: getGeminiPromptModel(),
+    };
+  }
   const groq = getGroqRuntimeConfig();
   if (groq) {
     return groq;
   }
-  return assertGeminiConfigured();
+  const error = new Error(formatGeminiConfigError());
+  error.statusCode = 503;
+  throw error;
 }
 
 async function postJsonWithTimeout(urlString, body, timeoutMs, headers = {}) {
@@ -619,71 +641,112 @@ async function requestChatCompletion({
   jsonMode = true,
   timeoutMs,
   isDocument = false,
+  model = null,
 }) {
   const config = assertGeminiConfigured();
-  const content = await requestGeminiChatCompletion(config, {
-    messages,
-    temperature,
-    jsonMode,
-    timeoutMs,
-    isDocument,
-  });
+  const resolvedModel = String(model || config.model).trim() || config.model;
+  const content = await requestGeminiChatCompletion(
+    { ...config, model: resolvedModel },
+    {
+      messages,
+      temperature,
+      jsonMode,
+      timeoutMs,
+      isDocument,
+    }
+  );
 
   return {
     content,
     provider: config.provider,
-    model: config.model,
+    model: resolvedModel,
   };
 }
 
-async function requestPromptChatCompletion(options) {
+async function requestPromptViaGroq(options) {
   const groq = getGroqRuntimeConfig();
-  if (groq) {
-    let lastError = null;
-    const modelsToTry = [groq.model, ...getGroqFallbackCandidates(groq.model)];
-
-    for (const model of modelsToTry) {
-      try {
-        if (model !== groq.model) {
-          console.warn(
-            `[assessment-ai] Trying Groq model ${model} (after ${groq.model}).`
-          );
-        }
-        const content = await requestGroqChatCompletion(
-          { ...groq, model },
-          options
-        );
-        return {
-          content,
-          provider: groq.provider,
-          model,
-        };
-      } catch (error) {
-        lastError = error;
-        if (isGroqJsonFailure(error) && getGeminiRuntimeConfig()) {
-          console.warn(
-            "[assessment-ai] Groq JSON failed; using Gemini for prompt."
-          );
-          return requestChatCompletion(options);
-        }
-        // Keep trying other Groq models on missing/busy models; otherwise stop Groq loop.
-        if (!isHighDemandError(error) && !isModelUnavailableError(error)) {
-          break;
-        }
-      }
-    }
-
-    if (getGeminiRuntimeConfig()) {
-      console.warn(
-        "[assessment-ai] Groq unavailable; falling back to Gemini for prompt."
-      );
-      return requestChatCompletion(options);
-    }
-
-    throw lastError || new Error(formatGroqConfigError());
+  if (!groq) {
+    throw new Error(formatGroqConfigError());
   }
 
-  return requestChatCompletion(options);
+  let lastError = null;
+  const modelsToTry = [groq.model, ...getGroqFallbackCandidates(groq.model)];
+
+  for (const model of modelsToTry) {
+    try {
+      if (model !== groq.model) {
+        console.warn(
+          `[assessment-ai] Trying Groq model ${model} (after ${groq.model}).`
+        );
+      }
+      const content = await requestGroqChatCompletion(
+        { ...groq, model },
+        options
+      );
+      return {
+        content,
+        provider: groq.provider,
+        model,
+      };
+    } catch (error) {
+      lastError = error;
+      if (!isHighDemandError(error) && !isModelUnavailableError(error)) {
+        break;
+      }
+    }
+  }
+
+  throw lastError || new Error(formatGroqConfigError());
+}
+
+async function requestPromptChatCompletion(options) {
+  const gemini = getGeminiRuntimeConfig();
+  const groq = getGroqRuntimeConfig();
+  const forceGroq = preferGroqForPrompts();
+
+  // Default: Gemini Flash for prompts. Groq only if forced or as fallback.
+  if (gemini && !forceGroq) {
+    try {
+      return await requestChatCompletion({
+        ...options,
+        model: getGeminiPromptModel(),
+      });
+    } catch (error) {
+      if (groq) {
+        console.warn(
+          "[assessment-ai] Gemini prompt failed; falling back to Groq."
+        );
+        try {
+          return await requestPromptViaGroq(options);
+        } catch {
+          throw error;
+        }
+      }
+      throw error;
+    }
+  }
+
+  if (groq) {
+    try {
+      return await requestPromptViaGroq(options);
+    } catch (error) {
+      if (gemini) {
+        console.warn(
+          "[assessment-ai] Groq prompt failed; falling back to Gemini Flash."
+        );
+        return requestChatCompletion({
+          ...options,
+          model: getGeminiPromptModel(),
+        });
+      }
+      throw error;
+    }
+  }
+
+  return requestChatCompletion({
+    ...options,
+    model: getGeminiPromptModel(),
+  });
 }
 
 async function requestDocumentChatCompletion(options) {
@@ -700,11 +763,14 @@ async function getAiServiceStatus() {
   const gemini = getGeminiRuntimeConfig();
   const groq = getGroqRuntimeConfig();
   const documentConfigured = Boolean(gemini);
-  const promptConfigured = Boolean(groq || gemini);
+  const promptConfigured = Boolean(gemini || groq);
   const configured = documentConfigured && promptConfigured;
 
-  const promptProvider = groq ? "groq" : gemini ? "gemini" : "gemini";
-  const promptModel = groq?.model || gemini?.model || getGroqModel();
+  const useGroqPrompt = Boolean(groq) && (preferGroqForPrompts() || !gemini);
+  const promptProvider = useGroqPrompt ? "groq" : gemini ? "gemini" : "gemini";
+  const promptModel = useGroqPrompt
+    ? groq?.model || getGroqModel()
+    : getGeminiPromptModel();
   const documentModel = gemini?.model || getGeminiModel();
 
   let error = null;
@@ -721,7 +787,7 @@ async function getAiServiceStatus() {
       }
     } else if (!promptConfigured) {
       error =
-        "No prompt AI configured. Add GROQ_API_KEY or GEMINI_API_KEY to backend/.env, then restart the backend.";
+        "No prompt AI configured. Add GEMINI_API_KEY to backend/.env, then restart the backend.";
     }
   }
 
@@ -746,7 +812,7 @@ async function getAiServiceStatus() {
         ? null
         : rawGroqKey
           ? "Groq API key looks invalid."
-          : "Groq not configured (prompts will use Gemini).",
+          : "Groq not configured (optional fallback for prompts).",
     },
     error: configured ? null : error,
   };
@@ -754,6 +820,7 @@ async function getAiServiceStatus() {
 
 module.exports = {
   getGeminiModel,
+  getGeminiPromptModel,
   getGroqModel,
   getGeminiRuntimeConfig,
   getGroqRuntimeConfig,
