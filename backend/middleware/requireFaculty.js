@@ -7,18 +7,16 @@ function normalizeRole(profile) {
 
 function normalizeStatus(profile) {
   const raw = profile?.account_status;
+  // Legacy rows with no status are treated as approved.
   if (raw == null || String(raw).trim() === "") return "approved";
   return String(raw).trim().toLowerCase();
 }
 
+/** Faculty AI routes: faculty role only, after normal signup account approval. */
 function isApprovedFaculty(profile) {
   const role = normalizeRole(profile);
   const status = normalizeStatus(profile);
-  const approved = status === "approved";
-
-  // Admins can manage assessments / AI the same way faculty can.
-  if (role === "admin") return true;
-  return role === "faculty" && approved;
+  return role === "faculty" && status === "approved";
 }
 
 async function requireFaculty(req, res, next) {
@@ -43,24 +41,33 @@ async function requireFaculty(req, res, next) {
       .maybeSingle();
 
     if (profileError || !profile) {
-      return res.status(403).json({ error: "Faculty profile not found." });
+      return res.status(403).json({
+        error: "Faculty profile not found. Sign in with a faculty account.",
+      });
     }
 
     if (!isApprovedFaculty(profile)) {
       const role = normalizeRole(profile);
       const status = normalizeStatus(profile);
 
+      if (role === "admin") {
+        return res.status(403).json({
+          error:
+            "AI assessment generation is for faculty accounts only. Sign in as faculty to use it.",
+        });
+      }
+
       if (role === "faculty" && status !== "approved") {
         return res.status(403).json({
           error:
             status === "pending"
-              ? "Your faculty account is still pending approval. Ask an admin to approve it, then try AI generation again."
-              : "Your faculty account is not approved for AI assessment generation. Contact an administrator.",
+              ? "Your faculty account is still pending signup approval. Once an admin approves your account, you can use AI generation."
+              : "Your faculty account is not approved yet. Contact an administrator.",
         });
       }
 
       return res.status(403).json({
-        error: "Only approved faculty or admin accounts can use AI assessment generation.",
+        error: "AI assessment generation is for faculty accounts only.",
       });
     }
 
