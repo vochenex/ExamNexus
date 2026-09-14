@@ -23,11 +23,11 @@ const promptKey = get("GEMINI_PROMPT_API_KEY");
 const vars = {
   GEMINI_API_KEY: documentKey,
   GEMINI_DOCUMENT_API_KEY: documentKey,
-  GEMINI_MODEL: get("GEMINI_MODEL") || "gemini-2.5-flash",
+  GEMINI_MODEL: get("GEMINI_MODEL") || "gemini-3.6-flash",
   GEMINI_DOCUMENT_MODEL:
-    get("GEMINI_DOCUMENT_MODEL") || get("GEMINI_MODEL") || "gemini-2.5-flash",
+    get("GEMINI_DOCUMENT_MODEL") || get("GEMINI_MODEL") || "gemini-3.6-flash",
   GEMINI_PROMPT_API_KEY: promptKey,
-  GEMINI_PROMPT_MODEL: get("GEMINI_PROMPT_MODEL") || "gemini-2.0-flash",
+  GEMINI_PROMPT_MODEL: get("GEMINI_PROMPT_MODEL") || "gemini-3.6-flash",
 };
 
 for (const [key, value] of Object.entries(vars)) {

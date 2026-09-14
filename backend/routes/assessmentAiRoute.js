@@ -4,6 +4,7 @@ const { requireFaculty } = require("../middleware/requireFaculty");
 const {
   extractMultipleDocumentsText,
   extractDocumentsSeparately,
+  extractDocumentsSeparatelyLenient,
   mergeDocumentTexts,
   cleanupUploadedFiles,
   isSupportedUpload,
@@ -18,7 +19,7 @@ const {
   clampQuestionCount,
   resolvePromptGenerationSettings,
   getAiServiceStatus,
-  classifyDocumentContent,
+  classifyDocumentsBatch,
 } = require("../lib/assessmentAiGenerator");
 
 const router = express.Router();
@@ -389,25 +390,34 @@ router.post(
       for (const file of files) {
         if (!isSupportedUpload(file)) {
           return res.status(400).json({
-            error: "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx).",
+            error:
+              "Unsupported file type. Use PDF, Word (.docx), or PowerPoint (.pptx). Older .doc/.ppt files are not supported — save as .docx/.pptx.",
           });
         }
       }
 
-      const docs = await extractDocumentsSeparately(files);
-      const fileResults = [];
-
-      for (const doc of docs) {
-        const classification = await classifyDocumentContent(doc.text);
-        fileResults.push({
-          index: doc.index,
-          name: doc.name,
-          documentKind: classification.documentKind,
-          isQuestionnaire: Boolean(classification.isQuestionnaire),
-          summary: classification.summary || "",
-          suggestedTitle: classification.suggestedTitle || "",
+      const { docs, failures } = await extractDocumentsSeparatelyLenient(files);
+      if (!docs.length) {
+        const detail = failures
+          .map((item) => `${item.name}: ${item.error}`)
+          .join(" | ");
+        return res.status(400).json({
+          error:
+            detail ||
+            "Could not extract readable text from the uploaded file(s). Use text-based PDF, .docx, or .pptx (not scanned images or old .doc/.ppt).",
+          failures,
         });
       }
+
+      const classifications = await classifyDocumentsBatch(docs);
+      const fileResults = classifications.map((classification) => ({
+        index: classification.index,
+        name: classification.name,
+        documentKind: classification.documentKind,
+        isQuestionnaire: Boolean(classification.isQuestionnaire),
+        summary: classification.summary || "",
+        suggestedTitle: classification.suggestedTitle || "",
+      }));
 
       const questionnaireFiles = fileResults.filter((item) => item.isQuestionnaire);
       const sourceFiles = fileResults.filter((item) => !item.isQuestionnaire);
@@ -429,11 +439,17 @@ router.post(
           `${sourceFiles.length} source/study file${sourceFiles.length === 1 ? "" : "s"}`
         );
       }
+      if (failures.length) {
+        summaryParts.push(
+          `${failures.length} file${failures.length === 1 ? "" : "s"} could not be read`
+        );
+      }
 
       res.json({
         success: true,
         extractedChars: docs.reduce((sum, doc) => sum + (doc.text?.length || 0), 0),
         fileCount: files.length,
+        readableFileCount: docs.length,
         mixed,
         hasQuestionnaire: questionnaireFiles.length > 0,
         hasSource: sourceFiles.length > 0,
@@ -443,9 +459,14 @@ router.post(
         isQuestionnaire: allQuestionnaire,
         summary: mixed
           ? `Mixed upload: ${summaryParts.join(" and ")}. Options apply only to source files; questionnaires convert as-is.`
-          : primary?.summary || "",
+          : failures.length
+            ? `${primary?.summary || "Documents classified."} (${failures
+                .map((item) => item.name)
+                .join(", ")} could not be read.)`
+            : primary?.summary || "",
         suggestedTitle: primary?.suggestedTitle || "",
         files: fileResults,
+        failures,
         questionnaireIndexes: questionnaireFiles.map((item) => item.index),
         sourceIndexes: sourceFiles.map((item) => item.index),
       });

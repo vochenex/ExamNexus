@@ -1,8 +1,8 @@
 const { Agent, fetch: undiciFetch } = require("undici");
 
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-// Prompt generation uses a separate Flash model from document analysis.
-const DEFAULT_GEMINI_PROMPT_MODEL = "gemini-2.0-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+// Prompt generation uses a separate key; same current Flash generation by default.
+const DEFAULT_GEMINI_PROMPT_MODEL = "gemini-3.6-flash";
 // llama-3.1-8b-instant / llama-3.3-70b-versatile were retired for free/developer
 // tiers on 2026-08-16. gpt-oss ids MUST include the openai/ prefix.
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
@@ -57,6 +57,7 @@ function isModelUnavailableError(error) {
     status === 404 ||
     code === "model_not_found" ||
     message.includes("model_not_found") ||
+    message.includes("no longer available") ||
     message.includes("does not exist") ||
     message.includes("do not have access") ||
     message.includes("you do not have access") ||
@@ -585,6 +586,14 @@ async function requestGeminiChatCompletion(
       }
 
       if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+        if (isModelUnavailableError(error)) {
+          const wrapped = new Error(
+            `Gemini model "${config.model}" is no longer available. Set GEMINI_MODEL / GEMINI_PROMPT_MODEL to gemini-3.6-flash in backend/.env and on Vercel, then restart/redeploy.`
+          );
+          wrapped.statusCode = 400;
+          wrapped.cause = error;
+          throw wrapped;
+        }
         throw error;
       }
 

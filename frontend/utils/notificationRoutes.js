@@ -38,7 +38,11 @@ export function sanitizeAppPath(path, { isStudent = true } = {}) {
   }
 
   if (path.includes("/platform-announcements")) {
-    return path.replace("/platform-announcements", "/admin-announcements");
+    path = path.replace("/platform-announcements", "/admin-announcements");
+  }
+
+  if (isStudent && path.startsWith("/student/admin-announcements")) {
+    return path.replace("/student/admin-announcements", "/student/announcements");
   }
 
   if (/\/subject\/(undefined|null)(\/|\?|$)/i.test(path)) {
@@ -75,7 +79,7 @@ export function getNotificationDestination(item, { isStudent, userId } = {}) {
   if (isAdminPlatformNotification(item)) {
     const id = item.id || item.announcement_id;
     const base = isStudent
-      ? "/student/admin-announcements"
+      ? "/student/announcements"
       : "/faculty/admin-announcements";
     const openComments = item.kind === "comment";
     return {

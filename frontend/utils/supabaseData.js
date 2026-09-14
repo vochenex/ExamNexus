@@ -3485,7 +3485,7 @@ export async function postAdminAnnouncementComment(announcementId, body) {
         data: {
           kind: "comment",
           platform: "1",
-          path: `/student/admin-announcements?highlight=${announcementId}&comments=1`,
+          path: `/student/announcements?highlight=${announcementId}&comments=1`,
           announcement_id: announcementId,
         },
       });

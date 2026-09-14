@@ -1,13 +1,23 @@
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Megaphone } from "lucide-react";
+import AnnouncementCard from "../../components/AnnouncementCard";
 import PageHeader from "../../components/ui/PageHeader";
 import AlertBanner from "../../components/ui/AlertBanner";
 import Select from "../../components/ui/Select";
 import { useTheme } from "../../layouts/ThemeContext";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { formatTargetSectionsLabel } from "../../utils/sections";
-import { fetchStudentAnnouncementsHub, fetchPlatformAnnouncements } from "../../utils/supabaseData";
+import {
+  fetchStudentAnnouncementsHub,
+  fetchPlatformAnnouncements,
+  fetchAdminAnnouncementComments,
+  postAdminAnnouncementComment,
+  toggleAdminAnnouncementHeart,
+  updateAdminAnnouncementComment,
+  deleteAdminAnnouncementComment,
+} from "../../utils/supabaseData";
+import { isAdminUser } from "../../utils/adminData";
 import { resolveStudentId } from "../../utils/authUser";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
@@ -16,6 +26,12 @@ import { usePolling } from "../../hooks/useRealtimeFetch";
 export default function StudentAnnouncementsHubPage() {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const openComments = searchParams.get("comments") === "1";
+  const cachedUser = JSON.parse(localStorage.getItem("examnexus_user") || "{}");
+  const canModerateComments = isAdminUser(cachedUser);
+
   const [subjects, setSubjects] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [platform, setPlatform] = useState([]);
@@ -40,7 +56,7 @@ export default function StudentAnnouncementsHubPage() {
 
       setSubjects(enrolled || []);
       setAnnouncements(rows || []);
-      setPlatform(Array.isArray(platformRows) ? platformRows.slice(0, 8) : []);
+      setPlatform(Array.isArray(platformRows) ? platformRows : []);
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to load announcements.");
@@ -51,12 +67,22 @@ export default function StudentAnnouncementsHubPage() {
 
   usePolling(load, []);
 
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    const timer = setTimeout(() => {
+      document
+        .getElementById(`announcement-${highlightId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [highlightId, loading, platform.length]);
+
   const filtered = useMemo(() => {
     if (!subjectFilter) return announcements;
     return announcements.filter((row) => String(row.subject_id) === String(subjectFilter));
   }, [announcements, subjectFilter]);
 
-  if (loading && announcements.length === 0 && subjects.length === 0) {
+  if (loading && announcements.length === 0 && subjects.length === 0 && platform.length === 0) {
     return <PageLoadingSkeleton theme={theme} variant="list" />;
   }
 
@@ -66,7 +92,7 @@ export default function StudentAnnouncementsHubPage() {
         theme={theme}
         icon={Megaphone}
         title="Announcements"
-        subtitle="Read-only class announcements for your enrolled subjects, plus admin announcements."
+        subtitle="Faculty class announcements and messages from administrators."
       />
 
       {error ? (
@@ -75,76 +101,66 @@ export default function StudentAnnouncementsHubPage() {
         </AlertBanner>
       ) : null}
 
-      <div className={`${panelClass(theme)} mb-5 space-y-3`}>
-        <label
-          className={`block text-xs font-semibold uppercase tracking-wide ${
-            theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
-          }`}
-        >
-          Filter by subject
-        </label>
-        <Select
-          value={subjectFilter}
-          onChange={(e) => setSubjectFilter(e.target.value)}
-          className="w-full max-w-md"
-        >
-          <option value="">All subjects</option>
-          {subjects.map((subject) => (
-            <option key={subject.id} value={subject.id}>
-              {subject.name}
-            </option>
-          ))}
-        </Select>
+      <div className={`${panelClass(theme)} mb-5 space-y-4`}>
+        <h2 className="font-semibold">Admin announcements</h2>
+        {loading && platform.length === 0 ? (
+          <PanelContentSkeleton rows={3} variant="list" />
+        ) : platform.length === 0 ? (
+          <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+            No admin announcements yet.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {platform.map((announcement) => (
+              <AnnouncementCard
+                key={announcement.id}
+                announcement={announcement}
+                allowInteract
+                hideSections
+                canModerateComments={canModerateComments}
+                highlighted={highlightId === String(announcement.id)}
+                autoExpandComments={
+                  openComments && highlightId === String(announcement.id)
+                }
+                onUpdated={() => load(true)}
+                fetchComments={fetchAdminAnnouncementComments}
+                postComment={postAdminAnnouncementComment}
+                toggleHeart={toggleAdminAnnouncementHeart}
+                updateComment={updateAdminAnnouncementComment}
+                removeComment={deleteAdminAnnouncementComment}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {!platform.length ? null : (
-        <div className={`${panelClass(theme)} mb-5 space-y-3`}>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">Admin announcements</h2>
-            <button
-              type="button"
-              onClick={() => navigate("/student/admin-announcements")}
-              className={`text-xs font-semibold underline-offset-2 hover:underline ${
-                theme === "dark" ? "text-emerald-300" : "text-teal-700"
+      <div className={`${panelClass(theme)} mb-5 space-y-3`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <h2 className="font-semibold">Class announcements</h2>
+          <div className="w-full max-w-md">
+            <label
+              className={`mb-1 block text-xs font-semibold uppercase tracking-wide ${
+                theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
               }`}
             >
-              View all
-            </button>
+              Filter by subject
+            </label>
+            <Select
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              className="w-full"
+            >
+              <option value="">All subjects</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
+                </option>
+              ))}
+            </Select>
           </div>
-          <ul className="space-y-2">
-            {platform.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(`/student/admin-announcements?highlight=${item.id}`)
-                  }
-                  className={`w-full rounded-xl border px-4 py-3 text-left transition ${
-                    theme === "dark"
-                      ? "border-white/10 bg-white/[0.03] hover:border-emerald-500/30"
-                      : "border-emerald-100 bg-emerald-50/40 hover:border-teal-300"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{item.title}</p>
-                  {item.body ? (
-                    <p
-                      className={`mt-1 line-clamp-2 text-xs ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {item.body}
-                    </p>
-                  ) : null}
-                </button>
-              </li>
-            ))}
-          </ul>
         </div>
-      )}
 
-      <div className={`${panelClass(theme)} space-y-3`}>
-        <h2 className="font-semibold">Class announcements</h2>
-        {loading ? (
+        {loading && filtered.length === 0 ? (
           <PanelContentSkeleton rows={4} variant="list" />
         ) : filtered.length === 0 ? (
           <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>

@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { fetchAdminDashboardStats } from "../utils/adminData";
-import { supabase } from "../supabaseClient";
 import { usePolling } from "./useRealtimeFetch";
 
 export default function useSidebarPendingBadges(role) {
@@ -18,21 +17,6 @@ export default function useSidebarPendingBadges(role) {
         }
         if ((stats.pending_password_resets ?? 0) > 0) {
           next["/admin/password-resets"] = true;
-        }
-      } catch {
-        // ignore polling errors
-      }
-    }
-
-    if (normalized === "faculty" || normalized === "teacher") {
-      try {
-        const { count, error } = await supabase
-          .from("exam_retake_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pending");
-
-        if (!error && (count ?? 0) > 0) {
-          next["/faculty/dashboard"] = true;
         }
       } catch {
         // ignore polling errors

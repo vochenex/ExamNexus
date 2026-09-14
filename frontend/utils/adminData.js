@@ -264,8 +264,8 @@ export async function createAdminBroadcast({ title, body, audience }) {
     ? `/faculty/admin-announcements?highlight=${announcementId}&comments=1`
     : "/faculty/admin-announcements";
   const studentPath = announcementId
-    ? `/student/admin-announcements?highlight=${announcementId}&comments=1`
-    : "/student/admin-announcements";
+    ? `/student/announcements?highlight=${announcementId}&comments=1`
+    : "/student/announcements";
 
   await dispatchBroadcastPush({
     audience: audienceValue,

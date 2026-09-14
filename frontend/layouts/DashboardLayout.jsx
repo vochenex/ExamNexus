@@ -206,7 +206,6 @@ export default function DashboardLayout() {
                 label={isStudent ? "Student Dashboard" : "Faculty Dashboard"}
                 end
                 collapsed={collapsed}
-                badge={!isStudent && pendingBadges["/faculty/dashboard"]}
               />
               <SidebarNavLink
                 to={isStudent ? "/student/profile" : "/faculty/profile"}
@@ -228,12 +227,6 @@ export default function DashboardLayout() {
                   to="/faculty/announcements"
                   icon={Megaphone}
                   label="Announcements"
-                  collapsed={collapsed}
-                />
-                <SidebarNavLink
-                  to="/faculty/admin-announcements"
-                  icon={Megaphone}
-                  label="Admin announcements"
                   collapsed={collapsed}
                 />
                 <SidebarNavLink
@@ -269,12 +262,6 @@ export default function DashboardLayout() {
                   to="/student/announcements"
                   icon={Megaphone}
                   label="Announcements"
-                  collapsed={collapsed}
-                />
-                <SidebarNavLink
-                  to="/student/admin-announcements"
-                  icon={Megaphone}
-                  label="Admin announcements"
                   collapsed={collapsed}
                 />
               </SidebarSection>

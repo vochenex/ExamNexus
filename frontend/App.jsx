@@ -1,9 +1,19 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "./guards/ProtectedRoute";
 import AdminRouteGuard from "./components/AdminRouteGuard";
 import RouteFallback from "./components/RouteFallback";
 import WebOnlyHomeRoute from "./components/WebOnlyHomeRoute";
+
+function RedirectToStudentAnnouncements() {
+  const location = useLocation();
+  return (
+    <Navigate
+      to={`/student/announcements${location.search || ""}`}
+      replace
+    />
+  );
+}
 
 const HomePage = lazy(() => import("./pages/public/HomePage"));
 const AuthPage = lazy(() => import("./pages/auth/AuthPage"));
@@ -82,8 +92,14 @@ export default function App() {
             <Route path="/faculty/platform-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/student/dashboard" element={<StudentDashboardPage />} />
             <Route path="/student/profile" element={<ProfilePage />} />
-            <Route path="/student/admin-announcements" element={<PlatformAnnouncementsPage />} />
-            <Route path="/student/platform-announcements" element={<PlatformAnnouncementsPage />} />
+            <Route
+              path="/student/admin-announcements"
+              element={<RedirectToStudentAnnouncements />}
+            />
+            <Route
+              path="/student/platform-announcements"
+              element={<RedirectToStudentAnnouncements />}
+            />
             <Route path="/student/assessments" element={<StudentAssessmentsPage />} />
             <Route path="/student/results" element={<StudentResultsListPage />} />
             <Route path="/student/results/:examId" element={<StudentResultDetailPage />} />

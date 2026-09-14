@@ -1028,6 +1028,154 @@ Rules:
   };
 }
 
+function normalizeClassificationRow(parsed, fallbackName = "") {
+  const kind = String(parsed?.documentKind || "other")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const isQuestionnaire =
+    parsed?.isQuestionnaire === true ||
+    kind === "questionnaire" ||
+    kind === "existing_exam" ||
+    kind === "exam" ||
+    kind === "quiz";
+
+  return {
+    documentKind: isQuestionnaire ? "questionnaire" : kind || "study_material",
+    isQuestionnaire,
+    summary: String(parsed?.summary || "").trim(),
+    suggestedTitle: String(parsed?.suggestedTitle || fallbackName || "").trim(),
+  };
+}
+
+/** Classify many extracted files in one Gemini call (avoids Vercel timeouts). */
+async function classifyDocumentsBatch(docs) {
+  assertGeminiConfigured();
+
+  const list = Array.isArray(docs) ? docs.filter((doc) => doc?.text) : [];
+  if (!list.length) {
+    const error = new Error("The documents did not contain readable text.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (list.length === 1) {
+    const single = await classifyDocumentContent(list[0].text);
+    return [
+      {
+        index: list[0].index,
+        name: list[0].name,
+        ...single,
+      },
+    ];
+  }
+
+  const perFileBudget = Math.max(
+    1200,
+    Math.floor(MAX_SOURCE_CHARS / Math.min(list.length, 8))
+  );
+  const catalog = list
+    .map(
+      (doc) =>
+        `### FILE_INDEX ${doc.index}\nNAME: ${doc.name || "document"}\nCONTENT:\n${String(
+          doc.text || ""
+        ).slice(0, perFileBudget)}`
+    )
+    .join("\n\n");
+
+  const response = await requestDocumentChatCompletion({
+    temperature: 0.1,
+    jsonMode: true,
+    messages: [
+      {
+        role: "system",
+        content: `You classify multiple teacher-uploaded documents for ExamNexus assessment generation.
+
+Return ONLY valid JSON:
+{
+  "files": [
+    {
+      "index": 0,
+      "documentKind": "questionnaire" | "topic" | "story" | "report" | "presentation" | "study_material" | "other",
+      "isQuestionnaire": true or false,
+      "summary": "one short sentence",
+      "suggestedTitle": "short title"
+    }
+  ]
+}
+
+Rules:
+- Include exactly one entry per FILE_INDEX provided.
+- isQuestionnaire = true ONLY when that file already contains numbered/labeled exam or quiz questions.
+- Topics, stories, reports, slide decks, handouts, and reading material without ready-made questions must set isQuestionnaire = false.
+- Prefer presentation for PowerPoint-style slide notes/outlines.`,
+      },
+      {
+        role: "user",
+        content: `Classify each file below:\n\n${catalog}`,
+      },
+    ],
+  });
+
+  let parsed = {};
+  try {
+    parsed = JSON.parse(String(response.content || "").trim());
+  } catch {
+    parsed = {};
+  }
+
+  const rows = Array.isArray(parsed?.files) ? parsed.files : [];
+  const byIndex = new Map();
+  for (const row of rows) {
+    const index = Number.parseInt(row?.index, 10);
+    if (!Number.isFinite(index)) continue;
+    byIndex.set(index, normalizeClassificationRow(row));
+  }
+
+  // Fallback: if batch JSON is incomplete, classify missing files individually.
+  const results = [];
+  for (const doc of list) {
+    if (byIndex.has(doc.index)) {
+      results.push({
+        index: doc.index,
+        name: doc.name,
+        ...byIndex.get(doc.index),
+        meta: {
+          provider: response.provider,
+          model: response.model,
+          mode: "document_classify_batch",
+        },
+      });
+      continue;
+    }
+
+    try {
+      const single = await classifyDocumentContent(doc.text);
+      results.push({
+        index: doc.index,
+        name: doc.name,
+        ...single,
+      });
+    } catch {
+      results.push({
+        index: doc.index,
+        name: doc.name,
+        documentKind: "study_material",
+        isQuestionnaire: false,
+        summary: "Could not classify this file; treated as study material.",
+        suggestedTitle: doc.name || "",
+        meta: {
+          provider: response.provider,
+          model: response.model,
+          mode: "document_classify_fallback",
+        },
+      });
+    }
+  }
+
+  return results;
+}
+
 async function requestDocumentQuestions({
   sourceText = "",
   questionCount,
@@ -1398,6 +1546,7 @@ module.exports = {
   requestDocumentQuestions,
   requestDocumentQuestionsStepwise,
   classifyDocumentContent,
+  classifyDocumentsBatch,
   getDocumentPlan,
   requestSingleAiQuestion,
   assertGeminiConfigured,

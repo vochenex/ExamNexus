@@ -184,6 +184,42 @@ async function extractDocumentsSeparately(files) {
   return docs;
 }
 
+/**
+ * Like extractDocumentsSeparately, but keeps going when one file fails
+ * (scanned PDF, old .doc, empty pptx, etc.).
+ */
+async function extractDocumentsSeparatelyLenient(files) {
+  const list = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (!list.length) {
+    throw new Error("No file uploaded.");
+  }
+
+  const docs = [];
+  const failures = [];
+
+  for (let index = 0; index < list.length; index += 1) {
+    const file = list[index];
+    const name = file.originalname || `document-${index + 1}`;
+    try {
+      const text = await extractDocumentText(file);
+      docs.push({
+        index,
+        name,
+        text: normalizeExtractedText(text),
+        file,
+      });
+    } catch (error) {
+      failures.push({
+        index,
+        name,
+        error: error?.message || "Could not read this file.",
+      });
+    }
+  }
+
+  return { docs, failures };
+}
+
 function mergeDocumentTexts(docs) {
   const list = Array.isArray(docs) ? docs.filter((doc) => doc?.text) : [];
   if (!list.length) return "";
@@ -208,6 +244,7 @@ module.exports = {
   extractDocumentText,
   extractMultipleDocumentsText,
   extractDocumentsSeparately,
+  extractDocumentsSeparatelyLenient,
   mergeDocumentTexts,
   cleanupUploadedFile,
   cleanupUploadedFiles,

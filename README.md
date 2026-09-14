@@ -71,9 +71,9 @@ cp backend/.env.example backend/.env
 | `SUPABASE_ANON_KEY` | `backend/.env` | Anon key (backend) |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` | **Server only** — never use `VITE_` prefix |
 | `GEMINI_API_KEY` / `GEMINI_DOCUMENT_API_KEY` | `backend/.env` | Gemini key for document upload analysis |
-| `GEMINI_MODEL` | `backend/.env` | Document model (default `gemini-2.5-flash`) |
+| `GEMINI_MODEL` | `backend/.env` | Document model (default `gemini-3.6-flash`) |
 | `GEMINI_PROMPT_API_KEY` | `backend/.env` | **Separate** Gemini key for topic/prompt generation |
-| `GEMINI_PROMPT_MODEL` | `backend/.env` | Prompt model (default `gemini-2.0-flash`) |
+| `GEMINI_PROMPT_MODEL` | `backend/.env` | Prompt model (default `gemini-3.6-flash`) |
 
 Verify the backend loaded the service role key:
 
