@@ -769,7 +769,9 @@ export default function CreateAssessment() {
         onImport={handleImportFromBank}
       />
 
-      <ScrollEdgeFab />
+      <ScrollEdgeFab
+        watchKey={`${creationMode}-${aiGenerating ? 1 : 0}-${questions.length}-${aiProgress?.status || ""}-${showAiProgress ? 1 : 0}`}
+      />
     </div>
   );
 }
