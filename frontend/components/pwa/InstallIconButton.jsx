@@ -128,9 +128,15 @@ export default function InstallIconButton({ inverted = false, compact = false })
       <div className="en-install-tip-wrap">
         <button
           type="button"
-          onClick={openChooser}
+          onClick={(event) => {
+            const btn = event.currentTarget;
+            btn.classList.remove("is-popping");
+            void btn.offsetWidth;
+            btn.classList.add("is-popping");
+            openChooser();
+          }}
           disabled={busy}
-          className={`en-install-icon-btn ${headerActionButtonClass(theme, {
+          className={`en-install-icon-btn en-header-pop-btn ${headerActionButtonClass(theme, {
             compact,
             inverted: onDarkSurface,
             extra: "disabled:opacity-60",

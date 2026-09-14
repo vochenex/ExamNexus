@@ -46,11 +46,11 @@ function parseValidQuestionCount(value) {
 
 function questionCountWarning(value) {
   if (value === "" || value == null) {
-    return "Enter how many questions to generate (1–150).";
+    return "Enter how many questions to generate ";
   }
   const parsed = parseRawQuestionCount(value);
   if (parsed == null) {
-    return "Enter how many questions to generate (1–150).";
+    return "Enter how many questions to generate";
   }
   if (parsed < MIN_QUESTIONS) {
     return `Enter at least ${MIN_QUESTIONS} question.`;

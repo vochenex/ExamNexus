@@ -3425,12 +3425,23 @@ export async function fetchAdminAnnouncementComments(announcementId) {
   return [];
 }
 
-export async function postAdminAnnouncementComment(announcementId, body) {
+export async function postAdminAnnouncementComment(
+  announcementId,
+  body,
+  parentCommentId = null
+) {
   await requireSession();
-  const { data, error } = await supabase.rpc("add_admin_announcement_comment", {
+  const payload = {
     p_announcement_id: announcementId,
     p_body: body,
-  });
+  };
+  if (parentCommentId) {
+    payload.p_parent_comment_id = parentCommentId;
+  }
+  const { data, error } = await supabase.rpc(
+    "add_admin_announcement_comment",
+    payload
+  );
   if (error) throw error;
 
   try {
@@ -3506,6 +3517,34 @@ export async function toggleAdminAnnouncementHeart(announcementId) {
   return data;
 }
 
+export async function toggleAnnouncementCommentHeart(commentId) {
+  await requireSession();
+  const { data, error } = await supabase.rpc(
+    "toggle_announcement_comment_reaction",
+    { p_comment_id: commentId }
+  );
+  if (error) throw error;
+  const row = normalizeRpcJson(data) || {};
+  return {
+    user_reacted: Boolean(row.user_reacted),
+    heart_count: Number(row.heart_count ?? 0),
+  };
+}
+
+export async function toggleAdminAnnouncementCommentHeart(commentId) {
+  await requireSession();
+  const { data, error } = await supabase.rpc(
+    "toggle_admin_announcement_comment_reaction",
+    { p_comment_id: commentId }
+  );
+  if (error) throw error;
+  const row = normalizeRpcJson(data) || {};
+  return {
+    user_reacted: Boolean(row.user_reacted),
+    heart_count: Number(row.heart_count ?? 0),
+  };
+}
+
 export async function updateAdminAnnouncementComment(commentId, body) {
   await requireSession();
   const { data, error } = await supabase.rpc("update_admin_announcement_comment", {
@@ -3558,6 +3597,22 @@ function normalizeJsonList(data) {
   // Some PostgREST jsonb responses unwrap a 1-item array into a bare object.
   if (typeof data === "object") return [data];
   return [];
+}
+
+/** Normalize jsonb RPC payloads that may arrive as string / array-wrapped. */
+function normalizeRpcJson(data) {
+  if (data == null) return null;
+  let value = data;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) value = value[0] ?? null;
+  if (!value || typeof value !== "object") return null;
+  return value;
 }
 
 export async function fetchUserNotifications(limit = 40) {
@@ -3753,13 +3808,22 @@ export async function fetchAnnouncementComments(announcementId) {
   return [];
 }
 
-export async function postAnnouncementComment(announcementId, body) {
+export async function postAnnouncementComment(
+  announcementId,
+  body,
+  parentCommentId = null
+) {
   await requireSession();
 
-  const { data, error } = await supabase.rpc("add_announcement_comment", {
+  const payload = {
     p_announcement_id: announcementId,
     p_body: body,
-  });
+  };
+  if (parentCommentId) {
+    payload.p_parent_comment_id = parentCommentId;
+  }
+
+  const { data, error } = await supabase.rpc("add_announcement_comment", payload);
 
   if (error) throw error;
 

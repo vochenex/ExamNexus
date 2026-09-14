@@ -18,6 +18,7 @@ import { clearStaleAccountCacheOnLoad } from "./utils/sessionReset";
 import { initNativeApp } from "./utils/nativeApp";
 import { initMobileShell } from "./utils/mobileShell";
 import { initIosInputZoomFix } from "./utils/iosInputZoom";
+import { installPassVerticalScroll } from "./utils/passVerticalScroll";
 import { registerServiceWorker } from "./utils/pwa";
 import "@fontsource/poppins/400.css";
 import "@fontsource/poppins/500.css";
@@ -28,6 +29,7 @@ clearStaleAccountCacheOnLoad();
 initNativeApp();
 initMobileShell();
 initIosInputZoomFix();
+installPassVerticalScroll();
 registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById("root")).render(

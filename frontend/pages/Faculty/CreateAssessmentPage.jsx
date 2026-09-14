@@ -26,6 +26,10 @@ import { mapAiQuestionToBuilder, mapAiPayloadToBuilderQuestions } from "../../ut
 import { getSubjectSections } from "../../utils/sections";
 import { createExam } from "../../utils/supabaseData";
 import { pageShellWithBellClass } from "../../utils/themeInputs";
+import {
+  focusAssessmentDurationField,
+  isDurationValueProvided,
+} from "../../utils/assessmentDuration";
 import { supabase } from "../../supabaseClient";
 import {
   canFacultyManageSubjects,
@@ -51,7 +55,7 @@ const defaultAssessment = {
   show_question_review: false,
   show_correct_answers: false,
   pass_mark: 50,
-  duration_value: 60,
+  duration_value: "",
   duration_unit: "minutes",
 };
 
@@ -92,6 +96,7 @@ export default function CreateAssessment() {
   const [loading, setLoading] = useState(false);
   const [savingToBankId, setSavingToBankId] = useState(null);
   const [error, setError] = useState("");
+  const [durationError, setDurationError] = useState("");
   const [fieldErrorsByIndex, setFieldErrorsByIndex] = useState({});
   const [creationMode, setCreationMode] = useState("manual");
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -166,7 +171,10 @@ export default function CreateAssessment() {
     }
   }, [facultyProfile.role, facultyCanManage, navigate, showWarning]);
 
-  const clearError = () => setError("");
+  const clearError = () => {
+    setError("");
+    setDurationError("");
+  };
   const clearFieldErrors = (questionIndex) => {
     if (questionIndex == null) {
       setFieldErrorsByIndex({});
@@ -426,6 +434,7 @@ export default function CreateAssessment() {
     try {
       setLoading(true);
       setError("");
+      setDurationError("");
 
       if (!exam.title.trim()) {
         setError("Please enter an assessment title.");
@@ -451,6 +460,14 @@ export default function CreateAssessment() {
       if (!Number.isFinite(passMark) || passMark < 0 || passMark > 100) {
         setError("Set a passing rate between 0 and 100% in Settings.");
         setLoading(false);
+        return;
+      }
+
+      if (!isDurationValueProvided(exam.duration_value)) {
+        setDurationError("This is a required field.");
+        setError("Time limit is required.");
+        setLoading(false);
+        focusAssessmentDurationField();
         return;
       }
 
@@ -748,8 +765,14 @@ export default function CreateAssessment() {
               theme={theme}
               loading={loading}
               publishLabel={`Publish ${assessmentLabel}`}
+              durationError={durationError}
               onPublish={handlePublish}
-              onChange={(patch) => setExam((prev) => ({ ...prev, ...patch }))}
+              onChange={(patch) => {
+                if (Object.prototype.hasOwnProperty.call(patch, "duration_value")) {
+                  setDurationError("");
+                }
+                setExam((prev) => ({ ...prev, ...patch }));
+              }}
             />
           </div>
         </div>

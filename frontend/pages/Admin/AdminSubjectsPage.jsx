@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { BookOpen, Plus, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { BookOpen, Plus, Search, Trash2 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -29,6 +29,16 @@ import ProgressButton from "../../components/ui/ProgressButton";
 import { DEFAULT_SECTION_COUNT } from "../../utils/sections";
 import { DEFAULT_YEAR_LEVEL } from "../../utils/yearLevels";
 
+function facultyLabel(subject, facultyRows) {
+  const schoolId = subject?.teacher_school_id;
+  if (!schoolId) return "";
+  const match = facultyRows.find((f) => f.school_id === schoolId);
+  if (!match) return String(schoolId);
+  return [[match.first_name, match.last_name].filter(Boolean).join(" "), match.school_id]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function FieldLabel({ theme, children, htmlFor }) {
   return (
     <label
@@ -52,12 +62,23 @@ export default function AdminSubjects() {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [busySubjectId, setBusySubjectId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState({
     name: "",
     teacherSchoolId: "",
     yearLevel: DEFAULT_YEAR_LEVEL,
     sectionCount: DEFAULT_SECTION_COUNT,
   });
+
+  const visibleSubjects = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return subjects;
+    return subjects.filter((subject) => {
+      const name = String(subject.name || "").toLowerCase();
+      const assigned = facultyLabel(subject, faculty).toLowerCase();
+      return name.includes(q) || assigned.includes(q);
+    });
+  }, [subjects, faculty, searchQuery]);
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -268,13 +289,34 @@ export default function AdminSubjects() {
       </div>
 
       <div className={adminTableWrapClass(theme)}>
+        <div
+          className={`border-b px-3 py-3 sm:px-4 ${
+            theme === "dark" ? "border-white/10" : "border-slate-100"
+          }`}
+        >
+          <div className="relative min-w-0 w-full max-w-md">
+            <Search
+              size={16}
+              className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+                theme === "dark" ? "text-gray-500" : "text-gray-400"
+              }`}
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by subject or faculty…"
+              className={inputClass(theme, "w-full min-w-0 py-2.5 pl-9 pr-3")}
+              aria-label="Search subjects by name or assigned faculty"
+            />
+          </div>
+        </div>
         <div className={adminTableInnerClass()}>
-          <table className={`${adminTableClass(theme)} min-w-[64rem]`}>
+          <table className={`${adminTableClass(theme)} min-w-[56rem]`}>
             <thead>
               <tr>
                 <th className={`${adminThClass(theme)} w-12`}>#</th>
                 <th className={`${adminThClass(theme)} min-w-[10rem]`}>Subject</th>
-                <th className={`${adminThClass(theme)} min-w-[7rem]`}>Invite code</th>
                 <th className={`${adminThClass(theme)} min-w-[16rem]`}>Assigned faculty</th>
                 <th className={`${adminThClass(theme)} min-w-[9rem]`}>Sections</th>
                 <th className={`${adminThClass(theme)} min-w-[5rem]`}>Enrolled</th>
@@ -285,20 +327,23 @@ export default function AdminSubjects() {
             <tbody>
               {!subjects.length ? (
                 <tr>
-                  <td colSpan={8} className={`${adminTdClass(theme)} py-8 text-center`}>
+                  <td colSpan={7} className={`${adminTdClass(theme)} py-8 text-center`}>
                     No subjects yet. Create one above to get started.
                   </td>
                 </tr>
+              ) : !visibleSubjects.length ? (
+                <tr>
+                  <td colSpan={7} className={`${adminTdClass(theme)} py-8 text-center`}>
+                    No subjects match “{searchQuery.trim()}”.
+                  </td>
+                </tr>
               ) : (
-              subjects.map((subject, index) => (
+              visibleSubjects.map((subject, index) => (
                 <tr key={subject.id}>
                   <td className={`${adminTdClass(theme)} tabular-nums text-gray-500`}>
                     {index + 1}
                   </td>
                   <td className={`${adminTdClass(theme)} min-w-[10rem]`}>{subject.name}</td>
-                  <td className={`${adminTdClass(theme)} min-w-[7rem] whitespace-nowrap`}>
-                    {subject.invite_code}
-                  </td>
                   <td className={`${adminTdClass(theme)} min-w-[16rem]`}>
                     <Select
                       value={subject.teacher_school_id || ""}

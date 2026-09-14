@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Users, Pencil, Trash2, Check, CheckCheck, X, Search } from "lucide-react";
+import { Users, Pencil, Trash2, Check, CheckCheck, Search } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -26,6 +26,7 @@ import {
   deleteAdminUser,
   fetchAdminUsers,
   getAccountStatus,
+  getDeletedAccountDaysLeft,
   reviewAdminAccount,
   updateAdminUser,
 } from "../../utils/adminData";
@@ -40,10 +41,10 @@ const STATUSES = [
   { value: "", label: "All statuses" },
   { value: "pending", label: "Pending approval" },
   { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
+  { value: "deleted", label: "Deleted (7-day hold)" },
 ];
 
-function statusBadge(theme, status) {
+function statusBadge(theme, status, daysLeft = null) {
   const value = status || "approved";
   const styles = {
     pending:
@@ -54,11 +55,16 @@ function statusBadge(theme, status) {
       theme === "dark"
         ? "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30"
         : "bg-emerald-50 text-emerald-800 ring-emerald-200",
-    rejected:
+    deleted:
       theme === "dark"
         ? "bg-red-500/15 text-red-300 ring-red-500/30"
         : "bg-red-50 text-red-800 ring-red-200",
   };
+
+  const label =
+    value === "deleted" && daysLeft != null
+      ? `Deleted · ${daysLeft}d left`
+      : value;
 
   return (
     <span
@@ -66,7 +72,7 @@ function statusBadge(theme, status) {
         styles[value] || styles.approved
       }`}
     >
-      {value}
+      {label}
     </span>
   );
 }
@@ -91,7 +97,6 @@ export default function AdminAccounts() {
   const [saving, setSaving] = useState(false);
   const [reviewingId, setReviewingId] = useState(null);
   const [bulkApproving, setBulkApproving] = useState(false);
-  const [bulkRejecting, setBulkRejecting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,7 +131,10 @@ export default function AdminAccounts() {
   const selectableVisibleUsers = useMemo(
     () =>
       visibleUsers.filter(
-        (user) => !isAdminRole(user) && user.id !== currentUser.id
+        (user) =>
+          !isAdminRole(user) &&
+          user.id !== currentUser.id &&
+          getAccountStatus(user) !== "deleted"
       ),
     [visibleUsers, currentUser.id]
   );
@@ -150,17 +158,23 @@ export default function AdminAccounts() {
 
   const busy =
     bulkApproving ||
-    bulkRejecting ||
     bulkDeleting ||
     reviewingId !== null ||
     deletingId !== null ||
     saving;
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, overrides = {}) => {
+    const nextRole =
+      overrides.role !== undefined ? overrides.role : roleFilter;
+    const nextStatus =
+      overrides.status !== undefined ? overrides.status : statusFilter;
     try {
       if (!silent) setLoading(true);
       setLoadError("");
-      const rows = await fetchAdminUsers(roleFilter || null, statusFilter || null);
+      const rows = await fetchAdminUsers(
+        nextRole || null,
+        nextStatus || null
+      );
       setUsers(rows);
       setSelectedIds((prev) => {
         const next = new Set();
@@ -233,27 +247,25 @@ export default function AdminAccounts() {
   };
 
   const handleReview = async (user, action) => {
-    const label = action === "approve" ? "Approve" : "Reject";
+    if (action !== "approve") return;
+
     const ok = await confirm({
-      title: `${label} account?`,
-      message:
-        action === "approve"
-          ? `Approve ${user.first_name} ${user.last_name} (${user.role})? They will be able to log in.`
-          : `Reject ${user.first_name} ${user.last_name}? They will not be able to use the platform.`,
-      tone: action === "approve" ? "success" : "danger",
-      confirmLabel: label,
+      title: "Approve account?",
+      message: `Approve ${user.first_name} ${user.last_name} (${user.role})? They will be able to log in.`,
+      tone: "success",
+      confirmLabel: "Approve",
     });
     if (!ok) return;
 
     try {
       setReviewingId(user.id);
-      await reviewAdminAccount(user.id, action);
+      await reviewAdminAccount(user.id, "approve");
       await load(true);
       setReviewingId(null);
-      await success(action === "approve" ? "Account approved." : "Account rejected.");
+      await success("Account approved.");
     } catch (err) {
       setReviewingId(null);
-      error(err.message || `Failed to ${action} account.`);
+      error(err.message || "Failed to approve account.");
     }
   };
 
@@ -318,35 +330,6 @@ export default function AdminAccounts() {
     }
   };
 
-  const handleRejectAll = async () => {
-    if (!pendingUsers.length) {
-      error("No pending accounts to reject.");
-      return;
-    }
-
-    const ok = await confirm({
-      title: "Reject all pending accounts?",
-      message: `Reject ${pendingUsers.length} account${pendingUsers.length === 1 ? "" : "s"}? Those users will not be able to use the platform.`,
-      tone: "danger",
-      confirmLabel: "Reject all",
-    });
-    if (!ok) return;
-
-    try {
-      setBulkRejecting(true);
-      for (const user of pendingUsers) {
-        await reviewAdminAccount(user.id, "reject");
-      }
-      const count = pendingUsers.length;
-      await load(true);
-      setBulkRejecting(false);
-      await success(`Rejected ${count} account${count === 1 ? "" : "s"}.`);
-    } catch (err) {
-      setBulkRejecting(false);
-      error(err.message || "Failed to reject all accounts.");
-    }
-  };
-
   const deleteUsers = async (targets, { title, message, confirmLabel, successLabel }) => {
     if (!targets.length) {
       error("No accounts available to delete.");
@@ -376,7 +359,8 @@ export default function AdminAccounts() {
         return next;
       });
       setDeletingId(null);
-      await load(true);
+      setStatusFilter("deleted");
+      await load(true, { status: "deleted" });
       setBulkDeleting(false);
       await success(successLabel);
     } catch (err) {
@@ -394,7 +378,7 @@ export default function AdminAccounts() {
 
     const ok = await confirm({
       title: "Delete account?",
-      message: `Permanently delete ${user.first_name} ${user.last_name}? This cannot be undone.`,
+      message: `Delete ${user.first_name} ${user.last_name}? They stay in Deleted for 1 week, then are removed forever.`,
       tone: "danger",
       confirmLabel: "Delete",
     });
@@ -411,8 +395,9 @@ export default function AdminAccounts() {
         return next;
       });
       setDeletingId(null);
-      await load(true);
-      await success("Account deleted.");
+      setStatusFilter("deleted");
+      await load(true, { status: "deleted" });
+      await success("Account moved to Deleted (kept 7 days).");
     } catch (err) {
       setDeletingId(null);
       error(err.message || "Failed to delete account.");
@@ -422,13 +407,13 @@ export default function AdminAccounts() {
   const handleDeleteSelected = async () => {
     await deleteUsers(selectedVisibleUsers, {
       title: "Delete selected accounts?",
-      message: `Permanently delete ${selectedVisibleUsers.length} selected account${
+      message: `Delete ${selectedVisibleUsers.length} selected account${
         selectedVisibleUsers.length === 1 ? "" : "s"
-      }? This cannot be undone.`,
+      }? They stay in Deleted for 1 week, then are removed forever.`,
       confirmLabel: "Delete selected",
-      successLabel: `Deleted ${selectedVisibleUsers.length} account${
+      successLabel: `Moved ${selectedVisibleUsers.length} account${
         selectedVisibleUsers.length === 1 ? "" : "s"
-      }.`,
+      } to Deleted (kept 7 days).`,
     });
   };
 
@@ -436,11 +421,11 @@ export default function AdminAccounts() {
     const targets = selectableVisibleUsers;
     await deleteUsers(targets, {
       title: "Delete all listed accounts?",
-      message: `Permanently delete all ${targets.length} non-admin account${
+      message: `Delete all ${targets.length} non-admin account${
         targets.length === 1 ? "" : "s"
-      } in the current list? This cannot be undone.`,
+      } in the current list? They stay in Deleted for 1 week, then are removed forever.`,
       confirmLabel: "Delete all",
-      successLabel: `Deleted ${targets.length} account${targets.length === 1 ? "" : "s"}.`,
+      successLabel: `Moved ${targets.length} account${targets.length === 1 ? "" : "s"} to Deleted (kept 7 days).`,
     });
   };
 
@@ -457,6 +442,12 @@ export default function AdminAccounts() {
 
       {loadError && (
         <AdminPageError theme={theme} message={loadError} onRetry={() => load()} />
+      )}
+
+      {statusFilter === "deleted" && (
+        <div className={adminNoticeClass(theme)}>
+          Recently deleted accounts stay here for 7 days, then are permanently removed.
+        </div>
       )}
 
       {statusFilter === "pending" && pendingCount > 0 && (
@@ -507,34 +498,19 @@ export default function AdminAccounts() {
           ))}
         </Select>
         {statusFilter === "pending" && pendingCount > 0 && (
-          <>
-            <ProgressButton
-              type="button"
-              onClick={handleApproveAll}
-              loading={bulkApproving}
-              loadingLabel="Approving..."
-              disabled={busy && !bulkApproving}
-              className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
-              aria-label="Approve all pending accounts"
-              title="Approve all pending accounts"
-            >
-              <CheckCheck size={14} />
-              Approve all
-            </ProgressButton>
-            <ProgressButton
-              type="button"
-              onClick={handleRejectAll}
-              loading={bulkRejecting}
-              loadingLabel="Rejecting..."
-              disabled={busy && !bulkRejecting}
-              className={dangerButton(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
-              aria-label="Reject all pending accounts"
-              title="Reject all pending accounts"
-            >
-              <X size={14} />
-              Reject all
-            </ProgressButton>
-          </>
+          <ProgressButton
+            type="button"
+            onClick={handleApproveAll}
+            loading={bulkApproving}
+            loadingLabel="Approving..."
+            disabled={busy && !bulkApproving}
+            className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
+            aria-label="Approve all pending accounts"
+            title="Approve all pending accounts"
+          >
+            <CheckCheck size={14} />
+            Approve all
+          </ProgressButton>
         )}
         {selectedPendingUsers.length > 0 && (
           <ProgressButton
@@ -591,7 +567,9 @@ export default function AdminAccounts() {
             theme === "dark" ? "text-gray-400" : "text-gray-600"
           }`}
         >
-          No accounts match the current filters.
+          {statusFilter === "deleted"
+            ? "No recently deleted accounts in the 7-day hold."
+            : "No accounts match the current filters."}
         </div>
       ) : (
         <div className={adminTableInnerClass()}>
@@ -622,8 +600,10 @@ export default function AdminAccounts() {
               {visibleUsers.map((user, index) => {
                   const status = getAccountStatus(user);
                   const isPending = status === "pending";
+                  const isDeleted = status === "deleted";
                   const isAdmin = isAdminRole(user);
-                  const canSelect = !isAdmin && user.id !== currentUser.id;
+                  const canSelect = !isAdmin && user.id !== currentUser.id && !isDeleted;
+                  const daysLeft = isDeleted ? getDeletedAccountDaysLeft(user) : null;
 
                   return (
                     <tr key={user.id}>
@@ -653,7 +633,7 @@ export default function AdminAccounts() {
                         {user.role}
                       </td>
                       <td className={`${adminTdClass(theme)} min-w-[6.5rem] whitespace-nowrap`}>
-                        {statusBadge(theme, status)}
+                        {statusBadge(theme, status, daysLeft)}
                       </td>
                       <td className={`${adminTdClass(theme)} min-w-[9rem]`}>
                         {user.department || "—"}
@@ -675,17 +655,19 @@ export default function AdminAccounts() {
                               <Check size={16} />
                             </ProgressButton>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => setEditing({ ...user })}
-                            className={iconButton(theme, "secondary")}
-                            aria-label={`Edit ${user.email}`}
-                            title="Edit"
-                            disabled={busy}
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          {!isAdmin && (
+                          {!isDeleted && (
+                            <button
+                              type="button"
+                              onClick={() => setEditing({ ...user })}
+                              className={iconButton(theme, "secondary")}
+                              aria-label={`Edit ${user.email}`}
+                              title="Edit"
+                              disabled={busy}
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )}
+                          {!isAdmin && !isDeleted && (
                             <ProgressButton
                               type="button"
                               loading={deletingId === user.id}
@@ -695,11 +677,20 @@ export default function AdminAccounts() {
                               onClick={() => handleDelete(user)}
                               className={iconButton(theme, "danger")}
                               aria-label={`Delete ${user.email}`}
-                              title="Delete"
+                              title="Delete (kept 7 days)"
                             >
                               <Trash2 size={16} />
                             </ProgressButton>
                           )}
+                          {isDeleted ? (
+                            <span
+                              className={`text-xs ${
+                                theme === "dark" ? "text-gray-500" : "text-gray-500"
+                              }`}
+                            >
+                              Purges automatically
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

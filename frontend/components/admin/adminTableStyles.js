@@ -1,7 +1,8 @@
-import { panelClass } from "../../utils/themeInputs";
+import { staticPanelClass } from "../../utils/themeInputs";
 
 export function adminTableWrapClass(theme) {
-  return `${panelClass(theme, "min-w-0 max-w-full overflow-x-auto overflow-y-visible p-0")} en-table-scroll`;
+  // No overflow on the outer panel — overflow-x:auto forces overflow-y:auto and traps wheel.
+  return staticPanelClass(theme, "min-w-0 max-w-full overflow-visible p-0");
 }
 
 export function adminTableClass(theme) {
@@ -54,5 +55,5 @@ export function adminToolbarButtonClass() {
 }
 
 export function adminTableInnerClass() {
-  return "w-full max-w-full overflow-x-auto overflow-y-visible overscroll-x-contain";
+  return "en-table-scroll w-full max-w-full overflow-x-auto overscroll-x-contain";
 }

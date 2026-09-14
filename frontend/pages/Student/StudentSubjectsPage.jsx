@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
-import { CheckCircle2, XCircle, BookOpen, ChevronRight, Plus, LogOut } from "lucide-react";
+import { CheckCircle2, XCircle, Plus, LogOut } from "lucide-react";
 import { primaryButton, secondaryButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { resolveStudentId } from "../../utils/authUser";
@@ -13,15 +13,17 @@ import {
   unenrollStudentFromSubject,
 } from "../../utils/supabaseData";
 import FacultyProfileChip from "../../components/FacultyProfileChip";
-import YearLevelBadge from "../../components/YearLevelBadge";
+import ProfileAvatar from "../../components/ProfileAvatar";
 import ActionDialog from "../../components/ui/ActionDialog";
 import ModalPortal from "../../components/ui/ModalPortal";
 import { formatSectionLabel } from "../../utils/sections";
+import { formatFacultyLabel } from "../../utils/subjectDisplay";
 import { pageShellWithBellClass, staggerGridClass } from "../../utils/themeInputs";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { API_BASE } from "../../utils/apiBase.js";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
+import { getYearLevelLabel } from "../../utils/yearLevels";
 
 export default function StudentSubjects() {
   const { theme } = useTheme();
@@ -49,6 +51,19 @@ export default function StudentSubjects() {
   const [enrolling, setEnrolling] = useState(false);
   const [unenrollTarget, setUnenrollTarget] = useState(null);
   const [unenrolling, setUnenrolling] = useState(false);
+
+  const sortedSubjects = useMemo(() => {
+    return [...subjects].sort((a, b) => {
+      const facultyA = formatFacultyLabel(a).toLowerCase();
+      const facultyB = formatFacultyLabel(b).toLowerCase();
+      const unassignedA = facultyA === "faculty not assigned";
+      const unassignedB = facultyB === "faculty not assigned";
+      if (unassignedA !== unassignedB) return unassignedA ? 1 : -1;
+      const byFaculty = facultyA.localeCompare(facultyB);
+      if (byFaculty !== 0) return byFaculty;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [subjects]);
 
   const getAuthContext = async () => {
     let { data: { session } } = await supabase.auth.getSession();
@@ -364,132 +379,84 @@ export default function StudentSubjects() {
       )}
 
       {subjects.length > 0 && (
-        <div className={staggerGridClass("grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3")}>
-          {subjects.map((subject) => (
-            <div
-              key={subject.id}
-              onClick={() => navigate(`/student/subject/${subject.id}`)}
-              className={`
-                group
-                en-interactive-card
-                relative
-                p-4
-                rounded-xl
-                backdrop-blur-md
-                cursor-pointer
-                transition-all
-                duration-300
-                hover:-translate-y-1
-                hover:shadow-xl
-                ${
-                  theme === "dark"
-                    ? "bg-white/[0.045] border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.22)] hover:border-emerald-500/30 hover:shadow-[0_0_30px_rgba(16,185,129,0.12)]"
-                    : "en-bg-elevated border border-emerald-200 shadow-md hover:border-emerald-400"
-                }
-              `}
-            >
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setUnenrollTarget(subject);
-                  setLoadError("");
-                }}
-                className={`absolute right-4 top-4 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-                  theme === "dark"
-                    ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
-                    : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                }`}
-              >
-                <span className="inline-flex items-center gap-1">
-                  <LogOut size={14} />
-                  Unenroll
-                </span>
-              </button>
+        <div
+          className={staggerGridClass(
+            "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          )}
+        >
+          {sortedSubjects.map((subject) => {
+            const facultyName = formatFacultyLabel(subject);
+            const facultyId = subject.teacher_school_id || "";
+            const muted = theme === "dark" ? "text-gray-400" : "text-gray-600";
+            const yearLabel = getYearLevelLabel(subject.year_level);
 
-              <div className="flex items-start justify-between gap-3 pr-24">
-                <div className="flex items-start gap-3 min-w-0">
-                <div
-                  className={`
-                    p-3
-                    rounded-xl
-                    shrink-0
-                    ${
-                      theme === "dark"
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : "en-bg-skeleton text-teal-700"
-                    }
-                  `}
-                >
-                  <BookOpen size={22} />
-                </div>
-                <YearLevelBadge yearLevel={subject.year_level} className="mt-1" />
-                </div>
-
-                <ChevronRight
-                  size={20}
-                  className={`
-                    opacity-0
-                    group-hover:opacity-100
-                    transition-opacity
-                    mt-1
-                    ${theme === "dark" ? "text-emerald-400" : "text-teal-600"}
-                  `}
-                />
-              </div>
-
-              <h2
-                className={`mt-4 text-xl font-bold ${
-                  theme === "dark" ? "text-emerald-400" : "text-teal-700"
-                }`}
-              >
-                {subject.name}
-              </h2>
-
+            return (
               <div
-                className={`mt-3 text-sm space-y-3 ${
-                  theme === "dark" ? "text-gray-400" : "text-gray-700"
-                }`}
-              >
-                <FacultyProfileChip subject={subject} />
-                <p>
-                  Invite Code:{" "}
-                  <span
-                    className={`
-                      px-2
-                      py-1
-                      rounded-md
-                      font-mono
-                      text-xs
-                      ${
-                        theme === "dark"
-                          ? "bg-emerald-500/10 text-emerald-400"
-                          : "en-bg-skeleton text-teal-700"
-                      }
-                    `}
-                  >
-                    {subject.invite_code}
-                  </span>
-                </p>
-                {subject.section && (
-                  <p>
-                    Your Section:{" "}
-                    <span className="font-semibold">{formatSectionLabel(subject.section)}</span>
-                  </p>
-                )}
-              </div>
-
-              <p
-                className={`mt-4 text-sm font-medium ${
+                key={subject.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/student/subject/${subject.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    navigate(`/student/subject/${subject.id}`);
+                  }
+                }}
+                className={`en-static-panel group relative flex h-full min-h-[4.75rem] min-w-0 cursor-pointer flex-col gap-1.5 rounded-xl border px-3 py-2.5 text-left transition ${
                   theme === "dark"
-                    ? "text-emerald-300/80 group-hover:text-emerald-300"
-                    : "text-teal-600 group-hover:text-teal-700"
+                    ? "border-white/10 bg-white/[0.04] hover:border-emerald-500/35"
+                    : "border-slate-200/80 bg-white hover:border-teal-300"
                 }`}
               >
-                View subject details
-              </p>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setUnenrollTarget(subject);
+                    setLoadError("");
+                  }}
+                  className={`absolute right-2 top-2 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${
+                    theme === "dark"
+                      ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                      : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                  }`}
+                  aria-label={`Unenroll from ${subject.name}`}
+                  title="Unenroll"
+                >
+                  <LogOut size={12} />
+                </button>
+
+                <div className="flex min-w-0 items-start gap-2.5 pr-7">
+                  <ProfileAvatar
+                    src={subject.faculty_avatar_url}
+                    alt={facultyName}
+                    size="xs"
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`truncate text-sm font-semibold leading-snug ${
+                        theme === "dark" ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {subject.name}
+                    </p>
+                    <p className={`mt-0.5 truncate text-[11px] ${muted}`}>
+                      {facultyName}
+                      {facultyId ? ` · ${facultyId}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <p className={`pl-[2.625rem] text-[11px] tabular-nums ${muted}`}>
+                  {yearLabel}
+                  {subject.section
+                    ? ` · ${formatSectionLabel(subject.section)}`
+                    : ""}
+                  {subject.invite_code ? ` · ${subject.invite_code}` : ""}
+                </p>
+              </div>
+            );
+          })}
         </div>
       )}
 

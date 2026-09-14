@@ -1495,9 +1495,11 @@ async function requestAiQuestions({
   const questions = [...(normalized.questions || [])];
   const seen = new Set(questions.map((item) => questionDedupeKey(item)).filter(Boolean));
 
-  // Fill shortfalls (common when Groq truncates a large JSON array).
+  // Prompt mode may fill shortfalls (Groq truncation). Document/source rounds must NOT —
+  // extra Gemini calls hit free-tier RPM and Vercel timeouts, so the client stops at ~8.
+  const maxFillSteps =
+    mode === "document" ? 0 : Math.max(0, count - questions.length) + 3;
   let fillStep = 0;
-  const maxFillSteps = Math.max(0, count - questions.length) + 3;
   while (questions.length < count && fillStep < maxFillSteps) {
     fillStep += 1;
     try {

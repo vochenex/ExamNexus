@@ -524,8 +524,16 @@ function geminiModelSupportsThinkingConfig(model) {
 }
 
 function extractGeminiResponseText(data) {
-  const parts = data?.candidates?.[0]?.content?.parts;
+  const candidate = data?.candidates?.[0];
+  const finishReason = String(candidate?.finishReason || "");
+  const parts = candidate?.content?.parts;
   if (!Array.isArray(parts) || !parts.length) {
+    if (finishReason && finishReason !== "STOP") {
+      throw Object.assign(
+        new Error(`Gemini stopped early (${finishReason}). Try a smaller batch.`),
+        { statusCode: 422, code: "GEMINI_FINISH", finishReason }
+      );
+    }
     return "";
   }
 
@@ -533,14 +541,29 @@ function extractGeminiResponseText(data) {
   const answerParts = parts.filter(
     (part) => part && part.thought !== true && String(part.text || "").trim()
   );
+  let text = "";
   if (answerParts.length) {
-    return answerParts.map((part) => String(part.text || "")).join("");
+    text = answerParts.map((part) => String(part.text || "")).join("");
+  } else {
+    text = parts
+      .filter((part) => part && part.thought !== true)
+      .map((part) => String(part?.text || ""))
+      .join("");
   }
 
-  return parts
-    .filter((part) => part && part.thought !== true)
-    .map((part) => String(part?.text || ""))
-    .join("");
+  if (
+    !String(text).trim() &&
+    finishReason &&
+    finishReason !== "STOP" &&
+    finishReason !== "MAX_TOKENS"
+  ) {
+    throw Object.assign(
+      new Error(`Gemini stopped early (${finishReason}). Try a smaller batch.`),
+      { statusCode: 422, code: "GEMINI_FINISH", finishReason }
+    );
+  }
+
+  return text;
 }
 
 async function requestGeminiChatCompletion(

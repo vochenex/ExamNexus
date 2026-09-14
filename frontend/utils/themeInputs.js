@@ -27,15 +27,25 @@ export function textareaClass(theme, extra = "") {
 }
 
 export function cardClass(theme, extra = "") {
-  return `rounded-2xl border p-4 backdrop-blur-md sm:rounded-3xl sm:p-5 ${motion.interactiveCard} ${
+  return `rounded-2xl border p-4 backdrop-blur-md sm:rounded-3xl sm:p-5 en-static-panel ${
     theme === "dark"
       ? "bg-white/[0.04] border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
       : `${LIGHT_BG.surface} border-slate-200/80 en-panel-glow`
   } ${extra}`;
 }
 
+/** Panel that stays put on hover — border glow only (for tables / dense lists). */
+export function staticPanelClass(theme, extra = "") {
+  return `rounded-2xl border p-4 backdrop-blur-md sm:rounded-3xl sm:p-5 en-static-panel ${
+    theme === "dark"
+      ? "bg-white/[0.045] border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.22)]"
+      : `${LIGHT_BG.surface} border-slate-200/80 en-panel-glow`
+  } ${extra}`;
+}
+
+/** Main / list panels — glow only, no hover translate (keeps layout stable while scrolling). */
 export function panelClass(theme, extra = "") {
-  return `rounded-2xl border p-4 backdrop-blur-md sm:rounded-3xl sm:p-5 ${motion.interactiveCard} ${
+  return `rounded-2xl border p-4 backdrop-blur-md sm:rounded-3xl sm:p-5 en-static-panel ${
     theme === "dark"
       ? "bg-white/[0.045] border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.22)]"
       : `${LIGHT_BG.surface} border-slate-200/80 en-panel-glow`

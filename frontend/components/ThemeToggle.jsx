@@ -10,8 +10,15 @@ export default function ThemeToggle({ inverted = false, compact = false }) {
   return (
     <button
       type="button"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={`en-theme-toggle-btn ${headerActionButtonClass(theme, {
+      onClick={(event) => {
+        const btn = event.currentTarget;
+        btn.classList.remove("is-flipping");
+        // Restart pop animation on each toggle.
+        void btn.offsetWidth;
+        btn.classList.add("is-flipping");
+        setTheme(isDark ? "light" : "dark");
+      }}
+      className={`en-theme-toggle-btn en-header-pop-btn ${headerActionButtonClass(theme, {
         compact,
         inverted,
       })}`}

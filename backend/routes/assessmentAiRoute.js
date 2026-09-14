@@ -326,7 +326,7 @@ router.post("/generate-from-source-text", requireFaculty, async (req, res) => {
     }
 
     // Cap a single hosted round so this request finishes within Vercel maxDuration.
-    const roundCount = Math.min(count, 8);
+    const roundCount = Math.min(count, 5);
     const result = await requestAiQuestions({
       sourceText: resolvedSource,
       additionalInstructions: [

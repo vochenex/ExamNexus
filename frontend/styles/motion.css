@@ -349,6 +349,32 @@ html.light .en-interactive-card:hover {
   transform: translateY(-1px) scale(0.995);
 }
 
+/* Admin tables / dense lists — glow only, never shift layout */
+.en-static-panel {
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.en-static-panel:hover {
+  transform: none;
+}
+
+html:not(.light) .en-static-panel:hover {
+  border-color: rgba(52, 211, 153, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(16, 185, 129, 0.28),
+    0 0 22px rgba(16, 185, 129, 0.18);
+}
+
+html.light .en-static-panel:hover {
+  border-color: rgba(13, 148, 136, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(13, 148, 136, 0.22),
+    0 0 18px rgba(20, 184, 166, 0.16);
+}
+
 .en-nav-item {
   transition:
     transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
@@ -428,16 +454,20 @@ html.light .en-interactive-card:hover {
 }
 
 .en-dropdown-enter {
-  animation: en-notif-from-bell 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: en-notif-from-bell 0.48s cubic-bezier(0.34, 1.45, 0.64, 1) both;
   transform-origin: top right;
 }
 
 @keyframes en-notif-from-bell {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(-8px) scale(0.92);
+    transform: translateY(-18px) scale(0.72);
   }
-  to {
+  58% {
+    opacity: 1;
+    transform: translateY(4px) scale(1.06);
+  }
+  100% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -528,6 +558,324 @@ html.light .en-interactive-card:hover {
   animation-delay: 0.52s;
 }
 
+/* Announcement social — distinct motions per action (no shared “jump” pop) */
+@keyframes en-comment-appear-kf {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes en-comment-appear-reply-kf {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes en-react-heart-pop-kf {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  35% {
+    transform: translateY(-7px) scale(1.28);
+    filter: drop-shadow(0 6px 10px rgba(239, 68, 68, 0.45));
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+@keyframes en-comment-icon-wiggle-kf {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-14deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-6deg);
+  }
+}
+
+@keyframes en-comments-panel-in-kf {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes en-comment-reveal-kf {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes en-comment-fade-out-kf {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes en-reply-banner-in-kf {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes en-comment-send-fly-kf {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(10px, -8px) rotate(18deg);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes en-comment-input-glow-kf {
+  0% {
+    border-color: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  40% {
+    border-color: rgba(16, 185, 129, 0.7);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.22);
+  }
+  100% {
+    border-color: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes en-comment-reply-target-kf {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  40% {
+    box-shadow: inset 3px 0 0 0 rgba(16, 185, 129, 0.85);
+  }
+  100% {
+    box-shadow: inset 2px 0 0 0 rgba(16, 185, 129, 0.35);
+  }
+}
+
+@keyframes en-comment-reply-flash-kf {
+  0% {
+    background-color: transparent;
+  }
+  35% {
+    background-color: rgba(16, 185, 129, 0.14);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.en-comment-appear {
+  animation: en-comment-appear-kf 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-comment-appear-reply {
+  animation: en-comment-appear-reply-kf 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-comment-reveal {
+  animation: en-comment-reveal-kf 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--en-comment-i, 0) * 85ms);
+}
+
+.en-comment-fade-out {
+  pointer-events: none;
+  animation: en-comment-fade-out-kf 0.9s ease forwards;
+  z-index: 2;
+}
+
+.en-react-burst {
+  /* Keep layout stable — motion lives on the heart icon only */
+}
+
+.en-react-heart-pop {
+  display: inline-block;
+  transform-origin: center bottom;
+  animation: en-react-heart-pop-kf 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.en-comment-icon-burst {
+  /* Button stays put; only the icon wiggles */
+}
+
+.en-comment-icon-spin {
+  display: inline-block;
+  transform-origin: center;
+  animation: en-comment-icon-wiggle-kf 0.55s ease-in-out;
+}
+
+.en-comments-panel {
+  overflow: clip;
+  contain: paint;
+  animation: en-comments-panel-in-kf 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none;
+}
+
+.en-comments-panel::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+.en-announcement-comments {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none;
+}
+
+.en-announcement-comments::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+.en-announcement-comments.en-comments-revealing {
+  overflow: clip !important;
+}
+
+.en-comments-panel:has(.en-comment-fade-out) {
+  overflow: clip;
+  contain: paint;
+}
+
+.en-comment-focus {
+  border-radius: 0.85rem;
+  animation: en-comment-reply-flash-kf 1.2s ease-out;
+}
+
+.en-comment-focus > .en-comment-body {
+  box-shadow: inset 0 0 0 1.5px rgba(16, 185, 129, 0.55);
+}
+
+html.light .en-comment-focus > .en-comment-body {
+  box-shadow: inset 0 0 0 1.5px rgba(13, 148, 136, 0.55);
+}
+
+.en-reply-banner {
+  animation: en-reply-banner-in-kf 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-comment-send-burst {
+  /* Form stays put */
+}
+
+.en-comment-send-pop {
+  display: inline-flex;
+  animation: en-comment-send-fly-kf 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.en-comment-input-pulse {
+  animation: en-comment-input-glow-kf 0.75s ease-out;
+}
+
+.en-comment-reply-target > div:last-child {
+  animation: en-comment-reply-target-kf 0.65s ease-out both;
+}
+
+.en-comment-reply-flash {
+  border-radius: 0.85rem;
+  animation: en-comment-reply-flash-kf 0.7s ease-out;
+}
+
+.en-comment-reply-btn {
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.en-comment-reply-btn:hover {
+  transform: none;
+}
+
+.en-comment-reply-btn:active {
+  transform: none;
+  opacity: 0.85;
+}
+
+.en-comment-reply-shell {
+  border-left: 2px solid rgba(16, 185, 129, 0.45);
+}
+
+.en-comment-replies {
+  position: relative;
+}
+
+html:not(.light) .en-comment-replies {
+  border-left-color: rgba(52, 211, 153, 0.35);
+}
+
+html.light .en-comment-reply-shell {
+  border-left-color: rgba(13, 148, 136, 0.5);
+}
+
+html.light .en-comment-replies {
+  border-left-color: rgba(13, 148, 136, 0.35);
+}
+
+html.light .en-comment-input-pulse {
+  animation-name: en-comment-input-glow-light-kf;
+}
+
+@keyframes en-comment-input-glow-light-kf {
+  0% {
+    border-color: rgba(13, 148, 136, 0.25);
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+  }
+  40% {
+    border-color: rgba(13, 148, 136, 0.65);
+    box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.18);
+  }
+  100% {
+    border-color: rgba(13, 148, 136, 0.25);
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .en-page-enter,
   .en-page-route.en-route-enter-active,
@@ -546,10 +894,32 @@ html.light .en-interactive-card:hover {
   .en-badge-pulse,
   .en-location-toast,
   .en-success-check-circle,
-  .en-success-check-mark {
+  .en-success-check-mark,
+  .en-comment-appear,
+  .en-comment-appear-reply,
+  .en-comment-reveal,
+  .en-comment-fade-out,
+  .en-react-burst,
+  .en-react-heart-pop,
+  .en-comment-icon-burst,
+  .en-comment-icon-spin,
+  .en-comments-panel,
+  .en-reply-banner,
+  .en-comment-send-burst,
+  .en-comment-send-pop,
+  .en-comment-input-pulse,
+  .en-comment-reply-target,
+  .en-comment-reply-flash {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+    max-height: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+  }
+
+  .en-comment-fade-out {
+    opacity: 0 !important;
   }
 
   .en-sidebar-shell,

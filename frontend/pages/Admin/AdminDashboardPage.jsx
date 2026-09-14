@@ -101,7 +101,7 @@ function AdminToolCard({ tool, stats, theme, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className={`${panelClass(theme, "text-left transition hover:-translate-y-0.5")}`}
+      className={`${panelClass(theme, "text-left")}`}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div

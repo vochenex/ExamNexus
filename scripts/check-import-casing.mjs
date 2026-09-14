@@ -11,7 +11,7 @@ const root = path.join(__dirname, "..", "frontend");
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === "node_modules" || entry.name === "_unused") continue;
+    if (entry.name === "node_modules") continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full, out);
     else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) out.push(full);

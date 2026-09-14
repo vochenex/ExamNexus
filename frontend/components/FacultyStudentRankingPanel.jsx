@@ -15,8 +15,8 @@ import { secondaryButtonSm } from "../utils/themeButtons";
 
 function panelClass(theme) {
   return theme === "dark"
-    ? "border-emerald-500/20 bg-gradient-to-br from-[#173a2e] via-[#123027] to-[#0d211b]"
-    : "border-emerald-200/80 en-bg-elevated shadow-sm";
+    ? "en-static-panel border-emerald-500/20 bg-gradient-to-br from-[#173a2e] via-[#123027] to-[#0d211b]"
+    : "en-static-panel border-emerald-200/80 en-bg-elevated shadow-sm";
 }
 
 function FilterSelect({ theme, label, value, onChange, options, disabled = false }) {

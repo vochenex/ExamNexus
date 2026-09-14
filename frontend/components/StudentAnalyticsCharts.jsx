@@ -1,7 +1,7 @@
 import { useTheme } from "../layouts/ThemeContext";
 
 function panelClass(theme) {
-  return `rounded-2xl border p-5 ${
+  return `en-static-panel rounded-2xl border p-5 ${
     theme === "dark"
       ? "border-white/10 bg-white/[0.03]"
       : "border-emerald-200/80 en-bg-elevated shadow-sm"

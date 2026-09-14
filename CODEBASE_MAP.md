@@ -87,9 +87,6 @@ Quick locator while debugging. Local tip: amber **Debug · page file** badge sho
 | `StudentResultsListPage.jsx` | Results list |
 | `StudentResultDetailPage.jsx` | One result · review answers |
 
-### `pages/_unused/`
-Old unused screens (not in `App.jsx`): `Admin` · `Faculty` · `Student` · `StudenEnroll` · `StudentExams` · `TeacherAnalytics` — ignore unless recovering old flows.
-
 ---
 
 ## `frontend/layouts/`

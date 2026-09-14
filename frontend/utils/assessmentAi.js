@@ -6,7 +6,12 @@ import { API_BASE, isLocalApiBase } from "./apiBase.js";
 const AI_REQUEST_TIMEOUT_MS = 600000;
 /** Keep each hosted API round small so Groq/Vercel do not truncate mid-JSON. */
 const PROMPT_CLIENT_ROUND_SIZE = 4;
-const DOCUMENT_CLIENT_ROUND_SIZE = 8;
+/** Source rounds: 5 matches backend DEFAULT_CHUNK_SIZE and keeps Gemini JSON reliable. */
+const DOCUMENT_CLIENT_ROUND_SIZE = 5;
+const DOCUMENT_SOURCE_MAX_CHARS = 14000;
+const DOCUMENT_ROUND_DELAY_MS = 2500;
+const DOCUMENT_MAX_ROUND_ATTEMPTS = 3;
+const DOCUMENT_MAX_SOFT_FAILURES = 4;
 
 function backendUnreachableMessage() {
   if (isLocalApiBase()) {
@@ -832,29 +837,38 @@ async function generateSourceMaterialBatched({
     status: "waiting",
   });
 
-  const sourceText = await extractDocumentsText({ file, files, fileIndexes, signal });
+  const rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
+  const sourceText = String(rawSource || "").slice(0, DOCUMENT_SOURCE_MAX_CHARS);
 
   const allQuestions = [];
   let suggestedTitle = "";
   let suggestedDescription = "";
   let meta = {};
   let lastError = null;
+  let consecutiveSoftFailures = 0;
+  let roundIndex = 0;
 
   while (allQuestions.length < total) {
     assertNotAborted();
+
+    if (roundIndex > 0) {
+      // Space Gemini calls — free-tier RPM is the usual reason rounds stop at ~8.
+      await sleep(DOCUMENT_ROUND_DELAY_MS);
+    }
+    roundIndex += 1;
 
     const need = Math.min(DOCUMENT_CLIENT_ROUND_SIZE, total - allQuestions.length);
     const recent = allQuestions
       .map((item) => item?.question)
       .filter(Boolean)
-      .slice(-12)
+      .slice(-10)
       .join(" | ");
 
     const additionalInstructions = allQuestions.length
       ? [
           `Already created ${allQuestions.length} of ${total} questions from this source.`,
           `Generate exactly ${need} NEW distinct questions grounded in the source.`,
-          recent ? `Do not repeat or paraphrase any of these: ${recent}` : "",
+          recent ? `Avoid repeating these topics: ${recent}` : "",
         ]
           .filter(Boolean)
           .join(" ")
@@ -868,49 +882,95 @@ async function generateSourceMaterialBatched({
       status: "generating",
     });
 
-    let res;
-    try {
-      const headers = await getAuthHeaders(true, { forceRefresh: allQuestions.length === 0 });
-      res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/generate-from-source-text`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          sourceText,
-          formats,
-          questionCount: need,
-          difficulty,
-          additionalInstructions,
-        }),
-        signal,
-      });
-    } catch (error) {
-      if (error?.name === "AbortError") throw error;
-      lastError = isBackendUnreachable(error)
-        ? new Error(backendUnreachableMessage())
-        : error;
-      break;
+    let batch = [];
+    let roundPayload = null;
+    let roundAttempts = 0;
+
+    while (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
+      roundAttempts += 1;
+      assertNotAborted();
+      try {
+        const headers = await getAuthHeaders(true, {
+          forceRefresh: allQuestions.length === 0 && roundAttempts === 1,
+        });
+        const res = await fetchAuthedWithRetry(
+          `${API_BASE}/assessment-ai/generate-from-source-text`,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              sourceText,
+              formats,
+              questionCount: need,
+              difficulty,
+              additionalInstructions,
+            }),
+            signal,
+          }
+        );
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          lastError = new Error(formatApiError(payload, "Failed to generate from source"));
+          const message = String(lastError.message || "").toLowerCase();
+          const retryable =
+            res.status === 429 ||
+            res.status >= 500 ||
+            message.includes("quota") ||
+            message.includes("rate") ||
+            message.includes("timeout") ||
+            message.includes("empty response") ||
+            message.includes("try again");
+          if (retryable && roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
+            await sleep(1200 * roundAttempts + (res.status === 429 ? 4000 : 0));
+            continue;
+          }
+          break;
+        }
+
+        roundPayload = payload;
+        batch = Array.isArray(payload.questions) ? payload.questions : [];
+        if (!batch.length) {
+          lastError = new Error("AI did not return any usable questions from this source.");
+          if (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
+            await sleep(900 * roundAttempts);
+            continue;
+          }
+          break;
+        }
+        lastError = null;
+        break;
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        lastError = isBackendUnreachable(error)
+          ? new Error(backendUnreachableMessage())
+          : error;
+        if (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
+          await sleep(1200 * roundAttempts);
+          continue;
+        }
+        break;
+      }
     }
 
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      lastError = new Error(formatApiError(payload, "Failed to generate from source"));
-      break;
-    }
-
-    const batch = Array.isArray(payload.questions) ? payload.questions : [];
     if (!batch.length) {
-      lastError = new Error("AI did not return any usable questions from this source.");
-      break;
+      consecutiveSoftFailures += 1;
+      if (consecutiveSoftFailures >= DOCUMENT_MAX_SOFT_FAILURES) {
+        break;
+      }
+      continue;
     }
 
-    if (!suggestedTitle && payload.suggestedTitle) {
-      suggestedTitle = payload.suggestedTitle;
+    consecutiveSoftFailures = 0;
+
+    if (!suggestedTitle && roundPayload?.suggestedTitle) {
+      suggestedTitle = roundPayload.suggestedTitle;
     }
-    if (!suggestedDescription && payload.suggestedDescription) {
-      suggestedDescription = payload.suggestedDescription;
+    if (!suggestedDescription && roundPayload?.suggestedDescription) {
+      suggestedDescription = roundPayload.suggestedDescription;
     }
     meta = {
-      ...(payload.meta || {}),
+      ...(roundPayload?.meta || {}),
       ...(meta || {}),
       requestedCount: total,
       generatedCount: allQuestions.length + batch.length,
@@ -946,7 +1006,10 @@ async function generateSourceMaterialBatched({
       }
     }
 
-    if (addedThisRound === 0) break;
+    if (addedThisRound === 0) {
+      consecutiveSoftFailures += 1;
+      if (consecutiveSoftFailures >= DOCUMENT_MAX_SOFT_FAILURES) break;
+    }
   }
 
   const finalQuestions = allQuestions.slice(0, total);
@@ -975,7 +1038,9 @@ async function generateSourceMaterialBatched({
       partial: finalQuestions.length < total,
       warning:
         finalQuestions.length < total
-          ? `Generated ${finalQuestions.length} of ${total} source questions. You can generate again to add more.`
+          ? `Generated ${finalQuestions.length} of ${total} source questions${
+              lastError?.message ? ` (${lastError.message})` : ""
+            }. You can generate again to add more.`
           : null,
       mode: "document_source_material_client_batched",
     },

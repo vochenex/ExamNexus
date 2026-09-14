@@ -1,7 +1,10 @@
 import ProgressButton from "./ui/ProgressButton";
 import ToggleOptionRow from "./ui/ToggleOptionRow";
 import { primaryButton } from "../utils/themeButtons";
-import { DEFAULT_DURATION_VALUE, parseDurationValue } from "../utils/assessmentDuration";
+import {
+  formatDurationInputValue,
+  parseDurationInput,
+} from "../utils/assessmentDuration";
 import Select from "./ui/Select";
 
 export default function AssessmentSettingsPanel({
@@ -11,12 +14,21 @@ export default function AssessmentSettingsPanel({
   onPublish,
   publishLabel,
   theme,
+  durationError = "",
 }) {
   const inputClass = `w-full p-3 rounded-xl text-sm ${
     theme === "dark"
       ? "bg-white/10 text-white border border-white/10"
       : "en-bg-elevated text-gray-900 border border-emerald-200"
   }`;
+
+  const durationInputClass = durationError
+    ? `${inputClass} ${
+        theme === "dark"
+          ? "!border-red-400/70 ring-1 ring-red-400/40"
+          : "!border-red-400 ring-1 ring-red-300/70"
+      }`
+    : inputClass;
 
   return (
     <div className="space-y-4">
@@ -69,26 +81,45 @@ export default function AssessmentSettingsPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div id="assessment-duration-field">
           <label
+            htmlFor="assessment-duration-value"
             className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${
               theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
             }`}
           >
-            Time limit
+            Time limit <span className="normal-case text-red-400">*</span>
           </label>
           <input
+            id="assessment-duration-value"
             type="number"
             min="1"
-            className={inputClass}
-            value={parseDurationValue(exam.duration_value, DEFAULT_DURATION_VALUE)}
-            onFocus={(e) => e.target.select()}
+            inputMode="numeric"
+            placeholder="e.g. 60"
+            className={durationInputClass}
+            value={formatDurationInputValue(exam.duration_value)}
+            aria-invalid={Boolean(durationError)}
+            aria-describedby={durationError ? "assessment-duration-error" : undefined}
             onChange={(e) =>
               onChange({
-                duration_value: parseDurationValue(e.target.value, DEFAULT_DURATION_VALUE),
+                duration_value: parseDurationInput(e.target.value),
               })
             }
           />
+          {durationError ? (
+            <p
+              id="assessment-duration-error"
+              className={`mt-1.5 text-xs font-medium ${
+                theme === "dark" ? "text-red-300" : "text-red-600"
+              }`}
+            >
+              {durationError}
+            </p>
+          ) : (
+            <p className={`mt-1.5 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-600"}`}>
+              Required before publishing.
+            </p>
+          )}
         </div>
         <div>
           <label

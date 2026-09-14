@@ -75,14 +75,43 @@ export async function fetchAdminUsers(role = null, status = null) {
     }));
 
     if (!error && status) {
-      data = (data || []).filter(
-        (user) => getAccountStatus(user) === status
-      );
+      data = (data || []).filter((user) => {
+        const accountStatus = getAccountStatus(user);
+        if (status === "deleted") {
+          return accountStatus === "deleted" || accountStatus === "rejected";
+        }
+        return accountStatus === status;
+      });
     }
   }
 
   if (error) throw error;
-  return data || [];
+
+  let rows = data || [];
+
+  // Older RPCs match account_status exactly ("deleted") and miss legacy
+  // "rejected" rows. Also some DBs never got soft-delete SQL.
+  if (status === "deleted" && rows.length === 0) {
+    const { data: rejectedRows, error: rejectedError } = await supabase.rpc(
+      "admin_list_users",
+      {
+        p_role: role || null,
+        p_status: "rejected",
+      }
+    );
+    if (!rejectedError && rejectedRows?.length) {
+      rows = rejectedRows;
+    }
+  }
+
+  if (status === "deleted") {
+    rows = rows.filter((user) => {
+      const accountStatus = getAccountStatus(user);
+      return accountStatus === "deleted" || accountStatus === "rejected";
+    });
+  }
+
+  return rows;
 }
 
 export async function reviewAdminAccount(userId, action) {
@@ -96,15 +125,14 @@ export async function reviewAdminAccount(userId, action) {
   const approved = String(action || "").toLowerCase() === "approve";
   await dispatchPushToUsers({
     userIds: [userId],
-    title: approved ? "Account approved" : "Account not approved",
+    title: approved ? "Account approved" : "Account deleted",
     body: approved
       ? "Your ExamNexus account was approved. You can sign in now."
-      : "Your ExamNexus registration was not approved. Contact an administrator if you need help.",
+      : "Your ExamNexus account was removed by an administrator.",
     data: {
       kind: "account",
-      // Must match a real App route. /login was never registered and opened a blank page.
       path: "/auth",
-      status: approved ? "approved" : "rejected",
+      status: approved ? "approved" : "deleted",
     },
   });
 
@@ -132,6 +160,42 @@ export async function deleteAdminUser(userId) {
     p_user_id: userId,
   });
   if (error) throw error;
+
+  // Confirm soft-delete landed. If the profile is gone, the DB still hard-deletes.
+  const { data: stillThere, error: checkError } = await supabase
+    .from("users")
+    .select("id, account_status, deleted_at")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!checkError && !stillThere) {
+    throw new Error(
+      "Account was permanently removed. Run database/account_soft_delete.sql in Supabase so deletes use the 7-day hold."
+    );
+  }
+
+  if (
+    !checkError &&
+    stillThere &&
+    !["deleted", "rejected"].includes(
+      String(stillThere.account_status || "").toLowerCase()
+    )
+  ) {
+    throw new Error(
+      "Delete did not mark the account as deleted. Run database/account_soft_delete.sql in Supabase."
+    );
+  }
+
+  await dispatchPushToUsers({
+    userIds: [userId],
+    title: "Account deleted",
+    body: "Your ExamNexus account was deleted by an administrator. Contact support if this was a mistake within 7 days.",
+    data: {
+      kind: "account",
+      path: "/auth",
+      status: "deleted",
+    },
+  });
 }
 
 export async function fetchAdminFaculty() {
@@ -329,7 +393,9 @@ export async function fetchAdminExamLogs(limit = 200) {
   if (examIds.length) {
     const { data: exams } = await supabase
       .from("exams")
-      .select("id, subjects(teacher_school_id)")
+      .select(
+        "id, title, target_sections, subject_id, subjects(id, name, section_count, teacher_school_id)"
+      )
       .in("id", examIds);
 
     const teacherIds = [
@@ -344,7 +410,7 @@ export async function fetchAdminExamLogs(limit = 200) {
     if (teacherIds.length) {
       const { data: facultyRows } = await supabase
         .from("users")
-        .select("school_id, first_name, last_name, department")
+        .select("school_id, first_name, last_name, department, avatar_url")
         .in("school_id", teacherIds);
       for (const faculty of facultyRows || []) {
         facultyBySchoolId.set(faculty.school_id, faculty);
@@ -352,12 +418,20 @@ export async function fetchAdminExamLogs(limit = 200) {
     }
 
     for (const exam of exams || []) {
-      const teacherId = exam.subjects?.teacher_school_id;
+      const subject = exam.subjects || {};
+      const teacherId = subject.teacher_school_id;
       const faculty = facultyBySchoolId.get(teacherId);
       examMeta.set(exam.id, {
+        exam_title: exam.title || "",
+        subject_id: subject.id || exam.subject_id || "",
+        subject_name: subject.name || "",
+        section_count: subject.section_count ?? null,
+        target_sections: Array.isArray(exam.target_sections) ? exam.target_sections : [],
+        teacher_school_id: teacherId || "",
         faculty_name:
           [faculty?.first_name, faculty?.last_name].filter(Boolean).join(" ") || "—",
         faculty_department: faculty?.department || "—",
+        faculty_avatar_url: faculty?.avatar_url || "",
       });
     }
   }
@@ -376,13 +450,53 @@ export async function fetchAdminExamLogs(limit = 200) {
     }
   }
 
+  const subjectIds = [
+    ...new Set(
+      [...examMeta.values()]
+        .map((exam) => exam.subject_id)
+        .filter(Boolean)
+        .concat(rows.map((row) => row.subject_id).filter(Boolean))
+    ),
+  ];
+
+  const enrollmentMeta = new Map();
+  if (studentIds.length && subjectIds.length) {
+    try {
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from("subject_students")
+        .select("student_id, subject_id, section")
+        .in("student_id", studentIds)
+        .in("subject_id", subjectIds);
+      if (!enrollmentError) {
+        for (const enrollment of enrollments || []) {
+          enrollmentMeta.set(`${enrollment.student_id}:${enrollment.subject_id}`, {
+            section: String(enrollment.section || "A").trim().toUpperCase() || "A",
+          });
+        }
+      }
+    } catch {
+      // Admin RLS may block direct enrollment reads; RPC student_section still applies.
+    }
+  }
+
   return rows.map((row) => {
     const exam = examMeta.get(row.exam_id) || {};
     const student = studentMeta.get(row.student_id) || {};
+    const subjectId = exam.subject_id || row.subject_id || "";
+    const enrollment = enrollmentMeta.get(`${row.student_id}:${subjectId}`) || {};
     return {
       ...row,
+      exam_title: row.exam_title || exam.exam_title || "Assessment",
+      subject_id: subjectId,
+      subject_name: row.subject_name || exam.subject_name || "Unknown subject",
+      section_count: exam.section_count ?? row.section_count ?? null,
+      target_sections: exam.target_sections || row.target_sections || [],
+      student_section:
+        row.student_section || enrollment.section || "",
       faculty_name: exam.faculty_name || "—",
       faculty_department: exam.faculty_department || "—",
+      faculty_avatar_url: exam.faculty_avatar_url || row.faculty_avatar_url || "",
+      teacher_school_id: exam.teacher_school_id || row.teacher_school_id || "",
       student_department: student.department || "—",
       student_course: student.course || "—",
     };
@@ -526,12 +640,24 @@ export async function fetchAdminAssessmentReport(examId) {
 }
 
 export function getAccountStatus(profile) {
-  const explicit = profile?.account_status;
+  const explicit = String(profile?.account_status || "")
+    .trim()
+    .toLowerCase();
+  if (explicit === "rejected") return "deleted";
   if (explicit) return explicit;
 
   const role = String(profile?.role || "").toLowerCase();
   if (role === "admin") return "approved";
   return "pending";
+}
+
+/** Days left before a soft-deleted account is purged (0–7). */
+export function getDeletedAccountDaysLeft(profile) {
+  const deletedAt = profile?.deleted_at ? new Date(profile.deleted_at).getTime() : NaN;
+  if (!Number.isFinite(deletedAt)) return null;
+  const msLeft = deletedAt + 7 * 24 * 60 * 60 * 1000 - Date.now();
+  if (msLeft <= 0) return 0;
+  return Math.max(1, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
 }
 
 export function isAccountApproved(profile) {

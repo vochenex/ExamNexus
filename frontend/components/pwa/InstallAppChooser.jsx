@@ -2,7 +2,6 @@ import { Monitor, Smartphone, TabletSmartphone } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import ModalPortal from "../ui/ModalPortal";
-import { motion } from "../../utils/motion";
 
 /** Public URL for the Android APK served from /public/downloads. */
 export const ANDROID_APK_URL = "/downloads/ExamNexus-Android.apk";
@@ -138,10 +137,10 @@ export default function InstallAppChooser({
   return (
     <ModalPortal>
       <div
-        className={`fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 ${motion.overlay}`}
+        className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4"
       >
         <div
-          className="absolute inset-0 bg-black/70 backdrop-blur-sm en-fade-in"
+          className="absolute inset-0 bg-black/55 en-fade-in"
           onClick={busy ? undefined : onClose}
           aria-hidden="true"
         />
@@ -150,7 +149,7 @@ export default function InstallAppChooser({
           role="dialog"
           aria-modal="true"
           aria-labelledby="install-chooser-title"
-          className={`${motion.scaleIn} en-modal-panel relative z-10 mx-auto w-full max-w-[min(100%,26rem)] overflow-hidden rounded-3xl border p-4 shadow-2xl sm:p-6 ${
+          className={`en-install-chooser-panel relative z-10 mx-auto w-full max-w-[min(100%,22rem)] overflow-hidden rounded-3xl border p-4 shadow-2xl sm:max-w-[min(100%,24rem)] sm:p-5 ${
             isDark
               ? "border-white/10 bg-[#0a1f1f]"
               : "border-emerald-200/80 en-bg-elevated"

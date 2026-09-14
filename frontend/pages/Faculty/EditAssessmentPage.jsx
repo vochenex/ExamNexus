@@ -23,7 +23,12 @@ import QuestionBankPicker from "../../components/QuestionBankPicker";
 import { getSubjectSections, normalizeTargetSections } from "../../utils/sections";
 import { deserializeQuestion, serializeQuestionForDb } from "../../utils/assessmentQuestions";
 import { getAssessmentCategoryLabel } from "../../utils/assessmentCategories";
-import { parseDurationValue, DEFAULT_DURATION_VALUE } from "../../utils/assessmentDuration";
+import {
+  parseDurationValue,
+  DEFAULT_DURATION_VALUE,
+  focusAssessmentDurationField,
+  isDurationValueProvided,
+} from "../../utils/assessmentDuration";
 import useQuestionSections from "../../hooks/useQuestionSections";
 import { saveQuestionToBank } from "../../utils/questionBank";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
@@ -43,7 +48,7 @@ const defaultAssessment = {
   show_question_review: false,
   show_correct_answers: false,
   pass_mark: 50,
-  duration_value: 60,
+  duration_value: "",
   duration_unit: "minutes",
 };
 
@@ -62,6 +67,7 @@ export default function EditAssessment() {
   const [loading, setLoading] = useState(false);
   const [savingToBankId, setSavingToBankId] = useState(null);
   const [error, setError] = useState("");
+  const [durationError, setDurationError] = useState("");
   const [fieldErrorsByIndex, setFieldErrorsByIndex] = useState({});
   const [subjectSections, setSubjectSections] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -191,7 +197,10 @@ export default function EditAssessment() {
     return `${year}-${month}-${day}`;
   };
 
-  const clearError = () => setError("");
+  const clearError = () => {
+    setError("");
+    setDurationError("");
+  };
   const clearFieldErrors = (questionIndex) => {
     if (questionIndex == null) {
       setFieldErrorsByIndex({});
@@ -255,6 +264,7 @@ export default function EditAssessment() {
     try {
       setLoading(true);
       setError("");
+      setDurationError("");
 
       if (!exam.title.trim()) {
         setError("Please enter an assessment title.");
@@ -272,6 +282,14 @@ export default function EditAssessment() {
       if (!Number.isFinite(passMark) || passMark < 0 || passMark > 100) {
         setError("Set a passing rate between 0 and 100% in Settings.");
         setLoading(false);
+        return;
+      }
+
+      if (!isDurationValueProvided(exam.duration_value)) {
+        setDurationError("This is a required field.");
+        setError("Time limit is required.");
+        setLoading(false);
+        focusAssessmentDurationField();
         return;
       }
 
@@ -497,8 +515,14 @@ export default function EditAssessment() {
               theme={theme}
               loading={loading}
               publishLabel="Save changes"
+              durationError={durationError}
               onPublish={handlePublish}
-              onChange={(patch) => setExam((prev) => ({ ...prev, ...patch }))}
+              onChange={(patch) => {
+                if (Object.prototype.hasOwnProperty.call(patch, "duration_value")) {
+                  setDurationError("");
+                }
+                setExam((prev) => ({ ...prev, ...patch }));
+              }}
             />
           </div>
         </div>

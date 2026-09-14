@@ -60,8 +60,8 @@ import AlertBanner from "../../components/ui/AlertBanner";
 
 function panelClass(theme) {
   return theme === "dark"
-    ? "bg-gradient-to-br from-[#173a2e] via-[#123027] to-[#0d211b] border border-emerald-500/20"
-    : "en-bg-surface border border-emerald-300 shadow-sm";
+    ? "en-static-panel bg-gradient-to-br from-[#173a2e] via-[#123027] to-[#0d211b] border border-emerald-500/20"
+    : "en-static-panel en-bg-surface border border-emerald-300 shadow-sm";
 }
 
 function StatPill({ icon: Icon, label, value, theme }) {

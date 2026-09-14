@@ -15,7 +15,7 @@ export function inputClass(theme, invalid = false) {
 }
 
 export function assessmentPanelClass(theme) {
-  return `box-border h-fit min-w-0 max-w-full rounded-2xl border p-4 sm:p-5 ${
+  return `box-border h-fit min-w-0 max-w-full rounded-2xl border p-4 sm:p-5 en-static-panel ${
     theme === "dark"
       ? "bg-white/5 border-white/10"
       : "en-bg-elevated border-emerald-200/80 en-panel-glow"

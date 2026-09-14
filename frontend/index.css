@@ -484,11 +484,12 @@ html:not(.light) .en-tabbar-label--active {
   touch-action: pan-x pan-y;
 }
 
-/* Nested tables / panels: allow vertical page scroll while swiping inside */
+/* Nested tables / panels: contain horizontal overscroll; chain vertical to page */
 .en-inner-scroll,
 .en-table-scroll {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
   touch-action: pan-x pan-y;
   max-width: 100%;
 }
@@ -670,15 +671,75 @@ html:not(.light) .overflow-auto::-webkit-scrollbar-thumb {
   padding: 0;
   margin: 0;
   cursor: pointer;
-  background: rgba(2, 12, 11, 0.45);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
+  background: rgba(2, 12, 11, 0.38);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.en-notif-backdrop--in {
+  animation: en-notif-backdrop-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.en-notif-backdrop--out {
+  animation: en-notif-backdrop-out 0.28s ease-in both;
+}
+
+@keyframes en-notif-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes en-notif-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .en-notif-panel {
   display: flex;
   flex-direction: column;
   z-index: 80;
+}
+
+.en-notif-panel--in {
+  animation: en-notif-panel-in 0.48s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+.en-notif-panel--out {
+  animation: en-notif-panel-out 0.3s cubic-bezier(0.4, 0, 0.7, 0.2) both;
+}
+
+@keyframes en-notif-panel-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.72);
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(4px) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes en-notif-panel-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.82);
+  }
 }
 
 /* Bottom sheet ("More") */
@@ -1338,6 +1399,127 @@ html.en-scroll-locked .en-native-topbar {
 
 .en-install-icon-btn {
   cursor: pointer;
+}
+
+.en-header-pop-btn,
+.en-theme-toggle-btn,
+.en-install-icon-btn,
+.en-notif-btn {
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.en-header-pop-btn:hover,
+.en-theme-toggle-btn:hover,
+.en-install-icon-btn:hover,
+.en-notif-btn:hover {
+  transform: scale(1.12);
+}
+
+.en-header-pop-btn:active,
+.en-theme-toggle-btn:active,
+.en-install-icon-btn:active,
+.en-notif-btn:active {
+  transform: scale(0.86);
+  transition-duration: 0.12s;
+}
+
+.en-theme-toggle-btn.is-flipping,
+.en-install-icon-btn.is-popping,
+.en-notif-btn.is-open {
+  animation: en-header-icon-pop 0.55s cubic-bezier(0.34, 1.6, 0.64, 1);
+}
+
+@keyframes en-header-icon-pop {
+  0% {
+    transform: scale(0.7) rotate(-12deg);
+  }
+  45% {
+    transform: scale(1.28) rotate(8deg);
+  }
+  70% {
+    transform: scale(0.92) rotate(-4deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.en-install-chooser-panel {
+  animation: en-install-chooser-in 0.48s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+
+@keyframes en-install-chooser-in {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.86);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.en-app-toast--in {
+  animation: en-app-toast-in 0.48s cubic-bezier(0.34, 1.55, 0.64, 1) both;
+}
+
+.en-app-toast--out {
+  animation: en-app-toast-out 0.28s cubic-bezier(0.4, 0, 0.7, 0.2) both;
+}
+
+@keyframes en-app-toast-in {
+  0% {
+    opacity: 0;
+    transform: translateX(28px) translateY(-10px) scale(0.86);
+  }
+  55% {
+    opacity: 1;
+    transform: translateX(-4px) translateY(0) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+}
+
+@keyframes en-app-toast-out {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(24px) scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .en-notif-panel--in,
+  .en-notif-panel--out,
+  .en-notif-backdrop--in,
+  .en-notif-backdrop--out,
+  .en-app-toast--in,
+  .en-app-toast--out,
+  .en-install-chooser-panel,
+  .en-theme-toggle-btn.is-flipping,
+  .en-install-icon-btn.is-popping,
+  .en-header-pop-btn:hover,
+  .en-theme-toggle-btn:hover,
+  .en-install-icon-btn:hover,
+  .en-notif-btn:hover,
+  .en-header-pop-btn:active,
+  .en-theme-toggle-btn:active,
+  .en-install-icon-btn:active,
+  .en-notif-btn:active {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 .en-install-tip {

@@ -16,7 +16,6 @@ export default defineConfig([
     'backend/uploads/**',
     'uploads/**',
     'public/downloads/**',
-    'frontend/pages/_unused/**',
     '**/*.min.js',
   ]),
   {

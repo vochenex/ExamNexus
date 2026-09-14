@@ -24,7 +24,6 @@ import {
 } from "../utils/notificationDismissals";
 import { stripAssessmentCategoryFromDescription } from "../utils/assessmentCategories";
 import { secondaryButtonSm } from "../utils/themeButtons";
-import { motion } from "../utils/motion";
 import ModalPortal from "./ui/ModalPortal";
 
 function statusLabel(item) {
@@ -143,14 +142,33 @@ export default function NotificationBell({ compact = false }) {
   const isStudent = user.role?.toLowerCase() === "student";
 
   const [open, setOpen] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [panelStyle, setPanelStyle] = useState(null);
+  const closeTimerRef = useRef(0);
 
   const closePanel = () => {
-    setOpen(false);
+    if (!open && !visible) return;
     setShowClearConfirm(false);
+    setClosing(true);
+    setOpen(false);
+    window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => {
+      setVisible(false);
+      setClosing(false);
+      setPanelStyle(null);
+    }, 320);
+  };
+
+  const openPanel = () => {
+    window.clearTimeout(closeTimerRef.current);
+    setClosing(false);
+    setVisible(true);
+    setOpen(true);
+    loadNotifications();
   };
 
   const loadNotifications = useCallback(async (silent = false) => {
@@ -193,8 +211,7 @@ export default function NotificationBell({ compact = false }) {
   }, [location.pathname]);
 
   useLayoutEffect(() => {
-    if (!open || !triggerRef.current) {
-      setPanelStyle(null);
+    if (!visible || !triggerRef.current) {
       return undefined;
     }
 
@@ -203,11 +220,20 @@ export default function NotificationBell({ compact = false }) {
       if (!trigger) return;
 
       const gap = 10;
-      const width = Math.min(400, Math.max(280, window.innerWidth - 24));
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const isMobile = vw < 640;
+      // Mobile: compact card (not edge-to-edge). Desktop: fixed dropdown width.
+      const width = isMobile
+        ? Math.min(20 * 16, Math.max(16.5 * 16, vw - 28))
+        : Math.min(22 * 16, Math.max(18 * 16, Math.min(360, vw - 48)));
       const preferredLeft = trigger.right - width;
-      const left = Math.max(12, Math.min(preferredLeft, window.innerWidth - width - 12));
-      const top = Math.min(trigger.bottom + gap, window.innerHeight - 240);
-      const maxHeight = Math.max(220, window.innerHeight - top - 16);
+      const left = Math.max(12, Math.min(preferredLeft, vw - width - 12));
+      const top = Math.min(trigger.bottom + gap, vh - (isMobile ? 200 : 260));
+      const maxHeight = Math.max(
+        200,
+        Math.min(isMobile ? vh * 0.58 : vh * 0.7, vh - top - 16)
+      );
 
       setPanelStyle({
         position: "fixed",
@@ -227,7 +253,7 @@ export default function NotificationBell({ compact = false }) {
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };
-  }, [open]);
+  }, [visible, items.length]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -239,6 +265,13 @@ export default function NotificationBell({ compact = false }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(closeTimerRef.current);
+    },
+    []
+  );
 
   const handleItemClick = async (item) => {
     closePanel();
@@ -280,22 +313,22 @@ export default function NotificationBell({ compact = false }) {
         ref={triggerRef}
         type="button"
         onClick={() => {
-          setOpen((prev) => !prev);
+          if (open) closePanel();
+          else openPanel();
           setShowClearConfirm(false);
-          if (!open) loadNotifications();
         }}
-        className={`relative en-notif-btn ${
-          open ? "en-bell-ring" : ""
+        className={`relative en-notif-btn en-header-pop-btn ${
+          open ? "en-bell-ring is-open" : ""
         } ${
           open
             ? headerActionButtonClass(theme, {
                 compact,
                 extra:
                   theme === "dark"
-                    ? "bg-emerald-500/20 ring-2 ring-emerald-500/40 text-emerald-300 transition-all duration-200"
-                    : "en-bg-skeleton ring-2 ring-emerald-300 text-teal-800 transition-all duration-200",
+                    ? "bg-emerald-500/20 ring-2 ring-emerald-500/40 text-emerald-300"
+                    : "en-bg-skeleton ring-2 ring-emerald-300 text-teal-800",
               })
-            : headerActionButtonClass(theme, { compact, extra: "transition-all duration-200" })
+            : headerActionButtonClass(theme, { compact })
         }`}
         aria-label="Notifications"
         aria-expanded={open}
@@ -314,19 +347,21 @@ export default function NotificationBell({ compact = false }) {
         )}
       </button>
 
-      {open && panelStyle && (
+      {visible && panelStyle && (
         <ModalPortal lockScroll>
           <div className="en-notif-layer" role="presentation">
             <button
               type="button"
-              className="en-notif-backdrop"
+              className={`en-notif-backdrop ${closing ? "en-notif-backdrop--out" : "en-notif-backdrop--in"}`}
               aria-label="Close notifications"
               onClick={closePanel}
             />
             <div
               ref={panelRef}
               style={panelStyle}
-              className={`${motion.dropdown} en-notif-panel overflow-hidden rounded-2xl border shadow-2xl ${
+              className={`en-notif-panel overflow-hidden rounded-2xl border shadow-2xl ${
+                closing ? "en-notif-panel--out" : "en-notif-panel--in"
+              } ${
                 theme === "dark"
                   ? "bg-[#0b1114] border-white/10"
                   : "en-bg-elevated border-emerald-200"
