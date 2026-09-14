@@ -2,18 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BrainCircuit,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   FileSearch,
   FileUp,
   Wand2,
   X,
 } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import {
-  AI_FORMAT_OPTIONS,
-  DEFAULT_AI_FORMATS,
-} from "../utils/aiQuestionMapper";
+import { AI_FORMAT_OPTIONS } from "../utils/aiQuestionMapper";
 import { parsePromptPreferences } from "../utils/promptPreferences";
 import {
   classifyAssessmentDocument,
@@ -23,6 +18,7 @@ import {
 } from "../utils/assessmentAi";
 import { assessmentInputClass } from "../utils/assessmentFormStyles";
 import Select from "./ui/Select";
+import FormatMultiSelect from "./ui/FormatMultiSelect";
 
 const DIFFICULTY_OPTIONS = [
   { value: "easy", label: "Easy" },
@@ -32,6 +28,7 @@ const DIFFICULTY_OPTIONS = [
 
 const MIN_QUESTIONS = 1;
 const MAX_QUESTIONS = 150;
+const DEFAULT_PROMPT_QUESTION_COUNT = 20;
 
 function parseRawQuestionCount(value) {
   if (value === "" || value == null) return null;
@@ -123,9 +120,8 @@ export default function AssessmentAiGenerator({
   const [prompt, setPrompt] = useState("");
   const [questionCount, setQuestionCount] = useState("");
   const [difficulty, setDifficulty] = useState("medium");
-  const [selectedFormats, setSelectedFormats] = useState(() => [...DEFAULT_AI_FORMATS]);
+  const [selectedFormats, setSelectedFormats] = useState([]);
   const [files, setFiles] = useState([]);
-  const [optionsOpen, setOptionsOpen] = useState(true);
   const [documentAnalysis, setDocumentAnalysis] = useState(null);
   const inFlightRef = useRef(false);
   const abortRef = useRef(null);
@@ -162,7 +158,20 @@ export default function AssessmentAiGenerator({
     setDocumentAnalysis(null);
     setPanelError("");
     setPanelNotice("");
-  }, [files, mode]);
+    setQuestionCount("");
+    setDifficulty("medium");
+    setSelectedFormats([]);
+    if (mode !== "document") {
+      setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    setDocumentAnalysis(null);
+    setPanelError("");
+    setPanelNotice("");
+  }, [files]);
 
   const promptHints = useMemo(() => {
     if (mode !== "prompt" || !prompt.trim()) return null;
@@ -205,14 +214,8 @@ export default function AssessmentAiGenerator({
       ? ""
       : countWarningRaw;
 
-  const toggleFormat = (value) => {
-    setSelectedFormats((prev) => {
-      if (prev.includes(value)) {
-        const next = prev.filter((item) => item !== value);
-        return next.length ? next : prev;
-      }
-      return [...prev, value];
-    });
+  const toggleFormat = (nextFormats) => {
+    setSelectedFormats(Array.isArray(nextFormats) ? nextFormats : []);
   };
 
   const addFiles = (fileList) => {
@@ -321,22 +324,14 @@ export default function AssessmentAiGenerator({
     }
 
     const hints = parsePromptPreferences(trimmed);
-    const count = resolvedQuestionCount || hints.questionCount;
-    if (!count) {
-      reportError("Enter how many questions to generate (1–150), or include a count in your prompt.");
-      return;
-    }
-    if (countWarning) {
-      reportError(countWarning);
-      return;
-    }
+    const count = hints.questionCount || DEFAULT_PROMPT_QUESTION_COUNT;
 
     runGeneration(({ onProgress, onQuestionGenerated, signal }) =>
       generateAssessmentFromPrompt({
         prompt: trimmed,
         formats: selectedFormats,
         questionCount: count,
-        difficulty,
+        difficulty: hints.difficulty || "medium",
         onProgress,
         onQuestionGenerated,
         signal,
@@ -524,25 +519,16 @@ export default function AssessmentAiGenerator({
     });
   };
 
-  const checkboxClass = `rounded border ${
-    theme === "dark" ? "border-white/20 bg-white/5" : "border-emerald-200 bg-white"
-  }`;
-
   const labelClass = `mb-2 block text-xs font-semibold uppercase tracking-wide ${
     theme === "dark" ? "text-emerald-400/80" : "text-teal-700"
   }`;
 
-  const promptNeedsCount =
-    mode === "prompt" &&
-    !promptHints?.questionCount &&
-    resolvedQuestionCount == null;
+  const promptNeedsCount = mode === "prompt" && !promptHints?.questionCount;
   const documentNeedsCount =
     showDocumentOptions &&
     (!documentAnalysis?.mixed || waitingForSourceGenerate) &&
     resolvedQuestionCount == null;
-  const generateDisabledByCount =
-    (mode === "prompt" && promptNeedsCount) ||
-    (showDocumentOptions && documentNeedsCount);
+  const generateDisabledByCount = showDocumentOptions && documentNeedsCount;
 
   const renderCountDifficulty = () => (
     <div
@@ -572,12 +558,10 @@ export default function AssessmentAiGenerator({
               }
               const parsed = Number(next);
               if (Number.isFinite(parsed)) {
-                // Keep typed value even when > MAX — warn + disable Generate.
                 setQuestionCount(Math.floor(parsed));
               }
             }}
             onBlur={() => {
-              // Stay blank when empty so faculty must enter a count (no default 0).
               if (questionCount === "" || questionCount == null) return;
               const parsed = Number(questionCount);
               if (!Number.isFinite(parsed) || parsed < 0) {
@@ -612,9 +596,6 @@ export default function AssessmentAiGenerator({
           <div className="mt-2 min-h-[2.25rem]">
             <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "en-text-muted"}`}>
               {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-              {mode === "prompt"
-                ? " · Large sets generate in small rounds so hosted API timeouts are avoided"
-                : ""}
             </p>
           </div>
         </div>
@@ -623,71 +604,18 @@ export default function AssessmentAiGenerator({
   );
 
   const renderFormats = () => (
-    <div
-      className={`rounded-xl border ${
-        theme === "dark"
-          ? "border-white/10 bg-white/[0.03]"
-          : "border-emerald-100 bg-emerald-50/30"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={() => setOptionsOpen((value) => !value)}
-        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left ${
-          theme === "dark" ? "text-emerald-300" : "text-teal-800"
-        }`}
-      >
-        <span>
-          <span className="block text-sm font-semibold">Question formats</span>
-          <span
-            className={`mt-0.5 block text-xs ${
-              theme === "dark" ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
-            {selectedFormats.length} format(s) selected
-          </span>
-        </span>
-        {optionsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-      </button>
-
-      {optionsOpen && (
-        <div className="space-y-4 border-t border-inherit px-4 py-4">
-          <div>
-            <label className={labelClass}>Question formats</label>
-            <div className="flex flex-wrap gap-2">
-              {AI_FORMAT_OPTIONS.map((option) => {
-                const checked = selectedFormats.includes(option.value);
-                return (
-                  <label
-                    key={option.value}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-                      checked
-                        ? theme === "dark"
-                          ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
-                          : "border-teal-300 bg-teal-50 text-teal-900"
-                        : theme === "dark"
-                          ? "border-white/10 bg-white/[0.03] text-gray-300"
-                          : "border-emerald-100 bg-white text-gray-700"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className={checkboxClass}
-                      checked={checked}
-                      disabled={disabled || loading}
-                      onChange={() => toggleFormat(option.value)}
-                    />
-                    {option.label}
-                  </label>
-                );
-              })}
-            </div>
-            <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              {formatHint}
-            </p>
-          </div>
-        </div>
-      )}
+    <div className="min-w-0">
+      <label className={labelClass}>Question formats</label>
+      <FormatMultiSelect
+        options={AI_FORMAT_OPTIONS}
+        value={selectedFormats}
+        onChange={toggleFormat}
+        disabled={disabled || loading}
+        placeholder="Select question formats…"
+      />
+      <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+        {formatHint}
+      </p>
     </div>
   );
 
@@ -696,10 +624,15 @@ export default function AssessmentAiGenerator({
     loading ||
     !files.length ||
     (aiReady && !aiReady.configured) ||
-    (showDocumentOptions && generateDisabledByCount);
+    (showDocumentOptions &&
+      (generateDisabledByCount || selectedFormats.length === 0));
 
   const promptButtonDisabled =
-    disabled || loading || (aiReady && !aiReady.configured) || generateDisabledByCount;
+    disabled ||
+    loading ||
+    (aiReady && !aiReady.configured) ||
+    generateDisabledByCount ||
+    selectedFormats.length === 0;
 
   return (
     <div className="space-y-5">
@@ -873,29 +806,52 @@ export default function AssessmentAiGenerator({
             className={assessmentInputClass(theme)}
             rows={5}
             disabled={disabled || loading}
-            placeholder="Example: Create 10 hard questions on cell division for Grade 10. Include multiple choice and identification. Focus on mitosis and meiosis."
+            placeholder="Example: Create 10 hard questions on cell division for Grade 10. Focus on mitosis and meiosis."
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
           />
-          {promptHints &&
-            (promptHints.questionCount ||
-              promptHints.difficulty ||
-              promptHints.formats.length > 0) && (
-              <p className={`mt-2 text-xs ${theme === "dark" ? "text-emerald-300/80" : "text-teal-700"}`}>
-                Detected in your prompt
-                {promptHints.questionCount ? `: ${promptHints.questionCount} questions` : ""}
+          <p
+            className={`mt-2 text-xs leading-relaxed ${
+              promptNeedsCount
+                ? theme === "dark"
+                  ? "text-amber-200/90"
+                  : "text-amber-800"
+                : theme === "dark"
+                  ? "text-gray-400"
+                  : "text-gray-600"
+            }`}
+          >
+            {promptNeedsCount ? (
+              <>
+                Add how many questions you want in your prompt (e.g. “Create{" "}
+                <span className="font-semibold">12</span> questions…”). If you
+                don’t, the AI will generate{" "}
+                <span className="font-semibold">
+                  {DEFAULT_PROMPT_QUESTION_COUNT} questions
+                </span>{" "}
+                by default.
+              </>
+            ) : (
+              <>
+                Using{" "}
+                <span className="font-semibold">
+                  {promptHints.questionCount} questions
+                </span>{" "}
+                from your prompt
                 {promptHints.difficulty ? ` · ${promptHints.difficulty}` : ""}
                 {promptHints.formats.length
                   ? ` · ${promptHints.formats
                       .map(
                         (value) =>
-                          AI_FORMAT_OPTIONS.find((item) => item.value === value)?.label || value
+                          AI_FORMAT_OPTIONS.find((item) => item.value === value)
+                            ?.label || value
                       )
                       .join(", ")}`
                   : ""}
-                . These override the optional controls below when present.
-              </p>
+                .
+              </>
             )}
+          </p>
         </div>
       )}
 
@@ -950,7 +906,6 @@ export default function AssessmentAiGenerator({
         </div>
       )}
 
-      {mode === "prompt" && renderCountDifficulty()}
       {mode === "prompt" && renderFormats()}
 
       {showDocumentOptions && renderCountDifficulty()}

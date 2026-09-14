@@ -519,6 +519,30 @@ function messagesToGeminiPayload(messages) {
   return { systemInstruction, contents };
 }
 
+function geminiModelSupportsThinkingConfig(model) {
+  return /^gemini-3/i.test(String(model || "").trim());
+}
+
+function extractGeminiResponseText(data) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts) || !parts.length) {
+    return "";
+  }
+
+  // Gemini 3.x may return thought parts — only keep final answer text.
+  const answerParts = parts.filter(
+    (part) => part && part.thought !== true && String(part.text || "").trim()
+  );
+  if (answerParts.length) {
+    return answerParts.map((part) => String(part.text || "")).join("");
+  }
+
+  return parts
+    .filter((part) => part && part.thought !== true)
+    .map((part) => String(part?.text || ""))
+    .join("");
+}
+
 async function requestGeminiChatCompletion(
   config,
   { messages, temperature, jsonMode, timeoutMs, isDocument = false }
@@ -530,6 +554,10 @@ async function requestGeminiChatCompletion(
     contents,
     generationConfig: {
       temperature,
+      maxOutputTokens: Number.parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS, 10) || 8192,
+      ...(geminiModelSupportsThinkingConfig(config.model)
+        ? { thinkingConfig: { thinkingLevel: "minimal" } }
+        : {}),
       ...(jsonMode ? { responseMimeType: "application/json" } : {}),
     },
   };
@@ -543,6 +571,7 @@ async function requestGeminiChatCompletion(
   )}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
 
   let lastError = null;
+  let omitThinkingConfig = false;
 
   for (let attempt = 0; attempt < GEMINI_QUOTA_MAX_ATTEMPTS; attempt += 1) {
     if (attempt > 0 && !isQuotaError(lastError)) {
@@ -553,12 +582,13 @@ async function requestGeminiChatCompletion(
       }
     }
 
+    if (omitThinkingConfig && body.generationConfig?.thinkingConfig) {
+      delete body.generationConfig.thinkingConfig;
+    }
+
     try {
       const data = await postJsonWithTimeout(url, body, effectiveTimeout);
-      const text =
-        data?.candidates?.[0]?.content?.parts
-          ?.map((part) => String(part?.text || ""))
-          .join("") || "";
+      const text = extractGeminiResponseText(data);
 
       if (!text.trim()) {
         const blockReason = data?.promptFeedback?.blockReason;
@@ -572,6 +602,19 @@ async function requestGeminiChatCompletion(
       return text;
     } catch (error) {
       lastError = error;
+
+      const message = String(error?.message || "").toLowerCase();
+      if (
+        !omitThinkingConfig &&
+        body.generationConfig?.thinkingConfig &&
+        (message.includes("thinking") ||
+          message.includes("thinkingconfig") ||
+          message.includes("thinking_level") ||
+          message.includes("thinkinglevel"))
+      ) {
+        omitThinkingConfig = true;
+        continue;
+      }
 
       if (isQuotaError(error)) {
         const waitMs = parseQuotaRetryMs(error);

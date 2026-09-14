@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import { fetchExamWithQuestions, fetchSubject, updateExam } from "../../utils/supabaseData";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ClipboardList, Settings } from "lucide-react";
 import AssessmentSchedule from "../../components/AssessmentSchedule";
 import SectionPicker from "../../components/SectionPicker";
@@ -49,6 +49,7 @@ const defaultAssessment = {
 
 export default function EditAssessment() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { examId } = useParams();
   const { theme } = useTheme();
   const { success: showSuccess, error: showError } = useAppModal();
@@ -66,6 +67,24 @@ export default function EditAssessment() {
   const [pageLoading, setPageLoading] = useState(true);
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
   const errorFeedbackRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
+
+  useLayoutEffect(() => {
+    const scrollToTop = () => {
+      const mainScroller = document.querySelector("main.en-scroll-region");
+      if (mainScroller) mainScroller.scrollTop = 0;
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      document.getElementById("assessment-page-top")?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
+    };
+
+    scrollToTop();
+    const timers = [0, 50, 150, 350, 700].map((ms) => window.setTimeout(scrollToTop, ms));
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [location.pathname, location.key, examId, pageLoading]);
 
   const {
     questionSections,
@@ -307,7 +326,7 @@ export default function EditAssessment() {
   }
 
   return (
-    <div className={pageShellWithBellClass(theme)}>
+    <div id="assessment-page-top" className={pageShellWithBellClass(theme)}>
 
       <div className="mb-8">
         <h1
@@ -337,7 +356,7 @@ export default function EditAssessment() {
       )}
 
       <div className="mx-auto max-w-[1440px]">
-        <div className="grid grid-cols-1 gap-8 xl:grid-cols-12 xl:items-start">
+        <div className="grid grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-12 xl:items-start xl:gap-6 2xl:gap-8">
           <div className="space-y-6 xl:col-span-4">
             <div className={`${assessmentPanelClass(theme)} space-y-4`}>
               <div className="flex items-center gap-2">

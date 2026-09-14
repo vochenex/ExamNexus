@@ -570,12 +570,8 @@ export async function generateAssessmentFromDocument({
 }) {
   const requested = Number(questionCount);
 
-  // Source material with large N: extract once, then short client rounds (same pattern as prompts).
-  if (
-    !isQuestionnaire &&
-    Number.isFinite(requested) &&
-    requested > DOCUMENT_CLIENT_ROUND_SIZE
-  ) {
+  // Source material: always use short client rounds (avoids Vercel timeouts + empty Gemini replies).
+  if (!isQuestionnaire && Number.isFinite(requested) && requested > 0) {
     return generateSourceMaterialBatched({
       file,
       files,

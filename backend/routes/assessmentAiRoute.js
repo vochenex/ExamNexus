@@ -3,7 +3,6 @@ const multer = require("multer");
 const { requireFaculty } = require("../middleware/requireFaculty");
 const {
   extractMultipleDocumentsText,
-  extractDocumentsSeparately,
   extractDocumentsSeparatelyLenient,
   mergeDocumentTexts,
   cleanupUploadedFiles,
@@ -272,10 +271,7 @@ router.post("/generate-from-prompt", requireFaculty, async (req, res) => {
     });
 
     if (!resolved.questionCount) {
-      return res.status(400).json({
-        error:
-          "Enter how many questions to generate (1–150), or include a count in your prompt.",
-      });
+      resolved.questionCount = 20;
     }
 
     const lockQuestionCount = Boolean(req.body?.lockQuestionCount);
@@ -500,7 +496,20 @@ router.post(
         }
       }
 
-      const docs = await extractDocumentsSeparately(files);
+      const docs = await extractDocumentsSeparatelyLenient(files).then(({ docs: extracted, failures }) => {
+        if (!extracted.length) {
+          const detail = failures
+            .map((item) => `${item.name}: ${item.error}`)
+            .join(" | ");
+          const error = new Error(
+            detail ||
+              "Could not extract readable text from the uploaded file(s)."
+          );
+          error.statusCode = 400;
+          throw error;
+        }
+        return extracted;
+      });
       const {
         questionCount,
         difficulty,
@@ -568,7 +577,19 @@ router.post(
         }
       }
 
-      const docs = await extractDocumentsSeparately(files);
+      const { docs, failures } = await extractDocumentsSeparatelyLenient(files);
+      if (!docs.length) {
+        const detail = failures
+          .map((item) => `${item.name}: ${item.error}`)
+          .join(" | ");
+        return res.status(400).json({
+          error:
+            detail ||
+            "Could not extract readable text from the uploaded file(s).",
+          failures,
+        });
+      }
+
       const {
         questionCount,
         difficulty,

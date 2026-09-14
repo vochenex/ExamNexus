@@ -48,14 +48,23 @@ export function pageShellClass(theme, extra = "") {
   } ${extra}`;
 }
 
-/** Leaves room for the fixed notification bell in DashboardLayout (web only). */
+/**
+ * Same horizontal inset on both sides. Floating header actions (back + bell)
+ * are cleared with top padding instead of a larger right pad.
+ */
 export function pageShellWithBellClass(theme, extra = "") {
   const native =
     typeof document !== "undefined" &&
     (document.documentElement.classList.contains("en-native-app") ||
       document.documentElement.classList.contains("en-mobile-shell"));
-  const bellPad = native ? "" : "pr-16 md:pr-24";
-  return pageShellClass(theme, `${bellPad} ${extra}`.trim());
+
+  if (native) {
+    return pageShellClass(theme, extra);
+  }
+
+  return `en-page-shell box-border min-h-full w-full max-w-full min-w-0 overflow-x-hidden bg-transparent px-3 pb-3 pt-14 sm:px-5 sm:pb-5 sm:pt-16 md:px-7 md:pb-7 md:pt-[4.25rem] ${
+    theme === "dark" ? "text-white" : "en-text-primary"
+  } ${extra}`.trim();
 }
 
 export function emptyStateClass(theme, extra = "") {

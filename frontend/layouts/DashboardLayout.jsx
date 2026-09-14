@@ -399,7 +399,7 @@ export default function DashboardLayout() {
         )}
         <div
           className={`en-scroll-region min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto ${
-            isLockdownActive ? "p-0" : mobileNav ? "p-3 sm:p-5" : "p-8"
+            isLockdownActive ? "p-0" : mobileNav ? "p-3 sm:p-5" : "px-4 py-6 sm:px-6 sm:py-7 lg:px-8 lg:py-8"
           } ${mobileNav && !isLockdownActive ? "en-has-tabbar pb-[calc(var(--en-tabbar-height,3.35rem)+2rem)]" : ""}`}
         >
           {!isLockdownActive && (

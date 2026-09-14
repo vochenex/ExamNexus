@@ -13,6 +13,7 @@ import {
   assessmentInputClass,
 } from "../../utils/assessmentFormStyles";
 import AssessmentSettingsPanel from "../../components/AssessmentSettingsPanel";
+import ScrollEdgeFab from "../../components/ui/ScrollEdgeFab";
 import FormatGradingSettings from "../../components/FormatGradingSettings";
 import AssessmentPointsPanel from "../../components/AssessmentPointsPanel";
 import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
@@ -64,14 +65,18 @@ export default function CreateAssessment() {
     const scrollToTop = () => {
       const mainScroller = document.querySelector("main.en-scroll-region");
       if (mainScroller) mainScroller.scrollTop = 0;
-      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      document.getElementById("assessment-page-top")?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
     };
 
     scrollToTop();
-    const timer = window.setTimeout(scrollToTop, 0);
-    return () => window.clearTimeout(timer);
+    const timers = [0, 50, 150, 350].map((ms) => window.setTimeout(scrollToTop, ms));
+    return () => timers.forEach((id) => window.clearTimeout(id));
   }, [location.pathname, location.key]);
 
   const assessmentType = location.state?.type || "exam";
@@ -500,7 +505,7 @@ export default function CreateAssessment() {
   };
 
   return (
-    <div className={pageShellWithBellClass(theme)}>
+    <div id="assessment-page-top" className={pageShellWithBellClass(theme)}>
 
       <div className="mb-8">
         <h1
@@ -533,11 +538,11 @@ export default function CreateAssessment() {
                 setCreationMode(option.id);
                 clearError();
               }}
-              className={`min-w-0 rounded-lg px-1.5 py-2 text-center text-xs font-medium transition sm:px-3 sm:text-sm ${
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-center text-xs font-medium transition-all duration-300 ease-out sm:px-3 sm:text-sm ${
                 creationMode === option.id
                   ? theme === "dark"
-                    ? "bg-emerald-500 text-[#031d1f]"
-                    : "bg-teal-600 text-white"
+                    ? "bg-emerald-500 text-[#031d1f] shadow-sm"
+                    : "bg-teal-600 text-white shadow-sm"
                   : theme === "dark"
                     ? "text-gray-300 hover:bg-white/5"
                     : "text-gray-700 hover:bg-emerald-50"
@@ -572,8 +577,8 @@ export default function CreateAssessment() {
       )}
 
       <div className="mx-auto w-full max-w-[min(100%,1760px)]">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 xl:items-start xl:gap-8">
-          <div className="space-y-6 xl:col-span-3">
+        <div className="grid grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-12 xl:items-start xl:gap-6 2xl:gap-8">
+          <div className="space-y-5 sm:space-y-6 xl:col-span-3">
             <div className={`${assessmentPanelClass(theme)} space-y-4`}>
               <div className="flex items-center gap-2">
                 <ClipboardList className="text-emerald-400" size={18} />
@@ -622,7 +627,8 @@ export default function CreateAssessment() {
             />
           </div>
 
-          <div className={`${assessmentPanelClass(theme)} min-h-[420px] xl:col-span-6`}>
+          <div className={`${assessmentPanelClass(theme)} min-h-[420px] overflow-hidden xl:col-span-6`}>
+            <div key={creationMode} className="en-creation-mode-enter">
             {creationMode !== "manual" && (
               <div className={showQuestionPanel ? "mb-6" : ""}>
                 <AssessmentAiGenerator
@@ -691,6 +697,7 @@ export default function CreateAssessment() {
                   onImportFromBank={() => setBankPickerOpen(true)}
               />
             )}
+            </div>
           </div>
 
           <div className={`${assessmentPanelClass(theme)} space-y-4 xl:col-span-3 xl:sticky xl:top-6`}>
@@ -761,6 +768,8 @@ export default function CreateAssessment() {
         onClose={() => setBankPickerOpen(false)}
         onImport={handleImportFromBank}
       />
+
+      <ScrollEdgeFab />
     </div>
   );
 }

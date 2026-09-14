@@ -1760,6 +1760,12 @@ html:not(.light) .en-auth-shell .hover\:border-white\/20:hover {
   overflow-x: hidden;
 }
 
+@media (min-width: 1024px) {
+  main.en-scroll-region {
+    scrollbar-gutter: stable;
+  }
+}
+
 .en-sidebar-shell .en-scroll-region,
 .en-sidebar-shell .overflow-y-auto {
   scrollbar-width: none;
@@ -1775,4 +1781,39 @@ html:not(.light) .en-auth-shell .hover\:border-white\/20:hover {
 
 .en-scroll-region .en-page-shell > * {
   max-width: 100%;
+}
+
+@keyframes en-scroll-fab-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+
+.en-scroll-fab-bob {
+  animation: en-scroll-fab-bob 1.5s ease-in-out infinite;
+}
+
+@keyframes en-creation-mode-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.en-creation-mode-enter {
+  animation: en-creation-mode-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .en-creation-mode-enter {
+    animation: none;
+  }
 }

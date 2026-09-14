@@ -12,11 +12,15 @@ export default function AnimatedPage({ children, className = "" }) {
 
     // Keep each route starting at the top of the dashboard main scroller
     // (otherwise long pages like Create Assessment open mid/bottom).
-    const mainScroller = document.querySelector("main.en-scroll-region");
-    if (mainScroller) {
-      mainScroller.scrollTop = 0;
-    }
-    window.scrollTo(0, 0);
+    const scrollToTop = () => {
+      const mainScroller = document.querySelector("main.en-scroll-region");
+      if (mainScroller) mainScroller.scrollTop = 0;
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    scrollToTop();
+    const timers = [0, 80, 200].map((ms) => window.setTimeout(scrollToTop, ms));
 
     node.classList.remove("en-route-enter-active");
     // Force reflow so the enter animation replays on each navigation
@@ -27,8 +31,11 @@ export default function AnimatedPage({ children, className = "" }) {
       node.classList.remove("en-route-enter-active");
     }, 500);
 
-    return () => window.clearTimeout(timer);
-  }, [location.pathname]);
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      window.clearTimeout(timer);
+    };
+  }, [location.pathname, location.key]);
 
   return (
     <div
