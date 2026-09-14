@@ -17,9 +17,16 @@ function get(name) {
   return match ? String(match[1] || "").trim() : "";
 }
 
+const documentKey = get("GEMINI_DOCUMENT_API_KEY") || get("GEMINI_API_KEY");
+const promptKey = get("GEMINI_PROMPT_API_KEY");
+
 const vars = {
-  GEMINI_API_KEY: get("GEMINI_API_KEY"),
+  GEMINI_API_KEY: documentKey,
+  GEMINI_DOCUMENT_API_KEY: documentKey,
   GEMINI_MODEL: get("GEMINI_MODEL") || "gemini-2.5-flash",
+  GEMINI_DOCUMENT_MODEL:
+    get("GEMINI_DOCUMENT_MODEL") || get("GEMINI_MODEL") || "gemini-2.5-flash",
+  GEMINI_PROMPT_API_KEY: promptKey,
   GEMINI_PROMPT_MODEL: get("GEMINI_PROMPT_MODEL") || "gemini-2.0-flash",
 };
 
@@ -28,6 +35,13 @@ for (const [key, value] of Object.entries(vars)) {
     console.error(`Missing ${key} in backend/.env`);
     process.exit(1);
   }
+}
+
+if (documentKey === promptKey) {
+  console.error(
+    "GEMINI_PROMPT_API_KEY must be a different key from the document key (GEMINI_DOCUMENT_API_KEY / GEMINI_API_KEY)."
+  );
+  process.exit(1);
 }
 
 const environments = ["production", "preview", "development"];

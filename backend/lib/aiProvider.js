@@ -142,42 +142,75 @@ function getGeminiAgent(timeoutMs) {
 }
 
 function getGeminiModel() {
-  return String(
-    process.env.GEMINI_MODEL || process.env.GEMINI_ASSESSMENT_MODEL || DEFAULT_GEMINI_MODEL
-  ).trim();
+  return (
+    String(
+      process.env.GEMINI_DOCUMENT_MODEL ||
+        process.env.GEMINI_MODEL ||
+        process.env.GEMINI_ASSESSMENT_MODEL ||
+        DEFAULT_GEMINI_MODEL
+    ).trim() || DEFAULT_GEMINI_MODEL
+  );
 }
 
 /** Flash model used for teacher topic/prompt generation (separate from documents). */
 function getGeminiPromptModel() {
-  return String(
-    process.env.GEMINI_PROMPT_MODEL || DEFAULT_GEMINI_PROMPT_MODEL
-  ).trim() || DEFAULT_GEMINI_PROMPT_MODEL;
+  return (
+    String(process.env.GEMINI_PROMPT_MODEL || DEFAULT_GEMINI_PROMPT_MODEL).trim() ||
+    DEFAULT_GEMINI_PROMPT_MODEL
+  );
 }
 
 function preferGroqForPrompts() {
   return String(process.env.AI_PROMPT_PROVIDER || "").trim().toLowerCase() === "groq";
 }
 
-function getGeminiApiKey() {
+/** Document uploads — dedicated key (legacy GEMINI_API_KEY still accepted). */
+function getGeminiDocumentApiKey() {
   return String(
-    process.env.GEMINI_API_KEY ||
+    process.env.GEMINI_DOCUMENT_API_KEY ||
+      process.env.GEMINI_API_KEY ||
       process.env.GOOGLE_API_KEY ||
       process.env.GOOGLE_GEMINI_API_KEY ||
       ""
   ).trim();
 }
 
-function getGeminiRuntimeConfig() {
-  const apiKey = getGeminiApiKey();
+/** Topic/prompt generation — must be a different key from documents. */
+function getGeminiPromptApiKey() {
+  return String(process.env.GEMINI_PROMPT_API_KEY || "").trim();
+}
+
+function getGeminiDocumentRuntimeConfig() {
+  const apiKey = getGeminiDocumentApiKey();
   if (!validateGeminiApiKey(apiKey)) {
     return null;
   }
 
   return {
     provider: "gemini",
+    purpose: "document",
     model: getGeminiModel(),
     apiKey,
   };
+}
+
+function getGeminiPromptRuntimeConfig() {
+  const apiKey = getGeminiPromptApiKey();
+  if (!validateGeminiApiKey(apiKey)) {
+    return null;
+  }
+
+  return {
+    provider: "gemini",
+    purpose: "prompt",
+    model: getGeminiPromptModel(),
+    apiKey,
+  };
+}
+
+/** @deprecated Prefer getGeminiDocumentRuntimeConfig — kept for older imports. */
+function getGeminiRuntimeConfig() {
+  return getGeminiDocumentRuntimeConfig();
 }
 
 function isTimeoutError(error) {
@@ -232,8 +265,27 @@ function formatGeminiProcessingTimeoutError(isDocument) {
   return "Gemini took too long to respond. Try fewer questions or a shorter prompt.";
 }
 
+function formatGeminiDocumentConfigError() {
+  return "Document AI is not configured. Add GEMINI_DOCUMENT_API_KEY (or GEMINI_API_KEY) to backend/.env, then restart the backend.";
+}
+
+function formatGeminiPromptConfigError() {
+  return "Prompt AI is not configured. Add GEMINI_PROMPT_API_KEY to backend/.env (a separate Google AI Studio key from documents), then restart the backend.";
+}
+
+function formatGeminiSharedKeyError() {
+  return "Prompt and document AI must use different API keys. Create a second key at https://aistudio.google.com/apikey and set GEMINI_PROMPT_API_KEY separately from GEMINI_DOCUMENT_API_KEY / GEMINI_API_KEY.";
+}
+
 function formatGeminiConfigError() {
-  return "Gemini is not configured. Add GEMINI_API_KEY to backend/.env (not the root .env file), then restart the backend from the backend folder.";
+  return formatGeminiDocumentConfigError();
+}
+
+function geminiKeysAreDistinct(promptKey, documentKey) {
+  const prompt = String(promptKey || "").trim();
+  const document = String(documentKey || "").trim();
+  if (!prompt || !document) return true;
+  return prompt !== document;
 }
 
 function formatGroqConfigError() {
@@ -319,10 +371,29 @@ function getGroqRuntimeConfig() {
   };
 }
 
-function assertGeminiConfigured() {
-  const config = getGeminiRuntimeConfig();
+function assertGeminiDocumentConfigured() {
+  const config = getGeminiDocumentRuntimeConfig();
   if (!config) {
-    const error = new Error(formatGeminiConfigError());
+    const error = new Error(formatGeminiDocumentConfigError());
+    error.statusCode = 503;
+    throw error;
+  }
+  return config;
+}
+
+function assertGeminiConfigured() {
+  return assertGeminiDocumentConfigured();
+}
+
+function assertGeminiPromptKeyConfigured() {
+  const config = getGeminiPromptRuntimeConfig();
+  if (!config) {
+    const error = new Error(formatGeminiPromptConfigError());
+    error.statusCode = 503;
+    throw error;
+  }
+  if (!geminiKeysAreDistinct(config.apiKey, getGeminiDocumentApiKey())) {
+    const error = new Error(formatGeminiSharedKeyError());
     error.statusCode = 503;
     throw error;
   }
@@ -330,18 +401,25 @@ function assertGeminiConfigured() {
 }
 
 function assertPromptAiConfigured() {
-  const gemini = getGeminiRuntimeConfig();
+  if (preferGroqForPrompts()) {
+    const groq = getGroqRuntimeConfig();
+    if (groq) return groq;
+  }
+
+  const gemini = getGeminiPromptRuntimeConfig();
   if (gemini) {
-    return {
-      ...gemini,
-      model: getGeminiPromptModel(),
-    };
+    if (!geminiKeysAreDistinct(gemini.apiKey, getGeminiDocumentApiKey())) {
+      const error = new Error(formatGeminiSharedKeyError());
+      error.statusCode = 503;
+      throw error;
+    }
+    return gemini;
   }
+
   const groq = getGroqRuntimeConfig();
-  if (groq) {
-    return groq;
-  }
-  const error = new Error(formatGeminiConfigError());
+  if (groq) return groq;
+
+  const error = new Error(formatGeminiPromptConfigError());
   error.statusCode = 503;
   throw error;
 }
@@ -642,8 +720,14 @@ async function requestChatCompletion({
   timeoutMs,
   isDocument = false,
   model = null,
+  purpose = null,
 }) {
-  const config = assertGeminiConfigured();
+  const resolvedPurpose =
+    purpose || (isDocument ? "document" : "document");
+  const config =
+    resolvedPurpose === "prompt"
+      ? assertGeminiPromptKeyConfigured()
+      : assertGeminiDocumentConfigured();
   const resolvedModel = String(model || config.model).trim() || config.model;
   const content = await requestGeminiChatCompletion(
     { ...config, model: resolvedModel },
@@ -652,7 +736,7 @@ async function requestChatCompletion({
       temperature,
       jsonMode,
       timeoutMs,
-      isDocument,
+      isDocument: resolvedPurpose === "document" || isDocument,
     }
   );
 
@@ -700,15 +784,19 @@ async function requestPromptViaGroq(options) {
 }
 
 async function requestPromptChatCompletion(options) {
-  const gemini = getGeminiRuntimeConfig();
+  const gemini = getGeminiPromptRuntimeConfig();
+  const geminiUsable =
+    Boolean(gemini) &&
+    geminiKeysAreDistinct(gemini.apiKey, getGeminiDocumentApiKey());
   const groq = getGroqRuntimeConfig();
   const forceGroq = preferGroqForPrompts();
 
-  // Default: Gemini Flash for prompts. Groq only if forced or as fallback.
-  if (gemini && !forceGroq) {
+  // Default: dedicated Gemini prompt key + Flash model. Groq only if forced or fallback.
+  if (geminiUsable && !forceGroq) {
     try {
       return await requestChatCompletion({
         ...options,
+        purpose: "prompt",
         model: getGeminiPromptModel(),
       });
     } catch (error) {
@@ -726,16 +814,17 @@ async function requestPromptChatCompletion(options) {
     }
   }
 
-  if (groq) {
+  if (forceGroq && groq) {
     try {
       return await requestPromptViaGroq(options);
     } catch (error) {
-      if (gemini) {
+      if (geminiUsable) {
         console.warn(
           "[assessment-ai] Groq prompt failed; falling back to Gemini Flash."
         );
         return requestChatCompletion({
           ...options,
+          purpose: "prompt",
           model: getGeminiPromptModel(),
         });
       }
@@ -743,8 +832,15 @@ async function requestPromptChatCompletion(options) {
     }
   }
 
+  if (gemini && !geminiUsable) {
+    const error = new Error(formatGeminiSharedKeyError());
+    error.statusCode = 503;
+    throw error;
+  }
+
   return requestChatCompletion({
     ...options,
+    purpose: "prompt",
     model: getGeminiPromptModel(),
   });
 }
@@ -752,42 +848,52 @@ async function requestPromptChatCompletion(options) {
 async function requestDocumentChatCompletion(options) {
   return requestChatCompletion({
     ...options,
+    purpose: "document",
     timeoutMs: getDocumentTimeoutMs(),
     isDocument: true,
   });
 }
 
 async function getAiServiceStatus() {
-  const rawGeminiKey = getGeminiApiKey();
+  const rawDocumentKey = getGeminiDocumentApiKey();
+  const rawPromptKey = getGeminiPromptApiKey();
   const rawGroqKey = getGroqApiKey();
-  const gemini = getGeminiRuntimeConfig();
+  const documentGemini = getGeminiDocumentRuntimeConfig();
+  const promptGemini = getGeminiPromptRuntimeConfig();
   const groq = getGroqRuntimeConfig();
-  const documentConfigured = Boolean(gemini);
-  const promptConfigured = Boolean(gemini || groq);
+  const keysDistinct = geminiKeysAreDistinct(rawPromptKey, rawDocumentKey);
+  const documentConfigured = Boolean(documentGemini);
+  const promptGeminiConfigured = Boolean(promptGemini) && keysDistinct;
+  const promptConfigured =
+    promptGeminiConfigured || (preferGroqForPrompts() && Boolean(groq));
   const configured = documentConfigured && promptConfigured;
 
-  const useGroqPrompt = Boolean(groq) && (preferGroqForPrompts() || !gemini);
-  const promptProvider = useGroqPrompt ? "groq" : gemini ? "gemini" : "gemini";
+  const useGroqPrompt = preferGroqForPrompts() && Boolean(groq);
+  const promptProvider = useGroqPrompt ? "groq" : "gemini";
   const promptModel = useGroqPrompt
     ? groq?.model || getGroqModel()
     : getGeminiPromptModel();
-  const documentModel = gemini?.model || getGeminiModel();
+  const documentModel = documentGemini?.model || getGeminiModel();
 
   let error = null;
   if (!configured) {
     if (!documentConfigured) {
-      if (!rawGeminiKey) {
+      if (!rawDocumentKey) {
         error =
-          "Gemini API key is missing (required for document analysis). Add GEMINI_API_KEY to backend/.env, then restart the backend.";
-      } else if (!rawGeminiKey.startsWith("AIza") && rawGeminiKey.length < 20) {
+          "Document Gemini key is missing. Add GEMINI_DOCUMENT_API_KEY (or GEMINI_API_KEY) to backend/.env, then restart the backend.";
+      } else if (
+        !rawDocumentKey.startsWith("AIza") &&
+        rawDocumentKey.length < 20
+      ) {
         error =
-          'Gemini API key format looks unusual. Create a key at https://aistudio.google.com/apikey — it should start with "AIza".';
+          'Document Gemini API key format looks unusual. Create a key at https://aistudio.google.com/apikey — it should start with "AIza".';
       } else {
-        error = formatGeminiConfigError();
+        error = formatGeminiDocumentConfigError();
       }
+    } else if (rawPromptKey && !keysDistinct) {
+      error = formatGeminiSharedKeyError();
     } else if (!promptConfigured) {
-      error =
-        "No prompt AI configured. Add GEMINI_API_KEY to backend/.env, then restart the backend.";
+      error = formatGeminiPromptConfigError();
     }
   }
 
@@ -797,13 +903,22 @@ async function getAiServiceStatus() {
     provider: promptProvider,
     model: promptModel,
     promptProvider,
-    documentProvider: documentConfigured ? "gemini" : "gemini",
+    documentProvider: "gemini",
     promptModel,
     documentModel,
     gemini: {
       configured: documentConfigured,
       model: documentModel,
-      error: documentConfigured ? null : formatGeminiConfigError(),
+      error: documentConfigured ? null : formatGeminiDocumentConfigError(),
+    },
+    promptGemini: {
+      configured: promptGeminiConfigured,
+      model: getGeminiPromptModel(),
+      error: promptGeminiConfigured
+        ? null
+        : rawPromptKey && !keysDistinct
+          ? formatGeminiSharedKeyError()
+          : formatGeminiPromptConfigError(),
     },
     groq: {
       configured: Boolean(groq),
@@ -823,13 +938,18 @@ module.exports = {
   getGeminiPromptModel,
   getGroqModel,
   getGeminiRuntimeConfig,
+  getGeminiDocumentRuntimeConfig,
+  getGeminiPromptRuntimeConfig,
   getGroqRuntimeConfig,
   assertGeminiConfigured,
+  assertGeminiDocumentConfigured,
   assertPromptAiConfigured,
   requestChatCompletion,
   requestPromptChatCompletion,
   requestDocumentChatCompletion,
   getAiServiceStatus,
   formatGeminiConfigError,
+  formatGeminiDocumentConfigError,
+  formatGeminiPromptConfigError,
   formatGroqConfigError,
 };

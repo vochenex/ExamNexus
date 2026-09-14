@@ -39,8 +39,9 @@ Add **all** of these (Production). Copy values from your local `.env` and `backe
 | `SUPABASE_ANON_KEY` | `backend/.env` |
 | `SUPABASE_SERVICE_ROLE_KEY` | `backend/.env` (secret) |
 | `SUPABASE_JWT_SECRET` | `backend/.env` |
-| `GEMINI_API_KEY` | `backend/.env` |
+| `GEMINI_API_KEY` or `GEMINI_DOCUMENT_API_KEY` | `backend/.env` (documents — one Google AI Studio key) |
 | `GEMINI_MODEL` | `gemini-2.5-flash` (documents) |
+| `GEMINI_PROMPT_API_KEY` | `backend/.env` (**different** Google AI Studio key for prompts) |
 | `GEMINI_PROMPT_MODEL` | `gemini-2.0-flash` (topic/prompt generation) |
 | `GROQ_API_KEY` | optional fallback only |
 | `AI_PROMPT_PROVIDER` | leave unset (Gemini) or `groq` to force Groq |
