@@ -959,6 +959,129 @@ JSON shape:
 }`;
 }
 
+function parseJsonLoose(raw) {
+  let text = String(raw || "").trim();
+  if (!text) return {};
+  text = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // continue
+  }
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      return JSON.parse(text.slice(start, end + 1));
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function guessDocumentTitle(name, text) {
+  const fromName = String(name || "")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  if (fromName) return fromName.slice(0, 80);
+  const firstLine = String(text || "")
+    .split(/\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 3);
+  return (firstLine || "Document").slice(0, 80);
+}
+
+/**
+ * Fast local classification — avoids Gemini for clear questionnaire vs study files.
+ * confidence: high | medium | low
+ */
+function heuristicClassifyDocument(text, name = "") {
+  const sample = String(text || "").slice(0, 10000);
+  const nameLower = String(name || "").toLowerCase();
+
+  const numbered = (sample.match(/(?:^|\n)\s*\d{1,3}[.)]\s+\S/gm) || []).length;
+  const letterChoices = (sample.match(/(?:^|\n)\s*[A-Da-d][.)]\s+\S/gm) || []).length;
+  const trueFalse = (sample.match(/\btrue\s*(?:or|\/)\s*false\b/gi) || []).length;
+  const answerKeys = (sample.match(/\b(?:answer|ans)\s*[:=]/gi) || []).length;
+  const questionMarks = (sample.match(/\?/g) || []).length;
+  const quizWords =
+    /\b(quiz|exam|test|questionnaire|assessment|multiple\s*choice|enumerate|enumeration|identification|true\s*or\s*false)\b/i.test(
+      sample
+    );
+
+  let score = 0;
+  if (numbered >= 3) score += 3;
+  if (numbered >= 8) score += 2;
+  if (letterChoices >= 4) score += 2;
+  if (trueFalse >= 1) score += 2;
+  if (answerKeys >= 2) score += 2;
+  if (questionMarks >= 5) score += 1;
+  if (quizWords) score += 1;
+  if (/\b(choices?|options?)\b/i.test(sample)) score += 1;
+
+  const isPptx =
+    nameLower.endsWith(".pptx") ||
+    nameLower.includes("presentation") ||
+    nameLower.includes("slides");
+  const lines = sample.split(/\n/).map((line) => line.trim()).filter(Boolean);
+  const shortLines = lines.filter((line) => line.length < 90).length;
+  const slideLike =
+    isPptx || (lines.length >= 10 && shortLines / lines.length >= 0.7 && numbered < 3);
+
+  const title = guessDocumentTitle(name, sample);
+
+  if (score >= 5) {
+    return {
+      documentKind: "questionnaire",
+      isQuestionnaire: true,
+      summary: "Detected numbered exam or quiz-style questions.",
+      suggestedTitle: title,
+      confidence: "high",
+      mode: "heuristic",
+    };
+  }
+
+  if (score >= 3) {
+    return {
+      documentKind: score >= 4 ? "questionnaire" : "study_material",
+      isQuestionnaire: score >= 4,
+      summary: score >= 4
+        ? "Likely a questionnaire based on question patterns."
+        : "Mixed study content; not clearly a ready-made questionnaire.",
+      suggestedTitle: title,
+      confidence: "medium",
+      mode: "heuristic",
+    };
+  }
+
+  if (slideLike) {
+    return {
+      documentKind: "presentation",
+      isQuestionnaire: false,
+      summary: isPptx
+        ? "PowerPoint slide content / study deck."
+        : "Slide-style outline or presentation notes.",
+      suggestedTitle: title,
+      confidence: isPptx ? "high" : "medium",
+      mode: "heuristic",
+    };
+  }
+
+  return {
+    documentKind: "study_material",
+    isQuestionnaire: false,
+    summary: "Study or source material without ready-made exam questions.",
+    suggestedTitle: title,
+    confidence: score <= 1 ? "high" : "medium",
+    mode: "heuristic",
+  };
+}
+
 async function classifyDocumentContent(sourceText) {
   assertGeminiConfigured();
 
@@ -972,6 +1095,7 @@ async function classifyDocumentContent(sourceText) {
   const response = await requestDocumentChatCompletion({
     temperature: 0.1,
     jsonMode: true,
+    timeoutMs: 18000,
     messages: [
       {
         role: "system",
@@ -992,34 +1116,15 @@ Rules:
       },
       {
         role: "user",
-        content: `Classify this document:\n\n${resolvedSource.slice(0, MAX_SOURCE_CHARS)}`,
+        content: `Classify this document:\n\n${resolvedSource.slice(0, 4500)}`,
       },
     ],
   });
 
-  let parsed = {};
-  try {
-    parsed = JSON.parse(String(response.content || "").trim());
-  } catch {
-    parsed = {};
-  }
-
-  const kind = String(parsed.documentKind || "other")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-  const isQuestionnaire =
-    parsed.isQuestionnaire === true ||
-    kind === "questionnaire" ||
-    kind === "existing_exam" ||
-    kind === "exam" ||
-    kind === "quiz";
-
+  const parsed = parseJsonLoose(response.content);
+  const normalized = normalizeClassificationRow(parsed);
   return {
-    documentKind: isQuestionnaire ? "questionnaire" : kind || "study_material",
-    isQuestionnaire,
-    summary: String(parsed.summary || "").trim(),
-    suggestedTitle: String(parsed.suggestedTitle || "").trim(),
+    ...normalized,
     meta: {
       provider: response.provider,
       model: response.model,
@@ -1048,10 +1153,13 @@ function normalizeClassificationRow(parsed, fallbackName = "") {
   };
 }
 
-/** Classify many extracted files in one Gemini call (avoids Vercel timeouts). */
+/**
+ * Efficient multi-file classify:
+ * 1) heuristic for every file (instant; used for all multi-file uploads)
+ * 2) one short Gemini pass only for a single uncertain file
+ * Never runs N sequential Gemini calls (that times out on Vercel).
+ */
 async function classifyDocumentsBatch(docs) {
-  assertGeminiConfigured();
-
   const list = Array.isArray(docs) ? docs.filter((doc) => doc?.text) : [];
   if (!list.length) {
     const error = new Error("The documents did not contain readable text.");
@@ -1059,121 +1167,47 @@ async function classifyDocumentsBatch(docs) {
     throw error;
   }
 
-  if (list.length === 1) {
-    const single = await classifyDocumentContent(list[0].text);
+  const heuristicRows = list.map((doc) => ({
+    doc,
+    heuristic: heuristicClassifyDocument(doc.text, doc.name),
+  }));
+
+  const byIndex = new Map();
+  for (const row of heuristicRows) {
+    byIndex.set(row.doc.index, {
+      index: row.doc.index,
+      name: row.doc.name,
+      documentKind: row.heuristic.documentKind,
+      isQuestionnaire: row.heuristic.isQuestionnaire,
+      summary: row.heuristic.summary,
+      suggestedTitle: row.heuristic.suggestedTitle,
+      meta: { mode: row.heuristic.mode, confidence: row.heuristic.confidence },
+    });
+  }
+
+  // Multi-file: heuristics only. Extract already uses most of the Vercel budget.
+  if (list.length > 1) {
+    return list.map((doc) => byIndex.get(doc.index));
+  }
+
+  const only = heuristicRows[0];
+  if (only.heuristic.confidence === "high") {
+    return [byIndex.get(only.doc.index)];
+  }
+
+  try {
+    assertGeminiConfigured();
+    const single = await classifyDocumentContent(only.doc.text);
     return [
       {
-        index: list[0].index,
-        name: list[0].name,
+        index: only.doc.index,
+        name: only.doc.name,
         ...single,
       },
     ];
-  }
-
-  const perFileBudget = Math.max(
-    1200,
-    Math.floor(MAX_SOURCE_CHARS / Math.min(list.length, 8))
-  );
-  const catalog = list
-    .map(
-      (doc) =>
-        `### FILE_INDEX ${doc.index}\nNAME: ${doc.name || "document"}\nCONTENT:\n${String(
-          doc.text || ""
-        ).slice(0, perFileBudget)}`
-    )
-    .join("\n\n");
-
-  const response = await requestDocumentChatCompletion({
-    temperature: 0.1,
-    jsonMode: true,
-    messages: [
-      {
-        role: "system",
-        content: `You classify multiple teacher-uploaded documents for ExamNexus assessment generation.
-
-Return ONLY valid JSON:
-{
-  "files": [
-    {
-      "index": 0,
-      "documentKind": "questionnaire" | "topic" | "story" | "report" | "presentation" | "study_material" | "other",
-      "isQuestionnaire": true or false,
-      "summary": "one short sentence",
-      "suggestedTitle": "short title"
-    }
-  ]
-}
-
-Rules:
-- Include exactly one entry per FILE_INDEX provided.
-- isQuestionnaire = true ONLY when that file already contains numbered/labeled exam or quiz questions.
-- Topics, stories, reports, slide decks, handouts, and reading material without ready-made questions must set isQuestionnaire = false.
-- Prefer presentation for PowerPoint-style slide notes/outlines.`,
-      },
-      {
-        role: "user",
-        content: `Classify each file below:\n\n${catalog}`,
-      },
-    ],
-  });
-
-  let parsed = {};
-  try {
-    parsed = JSON.parse(String(response.content || "").trim());
   } catch {
-    parsed = {};
+    return [byIndex.get(only.doc.index)];
   }
-
-  const rows = Array.isArray(parsed?.files) ? parsed.files : [];
-  const byIndex = new Map();
-  for (const row of rows) {
-    const index = Number.parseInt(row?.index, 10);
-    if (!Number.isFinite(index)) continue;
-    byIndex.set(index, normalizeClassificationRow(row));
-  }
-
-  // Fallback: if batch JSON is incomplete, classify missing files individually.
-  const results = [];
-  for (const doc of list) {
-    if (byIndex.has(doc.index)) {
-      results.push({
-        index: doc.index,
-        name: doc.name,
-        ...byIndex.get(doc.index),
-        meta: {
-          provider: response.provider,
-          model: response.model,
-          mode: "document_classify_batch",
-        },
-      });
-      continue;
-    }
-
-    try {
-      const single = await classifyDocumentContent(doc.text);
-      results.push({
-        index: doc.index,
-        name: doc.name,
-        ...single,
-      });
-    } catch {
-      results.push({
-        index: doc.index,
-        name: doc.name,
-        documentKind: "study_material",
-        isQuestionnaire: false,
-        summary: "Could not classify this file; treated as study material.",
-        suggestedTitle: doc.name || "",
-        meta: {
-          provider: response.provider,
-          model: response.model,
-          mode: "document_classify_fallback",
-        },
-      });
-    }
-  }
-
-  return results;
 }
 
 async function requestDocumentQuestions({

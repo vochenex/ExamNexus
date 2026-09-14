@@ -897,11 +897,11 @@ async function requestPromptChatCompletion(options) {
   });
 }
 
-async function requestDocumentChatCompletion(options) {
+async function requestDocumentChatCompletion(options = {}) {
   return requestChatCompletion({
     ...options,
     purpose: "document",
-    timeoutMs: getDocumentTimeoutMs(),
+    timeoutMs: options.timeoutMs || getDocumentTimeoutMs(),
     isDocument: true,
   });
 }

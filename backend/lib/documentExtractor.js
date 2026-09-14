@@ -186,7 +186,7 @@ async function extractDocumentsSeparately(files) {
 
 /**
  * Like extractDocumentsSeparately, but keeps going when one file fails
- * (scanned PDF, old .doc, empty pptx, etc.).
+ * (scanned PDF, old .doc, empty pptx, etc.). Extracts in parallel for speed.
  */
 async function extractDocumentsSeparatelyLenient(files) {
   const list = Array.isArray(files) ? files.filter(Boolean) : [];
@@ -194,27 +194,38 @@ async function extractDocumentsSeparatelyLenient(files) {
     throw new Error("No file uploaded.");
   }
 
+  const settled = await Promise.all(
+    list.map(async (file, index) => {
+      const name = file.originalname || `document-${index + 1}`;
+      try {
+        const text = await extractDocumentText(file);
+        return {
+          ok: true,
+          doc: {
+            index,
+            name,
+            text: normalizeExtractedText(text),
+            file,
+          },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          failure: {
+            index,
+            name,
+            error: error?.message || "Could not read this file.",
+          },
+        };
+      }
+    })
+  );
+
   const docs = [];
   const failures = [];
-
-  for (let index = 0; index < list.length; index += 1) {
-    const file = list[index];
-    const name = file.originalname || `document-${index + 1}`;
-    try {
-      const text = await extractDocumentText(file);
-      docs.push({
-        index,
-        name,
-        text: normalizeExtractedText(text),
-        file,
-      });
-    } catch (error) {
-      failures.push({
-        index,
-        name,
-        error: error?.message || "Could not read this file.",
-      });
-    }
+  for (const item of settled) {
+    if (item.ok) docs.push(item.doc);
+    else failures.push(item.failure);
   }
 
   return { docs, failures };

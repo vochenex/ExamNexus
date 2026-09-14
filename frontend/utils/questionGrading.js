@@ -12,7 +12,7 @@ export const DEFAULT_GRADING_OPTIONS = {
   alternatives: [],
   enum_alternatives: [],
   ignore_order: false,
-  trim_whitespace: true,
+  trim_whitespace: false,
   points: 1,
 };
 
@@ -61,6 +61,8 @@ export function normalizeGradingOptions(raw) {
     case_sensitive,
     accept_alternatives,
     case_format: "any",
+    trim_whitespace: Boolean(raw.trim_whitespace),
+    ignore_order: Boolean(raw.ignore_order),
     alternatives:
       accept_alternatives && Array.isArray(raw.alternatives) ? raw.alternatives : [],
     enum_alternatives:

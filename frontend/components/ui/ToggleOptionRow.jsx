@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from "react";
+
 /**
  * Checkbox row with label + hint text that wraps cleanly in narrow panels.
+ * Checkmark uses an exaggerated pop when the user toggles it on.
  */
 export default function ToggleOptionRow({
   theme,
@@ -9,10 +12,24 @@ export default function ToggleOptionRow({
   onChange,
   disabled = false,
 }) {
+  const [popOn, setPopOn] = useState(false);
+  const prevChecked = useRef(checked);
+
+  useEffect(() => {
+    if (checked && !prevChecked.current) {
+      setPopOn(false);
+      // Force a reflow so the animation restarts on every check.
+      requestAnimationFrame(() => setPopOn(true));
+    } else if (!checked) {
+      setPopOn(false);
+    }
+    prevChecked.current = checked;
+  }, [checked]);
+
   return (
     <label
       className={`en-toggle-row group flex w-full min-w-0 items-start gap-3 rounded-xl border px-3 py-2.5 transition-[border-color,background-color,transform] duration-200 ease-out ${
-        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer active:scale-[0.99]"
       } ${
         checked
           ? theme === "dark"
@@ -33,22 +50,24 @@ export default function ToggleOptionRow({
         />
         <span
           aria-hidden="true"
-          className={`en-toggle-box flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all duration-200 ease-out peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400/50 ${
+          className={`en-toggle-box flex h-5 w-5 items-center justify-center rounded-md border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400/50 ${
+            popOn ? "is-checked" : ""
+          } ${
             checked
-              ? "scale-100 border-emerald-500 bg-emerald-500 text-white shadow-sm"
+              ? "border-emerald-500 bg-emerald-500 text-white"
               : theme === "dark"
-                ? "scale-95 border-white/30 bg-transparent"
-                : "scale-95 border-teal-300/80 bg-white"
+                ? "scale-95 border-white/30 bg-transparent transition-[transform,border-color,background-color] duration-150"
+                : "scale-95 border-teal-300/80 bg-white transition-[transform,border-color,background-color] duration-150"
           }`}
         >
           <svg
             viewBox="0 0 16 16"
-            className={`h-3 w-3 transition-all duration-200 ease-out ${
-              checked ? "scale-100 opacity-100" : "scale-50 opacity-0"
+            className={`en-toggle-mark h-3.5 w-3.5 ${
+              popOn ? "is-checked" : checked ? "opacity-100" : "opacity-0"
             }`}
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.4"
+            strokeWidth="2.6"
             strokeLinecap="round"
             strokeLinejoin="round"
           >

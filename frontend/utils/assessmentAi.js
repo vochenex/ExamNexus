@@ -527,33 +527,124 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
     throw new Error("Your session expired. Please sign in again.");
   }
 
-  const formData = new FormData();
-  appendFilesToFormData(formData, files || file);
+  const list = Array.isArray(files) ? files.filter(Boolean) : files ? [files] : file ? [file] : [];
+  if (!list.length) {
+    throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
+  }
 
-  let res;
-  try {
-    res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/classify-document`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: formData,
-      signal,
-    });
-  } catch (error) {
-    if (error?.name === "AbortError") throw error;
-    if (isBackendUnreachable(error)) {
-      throw new Error(backendUnreachableMessage());
+  const postClassify = async (uploadFiles) => {
+    const formData = new FormData();
+    appendFilesToFormData(formData, uploadFiles);
+
+    let res;
+    try {
+      // Classify is extract + heuristics; keep under typical hosted limits.
+      res = await fetchAuthedWithRetry(
+        `${API_BASE}/assessment-ai/classify-document`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: formData,
+          signal,
+        },
+        90000
+      );
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      if (isBackendUnreachable(error)) {
+        throw new Error(backendUnreachableMessage());
+      }
+      throw error;
     }
-    throw error;
-  }
 
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(formatApiError(payload, "Failed to classify document"));
-  }
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(formatApiError(payload, "Failed to classify document"));
+    }
+    return payload;
+  };
 
-  return payload;
+  try {
+    return await postClassify(list);
+  } catch (batchError) {
+    if (batchError?.name === "AbortError" || list.length <= 1) {
+      throw batchError;
+    }
+
+    // Fallback: classify each file in parallel (avoids one oversized extract timing out).
+    const settled = await Promise.all(
+      list.map(async (single, index) => {
+        try {
+          const payload = await postClassify([single]);
+          const row = payload?.files?.[0] || {
+            index,
+            name: single.name || `document-${index + 1}`,
+            documentKind: payload?.documentKind || "study_material",
+            isQuestionnaire: Boolean(payload?.isQuestionnaire),
+            summary: payload?.summary || "",
+            suggestedTitle: payload?.suggestedTitle || "",
+          };
+          return {
+            ok: true,
+            file: {
+              index,
+              name: single.name || row.name || `document-${index + 1}`,
+              documentKind: row.documentKind || "study_material",
+              isQuestionnaire: Boolean(row.isQuestionnaire),
+              summary: row.summary || "",
+              suggestedTitle: row.suggestedTitle || "",
+            },
+          };
+        } catch (error) {
+          return {
+            ok: false,
+            failure: {
+              index,
+              name: single.name || `document-${index + 1}`,
+              error: error?.message || "Could not classify this file.",
+            },
+          };
+        }
+      })
+    );
+
+    const fileResults = settled.filter((item) => item.ok).map((item) => item.file);
+    const failures = settled.filter((item) => !item.ok).map((item) => item.failure);
+
+    if (!fileResults.length) {
+      throw batchError;
+    }
+
+    const questionnaireFiles = fileResults.filter((item) => item.isQuestionnaire);
+    const sourceFiles = fileResults.filter((item) => !item.isQuestionnaire);
+    const mixed = questionnaireFiles.length > 0 && sourceFiles.length > 0;
+    const allQuestionnaire = questionnaireFiles.length === fileResults.length;
+    const primary =
+      (allQuestionnaire ? questionnaireFiles[0] : null) ||
+      sourceFiles[0] ||
+      fileResults[0];
+
+    return {
+      success: true,
+      fileCount: list.length,
+      readableFileCount: fileResults.length,
+      mixed,
+      hasQuestionnaire: questionnaireFiles.length > 0,
+      hasSource: sourceFiles.length > 0,
+      documentKind: mixed ? "mixed" : primary?.documentKind || "study_material",
+      isQuestionnaire: allQuestionnaire,
+      summary: mixed
+        ? `Mixed upload: ${questionnaireFiles.length} questionnaire file(s) and ${sourceFiles.length} source/study file(s).`
+        : primary?.summary || "",
+      suggestedTitle: primary?.suggestedTitle || "",
+      files: fileResults,
+      failures,
+      questionnaireIndexes: questionnaireFiles.map((item) => item.index),
+      sourceIndexes: sourceFiles.map((item) => item.index),
+    };
+  }
 }
 
 export async function generateAssessmentFromDocument({

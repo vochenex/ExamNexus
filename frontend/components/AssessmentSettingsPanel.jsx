@@ -128,7 +128,7 @@ export default function AssessmentSettingsPanel({
         theme={theme}
         label="Allow answer review"
         hint="Let students revisit questions before submitting (within unlocked sections)."
-        checked={exam.allow_review !== false}
+        checked={Boolean(exam.allow_review)}
         onChange={(checked) => onChange({ allow_review: checked })}
       />
 
@@ -136,7 +136,7 @@ export default function AssessmentSettingsPanel({
         theme={theme}
         label="Show score to students"
         hint="Students can see their score after submission on the Results page."
-        checked={exam.show_result !== false}
+        checked={Boolean(exam.show_result)}
         onChange={(checked) =>
           onChange({
             show_result: checked,
@@ -149,8 +149,8 @@ export default function AssessmentSettingsPanel({
         theme={theme}
         label="Allow question review after submission"
         hint="When enabled, students can review each question and their answers. When off, only the score is shown."
-        checked={exam.show_question_review !== false}
-        disabled={exam.show_result === false}
+        checked={Boolean(exam.show_question_review)}
+        disabled={!exam.show_result}
         onChange={(checked) => onChange({ show_question_review: checked })}
       />
 
@@ -158,7 +158,7 @@ export default function AssessmentSettingsPanel({
         theme={theme}
         label="Show correct answers after submission"
         hint="Independent preference. Students only see correct answers when score and question review are also enabled."
-        checked={exam.show_correct_answers !== false}
+        checked={Boolean(exam.show_correct_answers)}
         onChange={(checked) => onChange({ show_correct_answers: checked })}
       />
 
