@@ -1,11 +1,11 @@
-const MAX_BLOCKS = 25;
+const MAX_BLOCKS = 150;
 
 function splitDocumentIntoBlocks(text) {
   const normalized = String(text || "").replace(/\r\n/g, "\n").trim();
   if (!normalized) return [];
 
   const lineStarts = [];
-  const linePattern = /^(?:(?:question|item|no\.?)\s*)?(\d{1,2})[.)]\s+(.+)/gim;
+  const linePattern = /^(?:(?:question|item|no\.?)\s*)?(\d{1,3})[.)]\s+(.+)/gim;
   let match;
 
   while ((match = linePattern.exec(normalized)) !== null) {

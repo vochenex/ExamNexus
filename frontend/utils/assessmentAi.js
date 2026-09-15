@@ -664,10 +664,11 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
   }
 }
 
-/** Keep each hosted questionnaire round small so Vercel finishes under 60s. */
-const QUESTIONNAIRE_CHUNK_CHARS = 4500;
-const QUESTIONNAIRE_STEPS_PER_ROUND = 4;
-const QUESTIONNAIRE_ROUND_DELAY_MS = 1200;
+/** Prefer one fast questionnaire convert; only batch huge docs or after timeout. */
+const QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS = 11000;
+const QUESTIONNAIRE_CHUNK_CHARS = 8000;
+const QUESTIONNAIRE_STEPS_PER_ROUND = 10;
+const QUESTIONNAIRE_ROUND_DELAY_MS = 400;
 
 function chunkTextForQuestionnaire(text, maxChars = QUESTIONNAIRE_CHUNK_CHARS) {
   const source = String(text || "").trim();
@@ -691,9 +692,20 @@ function chunkTextForQuestionnaire(text, maxChars = QUESTIONNAIRE_CHUNK_CHARS) {
     }
     const piece = source.slice(cursor, end).trim();
     if (piece) chunks.push(piece);
-    cursor = end;
+    cursor = Math.max(end, cursor + 1);
   }
   return chunks;
+}
+
+function isTimeoutLikeError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    message.includes("timed out") ||
+    message.includes("time limit") ||
+    message.includes("timeout") ||
+    message.includes("504") ||
+    message.includes("408")
+  );
 }
 
 async function fetchDocumentPlan(sourceText, signal) {
@@ -755,6 +767,23 @@ async function analyzeDocumentTextRound({
   return payload;
 }
 
+function buildQuestionnaireRounds(rawSource, plan) {
+  const steps = Array.isArray(plan?.steps) ? plan.steps : [];
+  if (plan?.mode === "existing_questions" && steps.length > QUESTIONNAIRE_STEPS_PER_ROUND) {
+    const rounds = [];
+    for (let i = 0; i < steps.length; i += QUESTIONNAIRE_STEPS_PER_ROUND) {
+      const batch = steps.slice(i, i + QUESTIONNAIRE_STEPS_PER_ROUND);
+      const joined = batch
+        .map((step) => String(step?.sourceText || "").trim())
+        .filter(Boolean)
+        .join("\n\n");
+      if (joined) rounds.push(joined);
+    }
+    return rounds;
+  }
+  return chunkTextForQuestionnaire(rawSource);
+}
+
 async function generateQuestionnaireBatched({
   file,
   files,
@@ -778,44 +807,117 @@ async function generateQuestionnaireBatched({
     }
   };
 
+  const collectFromPayload = (payload, allQuestions, titles) => {
+    const questions = Array.isArray(payload?.questions) ? payload.questions : [];
+    if (!titles.suggestedTitle && payload?.suggestedTitle) {
+      titles.suggestedTitle = payload.suggestedTitle;
+    }
+    if (!titles.suggestedDescription && payload?.suggestedDescription) {
+      titles.suggestedDescription = payload.suggestedDescription;
+    }
+
+    for (let i = 0; i < questions.length; i += 1) {
+      allQuestions.push(questions[i]);
+      emitQuestionReady({
+        onQuestionGenerated,
+        question: questions[i],
+        step: allQuestions.length - 1,
+        total: allQuestions.length,
+        phase: "structuring",
+        payload: {
+          suggestedTitle: titles.suggestedTitle,
+          suggestedDescription: titles.suggestedDescription,
+        },
+      });
+      emitProgress({
+        phase: "structuring",
+        current: allQuestions.length,
+        total: Math.max(allQuestions.length, 1),
+        percent: Math.min(96, 20 + Math.round((allQuestions.length / (allQuestions.length + 1)) * 70)),
+        status: "revealing",
+      });
+    }
+
+    return questions.length;
+  };
+
   emitProgress({
     phase: "reading",
     current: 0,
     total: 1,
-    percent: 5,
+    percent: 8,
     status: "waiting",
   });
 
   const rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
   assertNotAborted();
 
+  const titles = { suggestedTitle: "", suggestedDescription: "" };
+  const allQuestions = [];
+  let meta = {};
+  let lastError = null;
+  let mode = "document_questionnaire";
+
+  // Fast path: one convert call (how the original questionnaire flow worked).
+  if (rawSource.length <= QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS) {
+    emitProgress({
+      phase: "structuring",
+      current: 0,
+      total: 1,
+      percent: 25,
+      status: "analyzing",
+    });
+    try {
+      const payload = await analyzeDocumentTextRound({
+        sourceText: rawSource,
+        isQuestionnaire: true,
+        signal,
+      });
+      meta = { ...(payload.meta || {}) };
+      const added = collectFromPayload(payload, allQuestions, titles);
+      if (added > 0) {
+        emitProgress({
+          phase: "structuring",
+          current: allQuestions.length,
+          total: allQuestions.length,
+          percent: 100,
+          status: "done",
+        });
+        return {
+          success: true,
+          suggestedTitle: titles.suggestedTitle,
+          suggestedDescription: titles.suggestedDescription,
+          questions: allQuestions,
+          meta: {
+            ...meta,
+            generatedCount: allQuestions.length,
+            mode,
+            isQuestionnaire: true,
+            rounds: 1,
+          },
+        };
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = error;
+      if (!isTimeoutLikeError(error)) {
+        throw error;
+      }
+      // Timed out on hosted limit — fall through to smaller rounds.
+      mode = "document_questionnaire_batched";
+    }
+  }
+
   let rounds = [];
   try {
     const plan = await fetchDocumentPlan(rawSource, signal);
-    const steps = Array.isArray(plan?.steps) ? plan.steps : [];
-    if (plan?.mode === "existing_questions" && steps.length > QUESTIONNAIRE_STEPS_PER_ROUND) {
-      for (let i = 0; i < steps.length; i += QUESTIONNAIRE_STEPS_PER_ROUND) {
-        const batch = steps.slice(i, i + QUESTIONNAIRE_STEPS_PER_ROUND);
-        const joined = batch
-          .map((step) => String(step?.sourceText || "").trim())
-          .filter(Boolean)
-          .join("\n\n");
-        if (joined) rounds.push(joined);
-      }
-    }
+    rounds = buildQuestionnaireRounds(rawSource, plan);
   } catch {
-    // Fall back to plain text chunks if planning fails.
+    rounds = chunkTextForQuestionnaire(rawSource);
   }
-
   if (!rounds.length) {
     rounds = chunkTextForQuestionnaire(rawSource);
   }
-
-  const allQuestions = [];
-  let suggestedTitle = "";
-  let suggestedDescription = "";
-  let meta = {};
-  let lastError = null;
 
   for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
     assertNotAborted();
@@ -827,57 +929,31 @@ async function generateQuestionnaireBatched({
       phase: "structuring",
       current: allQuestions.length,
       total: Math.max(allQuestions.length + 1, rounds.length),
-      percent: Math.min(92, 12 + Math.round((roundIndex / rounds.length) * 70)),
+      percent: Math.min(92, 15 + Math.round((roundIndex / rounds.length) * 70)),
       status: "analyzing",
     });
 
-    try {
-      const payload = await analyzeDocumentTextRound({
-        sourceText: rounds[roundIndex],
-        isQuestionnaire: true,
-        signal,
-      });
-      const questions = Array.isArray(payload.questions) ? payload.questions : [];
-      if (!questions.length) {
-        lastError = new Error("AI did not return any usable questions from this document section.");
-        continue;
-      }
-
-      if (!suggestedTitle && payload.suggestedTitle) {
-        suggestedTitle = payload.suggestedTitle;
-      }
-      if (!suggestedDescription && payload.suggestedDescription) {
-        suggestedDescription = payload.suggestedDescription;
-      }
-      meta = { ...(meta || {}), ...(payload.meta || {}) };
-
-      for (let i = 0; i < questions.length; i += 1) {
-        allQuestions.push(questions[i]);
-        emitQuestionReady({
-          onQuestionGenerated,
-          question: questions[i],
-          step: allQuestions.length - 1,
-          total: allQuestions.length,
-          phase: "structuring",
-          payload: {
-            suggestedTitle,
-            suggestedDescription,
-          },
+    let roundOk = false;
+    for (let attempt = 1; attempt <= 2 && !roundOk; attempt += 1) {
+      try {
+        if (attempt > 1) await sleep(600);
+        const payload = await analyzeDocumentTextRound({
+          sourceText: rounds[roundIndex],
+          isQuestionnaire: true,
+          signal,
         });
-        emitProgress({
-          phase: "structuring",
-          current: allQuestions.length,
-          total: Math.max(allQuestions.length, rounds.length),
-          percent: Math.min(96, 18 + Math.round((allQuestions.length / (allQuestions.length + 2)) * 70)),
-          status: "revealing",
-        });
-      }
-    } catch (error) {
-      if (error?.name === "AbortError") throw error;
-      lastError = error;
-      // Continue other rounds when one chunk times out.
-      if (roundIndex === rounds.length - 1 && !allQuestions.length) {
-        throw error;
+        meta = { ...(meta || {}), ...(payload.meta || {}) };
+        const added = collectFromPayload(payload, allQuestions, titles);
+        if (!added) {
+          lastError = new Error(
+            "AI did not return any usable questions from this document section."
+          );
+          continue;
+        }
+        roundOk = true;
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        lastError = error;
       }
     }
   }
@@ -896,15 +972,19 @@ async function generateQuestionnaireBatched({
 
   return {
     success: true,
-    suggestedTitle,
-    suggestedDescription,
+    suggestedTitle: titles.suggestedTitle,
+    suggestedDescription: titles.suggestedDescription,
     questions: allQuestions,
     meta: {
       ...meta,
       generatedCount: allQuestions.length,
-      mode: "document_questionnaire_batched",
+      mode,
       isQuestionnaire: true,
       rounds: rounds.length,
+      warning:
+        mode === "document_questionnaire_batched"
+          ? `Converted ${allQuestions.length} question(s) in ${rounds.length} shorter rounds to fit the hosted time limit.`
+          : undefined,
     },
   };
 }
