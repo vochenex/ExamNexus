@@ -415,6 +415,14 @@ router.post(
         suggestedTitle: classification.suggestedTitle || "",
       }));
 
+      // Return extracted text so the client can convert questionnaires without
+      // a second upload/extract round-trip (major latency win on Vercel).
+      const documents = docs.map((doc) => ({
+        index: doc.index,
+        name: doc.name,
+        text: String(doc.text || ""),
+      }));
+
       const questionnaireFiles = fileResults.filter((item) => item.isQuestionnaire);
       const sourceFiles = fileResults.filter((item) => !item.isQuestionnaire);
       const mixed = questionnaireFiles.length > 0 && sourceFiles.length > 0;
@@ -462,6 +470,7 @@ router.post(
             : primary?.summary || "",
         suggestedTitle: primary?.suggestedTitle || "",
         files: fileResults,
+        documents,
         failures,
         questionnaireIndexes: questionnaireFiles.map((item) => item.index),
         sourceIndexes: sourceFiles.map((item) => item.index),

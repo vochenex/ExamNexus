@@ -603,6 +603,10 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
             summary: payload?.summary || "",
             suggestedTitle: payload?.suggestedTitle || "",
           };
+          const docText =
+            Array.isArray(payload?.documents) && payload.documents[0]
+              ? String(payload.documents[0].text || "")
+              : "";
           return {
             ok: true,
             file: {
@@ -612,6 +616,11 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
               isQuestionnaire: Boolean(row.isQuestionnaire),
               summary: row.summary || "",
               suggestedTitle: row.suggestedTitle || "",
+            },
+            document: {
+              index,
+              name: single.name || row.name || `document-${index + 1}`,
+              text: docText,
             },
           };
         } catch (error) {
@@ -628,6 +637,10 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
     );
 
     const fileResults = settled.filter((item) => item.ok).map((item) => item.file);
+    const documents = settled
+      .filter((item) => item.ok)
+      .map((item) => item.document)
+      .filter((doc) => String(doc?.text || "").trim());
     const failures = settled.filter((item) => !item.ok).map((item) => item.failure);
 
     if (!fileResults.length) {
@@ -657,6 +670,7 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
         : primary?.summary || "",
       suggestedTitle: primary?.suggestedTitle || "",
       files: fileResults,
+      documents,
       failures,
       questionnaireIndexes: questionnaireFiles.map((item) => item.index),
       sourceIndexes: sourceFiles.map((item) => item.index),
@@ -665,8 +679,8 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
 }
 
 /** Prefer one fast questionnaire convert; only batch huge docs or after timeout. */
-const QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS = 11000;
-const QUESTIONNAIRE_CHUNK_CHARS = 8000;
+const QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS = 12000;
+const QUESTIONNAIRE_CHUNK_CHARS = 9000;
 const QUESTIONNAIRE_STEPS_PER_ROUND = 10;
 const QUESTIONNAIRE_ROUND_DELAY_MS = 400;
 
@@ -744,21 +758,26 @@ async function analyzeDocumentTextRound({
     throw new Error("Your session expired. Please sign in again.");
   }
 
-  const res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/analyze-document-text`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      "Content-Type": "application/json",
+  // Hosted functions die near 60s — fail sooner so questionnaire convert can chunk.
+  const res = await fetchAuthedWithRetry(
+    `${API_BASE}/assessment-ai/analyze-document-text`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sourceText,
+        isQuestionnaire,
+        questionCount,
+        difficulty,
+        formats,
+      }),
+      signal,
     },
-    body: JSON.stringify({
-      sourceText,
-      isQuestionnaire,
-      questionCount,
-      difficulty,
-      formats,
-    }),
-    signal,
-  });
+    55000
+  );
 
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -1011,10 +1030,202 @@ async function generateQuestionnaireBatched({
   };
 }
 
+async function generateQuestionnaireFromText({
+  sourceText,
+  onProgress,
+  onQuestionGenerated,
+  signal,
+}) {
+  const resolved = String(sourceText || "").trim();
+  if (!resolved) {
+    throw new Error("The document did not contain readable text.");
+  }
+
+  let highestPercent = 18;
+  const guardedProgress = (payload) => {
+    const next = Math.max(highestPercent, Number(payload?.percent) || highestPercent);
+    highestPercent = Math.min(92, next);
+    onProgress?.({ ...payload, percent: highestPercent });
+  };
+
+  guardedProgress({
+    phase: "structuring",
+    percent: 22,
+    status: "converting",
+  });
+
+  const stopWaiting = startWaitingProgress({
+    onProgress: guardedProgress,
+    phase: "structuring",
+    floorPercent: 22,
+  });
+
+  try {
+    // Prefer one convert call; only chunk if the hosted function times out.
+    if (resolved.length <= QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS) {
+      try {
+        const payload = await analyzeDocumentTextRound({
+          sourceText: resolved,
+          isQuestionnaire: true,
+          signal,
+        });
+        stopWaiting();
+        const questions = Array.isArray(payload.questions) ? payload.questions : [];
+        if (!questions.length) {
+          throw new Error("AI did not return any usable questions from this document.");
+        }
+        await revealQuestionsIncrementally({
+          questions,
+          onProgress: guardedProgress,
+          onQuestionGenerated,
+          phase: "structuring",
+          payload: { ...payload, questions },
+        });
+        return {
+          ...payload,
+          questions,
+          meta: {
+            ...(payload.meta || {}),
+            generatedCount: questions.length,
+            mode: "document_questionnaire",
+            isQuestionnaire: true,
+            rounds: 1,
+          },
+        };
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        if (!isTimeoutLikeError(error)) throw error;
+      }
+    }
+
+    stopWaiting();
+    // Large / timed-out: chunk the already-extracted text (no second file upload).
+    const rounds = chunkTextForQuestionnaire(resolved);
+    const titles = { suggestedTitle: "", suggestedDescription: "" };
+    const allQuestions = [];
+    let meta = {};
+    let lastError = null;
+
+    for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+      if (signal?.aborted) {
+        const error = new Error("Generation cancelled.");
+        error.name = "AbortError";
+        throw error;
+      }
+      if (roundIndex > 0) await sleep(QUESTIONNAIRE_ROUND_DELAY_MS);
+
+      const floor = Math.min(88, 24 + Math.round((roundIndex / rounds.length) * 55));
+      const stopRound = startWaitingProgress({
+        onProgress: guardedProgress,
+        phase: "structuring",
+        floorPercent: floor,
+      });
+      try {
+        const payload = await analyzeDocumentTextRound({
+          sourceText: rounds[roundIndex],
+          isQuestionnaire: true,
+          signal,
+        });
+        const questions = Array.isArray(payload.questions) ? payload.questions : [];
+        meta = { ...(meta || {}), ...(payload.meta || {}) };
+        if (!titles.suggestedTitle && payload.suggestedTitle) {
+          titles.suggestedTitle = payload.suggestedTitle;
+        }
+        if (!titles.suggestedDescription && payload.suggestedDescription) {
+          titles.suggestedDescription = payload.suggestedDescription;
+        }
+        for (const question of questions) {
+          allQuestions.push(question);
+          emitQuestionReady({
+            onQuestionGenerated,
+            question,
+            step: allQuestions.length - 1,
+            total: allQuestions.length,
+            phase: "structuring",
+            payload: titles,
+          });
+          guardedProgress({
+            phase: "structuring",
+            current: allQuestions.length,
+            total: Math.max(allQuestions.length, rounds.length),
+            percent: Math.min(96, 30 + allQuestions.length),
+            status: "revealing",
+          });
+        }
+        if (!questions.length) {
+          lastError = new Error("AI did not return questions for a document section.");
+        }
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        lastError = error;
+      } finally {
+        stopRound();
+      }
+    }
+
+    if (!allQuestions.length) {
+      throw lastError || new Error("AI did not return any usable questions from this document.");
+    }
+
+    guardedProgress({
+      phase: "structuring",
+      current: allQuestions.length,
+      total: allQuestions.length,
+      percent: 100,
+      status: "done",
+    });
+
+    return {
+      success: true,
+      suggestedTitle: titles.suggestedTitle,
+      suggestedDescription: titles.suggestedDescription,
+      questions: allQuestions,
+      meta: {
+        ...meta,
+        generatedCount: allQuestions.length,
+        mode: "document_questionnaire_batched",
+        isQuestionnaire: true,
+        rounds: rounds.length,
+      },
+    };
+  } catch (error) {
+    stopWaiting();
+    throw error;
+  }
+}
+
+export function mergeClassificationQuestionnaireText(classification) {
+  const docs = Array.isArray(classification?.documents) ? classification.documents : [];
+  if (!docs.length) return "";
+
+  const indexes = Array.isArray(classification?.questionnaireIndexes)
+    ? new Set(classification.questionnaireIndexes.map((value) => Number(value)))
+    : null;
+
+  const selected = docs.filter((doc) => {
+    if (!indexes || !indexes.size) {
+      return classification?.isQuestionnaire !== false;
+    }
+    return indexes.has(Number(doc.index));
+  });
+
+  return selected
+    .map((doc) => String(doc?.text || "").trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+/**
+ * Convert / generate from a document.
+ * Questionnaires: prefer already-extracted classify text (one convert call).
+ * Study guides: stay on short client rounds.
+ */
 export async function generateAssessmentFromDocument({
   file,
   files,
   fileIndexes,
+  sourceText,
   questionCount,
   difficulty,
   formats,
@@ -1025,7 +1236,6 @@ export async function generateAssessmentFromDocument({
 }) {
   const requested = Number(questionCount);
 
-  // Source material: always use short client rounds (avoids Vercel timeouts + empty Gemini replies).
   if (!isQuestionnaire && Number.isFinite(requested) && requested > 0) {
     return generateSourceMaterialBatched({
       file,
@@ -1040,8 +1250,17 @@ export async function generateAssessmentFromDocument({
     });
   }
 
-  // Questionnaires: extract once, then analyze small text rounds (same Vercel limit).
   if (isQuestionnaire) {
+    const resolvedText = String(sourceText || "").trim();
+    if (resolvedText) {
+      return generateQuestionnaireFromText({
+        sourceText: resolvedText,
+        onProgress,
+        onQuestionGenerated,
+        signal,
+      });
+    }
+    // No classify text: extract once, then single convert (batched only on timeout).
     return generateQuestionnaireBatched({
       file,
       files,
@@ -1052,91 +1271,7 @@ export async function generateAssessmentFromDocument({
     });
   }
 
-  const session = await getAuthSession({ forceRefresh: true });
-  if (!session?.access_token) {
-    throw new Error("Your session expired. Please sign in again.");
-  }
-
-  const formData = new FormData();
-  appendFilesToFormData(formData, files || file);
-  formData.append("isQuestionnaire", isQuestionnaire ? "true" : "false");
-  if (Array.isArray(fileIndexes) && fileIndexes.length) {
-    formData.append("fileIndexes", JSON.stringify(fileIndexes));
-  }
-  if (questionCount != null && String(questionCount).trim() !== "" && Number(questionCount) > 0) {
-    formData.append("questionCount", String(questionCount));
-  }
-  if (difficulty) {
-    formData.append("difficulty", String(difficulty));
-  }
-  if (Array.isArray(formats) && formats.length) {
-    formData.append("formats", JSON.stringify(formats));
-  }
-
-  let highestPercent = 3;
-  const guardedProgress = (payload) => {
-    const next = Math.max(highestPercent, Number(payload?.percent) || highestPercent);
-    highestPercent = Math.min(100, next);
-    onProgress?.({ ...payload, percent: highestPercent });
-  };
-
-  let res;
-  const stopWaiting = startWaitingProgress({
-    onProgress: guardedProgress,
-    phase: "reading",
-    total: questionCount || undefined,
-    floorPercent: 3,
-  });
-
-  try {
-    res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/analyze-document`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: formData,
-      signal,
-    });
-  } catch (error) {
-    stopWaiting();
-    if (error?.name === "AbortError") throw error;
-    if (isBackendUnreachable(error)) {
-      throw new Error(backendUnreachableMessage());
-    }
-    throw error;
-  } finally {
-    stopWaiting();
-  }
-
-  const payload = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(formatApiError(payload, "Failed to analyze document", res.status));
-  }
-
-  let questions = Array.isArray(payload.questions) ? payload.questions : [];
-  if (
-    !isQuestionnaire &&
-    Number.isFinite(requested) &&
-    requested > 0 &&
-    questions.length > requested
-  ) {
-    questions = questions.slice(0, requested);
-  }
-
-  if (!questions.length) {
-    throw new Error("AI did not return any usable questions from this document.");
-  }
-
-  await revealQuestionsIncrementally({
-    questions,
-    onProgress: guardedProgress,
-    onQuestionGenerated,
-    phase: "structuring",
-    payload: { ...payload, questions },
-  });
-
-  return { ...payload, questions };
+  throw new Error("Set a question count to generate from study/source material.");
 }
 
 async function extractDocumentsText({ file, files, fileIndexes, signal }) {

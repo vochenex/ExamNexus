@@ -15,6 +15,7 @@ import {
   fetchAssessmentAiStatus,
   generateAssessmentFromDocument,
   generateAssessmentFromPrompt,
+  mergeClassificationQuestionnaireText,
 } from "../utils/assessmentAi";
 import { assessmentInputClass } from "../utils/assessmentFormStyles";
 import Select from "./ui/Select";
@@ -442,8 +443,10 @@ export default function AssessmentAiGenerator({
           status: "converting",
         });
 
+        const sourceText = mergeClassificationQuestionnaireText(classification);
         const payload = await generateAssessmentFromDocument({
           files: questionnaireFiles,
+          sourceText: sourceText || undefined,
           isQuestionnaire: true,
           onProgress,
           onQuestionGenerated,
@@ -490,8 +493,10 @@ export default function AssessmentAiGenerator({
           classification.files,
           true
         );
+        const sourceText = mergeClassificationQuestionnaireText(classification);
         return generateAssessmentFromDocument({
           files: questionnaireFiles.length ? questionnaireFiles : files,
+          sourceText: sourceText || undefined,
           isQuestionnaire: true,
           onProgress,
           onQuestionGenerated,
