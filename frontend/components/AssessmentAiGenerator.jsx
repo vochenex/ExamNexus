@@ -293,6 +293,7 @@ export default function AssessmentAiGenerator({
       }
 
       clearPanelMessages();
+      onProgress?.({ phase: "reading", percent: 6, status: "classifying" });
 
       const payload = await generator({
         onProgress,

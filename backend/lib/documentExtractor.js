@@ -32,23 +32,52 @@ function isSupportedUpload(file) {
   return SUPPORTED_MIME_TYPES.has(file.mimetype) || SUPPORTED_EXTENSIONS.has(ext);
 }
 
+function isVercelRuntime() {
+  return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+}
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => {
+      if (timer) clearTimeout(timer);
+    }),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error(message);
+        error.statusCode = 408;
+        reject(error);
+      }, ms);
+    }),
+  ]);
+}
+
 async function extractPdfText(buffer) {
-  // Lazy-load so Vercel cold start does not require optional @napi-rs/canvas.
-  const { PDFParse } = require("pdf-parse");
-  const parser = new PDFParse({ data: buffer });
-  try {
-    // Hosted functions need a bound; full long PDFs burn the whole request budget.
-    const options =
-      process.env.VERCEL || process.env.VERCEL_ENV
-        ? { first: 1, last: 12 }
-        : undefined;
-    const result = options ? await parser.getText(options) : await parser.getText();
-    return String(result?.text || "").trim();
-  } finally {
-    if (typeof parser.destroy === "function") {
-      await parser.destroy();
-    }
-  }
+  const hosted = isVercelRuntime();
+  return withTimeout(
+    (async () => {
+      // Lazy-load so Vercel cold start does not require optional @napi-rs/canvas.
+      const { PDFParse } = require("pdf-parse");
+      const parser = new PDFParse({ data: buffer });
+      try {
+        // Hosted: first pages only — full PDF parse can hang the function.
+        const result = hosted
+          ? await parser.getText({ first: 1, last: 8 })
+          : await parser.getText();
+        return String(result?.text || "").trim();
+      } finally {
+        if (typeof parser.destroy === "function") {
+          try {
+            await parser.destroy();
+          } catch {
+            // ignore cleanup errors
+          }
+        }
+      }
+    })(),
+    hosted ? 15000 : 120000,
+    "Reading this PDF took too long. Try a shorter text-based PDF, or export it as .docx."
+  );
 }
 
 async function extractDocxText(file) {
@@ -124,30 +153,39 @@ async function extractDocumentText(file) {
   }
 
   const ext = getFileExtension(file);
-  let rawText = "";
+  const hosted = isVercelRuntime();
+  const run = async () => {
+    let rawText = "";
 
-  if (file.mimetype === "application/pdf" || ext === ".pdf") {
-    const buffer = file.buffer || fs.readFileSync(file.path);
-    rawText = await extractPdfText(buffer);
-  } else if (
-    ext === ".pptx" ||
-    file.mimetype ===
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-  ) {
-    rawText = await extractPptxText(file);
-  } else {
-    rawText = await extractDocxText(file);
-  }
+    if (file.mimetype === "application/pdf" || ext === ".pdf") {
+      const buffer = file.buffer || fs.readFileSync(file.path);
+      rawText = await extractPdfText(buffer);
+    } else if (
+      ext === ".pptx" ||
+      file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ) {
+      rawText = await extractPptxText(file);
+    } else {
+      rawText = await extractDocxText(file);
+    }
 
-  const text = normalizeExtractedText(rawText);
+    const text = normalizeExtractedText(rawText);
 
-  if (text.length < MIN_EXTRACT_CHARS) {
-    throw new Error(
-      "Could not extract enough readable text from this file. Try a text-based PDF, .docx, or .pptx file."
-    );
-  }
+    if (text.length < MIN_EXTRACT_CHARS) {
+      throw new Error(
+        "Could not extract enough readable text from this file. Try a text-based PDF, .docx, or .pptx file."
+      );
+    }
 
-  return text;
+    return text;
+  };
+
+  return withTimeout(
+    run(),
+    hosted ? 20000 : 180000,
+    "Reading this document took too long. Try a shorter text-based file (.docx works best)."
+  );
 }
 
 function cleanupUploadedFile(file) {

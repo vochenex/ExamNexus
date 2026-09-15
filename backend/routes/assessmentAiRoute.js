@@ -379,6 +379,16 @@ router.post(
   handleMulterUpload,
   async (req, res) => {
     const files = getUploadedFiles(req);
+    let timedOut = false;
+    const watchdog = setTimeout(() => {
+      timedOut = true;
+      if (!res.headersSent) {
+        res.status(408).json({
+          error:
+            "Reading this document took too long on the hosted server. Try a shorter text-based PDF or .docx file.",
+        });
+      }
+    }, 45000);
 
     try {
       if (!files.length) {
@@ -397,6 +407,7 @@ router.post(
       }
 
       const { docs, failures } = await extractDocumentsSeparatelyLenient(files);
+      if (timedOut || res.headersSent) return;
       if (!docs.length) {
         const detail = failures
           .map((item) => `${item.name}: ${item.error}`)
@@ -410,6 +421,7 @@ router.post(
       }
 
       const classifications = await classifyDocumentsBatch(docs);
+      if (timedOut || res.headersSent) return;
       const fileResults = classifications.map((classification) => ({
         index: classification.index,
         name: classification.name,
@@ -481,8 +493,10 @@ router.post(
         sourceIndexes: sourceFiles.map((item) => item.index),
       });
     } catch (err) {
+      if (timedOut || res.headersSent) return;
       handleRouteError(res, err);
     } finally {
+      clearTimeout(watchdog);
       cleanupUploadedFiles(files);
     }
   }
