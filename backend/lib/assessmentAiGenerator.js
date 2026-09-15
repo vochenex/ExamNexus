@@ -1204,8 +1204,8 @@ async function classifyDocumentsBatch(docs) {
     });
   }
 
-  // Multi-file: heuristics only. Extract already uses most of the Vercel budget.
-  if (list.length > 1) {
+  // Multi-file / hosted: heuristics only. Extract already uses most of the budget.
+  if (list.length > 1 || process.env.VERCEL || process.env.VERCEL_ENV) {
     return list.map((doc) => byIndex.get(doc.index));
   }
 

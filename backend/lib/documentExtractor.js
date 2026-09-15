@@ -4,7 +4,14 @@ const mammoth = require("mammoth");
 const JSZip = require("jszip");
 
 const MAX_EXTRACT_CHARS = 50000;
+const MAX_EXTRACT_CHARS_VERCEL = 18000;
 const MIN_EXTRACT_CHARS = 40;
+
+function getMaxExtractChars() {
+  return process.env.VERCEL || process.env.VERCEL_ENV
+    ? MAX_EXTRACT_CHARS_VERCEL
+    : MAX_EXTRACT_CHARS;
+}
 
 const SUPPORTED_MIME_TYPES = new Set([
   "application/pdf",
@@ -30,7 +37,12 @@ async function extractPdfText(buffer) {
   const { PDFParse } = require("pdf-parse");
   const parser = new PDFParse({ data: buffer });
   try {
-    const result = await parser.getText();
+    // Hosted functions need a bound; full long PDFs burn the whole request budget.
+    const options =
+      process.env.VERCEL || process.env.VERCEL_ENV
+        ? { first: 1, last: 12 }
+        : undefined;
+    const result = options ? await parser.getText(options) : await parser.getText();
     return String(result?.text || "").trim();
   } finally {
     if (typeof parser.destroy === "function") {
@@ -97,7 +109,7 @@ function normalizeExtractedText(text) {
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
-    .slice(0, MAX_EXTRACT_CHARS);
+    .slice(0, getMaxExtractChars());
 }
 
 async function extractDocumentText(file) {

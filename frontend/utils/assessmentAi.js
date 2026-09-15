@@ -121,7 +121,7 @@ function formatApiError(payload, fallback, status) {
     return "The AI service is temporarily unavailable. Wait a moment and try again.";
   }
   if (code === 413) {
-    return "That file is too large for the server. Upload a smaller PDF, Word, or PowerPoint file.";
+    return "That file is too large for the hosted server (max about 4 MB). Compress the PDF or upload a shorter file.";
   }
 
   return fallback || "AI request failed";
@@ -153,7 +153,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function startWaitingProgress({ onProgress, phase, total, floorPercent = 3 }) {
+function startWaitingProgress({ onProgress, phase, total, floorPercent = 3, status = "waiting" }) {
   let percent = Math.max(3, Number(floorPercent) || 3);
   const cap = 72;
   let highest = percent;
@@ -162,7 +162,7 @@ function startWaitingProgress({ onProgress, phase, total, floorPercent = 3 }) {
     current: 0,
     total,
     percent: highest,
-    status: "waiting",
+    status,
   });
 
   const timer = setInterval(() => {
@@ -174,7 +174,7 @@ function startWaitingProgress({ onProgress, phase, total, floorPercent = 3 }) {
       current: 0,
       total,
       percent: highest,
-      status: "waiting",
+      status,
     });
   }, 500);
 
@@ -538,7 +538,7 @@ export async function generateAssessmentFromPrompt({
   };
 }
 
-export async function classifyAssessmentDocument({ file, files, signal }) {
+export async function classifyAssessmentDocument({ file, files, signal, onProgress }) {
   const session = await getAuthSession({ forceRefresh: true });
   if (!session?.access_token) {
     throw new Error("Your session expired. Please sign in again.");
@@ -548,6 +548,13 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
   if (!list.length) {
     throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
   }
+
+  const stopWaiting = startWaitingProgress({
+    onProgress,
+    phase: "reading",
+    floorPercent: 8,
+    status: "classifying",
+  });
 
   const postClassify = async (uploadFiles) => {
     const formData = new FormData();
@@ -675,6 +682,8 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
       questionnaireIndexes: questionnaireFiles.map((item) => item.index),
       sourceIndexes: sourceFiles.map((item) => item.index),
     };
+  } finally {
+    stopWaiting();
   }
 }
 

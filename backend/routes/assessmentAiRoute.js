@@ -26,7 +26,8 @@ const router = express.Router();
 // Memory storage works on Vercel (no persistent disk). Local runs also fine.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  // Vercel serverless request body limit is ~4.5 MB — stay under it.
+  limits: { fileSize: 4 * 1024 * 1024 },
 });
 
 const uploadDocuments = upload.fields([
@@ -95,7 +96,10 @@ function parseIndexList(value) {
 function handleMulterUpload(req, res, next) {
   uploadDocuments(req, res, (err) => {
     if (err?.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ error: "File is too large. Maximum size is 10 MB." });
+      return res.status(400).json({
+        error:
+          "File is too large. Maximum size is 4 MB on the hosted server. Compress the PDF or upload a shorter file.",
+      });
     }
     if (err) {
       return res.status(400).json({ error: err.message || "File upload failed." });
@@ -420,7 +424,8 @@ router.post(
       const documents = docs.map((doc) => ({
         index: doc.index,
         name: doc.name,
-        text: String(doc.text || ""),
+        // Cap payload size — convert only needs the leading questionnaire text.
+        text: String(doc.text || "").slice(0, 18000),
       }));
 
       const questionnaireFiles = fileResults.filter((item) => item.isQuestionnaire);

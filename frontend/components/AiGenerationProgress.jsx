@@ -106,7 +106,7 @@ export default function AiGenerationProgress({
           }`}
         >
           <div
-            className={`h-full w-[8%] rounded-full transition-all duration-500 ${
+            className={`h-full w-1/5 animate-pulse rounded-full ${
               isLight
                 ? "bg-gradient-to-r from-emerald-400 to-teal-500"
                 : "bg-gradient-to-r from-emerald-400 to-cyan-400"

@@ -30,6 +30,8 @@ const DIFFICULTY_OPTIONS = [
 const MIN_QUESTIONS = 1;
 const MAX_QUESTIONS = 150;
 const DEFAULT_PROMPT_QUESTION_COUNT = 20;
+/** Hosted API body limit is ~4.5 MB — reject earlier with a clear message. */
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 function parseRawQuestionCount(value) {
   if (value === "" || value == null) return null;
@@ -222,9 +224,21 @@ export default function AssessmentAiGenerator({
   const addFiles = (fileList) => {
     const incoming = Array.from(fileList || []).filter(Boolean);
     if (!incoming.length) return;
+
+    const oversized = incoming.filter((file) => Number(file.size) > MAX_UPLOAD_BYTES);
+    if (oversized.length) {
+      const names = oversized.map((file) => file.name).join(", ");
+      reportError(
+        `${names} ${oversized.length === 1 ? "is" : "are"} too large (max 4 MB). Compress the PDF or upload a shorter file.`
+      );
+    }
+
+    const accepted = incoming.filter((file) => Number(file.size) <= MAX_UPLOAD_BYTES);
+    if (!accepted.length) return;
+
     setFiles((prev) => {
       const next = [...prev];
-      for (const file of incoming) {
+      for (const file of accepted) {
         const duplicate = next.some(
           (item) =>
             item.name === file.name &&
@@ -414,7 +428,11 @@ export default function AssessmentAiGenerator({
     // Phase 1: classify. Mixed → show source options + convert questionnaires now.
     runGeneration(async ({ onProgress, onQuestionGenerated, signal }) => {
       onProgress?.({ phase: "reading", percent: 8, status: "classifying" });
-      const classification = await classifyAssessmentDocument({ files, signal });
+      const classification = await classifyAssessmentDocument({
+        files,
+        signal,
+        onProgress,
+      });
 
       if (classification.mixed) {
         setDocumentAnalysis({
