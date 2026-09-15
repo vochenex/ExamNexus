@@ -269,7 +269,7 @@ export default function AdminSubjects() {
           </div>
 
           <div
-            className={`flex justify-end border-t pt-4 ${
+            className={`flex justify-stretch border-t pt-4 sm:justify-end ${
               theme === "dark" ? "border-white/10" : "border-emerald-100"
             }`}
           >
@@ -279,7 +279,7 @@ export default function AdminSubjects() {
               loading={creating}
               loadingLabel="Creating…"
               disabled={!form.name.trim() || !form.teacherSchoolId || Boolean(deletingId)}
-              className={`${primaryButton(theme)} disabled:cursor-not-allowed disabled:opacity-60`}
+              className={`${primaryButton(theme)} w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <Plus size={18} />
               Create subject
@@ -305,23 +305,23 @@ export default function AdminSubjects() {
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by subject or faculty…"
+              placeholder="Search subjects…"
               className={inputClass(theme, "w-full min-w-0 py-2.5 pl-9 pr-3")}
               aria-label="Search subjects by name or assigned faculty"
             />
           </div>
         </div>
         <div className={adminTableInnerClass()}>
-          <table className={`${adminTableClass(theme)} min-w-[56rem]`}>
+          <table className={`${adminTableClass(theme)} min-w-[36rem] sm:min-w-[48rem]`}>
             <thead>
               <tr>
-                <th className={`${adminThClass(theme)} w-12`}>#</th>
-                <th className={`${adminThClass(theme)} min-w-[10rem]`}>Subject</th>
-                <th className={`${adminThClass(theme)} min-w-[16rem]`}>Assigned faculty</th>
-                <th className={`${adminThClass(theme)} min-w-[9rem]`}>Sections</th>
-                <th className={`${adminThClass(theme)} min-w-[5rem]`}>Enrolled</th>
-                <th className={`${adminThClass(theme)} min-w-[6rem]`}>Assessments</th>
-                <th className={`${adminThClass(theme)} min-w-[6rem]`}>Actions</th>
+                <th className={`${adminThClass(theme)} w-10 sm:w-12`}>#</th>
+                <th className={`${adminThClass(theme)} min-w-[8rem] sm:min-w-[10rem]`}>Subject</th>
+                <th className={`${adminThClass(theme)} min-w-[10rem] sm:min-w-[14rem]`}>Assigned faculty</th>
+                <th className={`${adminThClass(theme)} min-w-[7rem] sm:min-w-[9rem]`}>Sections</th>
+                <th className={`${adminThClass(theme)} min-w-[4.5rem]`}>Enrolled</th>
+                <th className={`${adminThClass(theme)} min-w-[5.5rem]`}>Assessments</th>
+                <th className={`${adminThClass(theme)} min-w-[4.5rem]`}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -343,13 +343,18 @@ export default function AdminSubjects() {
                   <td className={`${adminTdClass(theme)} tabular-nums text-gray-500`}>
                     {index + 1}
                   </td>
-                  <td className={`${adminTdClass(theme)} min-w-[10rem]`}>{subject.name}</td>
-                  <td className={`${adminTdClass(theme)} min-w-[16rem]`}>
+                  <td
+                    className={`${adminTdClass(theme)} min-w-[8rem] sm:min-w-[10rem] font-medium`}
+                    title={subject.name}
+                  >
+                    <span className="line-clamp-2 break-words">{subject.name}</span>
+                  </td>
+                  <td className={`${adminTdClass(theme)} min-w-[10rem] sm:min-w-[14rem]`}>
                     <Select
                       value={subject.teacher_school_id || ""}
                       onChange={(e) => handleAssign(subject.id, e.target.value)}
                       disabled={busySubjectId === subject.id || deletingId === subject.id}
-                      className="min-w-[15rem] w-full"
+                      className="w-full min-w-0 max-w-full"
                     >
                       <option value="">Unassigned</option>
                       {faculty.map((f) => (
@@ -359,14 +364,14 @@ export default function AdminSubjects() {
                       ))}
                     </Select>
                   </td>
-                  <td className={`${adminTdClass(theme)} min-w-[9rem]`}>
+                  <td className={`${adminTdClass(theme)} min-w-[7rem] sm:min-w-[9rem]`}>
                     <Select
                       value={String(subject.section_count || DEFAULT_SECTION_COUNT)}
                       onChange={(e) =>
                         handleSectionCount(subject.id, Number(e.target.value))
                       }
                       disabled={busySubjectId === subject.id || deletingId === subject.id}
-                      className="min-w-[8rem] w-full"
+                      className="w-full min-w-0 max-w-full"
                     >
                       {[1, 2, 3, 4, 5, 6].map((n) => (
                         <option key={n} value={n}>

@@ -13,6 +13,7 @@ import {
   updateAnnouncementComment,
   deleteAnnouncementComment,
 } from "../utils/supabaseData";
+import PanelContentSkeleton from "./ui/PanelContentSkeleton";
 
 function formatCommentTime(value) {
   if (!value) return "";
@@ -1100,9 +1101,7 @@ export default function AnnouncementCard({
           className="en-comments-panel mt-4 space-y-3"
         >
           {loadingComments && comments.length === 0 ? (
-            <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              Loading comments...
-            </p>
+            <PanelContentSkeleton rows={3} variant="comments" />
           ) : comments.length === 0 ? (
             <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
               No comments yet.

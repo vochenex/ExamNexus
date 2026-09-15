@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { cardClass, inputClass } from "../../utils/themeInputs";
 import Select from "../../components/ui/Select";
-import { supabase } from "../../supabaseClient";
+import { createEphemeralAuthClient, supabase } from "../../supabaseClient";
 import {
   updateUserProfile,
   updateUserAvatar,
@@ -24,7 +24,7 @@ import { isStudentRole, resolveStudentId } from "../../utils/authUser";
 import { loadProfileForUser, resolveSchoolId } from "../../utils/authProfile";
 import { broadcastProfileUpdate } from "../../utils/profileEvents";
 import { isFacultyRole, hasCustomProfilePhoto } from "../../utils/avatar";
-import { isAdminUser } from "../../utils/adminData";
+import { isAdminUser, fetchAdminDashboardStats } from "../../utils/adminData";
 import { primaryButton, secondaryButton, dangerButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
@@ -172,6 +172,7 @@ export default function Profile() {
     totalSubjects: 0,
     totalAssessments: 0,
     totalStudents: 0,
+    totalFaculty: 0,
   });
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -187,6 +188,7 @@ export default function Profile() {
   });
   const [passwordStatus, setPasswordStatus] = useState("idle");
   const [passwordMessage, setPasswordMessage] = useState("");
+  const passwordSuccessTimerRef = useRef(null);
   const profileFeedbackRef = useScrollIntoViewWhen(
     Boolean(saveSuccess || saveStatus === "error"),
     { deps: [saveSuccess, saveStatus] }
@@ -195,6 +197,31 @@ export default function Profile() {
     deps: [passwordMessage, passwordStatus],
   });
   const [profileLoading, setProfileLoading] = useState(true);
+
+  // Survive an accidental hard reload right after password change (browser
+  // password managers sometimes reload after detecting a password form submit).
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem("en_password_change_ok");
+      if (pending) {
+        sessionStorage.removeItem("en_password_change_ok");
+        setPasswordStatus("success");
+        setPasswordMessage("Password updated successfully.");
+        passwordSuccessTimerRef.current = window.setTimeout(() => {
+          setPasswordStatus("idle");
+          setPasswordMessage("");
+          passwordSuccessTimerRef.current = null;
+        }, 4000);
+      }
+    } catch {
+      // ignore storage access errors
+    }
+    return () => {
+      if (passwordSuccessTimerRef.current) {
+        window.clearTimeout(passwordSuccessTimerRef.current);
+      }
+    };
+  }, []);
 
   const isStudent = isStudentRole(profile.role);
   const isFaculty = isFacultyRole(profile.role);
@@ -224,15 +251,49 @@ export default function Profile() {
   }, []);
 
   const loadFacultyStats = useCallback(async (schoolId, role, silent = false) => {
-    if (!schoolId || !isFacultyRole(role)) return;
+    if (!isFacultyRole(role)) return;
+
+    const resolvedSchoolId = String(schoolId || "").trim();
+    if (!resolvedSchoolId) {
+      setFacultyStats({
+        totalSubjects: 0,
+        totalAssessments: 0,
+        totalStudents: 0,
+        totalFaculty: 0,
+      });
+      if (!silent) {
+        setStatsError(
+          "Could not load faculty stats: your school ID is missing. Update it in your profile, then refresh."
+        );
+      }
+      return;
+    }
 
     try {
       if (!silent) setStatsError("");
-      const stats = await getFacultyDashboardStats(schoolId);
+      const stats = await getFacultyDashboardStats(resolvedSchoolId);
       setFacultyStats(stats);
     } catch (err) {
       console.error("Failed to load faculty stats:", err);
       if (!silent) setStatsError("Could not load your faculty stats. Please refresh.");
+    }
+  }, []);
+
+  const loadAdminStats = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setStatsError("");
+      const stats = await fetchAdminDashboardStats();
+      setFacultyStats({
+        totalSubjects: Number(stats?.subjects ?? 0),
+        totalAssessments: Number(stats?.assessments ?? 0),
+        totalStudents: Number(stats?.students ?? 0),
+        totalFaculty: Number(stats?.faculty ?? 0),
+      });
+    } catch (err) {
+      console.error("Failed to load admin stats:", err);
+      if (!silent) {
+        setStatsError("Could not load platform stats. Please refresh.");
+      }
     }
   }, []);
 
@@ -271,12 +332,19 @@ export default function Profile() {
     setEditProfile(loadedProfile);
     if (isStudentRole(loadedProfile.role)) {
       await loadStudentStats(studentId, loadedProfile.role, silent);
+    } else if (isAdminUser(loadedProfile)) {
+      await loadAdminStats(silent);
     } else if (isFacultyRole(loadedProfile.role)) {
-      await loadFacultyStats(loadedProfile.school_id, loadedProfile.role, silent);
+      // Same resolution path as FacultyDashboard — raw school_id alone can be
+      // empty/UUID and getFacultyDashboardStats then returns permanent zeros.
+      const schoolId =
+        resolveSchoolId(currentAuthUser, loadedProfile) ||
+        String(loadedProfile.school_id || "").trim();
+      await loadFacultyStats(schoolId, loadedProfile.role, silent);
     }
 
     if (!silent) setProfileLoading(false);
-  }, [loadFacultyStats, loadStudentStats]);
+  }, [loadAdminStats, loadFacultyStats, loadStudentStats]);
 
   usePolling(loadProfile, []);
 
@@ -424,7 +492,8 @@ export default function Profile() {
   };
 
   const handleChangePassword = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
 
     const { current, new: newPassword, confirm } = passwordForm;
 
@@ -462,11 +531,23 @@ export default function Profile() {
     try {
       setPasswordStatus("saving");
       setPasswordMessage("");
+      if (passwordSuccessTimerRef.current) {
+        window.clearTimeout(passwordSuccessTimerRef.current);
+        passwordSuccessTimerRef.current = null;
+      }
 
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
+      // Verify on an ephemeral client so we do not replace the live session
+      // (signInWithPassword on the shared client was remounting protected UI).
+      const verifier = createEphemeralAuthClient();
+      const { error: verifyError } = await verifier.auth.signInWithPassword({
         email,
         password: current,
       });
+      try {
+        await verifier.auth.signOut({ scope: "local" });
+      } catch {
+        // ignore
+      }
 
       if (verifyError) {
         setPasswordStatus("error");
@@ -474,9 +555,31 @@ export default function Profile() {
         return;
       }
 
-      const { error: updateError } = await supabase.auth.updateUser({
+      let { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
+
+      // If the project requires a recent login on the active session, re-auth
+      // on the shared client only as a fallback.
+      if (
+        updateError &&
+        /reauth|reauthentication|aal|recent login/i.test(
+          String(updateError.message || "")
+        )
+      ) {
+        const { error: reauthError } = await supabase.auth.signInWithPassword({
+          email,
+          password: current,
+        });
+        if (reauthError) {
+          setPasswordStatus("error");
+          setPasswordMessage("Current password is incorrect.");
+          return;
+        }
+        ({ error: updateError } = await supabase.auth.updateUser({
+          password: newPassword,
+        }));
+      }
 
       if (updateError) {
         setPasswordStatus("error");
@@ -484,12 +587,24 @@ export default function Profile() {
         return;
       }
 
+      try {
+        sessionStorage.setItem("en_password_change_ok", "1");
+      } catch {
+        // ignore
+      }
+
       setPasswordForm({ current: "", new: "", confirm: "" });
       setPasswordStatus("success");
       setPasswordMessage("Password updated successfully.");
-      setTimeout(() => {
+      passwordSuccessTimerRef.current = window.setTimeout(() => {
         setPasswordStatus("idle");
         setPasswordMessage("");
+        passwordSuccessTimerRef.current = null;
+        try {
+          sessionStorage.removeItem("en_password_change_ok");
+        } catch {
+          // ignore
+        }
       }, 4000);
     } catch (err) {
       console.error("Failed to change password:", err);
@@ -734,6 +849,30 @@ export default function Profile() {
                 to="/student/assessments"
               />
             </div>
+          ) : isAdmin ? (
+            <div className="mb-3 grid gap-2 sm:mb-4 sm:grid-cols-3">
+              <StatCard
+                value={facultyStats.totalFaculty}
+                label="Total Faculties"
+                theme={theme}
+                variant="emerald"
+                to="/admin/accounts"
+              />
+              <StatCard
+                value={facultyStats.totalStudents}
+                label="Total Students"
+                theme={theme}
+                variant="cyan"
+                to="/admin/accounts"
+              />
+              <StatCard
+                value={facultyStats.totalSubjects}
+                label="Total Subjects"
+                theme={theme}
+                variant="purple"
+                to="/admin/subjects"
+              />
+            </div>
           ) : (
             <div className="mb-3 grid gap-2 sm:mb-4 sm:grid-cols-3">
               <StatCard
@@ -741,21 +880,21 @@ export default function Profile() {
                 label="Total subjects"
                 theme={theme}
                 variant="emerald"
-                to={isAdmin ? "/admin/dashboard" : "/faculty/dashboard"}
+                to="/faculty/dashboard"
               />
               <StatCard
                 value={facultyStats.totalAssessments}
                 label="Total assessments"
                 theme={theme}
                 variant="cyan"
-                to={isAdmin ? "/admin/assessments" : "/faculty/dashboard"}
+                to="/faculty/dashboard"
               />
               <StatCard
                 value={facultyStats.totalStudents}
                 label="Total students"
                 theme={theme}
                 variant="purple"
-                to={isAdmin ? "/admin/accounts" : "/faculty/dashboard"}
+                to="/faculty/dashboard"
               />
             </div>
           )}
@@ -1038,24 +1177,24 @@ export default function Profile() {
               theme === "dark" ? "border-white/10" : "border-emerald-100"
             }`}
           >
-            <form onSubmit={handleChangePassword}>
+            <div>
               <SectionTitle theme={theme}>Change password</SectionTitle>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
                 {[
                   {
                     key: "current",
                     placeholder: "Current password",
-                    autoComplete: "current-password",
+                    autoComplete: "off",
                   },
                   {
                     key: "new",
                     placeholder: "New password",
-                    autoComplete: "new-password",
+                    autoComplete: "off",
                   },
                   {
                     key: "confirm",
                     placeholder: "Confirm password",
-                    autoComplete: "new-password",
+                    autoComplete: "off",
                   },
                 ].map((field) => (
                   <div key={field.key} className="relative min-w-0">
@@ -1068,8 +1207,15 @@ export default function Profile() {
                           [field.key]: e.target.value,
                         })
                       }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleChangePassword(e);
+                        }
+                      }}
                       placeholder={field.placeholder}
                       autoComplete={field.autoComplete}
+                      name={`en-profile-${field.key}`}
                       className={`${inputStyle(theme)} py-2 pr-10 text-sm`}
                     />
                     <button
@@ -1092,7 +1238,8 @@ export default function Profile() {
                   </div>
                 ))}
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleChangePassword}
                   disabled={passwordStatus === "saving"}
                   className={`${primaryButton(theme, "px-4 py-2 text-sm")} w-full xl:w-auto`}
                 >
@@ -1116,7 +1263,7 @@ export default function Profile() {
                   {passwordMessage}
                 </p>
               )}
-            </form>
+            </div>
           </div>
 
           {editing && (

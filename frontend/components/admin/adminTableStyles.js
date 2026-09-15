@@ -12,7 +12,7 @@ export function adminTableClass(theme) {
 }
 
 export function adminThClass(theme) {
-  return `px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide sm:px-4 sm:py-3 sm:text-xs ${
+  return `px-2 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide sm:px-4 sm:py-3 sm:text-xs whitespace-nowrap ${
     theme === "dark"
       ? "bg-white/[0.04] text-gray-400"
       : "en-bg-muted text-slate-600"
@@ -20,7 +20,7 @@ export function adminThClass(theme) {
 }
 
 export function adminTdClass(theme) {
-  return `px-3 py-2.5 align-top border-t text-xs sm:px-4 sm:py-3 sm:text-sm ${
+  return `px-2 py-2.5 align-top border-t text-xs sm:px-4 sm:py-3 sm:text-sm max-w-[16rem] sm:max-w-none ${
     theme === "dark" ? "border-white/10" : "border-slate-100"
   }`;
 }

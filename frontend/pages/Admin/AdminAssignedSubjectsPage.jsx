@@ -121,7 +121,7 @@ export default function AdminAssignedSubjects() {
           <Select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="w-full min-w-[9rem] sm:w-auto sm:max-w-[14rem]"
+            className="w-full min-w-0 sm:w-auto sm:max-w-[14rem]"
           >
             <option value="">All departments</option>
             {DEPARTMENTS.map((dept) => (
@@ -135,7 +135,7 @@ export default function AdminAssignedSubjects() {
 
       <div className={adminTableWrapClass(theme)}>
         <div className={adminTableInnerClass()}>
-          <table className={`${adminTableClass(theme)} min-w-[52rem]`}>
+          <table className={`${adminTableClass(theme)} min-w-[36rem] sm:min-w-[48rem]`}>
             <thead>
               <tr>
                 <th className={adminThClass(theme)}>Subject</th>

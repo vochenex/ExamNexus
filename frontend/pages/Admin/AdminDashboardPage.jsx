@@ -101,9 +101,9 @@ function AdminToolCard({ tool, stats, theme, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className={`${panelClass(theme, "text-left")}`}
+      className={`${panelClass(theme, "min-w-0 max-w-full overflow-hidden text-left")}`}
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="mb-3 flex min-w-0 items-start justify-between gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
             theme === "dark" ? "bg-emerald-500/10 text-emerald-400" : "en-bg-skeleton text-teal-700"
@@ -115,12 +115,12 @@ function AdminToolCard({ tool, stats, theme, onOpen }) {
           <AdminStatBadge value={value} label={tool.valueLabel} alert={isAlert} />
         )}
       </div>
-      <h3 className="font-semibold">{tool.label}</h3>
-      <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+      <h3 className="min-w-0 break-words font-semibold">{tool.label}</h3>
+      <p className={`mt-1 min-w-0 break-words text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
         {tool.hint}
       </p>
       {tool.getDetail && (
-        <p className={`mt-2 text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+        <p className={`mt-2 min-w-0 break-words text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
           {tool.getDetail(stats)}
         </p>
       )}
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
         theme={theme}
         icon={Shield}
         title="Admin Dashboard"
-        subtitle="Manage accounts, subjects, announcements, and system-wide academic data."
+        subtitle="Manage accounts, subjects, announcements, and systematic wide academic data."
       />
 
       {loadError && (

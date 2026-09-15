@@ -34,13 +34,13 @@ export function getMobileNav(role) {
         { to: "/admin/subjects", icon: BookOpen, label: "Subjects" },
       ],
       more: [
-        { to: "/admin/password-resets", icon: KeyRound, label: "Password resets" },
-        { to: "/admin/assigned-subjects", icon: Link2, label: "Assigned subjects" },
-        { to: "/admin/catalog", icon: Building2, label: "Departments & courses" },
+        { to: "/admin/password-resets", icon: KeyRound, label: "Pw resets" },
+        { to: "/admin/assigned-subjects", icon: Link2, label: "Assigned" },
+        { to: "/admin/catalog", icon: Building2, label: "Catalog" },
         { to: "/admin/assessments", icon: ClipboardList, label: "Assessments" },
-        { to: "/admin/announcements", icon: Megaphone, label: "Announcements" },
+        { to: "/admin/announcements", icon: Megaphone, label: "Announce" },
         { to: "/admin/exam-logs", icon: ShieldAlert, label: "Exam logs" },
-        { to: "/admin/exports", icon: Download, label: "Export data" },
+        { to: "/admin/exports", icon: Download, label: "Export" },
         { to: "/admin/profile", icon: UserCircle, label: "Profile" },
       ],
     };
@@ -55,7 +55,7 @@ export function getMobileNav(role) {
         { to: "/faculty/profile", icon: UserCircle, label: "Profile" },
       ],
       more: [
-        { to: "/faculty/exports", icon: Download, label: "Export data" },
+        { to: "/faculty/exports", icon: Download, label: "Export" },
       ],
     };
   }

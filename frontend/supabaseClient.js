@@ -22,3 +22,23 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     detectSessionInUrl: true,
   },
 });
+
+/**
+ * Auth client that never touches localStorage / the live session.
+ * Use for password checks so sign-in does not replace the current session
+ * (which can remount protected UI right after a successful password change).
+ */
+export function createEphemeralAuthClient() {
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storage: {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+      },
+    },
+  });
+}

@@ -248,7 +248,7 @@ export default function MobileTabBar({ role, user, displayName, onLogout, pendin
                       />
                     ) : null}
                     <Icon size={22} strokeWidth={2.1} />
-                    <span>{item.label}</span>
+                    <span className="en-sheet-tile-label">{item.label}</span>
                   </ProgressNavLink>
                 );
               })}

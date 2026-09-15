@@ -573,7 +573,7 @@ export default function AdminAccounts() {
         </div>
       ) : (
         <div className={adminTableInnerClass()}>
-          <table className={`${adminTableClass(theme)} min-w-[76rem]`}>
+          <table className={`${adminTableClass(theme)} min-w-[42rem] sm:min-w-[56rem] lg:min-w-[76rem]`}>
             <thead>
               <tr>
                 <th className={`${adminThClass(theme)} w-10`}>

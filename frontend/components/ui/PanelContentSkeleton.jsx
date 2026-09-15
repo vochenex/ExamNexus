@@ -55,6 +55,43 @@ export default function PanelContentSkeleton({
     );
   }
 
+  if (variant === "comments") {
+    return (
+      <div
+        className={`space-y-3 ${className}`}
+        aria-hidden="true"
+        role="status"
+        aria-label="Loading comments"
+      >
+        {Array.from({ length: rows }).map((_, index) => (
+          <div key={index} className="flex items-start gap-2">
+            <Bone theme={theme} className="mt-0.5 h-7 w-7 shrink-0 rounded-full" />
+            <div
+              className={`min-w-0 flex-1 space-y-2 rounded-xl px-3 py-2.5 ${
+                theme === "dark" ? "bg-white/5" : "en-bg-muted"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <Bone theme={theme} className="h-3 w-24" />
+                <Bone theme={theme} className="h-2.5 w-16" />
+              </div>
+              <Bone
+                theme={theme}
+                className={`h-3 max-w-full ${
+                  index % 3 === 0 ? "w-[92%]" : index % 3 === 1 ? "w-[75%]" : "w-[84%]"
+                }`}
+              />
+              {index % 2 === 0 ? (
+                <Bone theme={theme} className="h-3 w-[58%] max-w-full" />
+              ) : null}
+              <Bone theme={theme} className="mt-1 h-2.5 w-10" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-3 ${className}`} aria-hidden="true" role="status" aria-label="Loading">
       {Array.from({ length: rows }).map((_, index) => (

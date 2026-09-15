@@ -453,10 +453,13 @@ export async function deleteSubjectById(subjectId) {
 export async function fetchTeacherSubjects(teacherSchoolId) {
   await requireSession();
 
+  const schoolId = String(teacherSchoolId || "").trim();
+  if (!schoolId) return [];
+
   const { data, error } = await supabase
     .from("subjects")
     .select("*")
-    .eq("teacher_school_id", teacherSchoolId)
+    .eq("teacher_school_id", schoolId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -2834,7 +2837,8 @@ export async function fetchStudentAnalytics(studentId) {
 }
 
 export async function getFacultyDashboardStats(teacherSchoolId) {
-  if (!teacherSchoolId) {
+  const schoolId = String(teacherSchoolId || "").trim();
+  if (!schoolId) {
     return {
       totalSubjects: 0,
       totalAssessments: 0,
@@ -2842,7 +2846,7 @@ export async function getFacultyDashboardStats(teacherSchoolId) {
     };
   }
 
-  const subjects = await fetchTeacherSubjects(teacherSchoolId);
+  const subjects = await fetchTeacherSubjects(schoolId);
   const subjectIds = subjects.map((subject) => subject.id);
 
   let totalAssessments = 0;
