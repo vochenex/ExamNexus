@@ -474,6 +474,48 @@ router.post(
   }
 );
 
+router.post("/analyze-document-text", requireFaculty, async (req, res) => {
+  try {
+    const {
+      sourceText,
+      questionCount,
+      difficulty,
+      formats,
+      isQuestionnaire,
+    } = req.body || {};
+
+    const resolvedSource = String(sourceText || "").trim();
+    if (!resolvedSource) {
+      return res.status(400).json({
+        error: "Document text is required. Re-upload the file and try again.",
+      });
+    }
+
+    const questionnaire =
+      isQuestionnaire === true ||
+      isQuestionnaire === "true" ||
+      isQuestionnaire === "1" ||
+      isQuestionnaire == null;
+
+    const result = await requestDocumentQuestions({
+      sourceText: resolvedSource,
+      questionCount,
+      difficulty,
+      formats: parseFormatsField(formats),
+      isQuestionnaire: questionnaire,
+    });
+
+    res.json({
+      success: true,
+      extractedChars: resolvedSource.length,
+      isQuestionnaire: questionnaire,
+      ...result,
+    });
+  } catch (err) {
+    handleRouteError(res, err);
+  }
+});
+
 router.post(
   "/analyze-document",
   requireFaculty,

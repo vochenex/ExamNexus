@@ -664,6 +664,251 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
   }
 }
 
+/** Keep each hosted questionnaire round small so Vercel finishes under 60s. */
+const QUESTIONNAIRE_CHUNK_CHARS = 4500;
+const QUESTIONNAIRE_STEPS_PER_ROUND = 4;
+const QUESTIONNAIRE_ROUND_DELAY_MS = 1200;
+
+function chunkTextForQuestionnaire(text, maxChars = QUESTIONNAIRE_CHUNK_CHARS) {
+  const source = String(text || "").trim();
+  if (!source) return [];
+  if (source.length <= maxChars) return [source];
+
+  const chunks = [];
+  let cursor = 0;
+  while (cursor < source.length) {
+    let end = Math.min(source.length, cursor + maxChars);
+    if (end < source.length) {
+      const window = source.slice(cursor, end);
+      const breakAt = Math.max(
+        window.lastIndexOf("\n\n"),
+        window.lastIndexOf("\n"),
+        window.lastIndexOf(". ")
+      );
+      if (breakAt > maxChars * 0.45) {
+        end = cursor + breakAt + 1;
+      }
+    }
+    const piece = source.slice(cursor, end).trim();
+    if (piece) chunks.push(piece);
+    cursor = end;
+  }
+  return chunks;
+}
+
+async function fetchDocumentPlan(sourceText, signal) {
+  const session = await getAuthSession({ forceRefresh: true });
+  if (!session?.access_token) {
+    throw new Error("Your session expired. Please sign in again.");
+  }
+
+  const res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/document-plan`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ sourceText }),
+    signal,
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(formatApiError(payload, "Failed to plan document analysis", res.status));
+  }
+  return payload;
+}
+
+async function analyzeDocumentTextRound({
+  sourceText,
+  isQuestionnaire = true,
+  questionCount,
+  difficulty,
+  formats,
+  signal,
+}) {
+  const session = await getAuthSession({ forceRefresh: true });
+  if (!session?.access_token) {
+    throw new Error("Your session expired. Please sign in again.");
+  }
+
+  const res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/analyze-document-text`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sourceText,
+      isQuestionnaire,
+      questionCount,
+      difficulty,
+      formats,
+    }),
+    signal,
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(formatApiError(payload, "Failed to analyze document", res.status));
+  }
+  return payload;
+}
+
+async function generateQuestionnaireBatched({
+  file,
+  files,
+  fileIndexes,
+  onProgress,
+  onQuestionGenerated,
+  signal,
+}) {
+  let highestPercent = 2;
+  const emitProgress = (payload) => {
+    const nextPercent = Math.max(highestPercent, Number(payload.percent) || highestPercent);
+    highestPercent = Math.min(100, nextPercent);
+    onProgress?.({ ...payload, percent: highestPercent });
+  };
+
+  const assertNotAborted = () => {
+    if (signal?.aborted) {
+      const error = new Error("Generation cancelled.");
+      error.name = "AbortError";
+      throw error;
+    }
+  };
+
+  emitProgress({
+    phase: "reading",
+    current: 0,
+    total: 1,
+    percent: 5,
+    status: "waiting",
+  });
+
+  const rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
+  assertNotAborted();
+
+  let rounds = [];
+  try {
+    const plan = await fetchDocumentPlan(rawSource, signal);
+    const steps = Array.isArray(plan?.steps) ? plan.steps : [];
+    if (plan?.mode === "existing_questions" && steps.length > QUESTIONNAIRE_STEPS_PER_ROUND) {
+      for (let i = 0; i < steps.length; i += QUESTIONNAIRE_STEPS_PER_ROUND) {
+        const batch = steps.slice(i, i + QUESTIONNAIRE_STEPS_PER_ROUND);
+        const joined = batch
+          .map((step) => String(step?.sourceText || "").trim())
+          .filter(Boolean)
+          .join("\n\n");
+        if (joined) rounds.push(joined);
+      }
+    }
+  } catch {
+    // Fall back to plain text chunks if planning fails.
+  }
+
+  if (!rounds.length) {
+    rounds = chunkTextForQuestionnaire(rawSource);
+  }
+
+  const allQuestions = [];
+  let suggestedTitle = "";
+  let suggestedDescription = "";
+  let meta = {};
+  let lastError = null;
+
+  for (let roundIndex = 0; roundIndex < rounds.length; roundIndex += 1) {
+    assertNotAborted();
+    if (roundIndex > 0) {
+      await sleep(QUESTIONNAIRE_ROUND_DELAY_MS);
+    }
+
+    emitProgress({
+      phase: "structuring",
+      current: allQuestions.length,
+      total: Math.max(allQuestions.length + 1, rounds.length),
+      percent: Math.min(92, 12 + Math.round((roundIndex / rounds.length) * 70)),
+      status: "analyzing",
+    });
+
+    try {
+      const payload = await analyzeDocumentTextRound({
+        sourceText: rounds[roundIndex],
+        isQuestionnaire: true,
+        signal,
+      });
+      const questions = Array.isArray(payload.questions) ? payload.questions : [];
+      if (!questions.length) {
+        lastError = new Error("AI did not return any usable questions from this document section.");
+        continue;
+      }
+
+      if (!suggestedTitle && payload.suggestedTitle) {
+        suggestedTitle = payload.suggestedTitle;
+      }
+      if (!suggestedDescription && payload.suggestedDescription) {
+        suggestedDescription = payload.suggestedDescription;
+      }
+      meta = { ...(meta || {}), ...(payload.meta || {}) };
+
+      for (let i = 0; i < questions.length; i += 1) {
+        allQuestions.push(questions[i]);
+        emitQuestionReady({
+          onQuestionGenerated,
+          question: questions[i],
+          step: allQuestions.length - 1,
+          total: allQuestions.length,
+          phase: "structuring",
+          payload: {
+            suggestedTitle,
+            suggestedDescription,
+          },
+        });
+        emitProgress({
+          phase: "structuring",
+          current: allQuestions.length,
+          total: Math.max(allQuestions.length, rounds.length),
+          percent: Math.min(96, 18 + Math.round((allQuestions.length / (allQuestions.length + 2)) * 70)),
+          status: "revealing",
+        });
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = error;
+      // Continue other rounds when one chunk times out.
+      if (roundIndex === rounds.length - 1 && !allQuestions.length) {
+        throw error;
+      }
+    }
+  }
+
+  if (!allQuestions.length) {
+    throw lastError || new Error("AI did not return any usable questions from this document.");
+  }
+
+  emitProgress({
+    phase: "structuring",
+    current: allQuestions.length,
+    total: allQuestions.length,
+    percent: 100,
+    status: "done",
+  });
+
+  return {
+    success: true,
+    suggestedTitle,
+    suggestedDescription,
+    questions: allQuestions,
+    meta: {
+      ...meta,
+      generatedCount: allQuestions.length,
+      mode: "document_questionnaire_batched",
+      isQuestionnaire: true,
+      rounds: rounds.length,
+    },
+  };
+}
+
 export async function generateAssessmentFromDocument({
   file,
   files,
@@ -687,6 +932,18 @@ export async function generateAssessmentFromDocument({
       questionCount: requested,
       difficulty,
       formats,
+      onProgress,
+      onQuestionGenerated,
+      signal,
+    });
+  }
+
+  // Questionnaires: extract once, then analyze small text rounds (same Vercel limit).
+  if (isQuestionnaire) {
+    return generateQuestionnaireBatched({
+      file,
+      files,
+      fileIndexes,
       onProgress,
       onQuestionGenerated,
       signal,

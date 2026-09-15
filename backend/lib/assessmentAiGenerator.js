@@ -29,7 +29,7 @@ const MAX_QUESTIONS = 150;
 const MIN_QUESTIONS = 1;
 const DEFAULT_QUESTIONS = 8;
 const MAX_SOURCE_CHARS = 14000;
-const MAX_SOURCE_CHARS_VERCEL = 9000;
+const MAX_SOURCE_CHARS_VERCEL = 5500;
 const MAX_PROMPT_CHARS = 4000;
 
 function getMaxSourceChars() {
