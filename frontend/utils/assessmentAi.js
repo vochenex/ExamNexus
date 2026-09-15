@@ -1230,6 +1230,32 @@ export function mergeClassificationQuestionnaireText(classification) {
     .trim();
 }
 
+export function mergeClassificationSourceText(classification) {
+  const docs = Array.isArray(classification?.documents) ? classification.documents : [];
+  if (!docs.length) return "";
+
+  const indexes = Array.isArray(classification?.sourceIndexes)
+    ? new Set(classification.sourceIndexes.map((value) => Number(value)))
+    : null;
+
+  const selected = docs.filter((doc) => {
+    if (!indexes || !indexes.size) {
+      // Pure study upload: all classified docs are source material.
+      return classification?.isQuestionnaire !== true;
+    }
+    return indexes.has(Number(doc.index));
+  });
+
+  // Fallback: if indexes missed, use every extracted doc.
+  const pool = selected.length ? selected : docs;
+
+  return pool
+    .map((doc) => String(doc?.text || "").trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 /**
  * Convert / generate from a document.
  * Questionnaires: prefer already-extracted classify text (one convert call).
@@ -1255,6 +1281,7 @@ export async function generateAssessmentFromDocument({
       file,
       files,
       fileIndexes,
+      sourceText,
       questionCount: requested,
       difficulty,
       formats,
@@ -1289,7 +1316,7 @@ export async function generateAssessmentFromDocument({
 }
 
 async function extractDocumentsText({ file, files, fileIndexes, signal }) {
-  const session = await getAuthSession({ forceRefresh: true });
+  const session = await getAuthSession({ forceRefresh: false });
   if (!session?.access_token) {
     throw new Error("Your session expired. Please sign in again.");
   }
@@ -1300,14 +1327,18 @@ async function extractDocumentsText({ file, files, fileIndexes, signal }) {
     formData.append("fileIndexes", JSON.stringify(fileIndexes));
   }
 
-  const res = await fetchAuthedWithRetry(`${API_BASE}/assessment-ai/extract-document`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
+  const res = await fetchAuthedWithRetry(
+    `${API_BASE}/assessment-ai/extract-document`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: formData,
+      signal,
     },
-    body: formData,
-    signal,
-  });
+    35000
+  );
 
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -1325,6 +1356,7 @@ async function generateSourceMaterialBatched({
   file,
   files,
   fileIndexes,
+  sourceText: providedSourceText,
   questionCount,
   difficulty,
   formats,
@@ -1353,12 +1385,39 @@ async function generateSourceMaterialBatched({
     phase: "reading",
     current: 0,
     total,
-    percent: 4,
+    percent: 10,
     status: "waiting",
   });
 
-  const rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
+  let rawSource = String(providedSourceText || "").trim();
+  if (!rawSource) {
+    const stopExtractWait = startWaitingProgress({
+      onProgress: emitProgress,
+      phase: "reading",
+      total,
+      floorPercent: 10,
+      status: "waiting",
+    });
+    try {
+      rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
+    } finally {
+      stopExtractWait();
+    }
+  }
+
+  assertNotAborted();
   const sourceText = String(rawSource || "").slice(0, DOCUMENT_SOURCE_MAX_CHARS);
+  if (!sourceText) {
+    throw new Error("The document did not contain readable text.");
+  }
+
+  emitProgress({
+    phase: "structuring",
+    current: 0,
+    total,
+    percent: 18,
+    status: "waiting",
+  });
 
   const allQuestions = [];
   let suggestedTitle = "";
@@ -1394,83 +1453,103 @@ async function generateSourceMaterialBatched({
           .join(" ")
       : `Generate exactly ${need} questions grounded in the source.`;
 
+    const floor = Math.min(
+      70,
+      Math.round(18 + (allQuestions.length / Math.max(total, 1)) * 52)
+    );
     emitProgress({
       phase: "structuring",
       current: allQuestions.length,
       total,
-      percent: Math.min(76, Math.round(8 + (allQuestions.length / total) * 68)),
-      status: "generating",
+      percent: floor,
+      status: "waiting",
     });
 
     let batch = [];
     let roundPayload = null;
     let roundAttempts = 0;
+    const stopRoundWait = startWaitingProgress({
+      onProgress: emitProgress,
+      phase: "structuring",
+      total,
+      floorPercent: floor,
+      status: "waiting",
+    });
 
-    while (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
-      roundAttempts += 1;
-      assertNotAborted();
-      try {
-        const headers = await getAuthHeaders(true, {
-          forceRefresh: allQuestions.length === 0 && roundAttempts === 1,
-        });
-        const res = await fetchAuthedWithRetry(
-          `${API_BASE}/assessment-ai/generate-from-source-text`,
-          {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              sourceText,
-              formats,
-              questionCount: need,
-              difficulty,
-              additionalInstructions,
-            }),
-            signal,
-          }
-        );
+    try {
+      while (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
+        roundAttempts += 1;
+        assertNotAborted();
+        try {
+          const headers = await getAuthHeaders(true, {
+            forceRefresh: false,
+          });
+          const res = await fetchAuthedWithRetry(
+            `${API_BASE}/assessment-ai/generate-from-source-text`,
+            {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                sourceText,
+                formats,
+                questionCount: need,
+                difficulty,
+                additionalInstructions,
+              }),
+              signal,
+            },
+            48000
+          );
 
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          lastError = new Error(formatApiError(payload, "Failed to generate from source", res.status));
-          const message = String(lastError.message || "").toLowerCase();
-          const retryable =
-            res.status === 429 ||
-            res.status >= 500 ||
-            message.includes("quota") ||
-            message.includes("rate") ||
-            message.includes("timeout") ||
-            message.includes("empty response") ||
-            message.includes("try again");
-          if (retryable && roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
-            await sleep(1200 * roundAttempts + (res.status === 429 ? 4000 : 0));
-            continue;
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            lastError = new Error(
+              formatApiError(payload, "Failed to generate from source", res.status)
+            );
+            const message = String(lastError.message || "").toLowerCase();
+            const retryable =
+              res.status === 429 ||
+              res.status >= 500 ||
+              message.includes("quota") ||
+              message.includes("rate") ||
+              message.includes("timeout") ||
+              message.includes("empty response") ||
+              message.includes("try again");
+            if (retryable && roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
+              await sleep(1200 * roundAttempts + (res.status === 429 ? 4000 : 0));
+              continue;
+            }
+            break;
           }
+
+          roundPayload = payload;
+          batch = Array.isArray(payload.questions) ? payload.questions : [];
+          if (!batch.length) {
+            lastError = new Error(
+              "AI did not return any usable questions from this source."
+            );
+            if (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
+              await sleep(900 * roundAttempts);
+              continue;
+            }
+            break;
+          }
+          lastError = null;
           break;
-        }
-
-        roundPayload = payload;
-        batch = Array.isArray(payload.questions) ? payload.questions : [];
-        if (!batch.length) {
-          lastError = new Error("AI did not return any usable questions from this source.");
+        } catch (error) {
+          if (error?.name === "AbortError") throw error;
+          lastError = isBackendUnreachable(error)
+            ? new Error(backendUnreachableMessage())
+            : error;
           if (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
-            await sleep(900 * roundAttempts);
+            await sleep(1200 * roundAttempts);
             continue;
           }
           break;
         }
-        lastError = null;
-        break;
-      } catch (error) {
-        if (error?.name === "AbortError") throw error;
-        lastError = isBackendUnreachable(error)
-          ? new Error(backendUnreachableMessage())
-          : error;
-        if (roundAttempts < DOCUMENT_MAX_ROUND_ATTEMPTS) {
-          await sleep(1200 * roundAttempts);
-          continue;
-        }
-        break;
       }
+    } finally {
+      stopRoundWait();
     }
 
     if (!batch.length) {

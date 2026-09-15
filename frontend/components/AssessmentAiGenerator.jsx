@@ -16,6 +16,7 @@ import {
   generateAssessmentFromDocument,
   generateAssessmentFromPrompt,
   mergeClassificationQuestionnaireText,
+  mergeClassificationSourceText,
 } from "../utils/assessmentAi";
 import { assessmentInputClass } from "../utils/assessmentFormStyles";
 import Select from "./ui/Select";
@@ -293,7 +294,7 @@ export default function AssessmentAiGenerator({
       }
 
       clearPanelMessages();
-      onProgress?.({ phase: "reading", percent: 6, status: "classifying" });
+      onProgress?.({ phase: "reading", percent: 5, status: "waiting" });
 
       const payload = await generator({
         onProgress,
@@ -387,6 +388,8 @@ export default function AssessmentAiGenerator({
         ({ onProgress, onQuestionGenerated, signal }) =>
           generateAssessmentFromDocument({
             files: sourceFiles,
+            sourceText:
+              mergeClassificationSourceText(documentAnalysis) || undefined,
             questionCount: resolvedQuestionCount,
             difficulty,
             formats: selectedFormats,
