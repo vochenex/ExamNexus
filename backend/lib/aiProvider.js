@@ -13,7 +13,7 @@ const DEFAULT_CHAT_TIMEOUT_MS = 300000;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;
 /** Stay under Vercel `maxDuration` (60s) so we return JSON instead of a gateway kill. */
 const VERCEL_CHAT_TIMEOUT_MS = 40000;
-const VERCEL_DOCUMENT_TIMEOUT_MS = 52000;
+const VERCEL_DOCUMENT_TIMEOUT_MS = 42000;
 const GEMINI_RETRY_DELAYS_MS = [0, 3000, 6000];
 const GROQ_RETRY_DELAYS_MS = [0, 2000, 4000];
 const GEMINI_QUOTA_MAX_ATTEMPTS = 10;
@@ -685,6 +685,11 @@ async function requestGeminiChatCompletion(
 
       if (!isTransientGeminiError(error)) {
         throw error;
+      }
+
+      // Vercel functions die at ~60s — a timeout retry cannot finish in time.
+      if (isTimeoutError(error) && isVercelRuntime()) {
+        break;
       }
     }
   }

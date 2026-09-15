@@ -49,7 +49,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOU
         throw cancelled;
       }
       throw new Error(
-        "The request took too long. Check your internet connection and try again."
+        "The server timed out analyzing this document. Try a shorter file, or wait and try again."
       );
     }
     throw error;
@@ -555,7 +555,7 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
 
     let res;
     try {
-      // Classify is extract + heuristics; keep under typical hosted limits.
+      // Classify is extract + heuristics; stay under hosted 60s so the client can recover.
       res = await fetchAuthedWithRetry(
         `${API_BASE}/assessment-ai/classify-document`,
         {
@@ -566,7 +566,7 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
           body: formData,
           signal,
         },
-        90000
+        58000
       );
     } catch (error) {
       if (error?.name === "AbortError") throw error;
@@ -678,9 +678,9 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
   }
 }
 
-/** Prefer one fast questionnaire convert; only batch huge docs or after timeout. */
-const QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS = 12000;
-const QUESTIONNAIRE_CHUNK_CHARS = 9000;
+/** Prefer one fast convert for short papers; chunk larger ones so Vercel stays under 60s. */
+const QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS = 6500;
+const QUESTIONNAIRE_CHUNK_CHARS = 5500;
 const QUESTIONNAIRE_STEPS_PER_ROUND = 10;
 const QUESTIONNAIRE_ROUND_DELAY_MS = 400;
 
@@ -715,6 +715,7 @@ function isTimeoutLikeError(error) {
   const message = String(error?.message || "").toLowerCase();
   return (
     message.includes("timed out") ||
+    message.includes("took too long") ||
     message.includes("time limit") ||
     message.includes("timeout") ||
     message.includes("504") ||
@@ -776,7 +777,7 @@ async function analyzeDocumentTextRound({
       }),
       signal,
     },
-    55000
+    48000
   );
 
   const payload = await res.json().catch(() => ({}));
