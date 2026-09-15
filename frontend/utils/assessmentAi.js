@@ -843,13 +843,22 @@ async function generateQuestionnaireBatched({
 
   emitProgress({
     phase: "reading",
-    current: 0,
-    total: 1,
     percent: 8,
     status: "waiting",
   });
 
-  const rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
+  const stopExtractWait = startWaitingProgress({
+    onProgress: emitProgress,
+    phase: "reading",
+    floorPercent: 8,
+  });
+
+  let rawSource = "";
+  try {
+    rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
+  } finally {
+    stopExtractWait();
+  }
   assertNotAborted();
 
   const titles = { suggestedTitle: "", suggestedDescription: "" };
@@ -862,10 +871,13 @@ async function generateQuestionnaireBatched({
   if (rawSource.length <= QUESTIONNAIRE_SINGLE_SHOT_MAX_CHARS) {
     emitProgress({
       phase: "structuring",
-      current: 0,
-      total: 1,
-      percent: 25,
-      status: "analyzing",
+      percent: 28,
+      status: "waiting",
+    });
+    const stopAnalyzeWait = startWaitingProgress({
+      onProgress: emitProgress,
+      phase: "structuring",
+      floorPercent: 28,
     });
     try {
       const payload = await analyzeDocumentTextRound({
@@ -873,6 +885,7 @@ async function generateQuestionnaireBatched({
         isQuestionnaire: true,
         signal,
       });
+      stopAnalyzeWait();
       meta = { ...(payload.meta || {}) };
       const added = collectFromPayload(payload, allQuestions, titles);
       if (added > 0) {
@@ -898,6 +911,7 @@ async function generateQuestionnaireBatched({
         };
       }
     } catch (error) {
+      stopAnalyzeWait();
       if (error?.name === "AbortError") throw error;
       lastError = error;
       if (!isTimeoutLikeError(error)) {
@@ -925,12 +939,16 @@ async function generateQuestionnaireBatched({
       await sleep(QUESTIONNAIRE_ROUND_DELAY_MS);
     }
 
+    const floor = Math.min(88, 20 + Math.round((roundIndex / rounds.length) * 60));
     emitProgress({
       phase: "structuring",
-      current: allQuestions.length,
-      total: Math.max(allQuestions.length + 1, rounds.length),
-      percent: Math.min(92, 15 + Math.round((roundIndex / rounds.length) * 70)),
-      status: "analyzing",
+      percent: floor,
+      status: "waiting",
+    });
+    const stopRoundWait = startWaitingProgress({
+      onProgress: emitProgress,
+      phase: "structuring",
+      floorPercent: floor,
     });
 
     let roundOk = false;
@@ -952,10 +970,14 @@ async function generateQuestionnaireBatched({
         }
         roundOk = true;
       } catch (error) {
-        if (error?.name === "AbortError") throw error;
+        if (error?.name === "AbortError") {
+          stopRoundWait();
+          throw error;
+        }
         lastError = error;
       }
     }
+    stopRoundWait();
   }
 
   if (!allQuestions.length) {

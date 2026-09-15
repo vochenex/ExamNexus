@@ -12,16 +12,28 @@ function resolvePercent(progress, isDone, isActive) {
 
   const current = Number(progress?.current);
   const total = Number(progress?.total);
+  const explicit =
+    typeof progress?.percent === "number" && Number.isFinite(progress.percent)
+      ? progress.percent
+      : null;
 
-  if (Number.isFinite(current) && Number.isFinite(total) && total > 0) {
+  // Only use current/total once questions are actually arriving.
+  // Early phases send current:0,total:1 which otherwise locks the bar at 1%.
+  const countsUseful =
+    Number.isFinite(current) &&
+    Number.isFinite(total) &&
+    total > 0 &&
+    current > 0;
+
+  if (countsUseful) {
     return Math.min(99, Math.max(1, Math.round((current / total) * 99)));
   }
 
-  if (typeof progress?.percent === "number") {
-    return Math.min(isActive ? 85 : 99, Math.max(0, Math.round(progress.percent)));
+  if (explicit != null) {
+    return Math.min(isActive ? 92 : 99, Math.max(1, Math.round(explicit)));
   }
 
-  return 0;
+  return isActive ? 3 : 0;
 }
 
 export default function AiGenerationProgress({
@@ -47,7 +59,11 @@ export default function AiGenerationProgress({
     const current = Number(progress?.current);
     const total = Number(progress?.total);
     const hasLiveCounts =
-      Number.isFinite(current) && Number.isFinite(total) && total > 0 && current < total;
+      Number.isFinite(current) &&
+      Number.isFinite(total) &&
+      total > 0 &&
+      current > 0 &&
+      current < total;
 
     if (isDone) {
       highestRef.current = 100;

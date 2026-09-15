@@ -412,7 +412,7 @@ export default function AssessmentAiGenerator({
 
     // Phase 1: classify. Mixed → show source options + convert questionnaires now.
     runGeneration(async ({ onProgress, onQuestionGenerated, signal }) => {
-      onProgress?.({ phase: "reading", current: 0, total: 1, percent: 8, status: "classifying" });
+      onProgress?.({ phase: "reading", percent: 8, status: "classifying" });
       const classification = await classifyAssessmentDocument({ files, signal });
 
       if (classification.mixed) {
@@ -438,8 +438,6 @@ export default function AssessmentAiGenerator({
 
         onProgress?.({
           phase: "structuring",
-          current: 0,
-          total: 1,
           percent: 18,
           status: "converting",
         });
@@ -484,8 +482,6 @@ export default function AssessmentAiGenerator({
         setDocumentAnalysis(classification);
         onProgress?.({
           phase: "structuring",
-          current: 0,
-          total: 1,
           percent: 20,
           status: "converting",
         });
