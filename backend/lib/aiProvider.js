@@ -11,10 +11,22 @@ const SECONDARY_FALLBACK_GROQ_MODEL = "qwen/qwen3.6-27b";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_CHAT_TIMEOUT_MS = 300000;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 600000;
+/** Stay under Vercel `maxDuration` (60s) so we return JSON instead of a gateway kill. */
+const VERCEL_CHAT_TIMEOUT_MS = 40000;
+const VERCEL_DOCUMENT_TIMEOUT_MS = 45000;
 const GEMINI_RETRY_DELAYS_MS = [0, 3000, 6000];
 const GROQ_RETRY_DELAYS_MS = [0, 2000, 4000];
 const GEMINI_QUOTA_MAX_ATTEMPTS = 10;
+const GEMINI_QUOTA_MAX_ATTEMPTS_VERCEL = 3;
 const GROQ_QUOTA_MAX_ATTEMPTS = 6;
+
+function isVercelRuntime() {
+  return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+}
+
+function getGeminiQuotaMaxAttempts() {
+  return isVercelRuntime() ? GEMINI_QUOTA_MAX_ATTEMPTS_VERCEL : GEMINI_QUOTA_MAX_ATTEMPTS;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -123,7 +135,7 @@ function getChatTimeoutMs() {
   if (Number.isFinite(configured) && configured > 0) {
     return configured;
   }
-  return DEFAULT_CHAT_TIMEOUT_MS;
+  return isVercelRuntime() ? VERCEL_CHAT_TIMEOUT_MS : DEFAULT_CHAT_TIMEOUT_MS;
 }
 
 function getDocumentTimeoutMs() {
@@ -131,7 +143,9 @@ function getDocumentTimeoutMs() {
   if (Number.isFinite(configured) && configured > 0) {
     return configured;
   }
-  return DEFAULT_DOCUMENT_TIMEOUT_MS;
+  // Local can wait longer; on Vercel the platform kills the function at ~60s with a
+  // non-JSON 504, which the UI surfaces as the generic "Failed to analyze document".
+  return isVercelRuntime() ? VERCEL_DOCUMENT_TIMEOUT_MS : DEFAULT_DOCUMENT_TIMEOUT_MS;
 }
 
 function getGeminiAgent(timeoutMs) {
@@ -261,6 +275,9 @@ function formatGeminiNetworkError() {
 
 function formatGeminiProcessingTimeoutError(isDocument) {
   if (isDocument) {
+    if (process.env.VERCEL || process.env.VERCEL_ENV) {
+      return "Document analysis hit the hosted time limit. Try a shorter file, or fewer questions, then analyze again.";
+    }
     return "Gemini took too long to analyze this document. Try a shorter file, or wait and try again.";
   }
   return "Gemini took too long to respond. Try fewer questions or a shorter prompt.";
@@ -596,7 +613,7 @@ async function requestGeminiChatCompletion(
   let lastError = null;
   let omitThinkingConfig = false;
 
-  for (let attempt = 0; attempt < GEMINI_QUOTA_MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < getGeminiQuotaMaxAttempts(); attempt += 1) {
     if (attempt > 0 && !isQuotaError(lastError)) {
       const delayMs =
         GEMINI_RETRY_DELAYS_MS[Math.min(attempt, GEMINI_RETRY_DELAYS_MS.length - 1)] || 0;
@@ -641,7 +658,7 @@ async function requestGeminiChatCompletion(
 
       if (isQuotaError(error)) {
         const waitMs = parseQuotaRetryMs(error);
-        if (attempt < GEMINI_QUOTA_MAX_ATTEMPTS - 1) {
+        if (attempt < getGeminiQuotaMaxAttempts() - 1) {
           await sleep(waitMs);
           continue;
         }

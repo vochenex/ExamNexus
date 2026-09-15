@@ -107,11 +107,23 @@ async function fetchAuthedWithRetry(url, options = {}, timeoutMs = AI_REQUEST_TI
   return res;
 }
 
-function formatApiError(payload, fallback) {
+function formatApiError(payload, fallback, status) {
   const message = payload?.error;
   if (typeof message === "string" && message.trim()) {
     return message.trim();
   }
+
+  const code = Number(status);
+  if (code === 504 || code === 408) {
+    return "The server timed out analyzing this document. Try a shorter file, or split it into a smaller upload.";
+  }
+  if (code === 502 || code === 503) {
+    return "The AI service is temporarily unavailable. Wait a moment and try again.";
+  }
+  if (code === 413) {
+    return "That file is too large for the server. Upload a smaller PDF, Word, or PowerPoint file.";
+  }
+
   return fallback || "AI request failed";
 }
 
@@ -401,7 +413,7 @@ export async function generateAssessmentFromPrompt({
 
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
-          lastError = new Error(formatApiError(payload, "Failed to generate questions"));
+          lastError = new Error(formatApiError(payload, "Failed to generate questions", res.status));
           if (roundAttempts < maxRoundAttempts) {
             await sleep(700 * roundAttempts);
             continue;
@@ -566,7 +578,7 @@ export async function classifyAssessmentDocument({ file, files, signal }) {
 
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(formatApiError(payload, "Failed to classify document"));
+      throw new Error(formatApiError(payload, "Failed to classify document", res.status));
     }
     return payload;
   };
@@ -740,7 +752,7 @@ export async function generateAssessmentFromDocument({
   const payload = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(formatApiError(payload, "Failed to analyze document"));
+    throw new Error(formatApiError(payload, "Failed to analyze document", res.status));
   }
 
   let questions = Array.isArray(payload.questions) ? payload.questions : [];
@@ -791,7 +803,7 @@ async function extractDocumentsText({ file, files, fileIndexes, signal }) {
 
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(formatApiError(payload, "Failed to read document text"));
+    throw new Error(formatApiError(payload, "Failed to read document text", res.status));
   }
 
   const text = String(payload.text || "").trim();
@@ -911,7 +923,7 @@ async function generateSourceMaterialBatched({
 
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
-          lastError = new Error(formatApiError(payload, "Failed to generate from source"));
+          lastError = new Error(formatApiError(payload, "Failed to generate from source", res.status));
           const message = String(lastError.message || "").toLowerCase();
           const retryable =
             res.status === 429 ||

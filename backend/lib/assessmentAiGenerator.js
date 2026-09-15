@@ -29,7 +29,15 @@ const MAX_QUESTIONS = 150;
 const MIN_QUESTIONS = 1;
 const DEFAULT_QUESTIONS = 8;
 const MAX_SOURCE_CHARS = 14000;
+const MAX_SOURCE_CHARS_VERCEL = 9000;
 const MAX_PROMPT_CHARS = 4000;
+
+function getMaxSourceChars() {
+  return process.env.VERCEL || process.env.VERCEL_ENV
+    ? MAX_SOURCE_CHARS_VERCEL
+    : MAX_SOURCE_CHARS;
+}
+
 const DEFAULT_BATCH_DELAY_MS = 4000;
 const DEFAULT_GROQ_BATCH_DELAY_MS = 750;
 const DEFAULT_CHUNK_SIZE = 5;
@@ -845,7 +853,7 @@ function buildUserPrompt({ sourceText, topicPrompt, additionalInstructions }) {
   const parts = [];
 
   if (sourceText) {
-    parts.push(`SOURCE MATERIAL:\n${sourceText.slice(0, MAX_SOURCE_CHARS)}`);
+    parts.push(`SOURCE MATERIAL:\n${sourceText.slice(0, getMaxSourceChars())}`);
   }
 
   if (topicPrompt) {
