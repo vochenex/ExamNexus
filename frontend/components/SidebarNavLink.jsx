@@ -107,7 +107,7 @@ export function SidebarSection({ title, theme, collapsed = false, children }) {
             {title}
           </p>
           <div
-            className={`mx-auto overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`mx-auto overflow-hidden transition-all duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
               collapsed ? "mb-2 h-px w-8 opacity-100" : "mb-0 h-0 w-0 opacity-0"
             } ${theme === "dark" ? "bg-white/10" : "bg-slate-200"}`}
             aria-hidden="true"

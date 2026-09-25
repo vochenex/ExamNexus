@@ -151,16 +151,7 @@ export default function HomePage() {
           <div className="en-home-wrap en-home-section-tight pb-10 pt-8 sm:pb-14 sm:pt-12 md:pb-20 md:pt-16">
             <div className="grid items-center gap-8 sm:gap-10 xl:grid-cols-2 xl:gap-16 2xl:gap-24">
               <ScrollReveal direction="up" className="space-y-6">
-                <p
-                  className={`en-home-eyebrow inline-flex items-center gap-2 rounded-full border px-3 py-1 ${
-                    isDark
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                      : "en-home-chip"
-                  }`}
-                >
-                  <Sparkles size={14} aria-hidden="true" />
-                  Intelligent Assessment Platform
-                </p>
+                
                 <h1 className="en-home-h1">
                   Assess smarter.
                   <span className="en-home-gradient-text block">Learn better.</span>

@@ -13,7 +13,9 @@ export default function AnimatedPage({ children, className = "" }) {
     // Keep each route starting at the top of the dashboard main scroller
     // (otherwise long pages like Create Assessment open mid/bottom).
     const scrollToTop = () => {
-      const mainScroller = document.querySelector("main.en-scroll-region");
+      const mainScroller =
+        document.querySelector("main > .en-scroll-region") ||
+        document.querySelector("main.en-scroll-region");
       if (mainScroller) mainScroller.scrollTop = 0;
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       document.documentElement.scrollTop = 0;

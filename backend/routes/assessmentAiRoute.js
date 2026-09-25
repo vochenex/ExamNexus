@@ -408,6 +408,36 @@ router.post(
 
       const { docs, failures } = await extractDocumentsSeparatelyLenient(files);
       if (timedOut || res.headersSent) return;
+      // #region agent log
+      try {
+        const fsLog = require("fs");
+        const pathLog = require("path");
+        fsLog.appendFileSync(
+          pathLog.join(__dirname, "..", "..", "debug-c88187.log"),
+          `${JSON.stringify({
+            sessionId: "c88187",
+            runId: "pptx-debug",
+            hypothesisId: "H4",
+            location: "assessmentAiRoute.js:classify-document",
+            message: "classify extract outcome",
+            data: {
+              uploadCount: files.length,
+              names: files.map((f) => f.originalname || ""),
+              mimes: files.map((f) => f.mimetype || ""),
+              sizes: files.map((f) => f.size ?? f.buffer?.length ?? 0),
+              docs: docs.map((d) => ({
+                name: d.name,
+                textLen: String(d.text || "").length,
+              })),
+              failures,
+            },
+            timestamp: Date.now(),
+          })}\n`
+        );
+      } catch {
+        // ignore debug log failures
+      }
+      // #endregion
       if (!docs.length) {
         const detail = failures
           .map((item) => `${item.name}: ${item.error}`)

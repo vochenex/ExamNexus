@@ -175,6 +175,10 @@ export default function AssessmentAiGenerator({
     setDocumentAnalysis(null);
     setPanelError("");
     setPanelNotice("");
+    // New / changed files should not keep the previous run's generation choices.
+    setQuestionCount("");
+    setDifficulty("medium");
+    setSelectedFormats([]);
   }, [files]);
 
   const promptHints = useMemo(() => {
@@ -237,6 +241,24 @@ export default function AssessmentAiGenerator({
     const accepted = incoming.filter((file) => Number(file.size) <= MAX_UPLOAD_BYTES);
     if (!accepted.length) return;
 
+    // New upload → hide any leftover completed progress bar.
+    onProgress?.(null);
+    // #region agent log
+    fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
+      body: JSON.stringify({
+        sessionId: "c88187",
+        runId: "ux-progress",
+        hypothesisId: "H1",
+        location: "AssessmentAiGenerator.jsx:addFiles",
+        message: "cleared progress on file add",
+        data: { acceptedCount: accepted.length },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     setFiles((prev) => {
       const next = [...prev];
       for (const file of accepted) {
@@ -258,12 +280,30 @@ export default function AssessmentAiGenerator({
     setFiles((prev) => prev.filter((_, i) => i !== index));
     setDocumentAnalysis(null);
     clearPanelMessages();
+    onProgress?.(null);
   };
 
   const runGeneration = async (generator, startOptions = undefined) => {
     if (disabled || loading || inFlightRef.current) return;
     inFlightRef.current = true;
     setLoading(true);
+    // Drop any leftover 100% "done" bar before status/auth work starts.
+    onProgress?.(null);
+    // #region agent log
+    fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
+      body: JSON.stringify({
+        sessionId: "c88187",
+        runId: "ux-progress",
+        hypothesisId: "H1",
+        location: "AssessmentAiGenerator.jsx:runGeneration",
+        message: "cleared progress at generation start",
+        data: {},
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -314,6 +354,26 @@ export default function AssessmentAiGenerator({
         return;
       }
       const message = normalizeErrorMessage(error);
+      // #region agent log
+      fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
+        body: JSON.stringify({
+          sessionId: "c88187",
+          runId: "pptx-debug",
+          hypothesisId: "H5",
+          location: "AssessmentAiGenerator.jsx:runGeneration:catch",
+          message: "generation/classify error",
+          data: {
+            err: String(message || "").slice(0, 240),
+            fileNames: files.map((f) => String(f?.name || "").slice(0, 60)),
+            fileTypes: files.map((f) => String(f?.type || "").slice(0, 80)),
+            fileSizes: files.map((f) => Number(f?.size) || 0),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       if (message) {
         reportError(message);
         onError?.(message);
@@ -385,11 +445,55 @@ export default function AssessmentAiGenerator({
       }
 
       runGeneration(
-        ({ onProgress, onQuestionGenerated, signal }) =>
-          generateAssessmentFromDocument({
+        ({ onProgress, onQuestionGenerated, signal }) => {
+          const mergedSource =
+            mergeClassificationSourceText(documentAnalysis) || undefined;
+          // #region agent log
+          fetch("/__agent_debug_log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: "c88187",
+              runId: "pre-fix",
+              hypothesisId: "B",
+              location: "AssessmentAiGenerator.jsx:sourceGenerate",
+              message: "phase2 source generate click",
+              data: {
+                mergedSourceLen: String(mergedSource || "").length,
+                hasAnalysis: Boolean(documentAnalysis),
+                hasDocuments: Array.isArray(documentAnalysis?.documents),
+                questionCount: resolvedQuestionCount,
+                formats: selectedFormats,
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "c88187",
+            },
+            body: JSON.stringify({
+              sessionId: "c88187",
+              runId: "pre-fix",
+              hypothesisId: "B",
+              location: "AssessmentAiGenerator.jsx:sourceGenerate",
+              message: "phase2 source generate click",
+              data: {
+                mergedSourceLen: String(mergedSource || "").length,
+                hasAnalysis: Boolean(documentAnalysis),
+                hasDocuments: Array.isArray(documentAnalysis?.documents),
+                questionCount: resolvedQuestionCount,
+                formats: selectedFormats,
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+          return generateAssessmentFromDocument({
             files: sourceFiles,
-            sourceText:
-              mergeClassificationSourceText(documentAnalysis) || undefined,
+            sourceText: mergedSource,
             questionCount: resolvedQuestionCount,
             difficulty,
             formats: selectedFormats,
@@ -420,7 +524,8 @@ export default function AssessmentAiGenerator({
                   ? "Source questions added below the questionnaire items."
                   : ""),
             };
-          }),
+          });
+        },
         // Always append after a mixed questionnaire pass so we never wipe those items.
         waitingForSourceGenerate || documentAnalysis?.mixed
           ? { preferredMode: "append" }
@@ -659,9 +764,9 @@ export default function AssessmentAiGenerator({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3">
+      <div className="flex min-w-0 items-start gap-3">
         <div
-          className={`rounded-xl p-2 ${
+          className={`shrink-0 rounded-xl p-2 ${
             theme === "dark" ? "bg-emerald-500/10" : "bg-emerald-50"
           }`}
         >
@@ -671,11 +776,11 @@ export default function AssessmentAiGenerator({
             <Wand2 className="text-emerald-400" size={20} />
           )}
         </div>
-        <div>
-          <h2 className="font-semibold">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold break-words">
             {mode === "document" ? "Generate from document" : "Generate from prompt"}
           </h2>
-          <p className={`mt-1 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+          <p className={`mt-1 text-sm break-words ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
             {mode === "document"
               ? "Upload one or more PDF, Word, or PowerPoint files. Each file is classified separately. Mixed questionnaire + source uploads convert questionnaires first, then let you generate from source files with options."
               : "Describe what you want assessed. If you name formats in the prompt (e.g. essay, MCQ), those override the checkboxes."}
@@ -692,7 +797,7 @@ export default function AssessmentAiGenerator({
           }`}
         >
           {aiReady.error ||
-            "AI is not ready. Add GEMINI_API_KEY (documents) and GROQ_API_KEY (prompts) to backend/.env, then restart the backend."}
+            "AI is not ready. Review API Key"}
         </div>
       )}
 
@@ -706,15 +811,6 @@ export default function AssessmentAiGenerator({
         >
           {aiReady.error}
         </div>
-      )}
-
-      {aiReady?.configured && !aiReady.error && (
-        <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-          Prompts: {aiReady.promptProvider || "gemini"} · {aiReady.promptModel || aiReady.model || "—"}
-          {" · "}
-          Documents: {aiReady.documentProvider || "gemini"} ·{" "}
-          {aiReady.documentModel || aiReady.model || "gemini-2.5-flash"}
-        </p>
       )}
 
       {(panelError || panelNotice) && (

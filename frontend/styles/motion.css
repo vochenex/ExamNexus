@@ -244,7 +244,7 @@ html.light .en-success-check {
 }
 
 .en-page-route {
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 
 .en-page-route.en-route-enter-active {
@@ -382,22 +382,21 @@ html.light .en-static-panel:hover {
     border-color 0.2s ease,
     color 0.2s ease,
     box-shadow 0.2s ease,
-    padding 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    gap 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    justify-content 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    padding 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    gap 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    justify-content 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Collapsible desktop sidebar */
+/* Collapsible desktop sidebar — same 650ms ease as CollapsiblePanel / dropdowns */
 .en-sidebar-shell {
   overflow: hidden;
   transition:
-    width 0.75s cubic-bezier(0.22, 1, 0.36, 1),
-    padding 0.75s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: width;
+    width 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-panel {
-  transition: padding 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: padding 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-label {
@@ -408,41 +407,53 @@ html.light .en-static-panel:hover {
   opacity: 1;
   transform: translateX(0);
   transition:
-    max-width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.45s ease 0.08s,
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    max-width 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.12s,
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-label.is-collapsed {
   max-width: 0;
   opacity: 0;
-  transform: translateX(-8px);
+  transform: translateX(-10px);
   pointer-events: none;
   transition:
-    max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.28s ease,
-    transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-section-title {
   overflow: hidden;
   max-height: 1.5rem;
   opacity: 1;
+  transform: translateY(0);
   transition:
     max-height 0.65s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.4s ease 0.06s,
-    margin 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.1s,
+    margin 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .en-sidebar-section-title.is-collapsed {
   max-height: 0;
   opacity: 0;
   margin-bottom: 0;
+  transform: translateY(-4px);
   pointer-events: none;
   transition:
-    max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.25s ease,
-    margin 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    margin 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.en-sidebar-collapse-chevron {
+  transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.en-sidebar-collapse-chevron.is-collapsed {
+  transform: rotate(180deg);
 }
 
 .en-nav-item:hover {
@@ -926,8 +937,13 @@ html.light .en-comment-input-pulse {
   .en-sidebar-panel,
   .en-sidebar-label,
   .en-sidebar-section-title,
+  .en-sidebar-collapse-chevron,
   .en-nav-item {
     transition: none !important;
+  }
+
+  .en-sidebar-collapse-chevron.is-collapsed {
+    transform: none !important;
   }
 
   .en-interactive-card:hover,

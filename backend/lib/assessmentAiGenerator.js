@@ -6,6 +6,7 @@ const {
   getAiServiceStatus,
 } = require("./aiProvider");
 const { planDocumentSteps } = require("./documentBlocks");
+const { repairMissingSpaces } = require("./textSpacing");
 
 const VALID_TYPES = new Set([
   "multiple_choice",
@@ -358,7 +359,7 @@ function normalizeTrueFalseAnswer(value) {
 }
 
 function trimField(value, max = 2000) {
-  return String(value || "").trim().slice(0, max);
+  return repairMissingSpaces(String(value || "")).slice(0, max);
 }
 
 function extractQuestionText(raw) {
@@ -540,7 +541,8 @@ function buildCompactSystemPrompt(format, difficulty) {
 Preferred flat shape example:
 ${examples[format] || examples.multiple_choice}
 You may also wrap it as {"question":{...},"suggestedTitle":"...","suggestedDescription":"..."}.
-Use "question" for the stem text (not "text"). Include "answer" for auto-graded types. Choices must be plain text without A/B/C/D prefixes.`;
+Use "question" for the stem text (not "text"). Include "answer" for auto-graded types. Choices must be plain text without A/B/C/D prefixes.
+CRITICAL: Use normal English spacing between every word. Never concatenate words (wrong: "WhatICTsectoris"; correct: "What ICT sector is").`;
 }
 
 function buildCompactUserPrompt({
@@ -836,6 +838,7 @@ Rules:
 - essay: no answer field required.
 - Questions must be clear, classroom-appropriate, and aligned with the ${mode} content.
 - Difficulty target: ${difficulty}.
+- Write normal English with a space between every word. Never glue words together (wrong: "WhatICTsectorisresponsible"; correct: "What ICT sector is responsible").
 - Every question must be unique. Do not repeat the same stem or near-paraphrase.
 - Prefer distinct concepts across the set; never create copy-paste variations of the same question.
 JSON shape:
@@ -912,6 +915,7 @@ Rules:
 - identification: provide a single correct "answer" string.
 - true_false: answer must be "true" or "false".
 - essay: no answer field required.
+- Preserve readable spacing in every question and choice. If the source text is missing spaces, restore normal English word spaces (never output glued stems like "WhatICTsectoris").
 
 JSON shape:
 {
@@ -957,6 +961,7 @@ Rules:
 - true_false: answer must be "true" or "false".
 - essay: no answer field required.
 - Ground every question in the source material (topics, stories, reports, slides).
+- Write normal English with a space between every word. Never glue words together (wrong: "WhatICTsectoris"; correct: "What ICT sector is").
 
 JSON shape:
 {
@@ -1065,19 +1070,8 @@ function heuristicClassifyDocument(text, name = "") {
     };
   }
 
-  if (score >= 3) {
-    return {
-      documentKind: score >= 4 ? "questionnaire" : "study_material",
-      isQuestionnaire: score >= 4,
-      summary: score >= 4
-        ? "Likely a questionnaire based on question patterns."
-        : "Mixed study content; not clearly a ready-made questionnaire.",
-      suggestedTitle: title,
-      confidence: "medium",
-      mode: "heuristic",
-    };
-  }
-
+  // Prefer slide-deck handling for .pptx before medium "maybe quiz" scores —
+  // saves a Gemini classify call (often the free-tier quota bottleneck).
   if (slideLike) {
     return {
       documentKind: "presentation",
@@ -1087,6 +1081,19 @@ function heuristicClassifyDocument(text, name = "") {
         : "Slide-style outline or presentation notes.",
       suggestedTitle: title,
       confidence: isPptx ? "high" : "medium",
+      mode: "heuristic",
+    };
+  }
+
+  if (score >= 3) {
+    return {
+      documentKind: score >= 4 ? "questionnaire" : "study_material",
+      isQuestionnaire: score >= 4,
+      summary: score >= 4
+        ? "Likely a questionnaire based on question patterns."
+        : "Mixed study content; not clearly a ready-made questionnaire.",
+      suggestedTitle: title,
+      confidence: "medium",
       mode: "heuristic",
     };
   }
@@ -1210,7 +1217,9 @@ async function classifyDocumentsBatch(docs) {
   }
 
   const only = heuristicRows[0];
-  if (only.heuristic.confidence === "high") {
+  // Never spend Gemini quota classifying PowerPoint — heuristic is enough.
+  const onlyName = String(only.doc.name || "").toLowerCase();
+  if (onlyName.endsWith(".pptx") || only.heuristic.confidence === "high") {
     return [byIndex.get(only.doc.index)];
   }
 

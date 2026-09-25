@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const mammoth = require("mammoth");
 const JSZip = require("jszip");
+const { repairMissingSpaces, looksMissingSpaces } = require("./textSpacing");
 
 const MAX_EXTRACT_CHARS = 50000;
 const MAX_EXTRACT_CHARS_VERCEL = 18000;
@@ -92,18 +93,50 @@ async function extractDocxText(file) {
   return String(result?.value || "").trim();
 }
 
-function stripXmlTags(xml) {
-  return String(xml || "")
-    .replace(/<a:t[^>]*>/gi, "")
-    .replace(/<\/a:t>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+function decodeXmlEntities(text) {
+  return String(text || "")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const n = Number(code);
+      return Number.isFinite(n) ? String.fromCharCode(n) : "";
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
+      const n = Number.parseInt(hex, 16);
+      return Number.isFinite(n) ? String.fromCharCode(n) : "";
+    })
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function stripXmlTags(xml) {
+  return decodeXmlEntities(
+    String(xml || "")
+      .replace(/<(?:[A-Za-z0-9._-]+:)?t(?:\s[^>]*)?>/gi, "")
+      .replace(/<\/(?:[A-Za-z0-9._-]+:)?t>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+  );
+}
+
+function extractTextNodesFromXml(xml) {
+  const source = String(xml || "");
+  const parts = [];
+  // Prefer explicit DrawingML / shared text nodes (handles xml:space and prefixes).
+  const nodeRe =
+    /<(?:[A-Za-z0-9._-]+:)?t(?:\s[^>]*)?>([\s\S]*?)<\/(?:[A-Za-z0-9._-]+:)?t>/gi;
+  let match;
+  while ((match = nodeRe.exec(source)) !== null) {
+    const text = decodeXmlEntities(match[1] || "");
+    if (text) parts.push(text);
+  }
+  if (parts.length) {
+    return parts.join(" ").replace(/\s+/g, " ").trim();
+  }
+  // Fallback for unusual packs: strip all tags from the part.
+  return stripXmlTags(source);
 }
 
 async function extractPptxText(file) {
@@ -113,32 +146,90 @@ async function extractPptxText(file) {
   }
 
   const zip = await JSZip.loadAsync(buffer);
-  const slideNames = Object.keys(zip.files)
-    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
+  const xmlNames = Object.keys(zip.files)
+    .filter((name) => {
+      const lower = name.toLowerCase();
+      return (
+        /^ppt\/slides\/slide\d+\.xml$/i.test(name) ||
+        /^ppt\/notesSlides\/notesSlide\d+\.xml$/i.test(name) ||
+        /^ppt\/charts\/chart\d+\.xml$/i.test(name) ||
+        /^ppt\/diagrams\/data\d+\.xml$/i.test(name) ||
+        // Some exporters nest slide XML under alternate folders.
+        (lower.endsWith(".xml") &&
+          lower.includes("ppt/") &&
+          (lower.includes("/slides/") || lower.includes("/notesslides/")))
+      );
+    })
     .sort((a, b) => {
-      const numA = Number.parseInt(a.match(/slide(\d+)/i)?.[1] || "0", 10);
-      const numB = Number.parseInt(b.match(/slide(\d+)/i)?.[1] || "0", 10);
-      return numA - numB;
+      const numA = Number.parseInt(a.match(/(\d+)/)?.[1] || "0", 10);
+      const numB = Number.parseInt(b.match(/(\d+)/)?.[1] || "0", 10);
+      if (numA !== numB) return numA - numB;
+      return a.localeCompare(b);
     });
 
   const parts = [];
-  for (const name of slideNames) {
-    const xml = await zip.files[name].async("string");
-    const text = stripXmlTags(xml);
-    if (text) {
-      parts.push(text);
-    }
+  for (const name of xmlNames) {
+    const entry = zip.files[name];
+    if (!entry || entry.dir) continue;
+    const xml = await entry.async("string");
+    const text = extractTextNodesFromXml(xml);
+    if (text) parts.push(text);
   }
 
-  return parts.join("\n\n").trim();
+  const joined = parts.join("\n\n").trim();
+
+  // #region agent log
+  try {
+    const fsLog = require("fs");
+    const logPath = require("path").join(
+      __dirname,
+      "..",
+      "..",
+      "debug-c88187.log"
+    );
+    fsLog.appendFileSync(
+      logPath,
+      `${JSON.stringify({
+        sessionId: "c88187",
+        runId: "pptx-debug",
+        hypothesisId: "H4",
+        location: "documentExtractor.js:extractPptxText",
+        message: "pptx extract result",
+        data: {
+          name: file?.originalname || "",
+          mime: file?.mimetype || "",
+          bytes: buffer.length,
+          xmlParts: xmlNames.length,
+          sampleParts: xmlNames.slice(0, 8),
+          textLen: joined.length,
+          preview: joined.slice(0, 120),
+        },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    // ignore debug log failures
+  }
+  // #endregion
+
+  return joined;
 }
 
 function normalizeExtractedText(text) {
-  return String(text || "")
+  let normalized = String(text || "")
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, getMaxExtractChars());
+    .trim();
+
+  // OCR / PDF extraction sometimes drops spaces between words.
+  if (looksMissingSpaces(normalized.replace(/\n/g, " "))) {
+    normalized = normalized
+      .split("\n")
+      .map((line) => (looksMissingSpaces(line) ? repairMissingSpaces(line) : line))
+      .join("\n");
+  }
+
+  return normalized.slice(0, getMaxExtractChars());
 }
 
 async function extractDocumentText(file) {
@@ -153,6 +244,12 @@ async function extractDocumentText(file) {
   }
 
   const ext = getFileExtension(file);
+  if (ext === ".ppt") {
+    throw new Error(
+      "Older .ppt files are not supported. Open the file in PowerPoint and Save As .pptx, then upload again."
+    );
+  }
+
   const hosted = isVercelRuntime();
   const run = async () => {
     let rawText = "";
@@ -163,9 +260,17 @@ async function extractDocumentText(file) {
     } else if (
       ext === ".pptx" ||
       file.mimetype ===
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+      (file.mimetype === "application/vnd.ms-powerpoint" && ext === ".pptx")
     ) {
       rawText = await extractPptxText(file);
+    } else if (
+      file.mimetype === "application/vnd.ms-powerpoint" ||
+      ext === ".ppt"
+    ) {
+      throw new Error(
+        "Older .ppt files are not supported. Open the file in PowerPoint and Save As .pptx, then upload again."
+      );
     } else {
       rawText = await extractDocxText(file);
     }
@@ -174,7 +279,9 @@ async function extractDocumentText(file) {
 
     if (text.length < MIN_EXTRACT_CHARS) {
       throw new Error(
-        "Could not extract enough readable text from this file. Try a text-based PDF, .docx, or .pptx file."
+        ext === ".pptx"
+          ? "This PowerPoint has almost no extractable text (often image-only slides). Add real text on the slides, or export as .pdf/.docx with selectable text."
+          : "Could not extract enough readable text from this file. Try a text-based PDF, .docx, or .pptx file."
       );
     }
 

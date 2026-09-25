@@ -173,7 +173,7 @@ export default function DashboardLayout() {
             }`}
           >
             <div
-              className={`flex items-center transition-[gap,justify-content] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              className={`flex items-center transition-[gap,justify-content] duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
                 collapsed ? "justify-center gap-0" : "gap-3"
               }`}
             >
@@ -195,7 +195,7 @@ export default function DashboardLayout() {
 
           {/* Navigation */}
           <nav
-            className={`mt-4 flex-1 space-y-5 overflow-y-auto en-scroll-region transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`mt-4 flex-1 space-y-5 overflow-y-auto en-scroll-region transition-[padding] duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
               collapsed ? "px-0" : "pr-1"
             }`}
           >
@@ -280,7 +280,7 @@ export default function DashboardLayout() {
               }`}
             >
               <div
-                className={`mb-3 flex items-center transition-[gap,justify-content] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                className={`mb-3 flex items-center transition-[gap,justify-content] duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
                   collapsed ? "justify-center gap-0" : "gap-3"
                 }`}
                 title={collapsed ? `${displayName} · ${user.role || "User"}` : undefined}
@@ -312,7 +312,7 @@ export default function DashboardLayout() {
                 onClick={handleLogout}
                 title="Logout"
                 aria-label="Logout"
-                className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
                   collapsed ? "h-9 w-full" : "w-full px-4 py-2.5"
                 } ${
                   theme === "dark"

@@ -67,7 +67,10 @@ export default function CreateAssessment() {
 
   useLayoutEffect(() => {
     const scrollToTop = () => {
-      const mainScroller = document.querySelector("main.en-scroll-region");
+      const mainScroller =
+        document.querySelector("main > .en-scroll-region") ||
+        document.querySelector("main .en-scroll-region") ||
+        document.querySelector("main.en-scroll-region");
       if (mainScroller) mainScroller.scrollTop = 0;
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
       document.documentElement.scrollTop = 0;
@@ -102,6 +105,7 @@ export default function CreateAssessment() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiProgress, setAiProgress] = useState(null);
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
+  const [questionCollapseToken, setQuestionCollapseToken] = useState(0);
   const applyAiExamDetailsRef = useRef(false);
   const aiReplaceSnapshotRef = useRef(null);
   const aiMergeModeRef = useRef("replace");
@@ -381,13 +385,12 @@ export default function CreateAssessment() {
 
     aiReplaceSnapshotRef.current = null;
 
-    setAiProgress((prev) => ({
-      ...(prev || {}),
-      status: "done",
-      percent: 100,
-      current: mappedQuestions.length,
-      total: mappedQuestions.length,
-    }));
+    // Top toast is the success confirmation — clear inline progress (no done chip).
+    setAiProgress(null);
+    setQuestionCollapseToken((token) => token + 1);
+    showSuccess(
+      `${mappedQuestions.length} question${mappedQuestions.length === 1 ? "" : "s"} ready to review.`
+    );
 
     setExam((prev) => {
       const nextType = resolveExamTypeFromMapped(mappedQuestions);
@@ -423,11 +426,35 @@ export default function CreateAssessment() {
   const showQuestionPanel =
     creationMode === "manual" || questions.length > 0;
 
-  const showAiProgress = aiGenerating || aiProgress?.status === "done";
+  const showAiProgress = Boolean(aiProgress) && aiGenerating;
+
+  // #region agent log
+  useEffect(() => {
+    fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
+      body: JSON.stringify({
+        sessionId: "c88187",
+        runId: "ux-progress",
+        hypothesisId: "H1",
+        location: "CreateAssessmentPage.jsx:showAiProgress",
+        message: "progress visibility",
+        data: {
+          showAiProgress,
+          aiGenerating,
+          status: aiProgress?.status || null,
+          percent: aiProgress?.percent ?? null,
+          phase: aiProgress?.phase || null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }, [showAiProgress, aiGenerating, aiProgress?.status, aiProgress?.percent, aiProgress?.phase]);
+  // #endregion
   const errorFeedbackRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
   const aiResultsRef = useScrollIntoViewWhen(
-    aiProgress?.status === "done" && questions.length > 0,
-    { deps: [aiProgress?.status, questions.length] }
+    !aiGenerating && questions.length > 0 && questionCollapseToken > 0,
+    { deps: [aiGenerating, questions.length, questionCollapseToken] }
   );
 
   const handlePublish = async () => {
@@ -573,7 +600,12 @@ export default function CreateAssessment() {
           ))}
         </div>
         {selectedSubject && (
-          <p className={`mt-2 text-sm font-medium ${theme === "dark" ? "text-emerald-300" : "text-teal-800"}`}>
+          <p
+            className={`mt-2 min-w-0 break-words text-sm font-medium ${
+              theme === "dark" ? "text-emerald-300" : "text-teal-800"
+            }`}
+            title={selectedSubject.name}
+          >
             Subject: {selectedSubject.name}
           </p>
         )}
@@ -644,7 +676,7 @@ export default function CreateAssessment() {
             />
           </div>
 
-          <div className={`${assessmentPanelClass(theme)} min-h-[420px] overflow-hidden xl:col-span-6`}>
+          <div className={`${assessmentPanelClass(theme)} min-h-0 overflow-hidden xl:col-span-6 xl:min-h-[420px]`}>
             <div key={creationMode} className="en-creation-mode-enter">
             {creationMode !== "manual" && (
               <div className={showQuestionPanel ? "mb-6" : ""}>
@@ -659,7 +691,7 @@ export default function CreateAssessment() {
                   onClearError={clearAiError}
                 />
                 {showAiProgress && (
-                  <div ref={aiResultsRef} className="mt-6">
+                  <div className="mt-6">
                     <AiGenerationProgress
                       progress={aiProgress}
                       questionCount={questions.length}
@@ -670,12 +702,14 @@ export default function CreateAssessment() {
               </div>
             )}
 
-            {showQuestionPanel && (
-              <QuestionSectionsPanel
+            {showQuestionPanel ? (
+              <div ref={aiResultsRef}>
+                <QuestionSectionsPanel
                   questionSections={questionSections}
                   activeSectionId={activeSectionId}
                   questions={questions}
                   fieldErrorsByIndex={fieldErrorsByIndex}
+                  collapseAllToken={questionCollapseToken}
                   onAddQuestionToSection={handleAddQuestionToSection}
                   onUpdateQuestion={(index, field, value) =>
                     updateQuestion(index, field, value, clearQuestionFeedback)
@@ -712,8 +746,9 @@ export default function CreateAssessment() {
                   onSaveQuestionToBank={handleSaveQuestionToBank}
                   savingToBankId={savingToBankId}
                   onImportFromBank={() => setBankPickerOpen(true)}
-              />
-            )}
+                />
+              </div>
+            ) : null}
             </div>
           </div>
 

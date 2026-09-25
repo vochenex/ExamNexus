@@ -33,14 +33,25 @@ export default function QuestionSectionsPanel({
   onSaveQuestionToBank,
   savingToBankId = null,
   onImportFromBank,
+  /** Bump after AI generation completes to collapse all format sections + questions. */
+  collapseAllToken = 0,
 }) {
   const { theme } = useTheme();
   const [expandedSections, setExpandedSections] = useState(() => new Set());
   const [expandedQuestions, setExpandedQuestions] = useState(() => new Set());
   const scrollTargetRef = useRef(null);
   const previousQuestionCountRef = useRef(0);
+  const suppressAutoExpandRef = useRef(false);
 
   useEffect(() => {
+    if (!collapseAllToken) return;
+    suppressAutoExpandRef.current = true;
+    setExpandedSections(new Set());
+    setExpandedQuestions(new Set());
+  }, [collapseAllToken]);
+
+  useEffect(() => {
+    if (suppressAutoExpandRef.current) return;
     setExpandedSections((prev) => {
       const next = new Set(prev);
       questionSections.forEach((section) => {
@@ -57,6 +68,10 @@ export default function QuestionSectionsPanel({
 
   useEffect(() => {
     if (questions.length === 0) return;
+    if (suppressAutoExpandRef.current) {
+      previousQuestionCountRef.current = questions.length;
+      return;
+    }
 
     if (questions.length > previousQuestionCountRef.current) {
       const lastQuestion = questions[questions.length - 1];
@@ -76,6 +91,7 @@ export default function QuestionSectionsPanel({
 
   useEffect(() => {
     if (questions.length === 0) return;
+    if (suppressAutoExpandRef.current) return;
 
     setExpandedQuestions((prev) => {
       if (prev.size > 0) return prev;
@@ -100,6 +116,7 @@ export default function QuestionSectionsPanel({
 
     if (invalidIndexes.length === 0) return;
 
+    suppressAutoExpandRef.current = false;
     setExpandedSections((prev) => {
       const next = new Set(prev);
       invalidIndexes.forEach((globalIndex) => {
@@ -130,6 +147,7 @@ export default function QuestionSectionsPanel({
   }, [fieldErrorsByIndex, questions]);
 
   const toggleSection = (sectionId) => {
+    suppressAutoExpandRef.current = false;
     setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(sectionId)) {
@@ -143,6 +161,7 @@ export default function QuestionSectionsPanel({
   };
 
   const toggleQuestion = (key) => {
+    suppressAutoExpandRef.current = false;
     setExpandedQuestions((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
@@ -155,6 +174,7 @@ export default function QuestionSectionsPanel({
   };
 
   const handleAddQuestion = (sectionId) => {
+    suppressAutoExpandRef.current = false;
     onSelectSection(sectionId);
     setExpandedSections((prev) => new Set(prev).add(sectionId));
 
@@ -172,7 +192,18 @@ export default function QuestionSectionsPanel({
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-semibold">Questions ({questions.length})</h2>
+        <div>
+          <p
+            className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${
+              theme === "dark" ? "text-emerald-400/80" : "text-teal-700/80"
+            }`}
+          >
+            Question hierarchy
+          </p>
+          <h2 className="mt-0.5 font-semibold">
+            Formats → Questions ({questions.length})
+          </h2>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {onImportFromBank && (
             <button
@@ -234,8 +265,8 @@ export default function QuestionSectionsPanel({
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {questionSections.map((section) => {
+        <div className="space-y-5">
+          {questionSections.map((section, sectionOrder) => {
             const sectionQuestions = questions.filter(
               (question) => question.sectionId === section.id
             );
@@ -246,19 +277,21 @@ export default function QuestionSectionsPanel({
             return (
               <div
                 key={section.id}
-                className={`rounded-2xl border overflow-hidden ${
+                className={`overflow-hidden rounded-2xl border-2 shadow-sm ${
                   isActive
                     ? theme === "dark"
-                      ? "border-emerald-500/30 bg-emerald-500/5"
-                      : "border-emerald-300 bg-emerald-50/40"
+                      ? "border-emerald-400/45 bg-emerald-500/10"
+                      : "border-teal-400/70 bg-emerald-50/70"
                     : theme === "dark"
-                      ? "border-white/10 bg-black/10"
-                      : "border-emerald-100 en-bg-elevated"
+                      ? "border-emerald-500/20 bg-[#071614]/80"
+                      : "border-emerald-200 bg-white"
                 }`}
               >
                 <div
-                  className={`flex items-center gap-2 px-4 py-3 ${
-                    theme === "dark" ? "border-white/10" : "border-emerald-100"
+                  className={`flex items-center gap-2 border-b px-4 py-3.5 ${
+                    theme === "dark"
+                      ? "border-emerald-500/15 bg-emerald-500/10"
+                      : "border-emerald-100 bg-gradient-to-r from-emerald-50 to-teal-50/80"
                   }`}
                 >
                   <button
@@ -266,6 +299,15 @@ export default function QuestionSectionsPanel({
                     onClick={() => toggleSection(section.id)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                   >
+                    <span
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                        theme === "dark"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-teal-700 text-white"
+                      }`}
+                    >
+                      {sectionOrder + 1}
+                    </span>
                     {isExpanded ? (
                       <ChevronUp
                         size={18}
@@ -278,20 +320,28 @@ export default function QuestionSectionsPanel({
                       />
                     )}
                     <div className="min-w-0">
+                      <p
+                        className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                          theme === "dark" ? "text-emerald-400/70" : "text-teal-700/70"
+                        }`}
+                      >
+                        Format section
+                      </p>
                       <h3
-                        className={`text-sm font-semibold ${
-                          theme === "dark" ? "text-emerald-300" : "text-teal-800"
+                        className={`text-base font-bold ${
+                          theme === "dark" ? "text-emerald-200" : "text-teal-900"
                         }`}
                       >
                         {getFormatLabel(section.type)}
                       </h3>
                       <p
-                        className={`text-xs mt-0.5 ${
+                        className={`mt-0.5 text-xs ${
                           theme === "dark" ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
                         {sectionQuestions.length} question
                         {sectionQuestions.length === 1 ? "" : "s"}
+                        {isExpanded ? "" : " · collapsed"}
                         {isActive ? " · active" : ""}
                       </p>
                     </div>
@@ -312,7 +362,20 @@ export default function QuestionSectionsPanel({
                 </div>
 
                 {isExpanded && (
-                  <div className="space-y-3 border-t px-4 py-4 border-inherit">
+                  <div
+                    className={`space-y-2 border-l-4 py-3 pl-3 pr-3 sm:pl-4 ${
+                      theme === "dark"
+                        ? "border-emerald-500/35 bg-black/20"
+                        : "border-teal-300/80 bg-emerald-50/30"
+                    }`}
+                  >
+                    <p
+                      className={`px-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                        theme === "dark" ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      Questions in this format
+                    </p>
                     {sectionQuestions.length === 0 && (
                       <p
                         className={`rounded-xl border border-dashed p-4 text-sm text-center ${
@@ -331,9 +394,7 @@ export default function QuestionSectionsPanel({
                       const questionFieldErrors = fieldErrorsByIndex[globalIndex] || [];
                       const hasFieldErrors = questionFieldErrors.length > 0;
                       const isQuestionExpanded =
-                        hasFieldErrors ||
-                        expandedQuestions.has(questionKey) ||
-                        (sectionQuestions.length === 1 && expandedQuestions.size === 0);
+                        hasFieldErrors || expandedQuestions.has(questionKey);
 
                       const shouldScroll = hasFieldErrors;
                       const showAlternatives =
@@ -345,10 +406,10 @@ export default function QuestionSectionsPanel({
                         <div
                           key={question.id || questionKey}
                           ref={shouldScroll ? scrollTargetRef : null}
-                          className={`rounded-xl border ${
+                          className={`ml-1 rounded-xl border sm:ml-2 ${
                             theme === "dark"
-                              ? "border-white/10 bg-black/20"
-                              : "border-emerald-100 en-bg-elevated"
+                              ? "border-white/10 bg-[#0a1211]"
+                              : "border-emerald-100 bg-white shadow-sm"
                           }`}
                         >
                           {!isQuestionExpanded ? (
@@ -361,8 +422,10 @@ export default function QuestionSectionsPanel({
                             >
                               <span className="min-w-0 truncate text-sm">
                                 <span
-                                  className={`mr-2 font-semibold ${
-                                    theme === "dark" ? "text-emerald-400" : "text-teal-700"
+                                  className={`mr-2 inline-flex rounded-md px-1.5 py-0.5 text-[11px] font-bold ${
+                                    theme === "dark"
+                                      ? "bg-emerald-500/15 text-emerald-300"
+                                      : "bg-teal-100 text-teal-800"
                                   }`}
                                 >
                                   Q{localIndex + 1}
@@ -377,10 +440,10 @@ export default function QuestionSectionsPanel({
                                 type="button"
                                 onClick={() => toggleQuestion(questionKey)}
                                 className={`mb-1 flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium ${
-                                  theme === "dark" ? "text-gray-400" : "text-gray-500"
+                                  theme === "dark" ? "text-emerald-300" : "text-teal-800"
                                 }`}
                               >
-                                Collapse question
+                                <span>Collapse Q{localIndex + 1}</span>
                                 <ChevronUp size={14} />
                               </button>
                               <QuestionBuilderCard

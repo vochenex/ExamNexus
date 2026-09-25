@@ -299,12 +299,37 @@ html.light.en-mobile-shell .en-signup-column:not(:last-child) {
 /* Dashboard shell / header                                                   */
 /* -------------------------------------------------------------------------- */
 
-:is(html.en-native-app, html.en-mobile-shell) main.en-has-tabbar {
-  padding: 0 !important;
+:is(html.en-native-app, html.en-mobile-shell) main.en-has-tabbar,
+:is(html.en-native-app, html.en-mobile-shell) main:has(> .en-has-tabbar),
+:is(html.en-native-app, html.en-mobile-shell) .en-scroll-region.en-has-tabbar {
   padding-bottom: calc(var(--en-tabbar-height) + var(--en-safe-bottom) + 0.75rem) !important;
   width: 100%;
   max-width: 100%;
   overflow-x: clip;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) main.en-has-tabbar {
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-scroll-edge-fab {
+  bottom: calc(var(--en-tabbar-height, 3.35rem) + var(--en-safe-bottom, 0px) + 0.85rem) !important;
+  right: max(0.75rem, env(safe-area-inset-right, 0px)) !important;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+}
+
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page h1,
+:is(html.en-native-app, html.en-mobile-shell) .en-profile-page h2 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-native-topbar {

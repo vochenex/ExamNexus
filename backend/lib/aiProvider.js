@@ -1,8 +1,8 @@
 const { Agent, fetch: undiciFetch } = require("undici");
 
-const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 // Prompt generation uses a separate key; same current Flash generation by default.
-const DEFAULT_GEMINI_PROMPT_MODEL = "gemini-3.6-flash";
+const DEFAULT_GEMINI_PROMPT_MODEL = "gemini-3.5-flash-lite";
 // llama-3.1-8b-instant / llama-3.3-70b-versatile were retired for free/developer
 // tiers on 2026-08-16. gpt-oss ids MUST include the openai/ prefix.
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
@@ -119,15 +119,16 @@ function parseQuotaRetryMs(error) {
   if (match) {
     const seconds = Number.parseFloat(match[1]);
     if (Number.isFinite(seconds) && seconds > 0) {
-      return Math.min(120000, Math.ceil(seconds * 1000) + 1000);
+      // Cap sleeps — multi-minute waits look like hard timeouts in the UI.
+      return Math.min(15000, Math.ceil(seconds * 1000) + 500);
     }
   }
-  return 62000;
+  return 4000;
 }
 
 function formatGeminiQuotaError(retryMs) {
-  const seconds = Math.max(1, Math.ceil(retryMs / 1000));
-  return `Gemini free-tier limit reached (20 requests/min). Wait about ${seconds} seconds and try again, or generate fewer questions at once.`;
+  const seconds = Math.max(1, Math.ceil((Number(retryMs) || 4000) / 1000));
+  return `Gemini API quota exceeded for this key. Wait about ${seconds}s (or longer if the daily free-tier limit is used up), then try again. Or create a fresh key at https://aistudio.google.com/apikey and put it in backend/.env as GEMINI_API_KEY / GEMINI_PROMPT_API_KEY, then restart the backend.`;
 }
 
 function getChatTimeoutMs() {
@@ -156,21 +157,37 @@ function getGeminiAgent(timeoutMs) {
   });
 }
 
+function normalizeGeminiModelId(value, fallback) {
+  const raw = String(value || "").trim() || fallback;
+  // Retired / unavailable Flash ids — force current generation.
+  if (
+    /^gemini-1\.5/i.test(raw) ||
+    /^gemini-2\.0-flash-exp$/i.test(raw) ||
+    /^gemini-2\.5-flash(-lite)?$/i.test(raw) ||
+    /^gemini-3\.6-flash$/i.test(raw)
+  ) {
+    console.warn(
+      `[assessment-ai] Model "${raw}" is retired/unavailable or quota-exhausted often; using ${fallback} instead.`
+    );
+    return fallback;
+  }
+  return raw;
+}
+
 function getGeminiModel() {
-  return (
-    String(
-      process.env.GEMINI_DOCUMENT_MODEL ||
-        process.env.GEMINI_MODEL ||
-        process.env.GEMINI_ASSESSMENT_MODEL ||
-        DEFAULT_GEMINI_MODEL
-    ).trim() || DEFAULT_GEMINI_MODEL
+  return normalizeGeminiModelId(
+    process.env.GEMINI_DOCUMENT_MODEL ||
+      process.env.GEMINI_MODEL ||
+      process.env.GEMINI_ASSESSMENT_MODEL ||
+      DEFAULT_GEMINI_MODEL,
+    DEFAULT_GEMINI_MODEL
   );
 }
 
 /** Flash model used for teacher topic/prompt generation (separate from documents). */
 function getGeminiPromptModel() {
-  return (
-    String(process.env.GEMINI_PROMPT_MODEL || DEFAULT_GEMINI_PROMPT_MODEL).trim() ||
+  return normalizeGeminiModelId(
+    process.env.GEMINI_PROMPT_MODEL || DEFAULT_GEMINI_PROMPT_MODEL,
     DEFAULT_GEMINI_PROMPT_MODEL
   );
 }
@@ -597,8 +614,10 @@ async function requestGeminiChatCompletion(
       maxOutputTokens:
         Number.parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS, 10) ||
         (isVercelRuntime() ? 4096 : 8192),
-      // Thinking burns latency on Vercel’s 60s ceiling — skip it there.
-      ...(geminiModelSupportsThinkingConfig(config.model) && !isVercelRuntime()
+      // Thinking burns latency and quota on document convert — skip it there.
+      ...(geminiModelSupportsThinkingConfig(config.model) &&
+      !isVercelRuntime() &&
+      !isDocument
         ? { thinkingConfig: { thinkingLevel: "minimal" } }
         : {}),
       ...(jsonMode ? { responseMimeType: "application/json" } : {}),
@@ -661,7 +680,9 @@ async function requestGeminiChatCompletion(
 
       if (isQuotaError(error)) {
         const waitMs = parseQuotaRetryMs(error);
-        if (attempt < getGeminiQuotaMaxAttempts() - 1) {
+        // Document analyze must fail fast. Long quota sleeps are aborted by the
+        // browser and misreported as "server timed out analyzing this document".
+        if (!isDocument && attempt < getGeminiQuotaMaxAttempts() - 1) {
           await sleep(waitMs);
           continue;
         }
@@ -674,7 +695,7 @@ async function requestGeminiChatCompletion(
       if (error?.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
         if (isModelUnavailableError(error)) {
           const wrapped = new Error(
-            `Gemini model "${config.model}" is no longer available. Set GEMINI_MODEL / GEMINI_PROMPT_MODEL to gemini-3.6-flash in backend/.env and on Vercel, then restart/redeploy.`
+            `Gemini model "${config.model}" is no longer available. Set GEMINI_MODEL / GEMINI_PROMPT_MODEL to gemini-3.5-flash-lite in backend/.env and on Vercel, then restart/redeploy.`
           );
           wrapped.statusCode = 400;
           wrapped.cause = error;
@@ -946,12 +967,63 @@ async function requestPromptChatCompletion(options) {
 }
 
 async function requestDocumentChatCompletion(options = {}) {
-  return requestChatCompletion({
-    ...options,
-    purpose: "document",
-    timeoutMs: options.timeoutMs || getDocumentTimeoutMs(),
-    isDocument: true,
-  });
+  const timeoutMs = options.timeoutMs || getDocumentTimeoutMs();
+  const prompt = getGeminiPromptRuntimeConfig();
+  const docKey = getGeminiDocumentApiKey();
+  const canFallbackPrompt =
+    Boolean(prompt) && geminiKeysAreDistinct(prompt.apiKey, docKey);
+
+  const runDocument = () =>
+    requestChatCompletion({
+      ...options,
+      purpose: "document",
+      timeoutMs,
+      isDocument: true,
+    });
+
+  const runPromptFallback = () =>
+    requestChatCompletion({
+      ...options,
+      purpose: "prompt",
+      model: getGeminiPromptModel(),
+      timeoutMs,
+      isDocument: true,
+    });
+
+  try {
+    return await runDocument();
+  } catch (error) {
+    const quotaHit =
+      isQuotaError(error) || Number(error?.statusCode) === 429;
+    if (!quotaHit) throw error;
+
+    // Prefer the other key immediately — sleeping on a burned free-tier key
+    // just multiplies 429s for PPTX/source generation.
+    if (canFallbackPrompt) {
+      console.warn(
+        "[assessment-ai] Document Gemini quota hit; falling back to prompt Gemini key."
+      );
+      try {
+        return await runPromptFallback();
+      } catch (fallbackError) {
+        const fallbackQuota =
+          isQuotaError(fallbackError) ||
+          Number(fallbackError?.statusCode) === 429;
+        if (fallbackQuota) {
+          const waitMs = Math.min(parseQuotaRetryMs(fallbackError), 8000);
+          const err = new Error(formatGeminiQuotaError(waitMs));
+          err.statusCode = 429;
+          throw err;
+        }
+        throw fallbackError;
+      }
+    }
+
+    const waitMs = Math.min(parseQuotaRetryMs(error), 8000);
+    const err = new Error(formatGeminiQuotaError(waitMs));
+    err.statusCode = 429;
+    throw err;
+  }
 }
 
 async function getAiServiceStatus() {

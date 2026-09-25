@@ -1,5 +1,6 @@
 import { createDefaultGradingOptions } from "./questionGrading";
 import { VALID_EXAM_TYPES } from "./assessmentQuestions";
+import { repairMissingSpaces } from "./textSpacing";
 
 export const AI_FORMAT_OPTIONS = [
   { value: "multiple_choice", label: "Multiple Choice" },
@@ -32,23 +33,29 @@ function normalizeLetterAnswer(value) {
 }
 
 function extractQuestionText(aiQuestion) {
-  return String(aiQuestion?.question || aiQuestion?.text || aiQuestion?.prompt || "").trim();
+  return repairMissingSpaces(
+    String(aiQuestion?.question || aiQuestion?.text || aiQuestion?.prompt || "")
+  );
 }
 
 function extractMultipleChoiceOptions(aiQuestion) {
   if (Array.isArray(aiQuestion?.choices)) {
     return aiQuestion.choices.map((item) =>
-      String(item || "")
-        .trim()
-        .replace(/^[A-D][.)]\s*/i, "")
+      repairMissingSpaces(
+        String(item || "")
+          .trim()
+          .replace(/^[A-D][.)]\s*/i, "")
+      )
     );
   }
 
   if (Array.isArray(aiQuestion?.options)) {
     return aiQuestion.options.map((item) =>
-      String(item || "")
-        .trim()
-        .replace(/^[A-D][.)]\s*/i, "")
+      repairMissingSpaces(
+        String(item || "")
+          .trim()
+          .replace(/^[A-D][.)]\s*/i, "")
+      )
     );
   }
 
@@ -57,7 +64,7 @@ function extractMultipleChoiceOptions(aiQuestion) {
     aiQuestion?.option_b,
     aiQuestion?.option_c,
     aiQuestion?.option_d,
-  ].map((item) => String(item || "").trim());
+  ].map((item) => repairMissingSpaces(String(item || "")));
 }
 
 export function mapAiQuestionToBuilder(aiQuestion) {
@@ -92,7 +99,7 @@ export function mapAiQuestionToBuilder(aiQuestion) {
 
   if (type === "enumeration") {
     const answers = (Array.isArray(aiQuestion.answers) ? aiQuestion.answers : [])
-      .map((item) => String(item || "").trim())
+      .map((item) => repairMissingSpaces(String(item || "")))
       .filter(Boolean);
 
     if (!answers.length) return null;
@@ -132,7 +139,7 @@ export function mapAiQuestionToBuilder(aiQuestion) {
     };
   }
 
-  const answer = String(aiQuestion.answer || "").trim();
+  const answer = repairMissingSpaces(String(aiQuestion.answer || ""));
   if (!answer) return null;
 
   return {

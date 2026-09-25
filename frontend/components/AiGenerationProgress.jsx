@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../layouts/ThemeContext";
 import { AI_FORMAT_OPTIONS } from "../utils/aiQuestionMapper";
@@ -7,9 +7,7 @@ function formatLabel(type) {
   return AI_FORMAT_OPTIONS.find((item) => item.value === type)?.label || type;
 }
 
-function resolvePercent(progress, isDone, isActive) {
-  if (isDone && !isActive) return 100;
-
+function resolvePercent(progress, isActive) {
   const current = Number(progress?.current);
   const total = Number(progress?.total);
   const explicit =
@@ -55,7 +53,7 @@ export default function AiGenerationProgress({
       return;
     }
 
-    const next = resolvePercent(progress, isDone, isActive);
+    const next = resolvePercent(progress, isActive);
     const current = Number(progress?.current);
     const total = Number(progress?.total);
     const hasLiveCounts =
@@ -66,8 +64,8 @@ export default function AiGenerationProgress({
       current < total;
 
     if (isDone) {
-      highestRef.current = 100;
-      setDisplayPercent(100);
+      highestRef.current = 0;
+      setDisplayPercent(0);
       return;
     }
 
@@ -82,47 +80,18 @@ export default function AiGenerationProgress({
     setDisplayPercent(monotonic);
   }, [progress, isDone, isActive]);
 
+  // Success is shown via the top toast — hide any done-state chip here.
+  if (!progress || isDone) return null;
+
   const panelClass = isLight
     ? "border-emerald-200/90 bg-gradient-to-r from-white via-emerald-50/80 to-emerald-100/90 en-panel-glow"
     : "border-emerald-500/20 bg-emerald-500/5";
 
-  if (!progress) {
-    return (
-      <div className={`rounded-xl border p-4 ${panelClass}`}>
-        <div className="flex items-center gap-3">
-          <Loader2 className="animate-spin text-emerald-500" size={18} />
-          <div>
-            <p className={`text-sm font-semibold ${isLight ? "en-text-primary" : ""}`}>
-              Starting AI generation…
-            </p>
-            <p className={`mt-0.5 text-xs ${isLight ? "en-text-muted" : "text-gray-400"}`}>
-              Preparing your request
-            </p>
-          </div>
-        </div>
-        <div
-          className={`mt-3 h-2 overflow-hidden rounded-full ${
-            isLight ? "bg-emerald-100" : "bg-white/10"
-          }`}
-        >
-          <div
-            className={`h-full w-1/5 animate-pulse rounded-full ${
-              isLight
-                ? "bg-gradient-to-r from-emerald-400 to-teal-500"
-                : "bg-gradient-to-r from-emerald-400 to-cyan-400"
-            }`}
-          />
-        </div>
-      </div>
-    );
-  }
-
   const { phase, current, total, latestType, status } = progress;
   const percent = displayPercent;
 
-  const phaseLabel = isDone
-    ? "Generation complete"
-    : status === "waiting"
+  const phaseLabel =
+    status === "waiting"
       ? phase === "reading"
         ? "AI is reading your document"
         : "AI is generating questions"
@@ -140,35 +109,28 @@ export default function AiGenerationProgress({
                   ? "Structuring questions"
                   : "Generating questions";
 
-  const stepLabel = isDone
-    ? `${questionCount} question${questionCount === 1 ? "" : "s"} ready to review below`
-    : status === "waiting" || status === "classifying"
+  const stepLabel =
+    status === "waiting" || status === "classifying"
       ? total
         ? `Working toward ${total} question${total === 1 ? "" : "s"}…`
         : "Pacing AI requests…"
       : current && total
         ? `Question ${current} of ${total}${latestType ? ` · ${formatLabel(latestType)}` : ""}`
-        : null;
+        : questionCount > 0
+          ? `${questionCount} question${questionCount === 1 ? "" : "s"} so far`
+          : null;
 
   return (
     <div className={`rounded-xl border p-4 ${panelClass}`}>
       <div className="flex items-start gap-4">
         <div
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-            isDone
-              ? isLight
-                ? "bg-emerald-100 text-emerald-600"
-                : "bg-emerald-500/20 text-emerald-400"
-              : isLight
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-emerald-500/15 text-emerald-400"
+            isLight
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-emerald-500/15 text-emerald-400"
           }`}
         >
-          {isDone ? (
-            <CheckCircle2 size={24} strokeWidth={2.5} />
-          ) : (
-            <Loader2 className="animate-spin" size={20} />
-          )}
+          <Loader2 className="animate-spin" size={20} />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -176,15 +138,13 @@ export default function AiGenerationProgress({
             <p className={`text-sm font-semibold ${isLight ? "en-text-primary" : ""}`}>
               {phaseLabel}
             </p>
-            {!isDone && (
-              <span
-                className={`shrink-0 text-lg font-bold tabular-nums ${
-                  isLight ? "text-emerald-700" : "text-emerald-400"
-                }`}
-              >
-                {percent}%
-              </span>
-            )}
+            <span
+              className={`shrink-0 text-lg font-bold tabular-nums ${
+                isLight ? "text-emerald-700" : "text-emerald-400"
+              }`}
+            >
+              {percent}%
+            </span>
           </div>
 
           {stepLabel && (
@@ -193,22 +153,20 @@ export default function AiGenerationProgress({
             </p>
           )}
 
-          {!isDone && (
+          <div
+            className={`mt-3 h-2 overflow-hidden rounded-full ${
+              isLight ? "bg-emerald-100" : "bg-white/10"
+            }`}
+          >
             <div
-              className={`mt-3 h-2 overflow-hidden rounded-full ${
-                isLight ? "bg-emerald-100" : "bg-white/10"
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                isLight
+                  ? "bg-gradient-to-r from-emerald-400 to-teal-500"
+                  : "bg-gradient-to-r from-emerald-400 to-cyan-400"
               }`}
-            >
-              <div
-                className={`h-full rounded-full transition-all duration-500 ease-out ${
-                  isLight
-                    ? "bg-gradient-to-r from-emerald-400 to-teal-500"
-                    : "bg-gradient-to-r from-emerald-400 to-cyan-400"
-                }`}
-                style={{ width: `${Math.max(percent, 3)}%` }}
-              />
-            </div>
-          )}
+              style={{ width: `${Math.max(percent, 3)}%` }}
+            />
+          </div>
         </div>
       </div>
     </div>

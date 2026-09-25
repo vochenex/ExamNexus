@@ -1,26 +1,40 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 
 function getMainScroller() {
-  return document.querySelector("main.en-scroll-region");
+  // Dashboard scrolls a child `.en-scroll-region` inside `<main>`, not `<main>` itself.
+  // Prefer the direct child so we never latch onto nested regions (e.g. notification list).
+  return (
+    document.querySelector("main > .en-scroll-region") ||
+    document.querySelector("main.en-scroll-region")
+  );
 }
 
 /**
- * Compact edge FAB for long create pages:
- * near top → scroll down; after a short scroll → back to top.
+ * Compact edge FABs for long create pages.
+ * Portaled to document.body so `position: fixed` is not trapped by
+ * `.en-page-route { will-change: transform }` (or other transform ancestors).
  *
- * `watchKey` should change when page content grows (AI generation, questions, etc.)
- * so the button reappears even though the scroller's own box size stays the same.
+ * Scroll down: any meaningful room below the viewport.
+ * Back to top: after leaving the top (shows while scrolling, not only at bottom).
  */
 export default function ScrollEdgeFab({
-  topThreshold = 64,
-  minOverflow = 80,
+  edgeThreshold = 48,
+  upThreshold = 120,
+  minOverflow = 48,
   watchKey = "",
 }) {
   const { theme } = useTheme();
-  const [mode, setMode] = useState("hidden"); // "down" | "up" | "hidden"
+  const [showDown, setShowDown] = useState(false);
+  const [showUp, setShowUp] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const dark = theme === "dark";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const scroller = getMainScroller();
@@ -32,10 +46,13 @@ export default function ScrollEdgeFab({
       const { scrollTop, scrollHeight, clientHeight } = scroller;
       const maxScroll = Math.max(0, scrollHeight - clientHeight);
       if (maxScroll < minOverflow) {
-        setMode("hidden");
+        setShowDown(false);
+        setShowUp(false);
         return;
       }
-      setMode(scrollTop <= topThreshold ? "down" : "up");
+      const distanceFromBottom = maxScroll - scrollTop;
+      setShowDown(distanceFromBottom > edgeThreshold);
+      setShowUp(scrollTop > upThreshold);
     };
 
     const scheduleUpdate = () => {
@@ -44,8 +61,9 @@ export default function ScrollEdgeFab({
     };
 
     update();
-    // Content often grows a beat after React commit (progress UI, question cards).
-    const timers = [50, 150, 400, 900].map((ms) => window.setTimeout(update, ms));
+    const timers = [50, 150, 400, 900, 1600, 2800].map((ms) =>
+      window.setTimeout(update, ms)
+    );
 
     scroller.addEventListener("scroll", scheduleUpdate, { passive: true });
     window.addEventListener("resize", scheduleUpdate);
@@ -78,49 +96,67 @@ export default function ScrollEdgeFab({
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
     };
-  }, [topThreshold, minOverflow, watchKey]);
+  }, [edgeThreshold, upThreshold, minOverflow, watchKey]);
 
-  if (mode === "hidden") return null;
+  if (!mounted || (!showDown && !showUp)) return null;
 
-  const goingDown = mode === "down";
-  const label = goingDown ? "Scroll down" : "Back to top";
-  const Icon = goingDown ? ArrowDown : ArrowUp;
+  const btnClass = `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-md transition-all duration-300 ease-out hover:-translate-y-0.5 active:scale-[0.98] ${
+    dark
+      ? "border-emerald-400/30 bg-[#062a2c]/95 text-emerald-100 hover:border-emerald-300/50"
+      : "border-teal-200/80 bg-white/95 text-teal-800 hover:border-teal-300"
+  }`;
 
-  const handleClick = () => {
+  const iconWrap = (bob) =>
+    `inline-flex h-5 w-5 items-center justify-center rounded-full ${
+      bob ? "en-scroll-fab-bob" : ""
+    } ${dark ? "bg-emerald-500/20 text-emerald-300" : "bg-teal-100 text-teal-700"}`;
+
+  const scrollTo = (top) => {
     const scroller = getMainScroller();
     if (!scroller) return;
-    scroller.scrollTo({
-      top: goingDown ? scroller.scrollHeight : 0,
-      behavior: "smooth",
-    });
+    scroller.scrollTo({ top, behavior: "smooth" });
   };
 
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label={label}
-      title={label}
-      className={`en-scroll-edge-fab fixed z-[60] inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-md transition-all duration-300 ease-out hover:-translate-y-0.5 active:scale-[0.98] ${
-        dark
-          ? "border-emerald-400/30 bg-[#062a2c]/95 text-emerald-100 hover:border-emerald-300/50"
-          : "border-teal-200/80 bg-white/95 text-teal-800 hover:border-teal-300"
-      }`}
+  return createPortal(
+    <div
+      className="en-scroll-edge-fab fixed z-[120] flex flex-col-reverse items-end gap-2"
       style={{
         right: "max(0.85rem, env(safe-area-inset-right, 0px))",
-        bottom: "max(5.25rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem))",
       }}
     >
-      <span
-        className={`inline-flex h-5 w-5 items-center justify-center rounded-full transition-transform duration-300 ${
-          goingDown ? "en-scroll-fab-bob" : ""
-        } ${
-          dark ? "bg-emerald-500/20 text-emerald-300" : "bg-teal-100 text-teal-700"
-        }`}
-      >
-        <Icon size={12} strokeWidth={2.5} />
-      </span>
-      <span className="max-w-[6.75rem] truncate">{label}</span>
-    </button>
+      {showDown && (
+        <button
+          type="button"
+          onClick={() => {
+            const scroller = getMainScroller();
+            if (!scroller) return;
+            scrollTo(scroller.scrollHeight);
+          }}
+          aria-label="Scroll down"
+          title="Scroll down"
+          className={btnClass}
+        >
+          <span className={iconWrap(true)}>
+            <ArrowDown size={12} strokeWidth={2.5} />
+          </span>
+          <span className="max-w-[6.75rem] truncate">Scroll down</span>
+        </button>
+      )}
+      {showUp && (
+        <button
+          type="button"
+          onClick={() => scrollTo(0)}
+          aria-label="Back to top"
+          title="Back to top"
+          className={btnClass}
+        >
+          <span className={iconWrap(false)}>
+            <ArrowUp size={12} strokeWidth={2.5} />
+          </span>
+          <span className="max-w-[6.75rem] truncate">Back to top</span>
+        </button>
+      )}
+    </div>,
+    document.body
   );
 }

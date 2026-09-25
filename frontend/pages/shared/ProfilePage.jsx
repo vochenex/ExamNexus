@@ -189,14 +189,23 @@ export default function Profile() {
   const [passwordStatus, setPasswordStatus] = useState("idle");
   const [passwordMessage, setPasswordMessage] = useState("");
   const passwordSuccessTimerRef = useRef(null);
-  const profileFeedbackRef = useScrollIntoViewWhen(
-    Boolean(saveSuccess || saveStatus === "error"),
-    { deps: [saveSuccess, saveStatus] }
-  );
+  const pageTopRef = useRef(null);
   const passwordFeedbackRef = useScrollIntoViewWhen(Boolean(passwordMessage), {
     deps: [passwordMessage, passwordStatus],
   });
   const [profileLoading, setProfileLoading] = useState(true);
+
+  const scrollProfileToTop = () => {
+    const mainScroller =
+      document.querySelector("main > .en-scroll-region") ||
+      document.querySelector("main.en-scroll-region");
+    if (mainScroller) {
+      mainScroller.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    pageTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // Survive an accidental hard reload right after password change (browser
   // password managers sometimes reload after detecting a password form submit).
@@ -396,7 +405,12 @@ export default function Profile() {
       );
       broadcastProfileUpdate(saved);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      setSaveStatus("saved");
+      scrollProfileToTop();
+      setTimeout(() => {
+        setSaveSuccess(false);
+        setSaveStatus("idle");
+      }, 3500);
     } catch (err) {
       console.error("Failed to save avatar:", err);
       showError(err.message || "Failed to save avatar to profile.");
@@ -472,6 +486,7 @@ export default function Profile() {
       setEditing(false);
       setSaveSuccess(true);
       setSaveStatus("saved");
+      scrollProfileToTop();
 
       localStorage.setItem(
         "examnexus_user",
@@ -483,7 +498,7 @@ export default function Profile() {
       setTimeout(() => {
         setSaveSuccess(false);
         setSaveStatus("idle");
-      }, 3000);
+      }, 3500);
     } catch (err) {
       console.error("Failed to save profile:", err);
       setSaveStatus("error");
@@ -629,10 +644,45 @@ export default function Profile() {
 
   return (
     <div
+      ref={pageTopRef}
       className={`en-profile-page w-full max-w-full min-w-0 overflow-x-hidden p-2 sm:p-4 ${
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
+      {(saveSuccess || saveStatus === "saving" || saveStatus === "error") && (
+        <div className="mb-4">
+          {saveSuccess && (
+            <div
+              role="status"
+              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                theme === "dark"
+                  ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                  : "border-emerald-300 en-bg-skeleton text-emerald-700"
+              }`}
+            >
+              Profile saved successfully.
+            </div>
+          )}
+          {saveStatus === "saving" && (
+            <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+              Saving...
+            </p>
+          )}
+          {saveStatus === "error" && (
+            <div
+              role="status"
+              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                theme === "dark"
+                  ? "border-red-500/30 bg-red-500/20 text-red-400"
+                  : "border-red-300 bg-red-100 text-red-700"
+              }`}
+            >
+              Failed to save. Check your connection and try again.
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mb-3 flex flex-col gap-2 sm:mb-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -658,7 +708,7 @@ export default function Profile() {
             )}
           </div>
           <h1
-            className={`mt-1.5 text-xl font-bold sm:text-2xl ${
+            className={`mt-1.5 min-w-0 break-words text-xl font-bold sm:text-2xl ${
               theme === "dark" ? "text-white" : "text-slate-900"
             }`}
           >
@@ -676,6 +726,8 @@ export default function Profile() {
               onClick={() => {
                 setEditProfile(profile);
                 setEditing(true);
+                setSaveSuccess(false);
+                setSaveStatus("idle");
               }}
               className={`flex items-center gap-1.5 ${primaryButton(theme, "px-3 py-2 text-xs sm:text-sm")}`}
             >
@@ -712,42 +764,6 @@ export default function Profile() {
           )}
         </div>
       </div>
-
-      {(saveSuccess || saveStatus === "saving" || saveStatus === "error") && (
-        <div className="mb-4">
-          {saveSuccess && (
-            <div
-              ref={profileFeedbackRef}
-              role="status"
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-                theme === "dark"
-                  ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-400"
-                  : "border-emerald-300 en-bg-skeleton text-emerald-700"
-              }`}
-            >
-              Successfully saved to Supabase
-            </div>
-          )}
-          {saveStatus === "saving" && (
-            <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-              Saving...
-            </p>
-          )}
-          {saveStatus === "error" && (
-            <div
-              ref={profileFeedbackRef}
-              role="status"
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-                theme === "dark"
-                  ? "border-red-500/30 bg-red-500/20 text-red-400"
-                  : "border-red-300 bg-red-100 text-red-700"
-              }`}
-            >
-              Failed to save. Check your connection and try again.
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="min-w-0">
         <div className={`${cardClass(theme)} min-w-0 max-w-full p-3 sm:p-4`}>

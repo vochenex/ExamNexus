@@ -4,19 +4,12 @@ import { useTheme } from "../../layouts/ThemeContext";
 import ModalPortal from "../ui/ModalPortal";
 import { isNativeApp } from "../../utils/platform";
 
-async function lockLandscape() {
+async function lockLandscapeAfterFullscreen() {
   try {
     if (isNativeApp()) {
       const { ScreenOrientation } = await import("@capacitor/screen-orientation");
       await ScreenOrientation.lock({ orientation: "landscape" });
       return;
-    }
-    // Mobile browsers often require a short fullscreen gesture before lock works.
-    const root = document.documentElement;
-    if (root.requestFullscreen) {
-      await root.requestFullscreen().catch(() => {});
-    } else if (root.webkitRequestFullscreen) {
-      root.webkitRequestFullscreen();
     }
     if (screen?.orientation?.lock) {
       await screen.orientation.lock("landscape");
@@ -24,6 +17,23 @@ async function lockLandscape() {
   } catch {
     /* unsupported on some browsers / devices — modal still works in current orientation */
   }
+}
+
+function requestChartFullscreenSync() {
+  if (isNativeApp()) return Promise.resolve(true);
+  const root = document.documentElement;
+  try {
+    if (typeof root.requestFullscreen === "function") {
+      return root.requestFullscreen().then(() => true).catch(() => false);
+    }
+    if (typeof root.webkitRequestFullscreen === "function") {
+      root.webkitRequestFullscreen();
+      return Promise.resolve(true);
+    }
+  } catch {
+    return Promise.resolve(false);
+  }
+  return Promise.resolve(false);
 }
 
 async function unlockOrientation() {
@@ -155,12 +165,35 @@ export function AdminVerticalBarChart({
 }) {
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     if (!expanded) return undefined;
-    lockLandscape();
+    const onFsChange = () => {
+      if (isNativeApp()) return;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        setExpanded(false);
+        setClosing(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      e.preventDefault();
+      setClosing(true);
+      window.setTimeout(() => {
+        setExpanded(false);
+        setClosing(false);
+        void unlockOrientation();
+      }, 280);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    document.addEventListener("keydown", onKey);
     return () => {
-      unlockOrientation();
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+      document.removeEventListener("keydown", onKey);
     };
   }, [expanded]);
 
@@ -174,8 +207,23 @@ export function AdminVerticalBarChart({
 
   const previewItems = items.slice(0, 5);
 
+  const handleExpand = () => {
+    setClosing(false);
+    setExpanded(true);
+    void requestChartFullscreenSync().then((ok) => {
+      if (ok || isNativeApp()) {
+        void lockLandscapeAfterFullscreen();
+      }
+    });
+  };
+
   const closeExpanded = () => {
-    setExpanded(false);
+    setClosing(true);
+    window.setTimeout(() => {
+      setExpanded(false);
+      setClosing(false);
+      void unlockOrientation();
+    }, 280);
   };
 
   return (
@@ -195,7 +243,7 @@ export function AdminVerticalBarChart({
       )}
       <button
         type="button"
-        onClick={() => setExpanded(true)}
+        onClick={handleExpand}
         className={`mt-2 inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${
           theme === "dark"
             ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30"
@@ -208,7 +256,17 @@ export function AdminVerticalBarChart({
 
       {expanded && (
         <ModalPortal>
-          <div className="en-chart-landscape-modal fixed inset-0 z-[140] flex items-center justify-center bg-black/85 p-2 backdrop-blur-sm sm:p-4">
+          <div
+            className={`en-chart-landscape-modal fixed inset-0 z-[140] flex items-center justify-center bg-black/85 backdrop-blur-sm ${
+              closing ? "en-chart-expand-backdrop-out" : "en-chart-expand-backdrop-in"
+            }`}
+            style={{
+              paddingTop: "max(0.5rem, env(safe-area-inset-top, 0px))",
+              paddingRight: "max(0.5rem, env(safe-area-inset-right, 0px))",
+              paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))",
+              paddingLeft: "max(0.5rem, env(safe-area-inset-left, 0px))",
+            }}
+          >
             <button
               type="button"
               className="absolute inset-0"
@@ -216,19 +274,25 @@ export function AdminVerticalBarChart({
               onClick={closeExpanded}
             />
             <div
-              className={`relative z-10 flex max-h-[96dvh] w-full max-w-[min(96vw,56rem)] flex-col overflow-hidden rounded-2xl border shadow-2xl sm:rounded-3xl ${
+              className={`en-chart-expand-panel relative z-10 flex w-full max-w-[min(96vw,56rem)] min-h-0 flex-col overflow-hidden rounded-2xl border shadow-2xl sm:rounded-3xl ${
+                closing ? "en-chart-expand-panel-out" : "en-chart-expand-panel-in"
+              } ${
                 theme === "dark"
                   ? "border-emerald-500/25 bg-[#071412]/95 backdrop-blur-md"
                   : "border-emerald-200 bg-white/95 backdrop-blur-md"
               }`}
+              style={{
+                maxHeight:
+                  "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1rem)",
+              }}
             >
               <div
-                className={`flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2.5 ${
+                className={`flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5 sm:gap-3 sm:px-4 ${
                   theme === "dark" ? "border-white/10" : "border-emerald-100"
                 }`}
               >
                 <h3
-                  className={`text-sm font-bold ${
+                  className={`min-w-0 flex-1 truncate text-sm font-bold ${
                     theme === "dark" ? "text-emerald-300" : "text-teal-800"
                   }`}
                 >
@@ -237,7 +301,7 @@ export function AdminVerticalBarChart({
                 <button
                   type="button"
                   onClick={closeExpanded}
-                  className={`rounded-lg p-1.5 ${
+                  className={`shrink-0 rounded-lg p-1.5 ${
                     theme === "dark"
                       ? "text-gray-300 hover:bg-white/10"
                       : "text-gray-600 hover:bg-emerald-50"
@@ -247,7 +311,6 @@ export function AdminVerticalBarChart({
                   <X size={18} />
                 </button>
               </div>
-              {/* Scroll works when dragging on bars or empty padding around them */}
               <div className="en-chart-scroll-area en-chart-expanded en-inner-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain p-3 sm:p-5">
                 <div className="inline-block min-w-full py-1">
                   <ChartBars

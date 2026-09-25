@@ -43,7 +43,6 @@ const app = createApp();
 
 // ================= START SERVER (local / non-Vercel) =================
 const PREFERRED_PORT = Number(process.env.PORT) || 5000;
-const MAX_PORT_TRIES = 10;
 
 function syncFrontendApiUrl(port) {
   const apiUrl = `http://localhost:${port}`;
@@ -68,17 +67,11 @@ function syncFrontendApiUrl(port) {
   console.log("   Restart Vite (or let it reload) so the frontend uses this backend URL.");
 }
 
-function listenOnAvailablePort(port, attempt = 0) {
-  const server = app.listen(port, "0.0.0.0");
+function listenOnPreferredPort() {
+  const server = app.listen(PREFERRED_PORT, "0.0.0.0");
 
   server.on("listening", async () => {
     const actualPort = server.address().port;
-
-    if (actualPort !== PREFERRED_PORT) {
-      console.warn(
-        `⚠️  Port ${PREFERRED_PORT} was busy — using http://localhost:${actualPort} instead.`
-      );
-    }
     syncFrontendApiUrl(actualPort);
 
     console.log(`🚀 Backend running on http://localhost:${actualPort}`);
@@ -123,19 +116,12 @@ function listenOnAvailablePort(port, attempt = 0) {
   });
 
   server.on("error", (err) => {
-    if (err.code === "EADDRINUSE" && attempt + 1 < MAX_PORT_TRIES) {
-      console.warn(`Port ${port} is in use, trying ${port + 1}...`);
-      listenOnAvailablePort(port + 1, attempt + 1);
-      return;
-    }
-
     if (err.code === "EADDRINUSE") {
+      console.error(`\n❌ Port ${PREFERRED_PORT} is already in use.`);
+      console.error("   A second backend on 5001+ rewrites Vite to the wrong API and breaks AI.");
+      console.error("   Free port 5000 in PowerShell, then run npm start again:");
       console.error(
-        `\n❌ No free port found between ${PREFERRED_PORT} and ${port}.`
-      );
-      console.error("   To free port 5000 in PowerShell, run this exact command:");
-      console.error(
-        "   Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }"
+        `   Get-NetTCPConnection -LocalPort ${PREFERRED_PORT} -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`
       );
       process.exit(1);
       return;
@@ -150,7 +136,7 @@ function listenOnAvailablePort(port, attempt = 0) {
 
 // Only listen when run directly (`npm start`). Vercel requires this module and must not bind a port.
 if (require.main === module) {
-  listenOnAvailablePort(PREFERRED_PORT);
+  listenOnPreferredPort();
 }
 
 module.exports = app;

@@ -65,7 +65,7 @@ export default function AppToastStack({ toasts, onDismiss, onConfirm, onAction }
           return (
             <div
               key={toast.id}
-              className={`en-app-toast pointer-events-auto w-[min(100%,20rem)] overflow-hidden rounded-2xl border shadow-[0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-md ${
+              className={`en-app-toast pointer-events-auto w-fit max-w-[min(100%,22rem)] overflow-hidden rounded-2xl border shadow-[0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-md ${
                 toast.leaving ? "en-app-toast--out" : "en-app-toast--in"
               } ${isDark ? tone.dark : tone.light}`}
               role="status"

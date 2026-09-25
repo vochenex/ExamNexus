@@ -169,15 +169,75 @@ function collectFramesFromNode(node) {
 function scoreFrame(frame, routeFile, indexFromLeaf) {
   const file = frame.file || "";
   let score = 100 - indexFromLeaf;
-  // Prefer nearer fibers; don't bias components over the current page file.
-  if (routeFile && file === routeFile) score += 45;
-  if (file.includes("/pages/")) score += 25;
-  if (file.includes("/components/")) score += 20;
-  if (file.includes("/hooks/") || file.includes("/utils/")) score += 10;
-  if (file.includes("/layouts/")) score += 8;
-  if (frame.via === "debugSource") score += 10;
-  if (frame.name && /^[A-Z]/.test(frame.name)) score += 8;
+  // Prefer the nearest leaf component over the route page host.
+  if (file.includes("/components/")) score += 48;
+  if (file.includes("/pages/")) score += 12;
+  if (file.includes("/hooks/") || file.includes("/utils/")) score += 14;
+  if (file.includes("/layouts/")) score += 6;
+  if (routeFile && file === routeFile) score += 8;
+  if (frame.via === "debugSource") score += 12;
+  if (frame.name && /^[A-Z]/.test(frame.name)) score += 10;
+  // Closer to the selected DOM node wins.
+  if (typeof frame.depth === "number") score += Math.max(0, 24 - frame.depth * 2);
   return score;
+}
+
+function pickNearestComponentFrame(frames, routeFile) {
+  const comps = frames
+    .filter(
+      (frame) =>
+        frame?.file &&
+        frame.file.includes("/components/") &&
+        frame.file !== routeFile
+    )
+    .sort((a, b) => {
+      const depthA = Number.isFinite(a.depth) ? a.depth : 99;
+      const depthB = Number.isFinite(b.depth) ? b.depth : 99;
+      if (depthA !== depthB) return depthA - depthB;
+      const namedA = a.name && /^[A-Z]/.test(a.name) ? 0 : 1;
+      const namedB = b.name && /^[A-Z]/.test(b.name) ? 0 : 1;
+      return namedA - namedB;
+    });
+  return comps[0] || null;
+}
+
+/** Static UI labels like "Prompts:" / "Documents:" that survive dynamic JSX. */
+function staticUiFragments(selectedText) {
+  const text = String(selectedText || "").replace(/\s+/g, " ").trim();
+  if (!text) return [];
+  const frags = [];
+  for (const match of text.matchAll(
+    /\b([A-Za-z][A-Za-z0-9]*(?:[ /&-][A-Za-z0-9]+){0,4}:)/g
+  )) {
+    const label = String(match[1] || "").trim();
+    if (label.length >= 3) frags.push(label);
+  }
+  return [...new Set(frags)];
+}
+
+function findStaticLabelRange(source, selectedText) {
+  const labels = staticUiFragments(selectedText);
+  if (!labels.length || !source) return null;
+  const lines = source.split(/\r?\n/);
+  const hits = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const matched = labels.filter((label) => line.includes(label));
+    if (!matched.length) continue;
+    hits.push({ line: i + 1, matched: matched.length });
+  }
+  if (!hits.length) return null;
+  hits.sort((a, b) => b.matched - a.matched || a.line - b.line);
+  const best = hits[0];
+  const nearby = hits.filter((hit) => Math.abs(hit.line - best.line) <= 6);
+  const startLine = Math.min(...nearby.map((hit) => hit.line));
+  const endLine = Math.max(...nearby.map((hit) => hit.line));
+  return {
+    startLine,
+    endLine,
+    kind: "labels",
+    score: 160 + best.matched * 30 + labels.length * 8,
+  };
 }
 
 function pickBestFrame(frames, routeFile) {
@@ -307,8 +367,11 @@ function findLineRangeInSource(source, selectedText) {
     }
   }
 
-  // 3) Whole-word token match for short labels ("Prompts:", etc.).
-  // Require most tokens on one line — never substring-match camelCase identifiers.
+  // 3) Static UI labels ("Prompts:", "Documents:") for dynamic JSX lines.
+  const labelHit = findStaticLabelRange(source, needle);
+  if (labelHit) return labelHit;
+
+  // 4) Whole-word token match for short labels.
   const tokens = selectionTokens(needle);
   if (!tokens.length) return null;
 
@@ -379,18 +442,20 @@ async function searchDevSourceIndex(selectedText, routeFile) {
       }
 
       let score = found.score || 0;
-      // Exact phrase on the current route page wins over unrelated components.
+      // Prefer component exact/label hits over the route page for nested UI.
+      if (file.includes("/components/") && found.kind === "exact") score += 70;
+      if (file.includes("/components/") && found.kind === "labels") score += 90;
+      if (file.includes("/components/") && found.kind === "phrase") score += 45;
+      if (file.includes("/components/") && found.kind === "tokens") score += 15;
       if (file === routeFile && (found.kind === "exact" || found.kind === "phrase")) {
-        score += 120;
+        score += 35;
       } else if (file === routeFile) {
-        score += 40;
+        score += 8;
       }
-      if (found.kind === "exact") score += 50;
-      if (found.kind === "phrase") score += 25;
-      if (file.includes("/pages/")) score += 15;
-      // Mild boost for components only when the match is exact UI copy.
-      if (file.includes("/components/") && found.kind === "exact") score += 20;
-      if (file.includes("/components/") && found.kind === "tokens") score -= 30;
+      if (found.kind === "exact") score += 40;
+      if (found.kind === "phrase") score += 20;
+      if (found.kind === "labels") score += 35;
+      if (file.includes("/pages/") && !file.includes("/components/")) score += 5;
 
       if (!best || score > best.score) {
         best = {
@@ -427,6 +492,8 @@ async function resolveSelectionLocation(selection, routeFile) {
 
   const pageFrame = frames.find((f) => f.file && f.file === routeFile);
   const componentFrame =
+    pickNearestComponentFrame(startFrames, routeFile) ||
+    pickNearestComponentFrame(frames, routeFile) ||
     frames.find(
       (f) =>
         f.file?.includes("/components/") &&
@@ -434,17 +501,20 @@ async function resolveSelectionLocation(selection, routeFile) {
         /^[A-Z]/.test(f.name) &&
         f.file !== routeFile
     ) ||
-    frames.find((f) => f.file?.includes("/components/")) ||
-    best;
+    frames.find((f) => f.file?.includes("/components/"));
 
-  let file = pageFrame?.file || componentFrame?.file || best?.file || routeFile || "";
-  let startLine = bestStart?.line || pageFrame?.line || componentFrame?.line || null;
+  // Nested component hosting the DOM node beats the route page host.
+  let file =
+    componentFrame?.file || best?.file || pageFrame?.file || routeFile || "";
+  let startLine =
+    componentFrame?.line || bestStart?.line || best?.line || pageFrame?.line || null;
   let endLine = bestEnd?.line || startLine;
-  let column = bestStart?.column ?? pageFrame?.column ?? componentFrame?.column ?? null;
+  let column =
+    componentFrame?.column ?? bestStart?.column ?? best?.column ?? pageFrame?.column ?? null;
   let component =
-    pageFrame?.name ||
     componentFrame?.name ||
     best?.name ||
+    pageFrame?.name ||
     frames.find((f) => f.name && /^[A-Z]/.test(f.name))?.name ||
     "";
 
@@ -452,63 +522,72 @@ async function resolveSelectionLocation(selection, routeFile) {
   let matchedRange = null;
   let matchedScore = -Infinity;
 
-  // Always check the current route page first for exact UI copy.
-  if (routeFile) {
-    const routeSource = await fetchSourceText(routeFile);
-    const routeFound = findLineRangeInSource(routeSource, text);
-    if (routeFound && (routeFound.kind === "exact" || routeFound.kind === "phrase")) {
-      matchedFile = routeFile;
-      matchedRange = routeFound;
-      matchedScore = (routeFound.score || 0) + 120;
-    }
-  }
-
   const candidateFiles = [
     ...new Set(
-      frames
-        .map((f) => f.file)
-        .filter(Boolean)
-        .concat(file ? [file] : [])
-        .concat(routeFile ? [routeFile] : [])
+      [
+        componentFrame?.file,
+        ...frames.map((f) => f.file),
+        file,
+        routeFile,
+      ].filter(Boolean)
     ),
-  ].slice(0, 10);
+  ].slice(0, 12);
 
-  // Prefer route page, then frames near the selection (no blind component bias).
+  // Search nested components before the route page.
   candidateFiles.sort((a, b) => {
-    const score = (f) =>
-      (f === routeFile ? 0 : 2) + (f.includes("/pages/") ? 0 : 1);
-    return score(a) - score(b);
+    const rank = (path) => {
+      if (path === componentFrame?.file) return 0;
+      if (path.includes("/components/")) return 1;
+      if (path === routeFile) return 3;
+      if (path.includes("/pages/")) return 4;
+      return 2;
+    };
+    return rank(a) - rank(b);
   });
 
   for (const candidate of candidateFiles) {
-    if (matchedFile === candidate && matchedRange?.kind === "exact") continue;
     const source = await fetchSourceText(candidate);
     const found = findLineRangeInSource(source, text);
     if (!found) continue;
     let score = found.score || 0;
-    if (candidate === routeFile) score += 80;
+    if (candidate === componentFrame?.file) score += 100;
+    if (candidate.includes("/components/")) score += 55;
+    if (candidate === routeFile) score += 10;
     if (found.kind === "exact") score += 40;
+    if (found.kind === "labels") score += 50;
+    if (found.kind === "phrase") score += 25;
     if (score > matchedScore) {
       matchedFile = candidate;
       matchedRange = found;
       matchedScore = score;
     }
-    if (found.kind === "exact" && candidate === routeFile) break;
+    if (
+      found.kind === "exact" &&
+      candidate === componentFrame?.file &&
+      candidate.includes("/components/")
+    ) {
+      break;
+    }
   }
 
-  // Full DEV index search — only win when clearly better than an existing match.
+  // Full DEV index search — prefer strong component hits for nested UI copy.
   const indexHit = await searchDevSourceIndex(text, routeFile);
   if (indexHit) {
     const preferIndex =
       !matchedFile ||
       (indexHit.kind === "exact" && matchedRange?.kind !== "exact") ||
+      (indexHit.kind === "labels" &&
+        matchedRange?.kind !== "exact" &&
+        matchedRange?.kind !== "labels") ||
       (indexHit.kind === "phrase" && matchedRange?.kind === "tokens") ||
-      indexHit.score > matchedScore + 15;
-    // Never let a weak token hit override an exact/phrase match on the route page.
+      indexHit.score > matchedScore + 10;
     const blockWeakOverride =
-      matchedFile === routeFile &&
-      (matchedRange?.kind === "exact" || matchedRange?.kind === "phrase") &&
-      indexHit.kind === "tokens";
+      matchedFile?.includes("/components/") &&
+      (matchedRange?.kind === "exact" ||
+        matchedRange?.kind === "labels" ||
+        matchedRange?.kind === "phrase") &&
+      indexHit.kind === "tokens" &&
+      indexHit.file === routeFile;
 
     if (preferIndex && !blockWeakOverride) {
       matchedFile = indexHit.file;
@@ -518,6 +597,29 @@ async function resolveSelectionLocation(selection, routeFile) {
         kind: indexHit.kind,
       };
       matchedScore = indexHit.score;
+    }
+  }
+
+  // Fiber fallback: keep nearest component when text search only hit the page.
+  if (
+    componentFrame?.file &&
+    (!matchedFile ||
+      (matchedFile === routeFile &&
+        matchedRange?.kind !== "exact" &&
+        componentFrame.file !== routeFile))
+  ) {
+    const componentSource = await fetchSourceText(componentFrame.file);
+    const componentFound = findLineRangeInSource(componentSource, text);
+    if (componentFound) {
+      matchedFile = componentFrame.file;
+      matchedRange = componentFound;
+    } else if (!matchedFile || matchedFile === routeFile) {
+      matchedFile = componentFrame.file;
+      matchedRange = {
+        startLine: componentFrame.line || null,
+        endLine: componentFrame.line || null,
+        kind: "fiber",
+      };
     }
   }
 
@@ -531,13 +633,13 @@ async function resolveSelectionLocation(selection, routeFile) {
 
   if (!file) file = routeFile || "(unknown file)";
 
-  // Derive a nicer component title from the file name when stack name is missing.
-  if (!component && file.includes("/")) {
-    const base = file.split("/").pop()?.replace(/\.(jsx|tsx|js|ts)$/i, "") || "";
-    if (base && /^[A-Z]/.test(base)) component = base;
-  } else if (matchedFile && matchedFile.includes("/")) {
+  if (matchedFile?.includes("/components/") || file.includes("/components/")) {
+    const pathForName = matchedFile || file;
     const base =
-      matchedFile.split("/").pop()?.replace(/\.(jsx|tsx|js|ts)$/i, "") || "";
+      pathForName.split("/").pop()?.replace(/\.(jsx|tsx|js|ts)$/i, "") || "";
+    if (base && /^[A-Z]/.test(base)) component = base;
+  } else if (!component && file.includes("/")) {
+    const base = file.split("/").pop()?.replace(/\.(jsx|tsx|js|ts)$/i, "") || "";
     if (base && /^[A-Z]/.test(base)) component = base;
   }
 
@@ -562,6 +664,8 @@ export default function DevLocationToast() {
   const hideTimerRef = useRef(0);
   const flashKeyRef = useRef(0);
   const resolveSeqRef = useRef(0);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   const showToast = useCallback((next) => {
     flashKeyRef.current += 1;
@@ -582,6 +686,23 @@ export default function DevLocationToast() {
     });
   }, [location.pathname, showToast]);
 
+  const publishSelection = useCallback(() => {
+    const selection = window.getSelection?.();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return false;
+
+    const route = resolveRouteFileInfo(location.pathname);
+    const seq = ++resolveSeqRef.current;
+
+    resolveSelectionLocation(selection, route.file).then((resolved) => {
+      if (!resolved || seq !== resolveSeqRef.current) return;
+      showToast({
+        kind: "selection",
+        file: `${resolved.file}${resolved.lineLabel || ""}`,
+      });
+    });
+    return true;
+  }, [location.pathname, showToast]);
+
   useEffect(() => {
     const onKeyDown = (event) => {
       if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
@@ -589,6 +710,27 @@ export default function DevLocationToast() {
       }
       if (event.key.toLowerCase() !== "q") return;
       event.preventDefault();
+
+      const selection = window.getSelection?.();
+      const hasSelection =
+        Boolean(selection) &&
+        !selection.isCollapsed &&
+        selection.rangeCount > 0 &&
+        String(selection.toString() || "").trim().length >= 2;
+
+      // With a highlight: always resolve the nested source (faster debugging).
+      if (hasSelection) {
+        if (!enabledRef.current) {
+          writeEnabled(true);
+          setEnabled(true);
+        }
+        window.setTimeout(() => {
+          publishSelection();
+        }, 0);
+        return;
+      }
+
+      // No highlight: toggle page-location mode on/off.
       setEnabled((current) => {
         const next = !current;
         writeEnabled(next);
@@ -610,7 +752,7 @@ export default function DevLocationToast() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showToast]);
+  }, [publishSelection, showToast]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -621,29 +763,17 @@ export default function DevLocationToast() {
     if (!enabled) return undefined;
 
     let frame = 0;
-    const publishSelection = () => {
-      const selection = window.getSelection?.();
-      if (!selection || selection.isCollapsed || !selection.rangeCount) return;
-
-      const route = resolveRouteFileInfo(location.pathname);
-      const seq = ++resolveSeqRef.current;
-
-      resolveSelectionLocation(selection, route.file).then((resolved) => {
-        if (!resolved || seq !== resolveSeqRef.current) return;
-        showToast({
-          kind: "selection",
-          file: `${resolved.file}${resolved.lineLabel || ""}`,
-        });
+    const onSelectionChange = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        publishSelection();
       });
     };
 
-    const onSelectionChange = () => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(publishSelection);
-    };
-
     const onMouseUp = () => {
-      window.setTimeout(publishSelection, 0);
+      window.setTimeout(() => {
+        publishSelection();
+      }, 0);
     };
 
     document.addEventListener("selectionchange", onSelectionChange);
@@ -653,7 +783,7 @@ export default function DevLocationToast() {
       document.removeEventListener("mouseup", onMouseUp);
       window.cancelAnimationFrame(frame);
     };
-  }, [enabled, location.pathname, showToast]);
+  }, [enabled, publishSelection]);
 
   useEffect(
     () => () => {
@@ -667,10 +797,10 @@ export default function DevLocationToast() {
   return (
     <div
       key={toast.key}
-      className="en-location-toast pointer-events-auto fixed bottom-3 right-3 z-[100002] max-w-[min(88vw,20rem)]"
+      className="en-location-toast pointer-events-auto fixed bottom-3 right-3 z-[100002] max-w-[min(88vw,22rem)]"
       role="status"
       aria-live="polite"
-      title={`${toast.file}\nCtrl+Q to toggle · click to dismiss`}
+      title={`${toast.file}\nHighlight text + Ctrl+Q for component · Ctrl+Q alone toggles page mode · click to dismiss`}
       onClick={() => {
         setToast(null);
         window.clearTimeout(hideTimerRef.current);

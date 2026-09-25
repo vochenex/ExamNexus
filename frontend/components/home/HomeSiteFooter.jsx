@@ -25,7 +25,7 @@ export default function HomeSiteFooter() {
         <div className="md:col-span-1 lg:col-span-1">
           <ExamNexusBrand variant="inline" className="mb-3" panelTone="dark" />
           <p className={`max-w-sm text-sm leading-relaxed ${muted}`}>
-            A secure assessment platform for students, faculty, and administrators — built for modern
+            A secure assessment platform for students, faculty, and administrators built for modern
             classrooms.
           </p>
         </div>
