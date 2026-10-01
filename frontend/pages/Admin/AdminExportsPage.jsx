@@ -20,6 +20,7 @@ import {
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { iconButton } from "../../utils/themeButtons";
+import { friendlyError } from "../../utils/friendlyError";
 
 async function finishExport(result, success, warning, sharedMsg, downloadMsg) {
   if (!result?.ok) {
@@ -92,8 +93,7 @@ export default function AdminExports() {
       );
     } catch (err) {
       error(
-        err.message ||
-          "Export failed. If this keeps happening, run database/admin_export_assessment_report.sql in Supabase."
+        friendlyError(err, "Export failed. Please try again.")
       );
     } finally {
       setExporting("");
@@ -145,7 +145,7 @@ export default function AdminExports() {
         "Results CSV saved to your downloads."
       );
     } catch (err) {
-      error(err.message || "Export failed.");
+      error(friendlyError(err, "Export failed."));
     } finally {
       setExporting("");
     }

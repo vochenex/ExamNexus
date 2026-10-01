@@ -30,6 +30,7 @@ import {
   adminThClass,
 } from "../../components/admin/adminTableStyles";
 import { primaryButton } from "../../utils/themeButtons";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function FacultyAnnouncementsHub() {
   const { theme } = useTheme();
@@ -84,7 +85,7 @@ export default function FacultyAnnouncementsHub() {
         setSubjects(rows || []);
         setPosted(announcementRows || []);
       } catch (err) {
-        setError(err.message || "Failed to load announcements.");
+        setError(friendlyError(err, "Failed to load announcements."));
       } finally {
         if (!silent) setLoading(false);
       }
@@ -156,7 +157,7 @@ export default function FacultyAnnouncementsHub() {
 
       void load(true);
     } catch (err) {
-      setError(err.message || "Failed to post announcement.");
+      setError(friendlyError(err, "Failed to post announcement."));
     } finally {
       setPosting(false);
     }

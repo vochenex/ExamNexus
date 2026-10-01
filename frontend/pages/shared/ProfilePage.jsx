@@ -41,6 +41,7 @@ import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import useMobileNav from "../../hooks/useMobileNav";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { ProgressLink } from "../../components/ProgressLink";
+import { friendlyError } from "../../utils/friendlyError";
 
 function inputStyle(theme) {
   return inputClass(theme);
@@ -253,7 +254,7 @@ export default function Profile() {
       console.error("Failed to load student stats:", err);
       if (!silent) {
         setStatsError(
-          "Could not load your stats. Run database/enroll_student.sql in Supabase, then refresh."
+          friendlyError(err, "Could not load your stats. Please refresh and try again.")
         );
       }
     }
@@ -329,8 +330,7 @@ export default function Profile() {
     if (error || !loadedProfile) {
       console.error("Failed to fetch user:", error);
       setLoadError(
-        error?.message ||
-          "Could not load your profile. Run database/users_signup_policies.sql in Supabase, then log in again."
+        friendlyError(error, "Could not load your profile. Please sign out and sign in again.")
       );
       if (!silent) setProfileLoading(false);
       return;
@@ -383,7 +383,7 @@ export default function Profile() {
 
       if (uploadError) {
         console.error("UPLOAD ERROR:", uploadError);
-        showError(`Upload failed:\n${uploadError.message}`, "Upload failed");
+        showError(friendlyError(uploadError, "Could not upload the photo. Please try again."), "Upload failed");
         return;
       }
 
@@ -413,7 +413,7 @@ export default function Profile() {
       }, 3500);
     } catch (err) {
       console.error("Failed to save avatar:", err);
-      showError(err.message || "Failed to save avatar to profile.");
+      showError(friendlyError(err, "Failed to save avatar to profile."));
     } finally {
       setAvatarUploading(false);
       event.target.value = "";
@@ -502,7 +502,7 @@ export default function Profile() {
     } catch (err) {
       console.error("Failed to save profile:", err);
       setSaveStatus("error");
-      showError(err.message || "Error saving profile. Please try again.");
+      showError(friendlyError(err, "Error saving profile. Please try again."));
     }
   };
 
@@ -598,7 +598,7 @@ export default function Profile() {
 
       if (updateError) {
         setPasswordStatus("error");
-        setPasswordMessage(updateError.message || "Failed to update password.");
+        setPasswordMessage(friendlyError(updateError, "Failed to update password."));
         return;
       }
 
@@ -624,7 +624,7 @@ export default function Profile() {
     } catch (err) {
       console.error("Failed to change password:", err);
       setPasswordStatus("error");
-      setPasswordMessage(err.message || "Failed to update password.");
+      setPasswordMessage(friendlyError(err, "Failed to update password."));
     }
   };
 

@@ -13,6 +13,7 @@ import {
 import { useAppModal } from "../contexts/AppModalContext";
 import { usePolling } from "../hooks/useRealtimeFetch";
 import { matchesStudentSearch } from "../utils/studentSearch";
+import { friendlyError } from "../utils/friendlyError";
 
 function displayName(row) {
   const name = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
@@ -46,8 +47,8 @@ export default function ExamExclusionsPanel({ examId, subjectId, onUpdated }) {
           err.message?.includes("exam_student_exclusions") ||
             err.message?.includes("exclude_student_from_exam") ||
             err.message?.includes("get_exam_exclusions")
-            ? "Run database/exam_student_exclusions.sql in Supabase to enable exclusions."
-            : err.message || "Failed to load exclusions."
+            ? "Student exclusions aren't set up yet. Please contact the system administrator."
+            : friendlyError(err, "Failed to load exclusions.")
         );
       } finally {
         if (!silent) setLoading(false);
@@ -111,7 +112,7 @@ export default function ExamExclusionsPanel({ examId, subjectId, onUpdated }) {
       await load(true);
       onUpdated?.();
     } catch (err) {
-      appModal.error(err.message || "Could not exclude student.");
+      appModal.error(friendlyError(err, "Could not exclude student."));
     } finally {
       setBusyId(null);
     }
@@ -132,7 +133,7 @@ export default function ExamExclusionsPanel({ examId, subjectId, onUpdated }) {
       await load(true);
       onUpdated?.();
     } catch (err) {
-      appModal.error(err.message || "Could not restore student.");
+      appModal.error(friendlyError(err, "Could not restore student."));
     } finally {
       setBusyId(null);
     }

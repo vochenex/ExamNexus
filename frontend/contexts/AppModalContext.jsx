@@ -3,16 +3,19 @@ import { useLocation } from "react-router-dom";
 import AppModal from "../components/ui/AppModal";
 import AppToastStack from "../components/ui/AppToastStack";
 import { forceUnlockBodyScroll } from "../utils/bodyScrollLock";
+import { friendlyError } from "../utils/friendlyError";
 
 const AppModalContext = createContext(null);
 
 let toastSeq = 0;
 
 function normalizeAlertOptions(input, defaults = {}) {
-  if (typeof input === "string") {
-    return { message: input, ...defaults };
+  const options =
+    typeof input === "string" ? { message: input, ...defaults } : { ...defaults, ...input };
+  if (options.tone === "error") {
+    options.message = friendlyError(options.message);
   }
-  return { ...defaults, ...input };
+  return options;
 }
 
 function toastDurationMs(tone, mode) {

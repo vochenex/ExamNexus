@@ -22,6 +22,7 @@ import {
   resolveAssessmentCategory,
 } from "../utils/assessmentCategories";
 import { getFormatLabel } from "../utils/questionSections";
+import { friendlyError } from "../utils/friendlyError";
 
 function getStudentStatusBadgeClass(status, theme) {
   if (status === "excluded") {
@@ -99,7 +100,7 @@ export default function StudentAssessmentCard({
       setRequestMessage("");
       onRetakeUpdated?.();
     } catch (err) {
-      error(err.message || "Failed to submit retake request.");
+      error(friendlyError(err, "Failed to submit retake request."));
     } finally {
       setRequesting(false);
     }

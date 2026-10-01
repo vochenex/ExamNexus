@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { friendlyError } from "../utils/friendlyError";
 
 export const REALTIME_POLL_MS = 5000;
 export const REALTIME_POLL_HIDDEN_MS = 20000;
@@ -83,7 +84,7 @@ export default function useRealtimeFetch(
       hasPaintedRef.current = true;
       return result;
     } catch (err) {
-      setError(err.message || "Failed to load data.");
+      setError(friendlyError(err, "Failed to load data."));
       throw err;
     } finally {
       if (!silent) setLoading(false);
@@ -103,7 +104,7 @@ export default function useRealtimeFetch(
           hasPaintedRef.current = true;
         }
       } catch (err) {
-        if (!cancelled) setError(err.message || "Failed to load data.");
+        if (!cancelled) setError(friendlyError(err, "Failed to load data."));
       } finally {
         if (!cancelled && !silent) setLoading(false);
       }

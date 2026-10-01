@@ -23,6 +23,7 @@ import {
 import { formatQuestionCorrectAnswers } from "../../utils/assessmentQuestions";
 import { EXAM_TYPE_LABELS } from "../../utils/assessmentQuestions";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
+import { friendlyError } from "../../utils/friendlyError";
 
 function questionPreview(row) {
   const text = String(row.title || row.question || "").trim();
@@ -54,7 +55,7 @@ export default function QuestionBank() {
       const rows = await fetchQuestionBank();
       setItems(rows);
     } catch (err) {
-      setError(err.message || "Failed to load question bank.");
+      setError(friendlyError(err, "Failed to load question bank."));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -115,7 +116,7 @@ export default function QuestionBank() {
       }
       showSuccess("Question removed from your bank.");
     } catch (err) {
-      showError(err.message || "Could not delete question.");
+      showError(friendlyError(err, "Could not delete question."));
     } finally {
       setDeletingId(null);
     }

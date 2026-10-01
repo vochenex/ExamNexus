@@ -26,6 +26,7 @@ import {
   primaryButton,
 } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
+import { friendlyError } from "../../utils/friendlyError";
 
 const TABS = [
   { id: "department", label: "Departments" },
@@ -128,7 +129,7 @@ export default function AdminCatalog() {
       clearCurrentForm();
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to save catalog item.");
+      error(friendlyError(err, "Failed to save catalog item."));
     } finally {
       setSaving(false);
     }
@@ -150,7 +151,7 @@ export default function AdminCatalog() {
       await success("Item removed.");
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to remove item.");
+      error(friendlyError(err, "Failed to remove item."));
     } finally {
       setDeletingId(null);
     }

@@ -32,8 +32,7 @@ try {
   app.use((req, res) => {
     res.status(500).json({
       ok: false,
-      error: "API failed to start",
-      detail: String(err?.message || err),
+      error: "The server is temporarily unavailable. Please try again in a moment.",
     });
   });
 }

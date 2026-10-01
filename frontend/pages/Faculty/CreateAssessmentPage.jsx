@@ -41,6 +41,7 @@ import { getAssessmentCategoryLabel } from "../../utils/assessmentCategories";
 import useQuestionSections from "../../hooks/useQuestionSections";
 import { saveQuestionToBank } from "../../utils/questionBank";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
+import { friendlyError } from "../../utils/friendlyError";
 
 const defaultAssessment = {
   subject_id: "",
@@ -214,7 +215,7 @@ export default function CreateAssessment() {
       await saveQuestionToBank(question);
       showSuccess("Question saved to your bank.");
     } catch (err) {
-      showError(err.message || "Could not save question to bank.");
+      showError(friendlyError(err, "Could not save question to bank."));
     } finally {
       setSavingToBankId(null);
     }
@@ -428,29 +429,6 @@ export default function CreateAssessment() {
 
   const showAiProgress = Boolean(aiProgress) && aiGenerating;
 
-  // #region agent log
-  useEffect(() => {
-    fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
-      body: JSON.stringify({
-        sessionId: "c88187",
-        runId: "ux-progress",
-        hypothesisId: "H1",
-        location: "CreateAssessmentPage.jsx:showAiProgress",
-        message: "progress visibility",
-        data: {
-          showAiProgress,
-          aiGenerating,
-          status: aiProgress?.status || null,
-          percent: aiProgress?.percent ?? null,
-          phase: aiProgress?.phase || null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  }, [showAiProgress, aiGenerating, aiProgress?.status, aiProgress?.percent, aiProgress?.phase]);
-  // #endregion
   const errorFeedbackRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
   const aiResultsRef = useScrollIntoViewWhen(
     !aiGenerating && questions.length > 0 && questionCollapseToken > 0,
@@ -542,7 +520,7 @@ export default function CreateAssessment() {
         },
       });
     } catch (err) {
-      setError(err.message || "Failed to publish assessment.");
+      setError(friendlyError(err, "Failed to publish assessment."));
     } finally {
       setLoading(false);
     }

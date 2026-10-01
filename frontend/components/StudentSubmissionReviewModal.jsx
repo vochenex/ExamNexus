@@ -13,6 +13,7 @@ import {
 } from "../utils/facultyGrading";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 import ModalPortal from "./ui/ModalPortal";
+import { friendlyError } from "../utils/friendlyError";
 
 function clampEssayScoreInput(raw, maxPoints) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -105,7 +106,7 @@ export default function StudentSubmissionReviewModal({
           )
         );
       })
-      .catch((err) => setError(err.message || "Failed to load submission."))
+      .catch((err) => setError(friendlyError(err, "Failed to load submission.")))
       .finally(() => setLoading(false));
     // `questions`/`examType` are read to seed essay scores but must NOT trigger a
     // refetch: their parent rebuilds a new array reference on every realtime poll,
@@ -197,7 +198,7 @@ export default function StudentSubmissionReviewModal({
 
       setSaveNotice("Scores saved. Finish remaining essays or close when done.");
     } catch (err) {
-      setError(err.message || "Failed to save scores.");
+      setError(friendlyError(err, "Failed to save scores."));
     } finally {
       setSaving(false);
     }

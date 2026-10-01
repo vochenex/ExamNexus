@@ -1,3 +1,5 @@
+import { friendlyError } from "./friendlyError";
+
 function collectErrorText(error) {
   if (!error) return "";
   return [
@@ -111,9 +113,5 @@ export function formatSupabaseError(error, options = {}) {
     }
   }
 
-  if (message && !/^PGRST\d+/i.test(message)) {
-    return message;
-  }
-
-  return fallback || message || "Something went wrong. Please try again.";
+  return friendlyError(error, fallback);
 }

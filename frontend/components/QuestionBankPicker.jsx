@@ -10,6 +10,7 @@ import {
   getQuestionBankTypeLabel,
 } from "../utils/questionBank";
 import { EXAM_TYPE_LABELS } from "../utils/assessmentQuestions";
+import { friendlyError } from "../utils/friendlyError";
 
 function questionPreview(row) {
   const text = String(row.title || row.question || "").trim();
@@ -41,7 +42,7 @@ export default function QuestionBankPicker({ open, onClose, onImport, filterType
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || "Failed to load question bank.");
+          setError(friendlyError(err, "Failed to load question bank."));
         }
       } finally {
         if (!cancelled) {

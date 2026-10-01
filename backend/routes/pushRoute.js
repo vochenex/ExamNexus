@@ -9,6 +9,7 @@ const {
   getPushApiMode,
   getVapidPublicKey,
 } = require("../lib/pushSender");
+const { publicErrorMessage } = require("../lib/publicError");
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ async function requireAuth(req, res, next) {
     next();
   } catch (err) {
     return res.status(err.statusCode || 401).json({
-      error: err.message || "Unauthorized",
+      error: publicErrorMessage(err, "Please sign in again."),
     });
   }
 }
@@ -57,7 +58,7 @@ router.post("/announce", requireAuth, async (req, res) => {
     const admin = getSupabaseAdmin();
     if (!admin) {
       return res.status(503).json({
-        error: "SUPABASE_SERVICE_ROLE_KEY is required to send push notifications",
+        error: publicErrorMessage("SUPABASE_SERVICE_ROLE_KEY is required to send push notifications"),
       });
     }
 
@@ -82,7 +83,7 @@ router.post("/announce", requireAuth, async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (err) {
     console.error("push/announce:", err);
-    res.status(500).json({ error: err.message || "Failed to send push" });
+    res.status(500).json({ error: publicErrorMessage(err, "Failed to send the notification.") });
   }
 });
 
@@ -96,7 +97,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
     const admin = getSupabaseAdmin();
     if (!admin) {
       return res.status(503).json({
-        error: "SUPABASE_SERVICE_ROLE_KEY is required to send push notifications",
+        error: publicErrorMessage("SUPABASE_SERVICE_ROLE_KEY is required to send push notifications"),
       });
     }
 
@@ -121,7 +122,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (err) {
     console.error("push/broadcast:", err);
-    res.status(500).json({ error: err.message || "Failed to send broadcast push" });
+    res.status(500).json({ error: publicErrorMessage(err, "Failed to send the notification.") });
   }
 });
 
@@ -134,7 +135,7 @@ router.post("/notify-users", requireAuth, async (req, res) => {
     const admin = getSupabaseAdmin();
     if (!admin) {
       return res.status(503).json({
-        error: "SUPABASE_SERVICE_ROLE_KEY is required to send push notifications",
+        error: publicErrorMessage("SUPABASE_SERVICE_ROLE_KEY is required to send push notifications"),
       });
     }
 
@@ -158,7 +159,7 @@ router.post("/notify-users", requireAuth, async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (err) {
     console.error("push/notify-users:", err);
-    res.status(500).json({ error: err.message || "Failed to send push" });
+    res.status(500).json({ error: publicErrorMessage(err, "Failed to send the notification.") });
   }
 });
 

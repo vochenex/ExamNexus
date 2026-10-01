@@ -2,15 +2,16 @@ import App from "../App";
 import UpdatePrompt from "./pwa/UpdatePrompt";
 import NativeBackBridge from "./NativeBackBridge";
 import NavigationProgressOverlay from "./NavigationProgressOverlay";
-import DevRouteFileIndicator from "./DevRouteFileIndicator";
 import DevLocationToast from "./DevLocationToast";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { syncPushTokenForCurrentUser } from "../utils/pushNotifications";
 import { isNativeApp } from "../utils/platform";
 import { isNativeEntryPath, getNativeEntryPath } from "../utils/nativeRoutes";
 import { getCachedExamNexusUser } from "../utils/authUser";
 import { sanitizeAppPath } from "../utils/notificationRoutes";
+
+const DevUiInspector = import.meta.env.DEV ? lazy(() => import("./DevUiInspector")) : null;
 
 function PushNavigationBridge() {
   const navigate = useNavigate();
@@ -99,8 +100,12 @@ export default function AppBootstrap() {
       <NativeEntryRedirect />
       <PushNavigationBridge />
       <NativeBackBridge />
-      <DevRouteFileIndicator />
       <DevLocationToast />
+      {DevUiInspector ? (
+        <Suspense fallback={null}>
+          <DevUiInspector />
+        </Suspense>
+      ) : null}
     </>
   );
 }

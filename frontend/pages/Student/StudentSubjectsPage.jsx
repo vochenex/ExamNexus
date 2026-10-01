@@ -24,6 +24,7 @@ import { usePolling } from "../../hooks/useRealtimeFetch";
 import { API_BASE } from "../../utils/apiBase.js";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 import { getYearLevelLabel } from "../../utils/yearLevels";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function StudentSubjects() {
   const { theme } = useTheme();
@@ -109,8 +110,7 @@ export default function StudentSubjects() {
       console.error("Failed to load subjects:", err);
       setSubjects([]);
       setLoadError(
-        err.message ||
-          "Could not load your subjects. Run database/student_rpc_functions.sql in Supabase SQL Editor, then refresh."
+        friendlyError(err, "Could not load your subjects. Please refresh and try again.")
       );
     } finally {
       if (!silent) setLoading(false);
@@ -195,7 +195,7 @@ export default function StudentSubjects() {
 
       if (error.message?.includes("ON CONFLICT") || error.message?.includes("unique or exclusion constraint")) {
         throw new Error(
-          "Enrollment database setup is incomplete. Run database/fix_enrollment_unique.sql in Supabase SQL Editor, then try again."
+          "Enrollment isn't set up yet. Please contact the system administrator."
         );
       }
 
@@ -288,7 +288,7 @@ export default function StudentSubjects() {
       await loadSubjects();
     } catch (err) {
       console.error(err);
-      setEnrollError(err.message || "Failed to enroll. Please try again.");
+      setEnrollError(friendlyError(err, "Failed to enroll. Please try again."));
     } finally {
       setEnrolling(false);
     }
@@ -313,7 +313,7 @@ export default function StudentSubjects() {
       setUnenrollTarget(null);
     } catch (err) {
       console.error(err);
-      setLoadError(err.message || "Failed to unenroll from this subject.");
+      setLoadError(friendlyError(err, "Failed to unenroll from this subject."));
       setUnenrollTarget(null);
     } finally {
       setUnenrolling(false);

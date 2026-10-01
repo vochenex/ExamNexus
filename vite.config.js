@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { examNexusDevDebuggerBridge } from './frontend/dev/examNexusDevDebuggerBridge.js'
+import { examNexusUiInspectorPlugin } from './frontend/dev/examNexusUiInspectorPlugin.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -52,7 +52,11 @@ function serviceWorkerBuildStamp() {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), examNexusDevDebuggerBridge(), serviceWorkerBuildStamp()],
+  plugins: [
+    examNexusUiInspectorPlugin(),
+    react(),
+    serviceWorkerBuildStamp(),
+  ],
   server: {
     open: '/',
   },

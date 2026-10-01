@@ -1,5 +1,6 @@
 const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
 const { resolveUserIdFromAccessToken } = require("../lib/verifyAccessToken");
+const { publicErrorMessage } = require("../lib/publicError");
 
 function normalizeRole(profile) {
   return String(profile?.role || "").trim().toLowerCase();
@@ -30,7 +31,7 @@ async function requireFaculty(req, res, next) {
     const admin = getSupabaseAdmin();
     if (!admin) {
       return res.status(503).json({
-        error: "Server auth is not configured. Add SUPABASE_SERVICE_ROLE_KEY to backend/.env.",
+        error: publicErrorMessage("Server auth is not configured. Add SUPABASE_SERVICE_ROLE_KEY to backend/.env."),
       });
     }
 
@@ -79,7 +80,7 @@ async function requireFaculty(req, res, next) {
     if (status >= 500) {
       console.error("requireFaculty error:", err);
     }
-    res.status(status).json({ error: err.message || "Authorization failed" });
+    res.status(status).json({ error: publicErrorMessage(err, "Could not verify your account. Please sign in again.") });
   }
 }
 

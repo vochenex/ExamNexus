@@ -15,6 +15,7 @@ import {
 import { DEFAULT_YEAR_LEVEL, normalizeYearLevel } from "../utils/yearLevels";
 import ModalPortal from "./ui/ModalPortal";
 import ProgressButton from "./ui/ProgressButton";
+import { friendlyError } from "../utils/friendlyError";
 
 export default function EditSubjectModal({
   subject,
@@ -74,7 +75,7 @@ export default function EditSubjectModal({
       onClose?.();
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to update subject.");
+      setError(friendlyError(err, "Failed to update subject."));
     } finally {
       setSaving(false);
     }

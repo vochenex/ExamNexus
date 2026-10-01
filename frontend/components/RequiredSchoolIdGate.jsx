@@ -12,6 +12,7 @@ import {
 } from "../utils/schoolIdRules";
 import ModalPortal from "./ui/ModalPortal";
 import { useScrollIntoViewWhen } from "../hooks/useScrollIntoViewWhen";
+import { friendlyError } from "../utils/friendlyError";
 
 function inputClass(theme) {
   return `w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-emerald-400 ${
@@ -152,8 +153,7 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
         // Faculty ID changes must remap subjects or ownership breaks.
         // Do not silently change school_id without remapping.
         throw new Error(
-          rpcError?.message ||
-            "Could not update your School ID while keeping your subjects linked. Ask an admin to run the update_own_school_id database fix, then try again."
+          friendlyError(rpcError, "Could not update your School ID while keeping your subjects linked. Ask an admin to run the update_own_school_id database fix, then try again.")
         );
       } else {
         const { data, error: updateError } = await supabase
@@ -235,8 +235,7 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
       onResolved?.(nextUser);
     } catch (err) {
       setError(
-        err?.message ||
-          "Could not save your School ID. Check that it is not already registered."
+        friendlyError(err, "Could not save your School ID. Check that it is not already registered.")
       );
     } finally {
       setSaving(false);

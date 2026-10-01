@@ -75,6 +75,7 @@ import {
   releaseScrollLock,
 } from "../../utils/bodyScrollLock";
 import "../../styles/home.css";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function ExamNexusAuth() {
   const navigate = useNavigate();
@@ -423,8 +424,7 @@ export default function ExamNexusAuth() {
     setLoading(false);
     setServerError("");
     setPendingReviewMessage(
-      notice.message ||
-        "Your account is still under review by an administrator. You can log in after it is approved."
+      notice.message || "Your account is still under review by an administrator. You can log in after it is approved."
     );
     clearAuthNotice();
     await supabase.auth.signOut();
@@ -519,8 +519,7 @@ function getAuthInputProps(theme) {
         const verification = await verifyPasswordResetAccount({ email, schoolId });
         if (!verification?.found) {
           setServerError(
-            verification?.message ||
-              "No account matches this email and school ID. Check both fields and try again."
+            friendlyError(verification, "No account matches this email and school ID. Check both fields and try again.")
           );
           return;
         }
@@ -534,8 +533,7 @@ function getAuthInputProps(theme) {
           });
           if (updateResult?.success === false && updateResult?.status === "none") {
             setServerError(
-              updateResult.message ||
-                "No pending request found. Switch to “Send new request” instead."
+              friendlyError(updateResult, "No pending request found. Switch to “Send new request” instead.")
             );
             return;
           }
@@ -553,16 +551,14 @@ function getAuthInputProps(theme) {
       const verification = await verifyPasswordResetAccount({ email, schoolId });
       if (!verification?.found) {
         setServerError(
-          verification?.message ||
-            "No account matches this email and school ID. Check both fields and try again."
+          friendlyError(verification, "No account matches this email and school ID. Check both fields and try again.")
         );
         return;
       }
 
       if (verification?.has_pending) {
         setSuccessMessage(
-          verification.message ||
-            "You already have a pending password reset request. An administrator will contact you soon."
+          friendlyError(verification, "You already have a pending password reset request. An administrator will contact you soon.")
         );
         return;
       }
@@ -575,15 +571,13 @@ function getAuthInputProps(theme) {
 
       if (result?.success === false) {
         setServerError(
-          result.message ||
-            "No account matches this email and school ID. Check both fields and try again."
+          friendlyError(result, "No account matches this email and school ID. Check both fields and try again.")
         );
         return;
       }
 
       setSuccessMessage(
-        result.message ||
-          "Your request was sent to an administrator. You will be able to log in after they reset your password."
+        result?.message || "Your request was sent to an administrator. You will be able to log in after they reset your password."
       );
       setForm((current) => ({
         ...current,
@@ -733,7 +727,7 @@ function getAuthInputProps(theme) {
         finishAuthenticatedSession(profile);
         return true;
       } catch (err) {
-        setPinError(err?.message || "Could not save device PIN.");
+        setPinError(friendlyError(err, "Could not save device PIN."));
         setPinBusy(false);
         return false;
       }
@@ -833,7 +827,7 @@ function getAuthInputProps(theme) {
         finishAuthenticatedSession(profile);
         return true;
       } catch (err) {
-        setPinError(err?.message || "Could not verify PIN.");
+        setPinError(friendlyError(err, "Could not verify PIN."));
         setPinBusy(false);
         return false;
       }

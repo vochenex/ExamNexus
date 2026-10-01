@@ -6,6 +6,7 @@ import ProgressButton from "./ui/ProgressButton";
 import { primaryButton, secondaryButton } from "../utils/themeButtons";
 import { deserializeQuestion } from "../utils/assessmentQuestions";
 import { getQuestionBankTypeLabel, saveQuestionToBank } from "../utils/questionBank";
+import { friendlyError } from "../utils/friendlyError";
 
 function questionPreview(question) {
   const text = String(question.question || "").trim();
@@ -85,7 +86,7 @@ export default function QuestionBankSaveModal({
       onSaved?.(selected.length);
       handleClose();
     } catch (err) {
-      setError(err.message || "Could not save questions to your bank.");
+      setError(friendlyError(err, "Could not save questions to your bank."));
     } finally {
       setSaving(false);
     }

@@ -25,6 +25,7 @@ const pushRoute = require("./routes/pushRoute");
 const { getSupabaseAdmin } = require("./lib/supabaseAdmin");
 const { getAiServiceStatus } = require("./lib/aiProvider");
 const { isPushConfigured, getPushApiMode } = require("./lib/pushSender");
+const { publicErrorMessage } = require("./lib/publicError");
 
 function ensureUploadsDir() {
   try {
@@ -73,7 +74,7 @@ function createApp() {
       try {
         aiStatus = await getAiServiceStatus();
       } catch (err) {
-        aiStatus = { configured: false, error: err.message };
+        aiStatus = { configured: false, error: publicErrorMessage(err) };
       }
 
       const hasSupabase = Boolean(
@@ -102,7 +103,7 @@ function createApp() {
             : "Add SUPABASE_SERVICE_ROLE_KEY (Supabase → Project Settings → API → service_role)",
       });
     } catch (err) {
-      res.status(500).json({ ok: false, error: err.message });
+      res.status(500).json({ ok: false, error: publicErrorMessage(err) });
     }
   });
 
@@ -114,7 +115,7 @@ function createApp() {
       res.json(data);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: publicErrorMessage(err) });
     }
   });
 
@@ -188,7 +189,7 @@ function createApp() {
       });
     } catch (err) {
       console.error("❌ manual-exam error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: publicErrorMessage(err) });
     }
   });
 
@@ -242,7 +243,7 @@ function createApp() {
       });
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: publicErrorMessage(err) });
     }
   });
 
@@ -261,7 +262,7 @@ function createApp() {
 
       res.json({ data, error });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: publicErrorMessage(err) });
     }
   });
 
@@ -340,7 +341,7 @@ function createApp() {
       });
     } catch (err) {
       console.error("UPDATE EXAM ERROR:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: publicErrorMessage(err) });
     }
   });
 
@@ -367,7 +368,7 @@ function createApp() {
       });
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: publicErrorMessage(err) });
     }
   });
 
@@ -380,7 +381,7 @@ function createApp() {
   app.use((err, req, res, _next) => {
     console.error("GLOBAL EXPRESS ERROR:", err);
     res.status(500).json({
-      error: err.message || "Internal Server Error",
+      error: publicErrorMessage(err, "Something went wrong on the server. Please try again in a moment."),
     });
   });
 

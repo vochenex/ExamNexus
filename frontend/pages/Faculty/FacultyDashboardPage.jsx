@@ -57,6 +57,7 @@ import CollapsiblePanel from "../../components/ui/CollapsiblePanel";
 import ProgressButton from "../../components/ui/ProgressButton";
 import ModalPortal from "../../components/ui/ModalPortal";
 import AlertBanner from "../../components/ui/AlertBanner";
+import { friendlyError } from "../../utils/friendlyError";
 
 function panelClass(theme) {
   return theme === "dark"
@@ -194,7 +195,7 @@ export default function FacultyDashboard() {
       await fetchSubjects(true);
     } catch (err) {
       console.error("Delete Subject Error:", err);
-      showError(err.message);
+      showError(friendlyError(err, "Something went wrong. Please try again."));
     } finally {
       setDeletingSubjectId(null);
     }
@@ -218,7 +219,7 @@ export default function FacultyDashboard() {
       await fetchSubjects(true);
     } catch (err) {
       console.error("Error adding subject:", err);
-      showError(err.message);
+      showError(friendlyError(err, "Something went wrong. Please try again."));
     } finally {
       setCreatingSubject(false);
     }
@@ -266,7 +267,7 @@ export default function FacultyDashboard() {
       await fetchSubjects(true);
     } catch (err) {
       console.error("Error updating subject:", err);
-      showError(err.message);
+      showError(friendlyError(err, "Something went wrong. Please try again."));
     } finally {
       setSavingSubjectId(null);
     }

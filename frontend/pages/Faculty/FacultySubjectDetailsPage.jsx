@@ -44,6 +44,7 @@ import AlertBanner from "../../components/ui/AlertBanner";
 import { pageShellWithBellClass, inputClass } from "../../utils/themeInputs";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { matchesStudentSearch } from "../../utils/studentSearch";
+import { friendlyError } from "../../utils/friendlyError";
 
 function getAssessmentStatus(assessment) {
   const now = new Date();
@@ -148,7 +149,7 @@ export default function SubjectDetails() {
       }
     } catch (err) {
       console.error(err);
-      if (!silent) showError(err.message || "Failed to load subject");
+      if (!silent) showError(friendlyError(err, "Failed to load subject"));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -309,7 +310,7 @@ export default function SubjectDetails() {
       setUnenrollTarget(null);
       loadAnalytics(true);
     } catch (err) {
-      showError(err.message || "Failed to unenroll student.");
+      showError(friendlyError(err, "Failed to unenroll student."));
     } finally {
       setUnenrolling(false);
     }

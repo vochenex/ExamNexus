@@ -8,6 +8,7 @@ import {
 import StudentIntegrityAlertsModal from "./StudentIntegrityAlertsModal";
 import { PageLoadingSkeleton } from "./ui/PageLoadingSkeleton";
 import { usePolling } from "../hooks/useRealtimeFetch";
+import { friendlyError } from "../utils/friendlyError";
 
 const tierStyles = {
   blue: {
@@ -47,7 +48,7 @@ export default function ExamSubmissionAlertsPanel({ examId }) {
       const rows = await fetchExamSubmissionAlerts(examId);
       setSubmissions(rows);
     } catch (err) {
-      setError(err.message || "Failed to load submission alerts.");
+      setError(friendlyError(err, "Failed to load submission alerts."));
     } finally {
       if (!silent) setLoading(false);
     }

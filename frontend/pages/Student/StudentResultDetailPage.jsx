@@ -19,6 +19,7 @@ import { fetchStudentExamResultReview } from "../../utils/supabaseData";
 import { isStudentResultsFlagEnabled } from "../../utils/assessmentStatus";
 import { resolveStudentId } from "../../utils/authUser";
 import { exitAssessmentFullscreen } from "../../utils/examIntegrity";
+import { friendlyError } from "../../utils/friendlyError";
 
 function QuestionResultCard({
   question,
@@ -162,7 +163,7 @@ export default function StudentResults() {
       );
     } catch (err) {
       console.error(err?.message || err);
-      setLoadError(err?.message || "Could not load results.");
+      setLoadError(friendlyError(err, "Could not load results."));
       setExam(null);
       setResult(null);
       setQuestions([]);

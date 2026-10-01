@@ -2,6 +2,8 @@
 
 Quick locator while debugging. Local tip: amber **Debug · page file** badge shows the active page (`Ctrl+Shift+D`).
 
+**UI Inspector (`Ctrl+E`, dev only):** click any element to see its JSX file:line, the helpers/state it uses (e.g. `className → primaryButtonFull`), the component chain, colors, animations/keyframes, CSS rules, and hidden layers under the cursor; click a file chip to open it in Cursor. Includes a code search box. Files: `frontend/components/DevUiInspector.jsx`, `frontend/dev/uiInspector*.js`, `frontend/dev/examNexusUiInspectorPlugin.js` (Vite plugin that tags JSX with `data-en-src`).
+
 ---
 
 ## Top level
@@ -167,7 +169,7 @@ Quick locator while debugging. Local tip: amber **Debug · page file** badge sho
 ## `frontend/components/` (grouped)
 
 ### Core / chrome
-`AppBootstrap` · `DevRouteFileIndicator` · `RouteFallback` · `WebOnlyHomeRoute` · `NavigationProgressOverlay` · `LogoSplashScreen` · `ThemeToggle` · `NotificationBell` · `BackButton` · `ProgressLink` · `SidebarNavLink` · `SidebarCollapseToggle` · `NativeAuthHeader` · `NativeBackBridge` · `RequiredSchoolIdGate` · `ExamNexusLogo` · `ExamNexusBrand` · `ProfileAvatar` · `AvatarLightbox` · `DefaultAvatarIcon`
+`AppBootstrap` · `RouteFallback` · `WebOnlyHomeRoute` · `NavigationProgressOverlay` · `LogoSplashScreen` · `ThemeToggle` · `NotificationBell` · `BackButton` · `ProgressLink` · `SidebarNavLink` · `SidebarCollapseToggle` · `NativeAuthHeader` · `NativeBackBridge` · `RequiredSchoolIdGate` · `ExamNexusLogo` · `ExamNexusBrand` · `ProfileAvatar` · `AvatarLightbox` · `DefaultAvatarIcon`
 
 ### Auth / home subfolders
 - `auth/` — `SignupFormFields` · `PendingApprovalModal`

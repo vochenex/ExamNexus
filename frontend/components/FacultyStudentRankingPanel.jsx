@@ -12,6 +12,7 @@ import {
 } from "../utils/supabaseData";
 import { getSubjectSections } from "../utils/sections";
 import { secondaryButtonSm } from "../utils/themeButtons";
+import { friendlyError } from "../utils/friendlyError";
 
 function panelClass(theme) {
   return theme === "dark"
@@ -130,7 +131,7 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
         });
       } catch (err) {
         console.error("Faculty student ranking subjects:", err);
-        setError(err?.message || "Could not load subjects.");
+        setError(friendlyError(err, "Could not load subjects."));
         setSubjects([]);
       } finally {
         if (!silent) setLoadingSubjects(false);
@@ -171,7 +172,7 @@ export default function FacultyStudentRankingPanel({ teacherSchoolId }) {
       } catch (err) {
         console.error("Faculty student ranking:", err);
         setRows([]);
-        setError(err?.message || "Could not load student rankings.");
+        setError(friendlyError(err, "Could not load student rankings."));
       } finally {
         if (!silent) setLoadingRanks(false);
       }

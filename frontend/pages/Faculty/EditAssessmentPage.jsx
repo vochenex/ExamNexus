@@ -34,6 +34,7 @@ import { saveQuestionToBank } from "../../utils/questionBank";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 import { pageShellWithBellClass } from "../../utils/themeInputs";
+import { friendlyError } from "../../utils/friendlyError";
 
 const defaultAssessment = {
   subject_id: "",
@@ -185,7 +186,7 @@ export default function EditAssessment() {
       })
       .catch((err) => {
         console.error(err);
-        setError(err.message || "Failed to load assessment.");
+        setError(friendlyError(err, "Failed to load assessment."));
       })
       .finally(() => setPageLoading(false));
   }, [examId, initializeFromLoadedQuestions]);
@@ -236,7 +237,7 @@ export default function EditAssessment() {
       await saveQuestionToBank(question);
       showSuccess("Question saved to your bank.");
     } catch (err) {
-      showError(err.message || "Could not save question to bank.");
+      showError(friendlyError(err, "Could not save question to bank."));
     } finally {
       setSavingToBankId(null);
     }
@@ -333,7 +334,7 @@ export default function EditAssessment() {
         },
       });
     } catch (err) {
-      setError(err.message || "Failed to save assessment.");
+      setError(friendlyError(err, "Failed to save assessment."));
     } finally {
       setLoading(false);
     }

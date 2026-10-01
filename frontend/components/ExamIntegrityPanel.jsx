@@ -4,6 +4,7 @@ import { useTheme } from "../layouts/ThemeContext";
 import { fetchExamIntegrityEvents } from "../utils/supabaseData";
 import { formatIntegrityEventLabel, isStrikeWorthyEvent } from "../utils/examIntegrity";
 import { usePolling } from "../hooks/useRealtimeFetch";
+import { friendlyError } from "../utils/friendlyError";
 
 function studentName(row) {
   const user = row.users;
@@ -26,7 +27,7 @@ export default function ExamIntegrityPanel({ examId }) {
       const rows = await fetchExamIntegrityEvents(examId);
       setEvents(rows);
     } catch (err) {
-      setError(err.message || "Failed to load integrity events.");
+      setError(friendlyError(err, "Failed to load integrity events."));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -49,9 +50,7 @@ export default function ExamIntegrityPanel({ examId }) {
   if (error) {
     return (
       <p className="text-sm text-red-500">
-        {error.includes("exam_integrity_events")
-          ? "Run database/exam_integrity_events.sql in Supabase to enable integrity reporting."
-          : error}
+        {error}
       </p>
     );
   }

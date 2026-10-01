@@ -35,6 +35,7 @@ import AdminPageError, { formatAdminError } from "../../components/admin/AdminPa
 import AlertBanner from "../../components/ui/AlertBanner";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
 import { primaryButton } from "../../utils/themeButtons";
+import { friendlyError } from "../../utils/friendlyError";
 
 function formatAdminPublishBanner(audience) {
   if (audience === "faculty") return "Announcement published to faculty.";
@@ -122,7 +123,7 @@ export default function AdminAnnouncements() {
       setPublishBanner(formatAdminPublishBanner(audience));
       void load(true);
     } catch (err) {
-      error(err.message || "Failed to publish announcement.");
+      error(friendlyError(err, "Failed to publish announcement."));
     } finally {
       setSaving(false);
     }
@@ -143,7 +144,7 @@ export default function AdminAnnouncements() {
       if (selectedId === row.id) setSelectedId(null);
       await load(true);
     } catch (err) {
-      error(err.message || "Could not delete announcement.");
+      error(friendlyError(err, "Could not delete announcement."));
     }
   };
 

@@ -26,6 +26,7 @@ import {
 } from "../../utils/avatar";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function FacultySubjectSocial() {
   const { theme } = useTheme();
@@ -68,7 +69,7 @@ export default function FacultySubjectSocial() {
       setAnnouncements(announcementData);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to load social page.");
+      setError(friendlyError(err, "Failed to load social page."));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -121,7 +122,7 @@ export default function FacultySubjectSocial() {
       await loadPage();
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to post announcement.");
+      setError(friendlyError(err, "Failed to post announcement."));
     } finally {
       setPosting(false);
     }

@@ -20,6 +20,7 @@ const {
   getAiServiceStatus,
   classifyDocumentsBatch,
 } = require("../lib/assessmentAiGenerator");
+const { publicErrorMessage } = require("../lib/publicError");
 
 const router = express.Router();
 
@@ -102,15 +103,22 @@ function handleMulterUpload(req, res, next) {
       });
     }
     if (err) {
-      return res.status(400).json({ error: err.message || "File upload failed." });
+      return res.status(400).json({ error: publicErrorMessage(err, "File upload failed. Please try again.") });
     }
     next();
   });
 }
 
+function publicFailures(failures) {
+  return (failures || []).map((item) => ({
+    ...item,
+    error: publicErrorMessage(item.error, "Could not read this file."),
+  }));
+}
+
 function handleRouteError(res, err) {
   const status = err.statusCode || 500;
-  const message = err.message || "AI assessment generation failed";
+  const message = publicErrorMessage(err, "AI question generation failed. Please try again.");
 
   if (status >= 500) {
     console.error("assessment-ai error:", err);
@@ -132,7 +140,7 @@ router.get("/status", requireFaculty, async (req, res) => {
       documentModel: status.documentModel,
       gemini: status.gemini,
       groq: status.groq,
-      error: status.error,
+      error: status.error ? publicErrorMessage(status.error) : null,
     });
   }
 
@@ -160,7 +168,7 @@ router.get("/public-config", async (req, res) => {
     documentModel: status.documentModel,
     gemini: status.gemini,
     groq: status.groq,
-    error: status.error || null,
+    error: status.error ? publicErrorMessage(status.error) : null,
   });
 });
 
@@ -408,45 +416,15 @@ router.post(
 
       const { docs, failures } = await extractDocumentsSeparatelyLenient(files);
       if (timedOut || res.headersSent) return;
-      // #region agent log
-      try {
-        const fsLog = require("fs");
-        const pathLog = require("path");
-        fsLog.appendFileSync(
-          pathLog.join(__dirname, "..", "..", "debug-c88187.log"),
-          `${JSON.stringify({
-            sessionId: "c88187",
-            runId: "pptx-debug",
-            hypothesisId: "H4",
-            location: "assessmentAiRoute.js:classify-document",
-            message: "classify extract outcome",
-            data: {
-              uploadCount: files.length,
-              names: files.map((f) => f.originalname || ""),
-              mimes: files.map((f) => f.mimetype || ""),
-              sizes: files.map((f) => f.size ?? f.buffer?.length ?? 0),
-              docs: docs.map((d) => ({
-                name: d.name,
-                textLen: String(d.text || "").length,
-              })),
-              failures,
-            },
-            timestamp: Date.now(),
-          })}\n`
-        );
-      } catch {
-        // ignore debug log failures
-      }
-      // #endregion
       if (!docs.length) {
         const detail = failures
-          .map((item) => `${item.name}: ${item.error}`)
+          .map((item) => `${item.name}: ${publicErrorMessage(item.error, "Could not read this file.")}`)
           .join(" | ");
         return res.status(400).json({
           error:
             detail ||
             "Could not extract readable text from the uploaded file(s). Use text-based PDF, .docx, or .pptx (not scanned images or old .doc/.ppt).",
-          failures,
+          failures: publicFailures(failures),
         });
       }
 
@@ -599,7 +577,7 @@ router.post(
       const docs = await extractDocumentsSeparatelyLenient(files).then(({ docs: extracted, failures }) => {
         if (!extracted.length) {
           const detail = failures
-            .map((item) => `${item.name}: ${item.error}`)
+            .map((item) => `${item.name}: ${publicErrorMessage(item.error, "Could not read this file.")}`)
             .join(" | ");
           const error = new Error(
             detail ||
@@ -680,13 +658,13 @@ router.post(
       const { docs, failures } = await extractDocumentsSeparatelyLenient(files);
       if (!docs.length) {
         const detail = failures
-          .map((item) => `${item.name}: ${item.error}`)
+          .map((item) => `${item.name}: ${publicErrorMessage(item.error, "Could not read this file.")}`)
           .join(" | ");
         return res.status(400).json({
           error:
             detail ||
             "Could not extract readable text from the uploaded file(s).",
-          failures,
+          failures: publicFailures(failures),
         });
       }
 

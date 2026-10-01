@@ -23,6 +23,7 @@ import StudentGradeCalculator from "../../components/StudentGradeCalculator";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { staggerGridClass } from "../../utils/themeInputs";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function StudentDashboard() {
   const { theme } = useTheme();
@@ -56,7 +57,7 @@ export default function StudentDashboard() {
         navigate("/auth", { replace: true });
         return;
       }
-      setError(err.message || "Failed to load dashboard analytics.");
+      setError(friendlyError(err, "Failed to load dashboard analytics."));
     } finally {
       if (!silent) setLoading(false);
     }

@@ -36,6 +36,7 @@ import ProgressButton from "../../components/ui/ProgressButton";
 import ModalPortal from "../../components/ui/ModalPortal";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { getCachedExamNexusUser } from "../../utils/authUser";
+import { friendlyError } from "../../utils/friendlyError";
 const TABS = [
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "integrity", label: "Integrity", icon: Shield },
@@ -211,7 +212,7 @@ export default function AssessmentDetails() {
         await reloadAnalytics(data.questions, data.exam, { silent: true });
       } catch (err) {
         console.error(err);
-        setError(err.message || "Failed to load assessment.");
+        setError(friendlyError(err, "Failed to load assessment."));
       } finally {
         if (!silent) {
           setLoading(false);
@@ -282,7 +283,7 @@ export default function AssessmentDetails() {
         );
       }
     } catch (err) {
-      showError(err.message || "Export failed.");
+      showError(friendlyError(err, "Export failed."));
     } finally {
       setExportingResults(false);
     }
@@ -303,7 +304,7 @@ export default function AssessmentDetails() {
       navigate(-1);
     } catch (err) {
       console.error(err);
-      showError(err.message || "Delete failed.");
+      showError(friendlyError(err, "Delete failed."));
     } finally {
       setDeleting(false);
     }

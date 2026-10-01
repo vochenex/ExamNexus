@@ -28,6 +28,7 @@ import { iconButton, primaryButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { DEFAULT_SECTION_COUNT } from "../../utils/sections";
 import { DEFAULT_YEAR_LEVEL } from "../../utils/yearLevels";
+import { friendlyError } from "../../utils/friendlyError";
 
 function facultyLabel(subject, facultyRows) {
   const schoolId = subject?.teacher_school_id;
@@ -125,7 +126,7 @@ export default function AdminSubjects() {
       });
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to create subject.");
+      error(friendlyError(err, "Failed to create subject."));
     } finally {
       setCreating(false);
     }
@@ -141,7 +142,7 @@ export default function AdminSubjects() {
       );
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to assign faculty.");
+      error(friendlyError(err, "Failed to assign faculty."));
       await load(true);
     } finally {
       setBusySubjectId(null);
@@ -155,7 +156,7 @@ export default function AdminSubjects() {
       await adminUpdateSubject(subjectId, { section_count: sectionCount });
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to update sections.");
+      error(friendlyError(err, "Failed to update sections."));
     } finally {
       setBusySubjectId(null);
     }
@@ -176,7 +177,7 @@ export default function AdminSubjects() {
       await success("Subject deleted.");
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to delete subject.");
+      error(friendlyError(err, "Failed to delete subject."));
     } finally {
       setDeletingId(null);
     }

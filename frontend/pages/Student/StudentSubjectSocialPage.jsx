@@ -17,6 +17,7 @@ import {
 import { resolveStudentId } from "../../utils/authUser";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function StudentSubjectSocial() {
   const { theme } = useTheme();
@@ -57,7 +58,7 @@ export default function StudentSubjectSocial() {
       setMySection(sectionData || "A");
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to load announcements.");
+      setError(friendlyError(err, "Failed to load announcements."));
     } finally {
       if (!silent) setLoading(false);
     }

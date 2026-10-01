@@ -73,6 +73,8 @@ The product is deployed as a **web app** (Vite + React), backed by an **Express 
 
 ## 3. Architecture (high level)
 
+Full map, HTTPS routes, API key names, and a redraw prompt: `docs/SYSTEM_ARCHITECTURE.md`.
+
 ```
 Browser / PWA / Capacitor app
         │

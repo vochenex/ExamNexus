@@ -244,9 +244,7 @@ export default function AdminDashboard() {
 
         {analytics?.unavailable && (
           <div className={adminNoticeClass(theme)}>
-            Chart analytics are not set up yet. Run{" "}
-            <code className="text-xs">database/admin_dashboard_analytics.sql</code> in Supabase to
-            enable graphs.
+            Chart analytics aren't set up yet. Please contact the system administrator.
           </div>
         )}
 

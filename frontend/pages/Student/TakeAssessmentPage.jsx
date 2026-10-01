@@ -61,6 +61,7 @@ import {
   saveExamSession,
   secondsUntilEndDatetime,
 } from "../../utils/examIntegrity";
+import { friendlyError } from "../../utils/friendlyError";
 
 function formatDurationLabel(examData) {
   return formatAssessmentDurationLabel(examData);
@@ -1051,7 +1052,7 @@ function TakeAssessmentExperience() {
       setResultDialog({
         tone: "danger",
         title: "Submission failed",
-        message: err.message || "Could not submit your answers. Please try again.",
+        message: friendlyError(err, "Could not submit your answers. Please try again."),
         exitLockdown: false,
       });
     } finally {

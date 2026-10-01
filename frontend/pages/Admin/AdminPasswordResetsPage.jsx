@@ -29,6 +29,7 @@ import {
 } from "../../utils/passwordReset";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
 import { iconButton, primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
+import { friendlyError } from "../../utils/friendlyError";
 
 const STATUSES = [
   { value: "pending", label: "Pending" },
@@ -139,7 +140,7 @@ export default function AdminPasswordResets() {
       await success("Request rejected.");
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to reject request.");
+      error(friendlyError(err, "Failed to reject request."));
     } finally {
       setActingId(null);
     }
@@ -166,7 +167,7 @@ export default function AdminPasswordResets() {
       setShowResetPassword(false);
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to reset password.");
+      error(friendlyError(err, "Failed to reset password."));
     } finally {
       setSubmitting(false);
     }
@@ -210,7 +211,7 @@ export default function AdminPasswordResets() {
       );
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to complete all password resets.");
+      error(friendlyError(err, "Failed to complete all password resets."));
     } finally {
       setBulkCompleting(false);
     }
@@ -240,7 +241,7 @@ export default function AdminPasswordResets() {
       );
       await load(true);
     } catch (err) {
-      error(err.message || "Failed to reject all password reset requests.");
+      error(friendlyError(err, "Failed to reject all password reset requests."));
     } finally {
       setBulkRejecting(false);
     }
@@ -368,7 +369,7 @@ export default function AdminPasswordResets() {
                     </td>
                     <td className={adminTdClass(theme)}>{row.email}</td>
                     <td className={adminTdClass(theme)}>{row.school_id}</td>
-                    <td className={adminTdClass(theme)}>{row.message || "—"}</td>
+                    <td className={adminTdClass(theme)}>{friendlyError(row, "—")}</td>
                     <td className={adminTdClass(theme)}>{statusBadge(theme, row.status)}</td>
                     <td className={adminTdClass(theme)}>
                       {row.status === "pending" ? (

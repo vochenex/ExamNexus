@@ -35,6 +35,7 @@ import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs"
 import { iconButton, primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
+import { friendlyError } from "../../utils/friendlyError";
 
 const ROLES = ["Student", "Faculty", "Admin"];
 const STATUSES = [
@@ -242,7 +243,7 @@ export default function AdminAccounts() {
       await success("Account updated successfully.");
     } catch (err) {
       setSaving(false);
-      error(err.message || "Failed to update account.");
+      error(friendlyError(err, "Failed to update account."));
     }
   };
 
@@ -265,7 +266,7 @@ export default function AdminAccounts() {
       await success("Account approved.");
     } catch (err) {
       setReviewingId(null);
-      error(err.message || "Failed to approve account.");
+      error(friendlyError(err, "Failed to approve account."));
     }
   };
 
@@ -294,7 +295,7 @@ export default function AdminAccounts() {
       await success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
     } catch (err) {
       setBulkApproving(false);
-      error(err.message || "Failed to approve all accounts.");
+      error(friendlyError(err, "Failed to approve all accounts."));
     }
   };
 
@@ -326,7 +327,7 @@ export default function AdminAccounts() {
       await success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
     } catch (err) {
       setBulkApproving(false);
-      error(err.message || "Failed to approve selected accounts.");
+      error(friendlyError(err, "Failed to approve selected accounts."));
     }
   };
 
@@ -366,7 +367,7 @@ export default function AdminAccounts() {
     } catch (err) {
       setDeletingId(null);
       setBulkDeleting(false);
-      error(err.message || "Failed to delete account.");
+      error(friendlyError(err, "Failed to delete account."));
     }
   };
 
@@ -400,7 +401,7 @@ export default function AdminAccounts() {
       await success("Account moved to Deleted (kept 7 days).");
     } catch (err) {
       setDeletingId(null);
-      error(err.message || "Failed to delete account.");
+      error(friendlyError(err, "Failed to delete account."));
     }
   };
 

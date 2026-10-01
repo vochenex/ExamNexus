@@ -23,6 +23,7 @@ import { resolveStudentId } from "../../utils/authUser";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function StudentAnnouncementsHubPage() {
   const { theme } = useTheme();
@@ -60,7 +61,7 @@ export default function StudentAnnouncementsHubPage() {
       setPlatform(Array.isArray(platformRows) ? platformRows : []);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to load announcements.");
+      setError(friendlyError(err, "Failed to load announcements."));
     } finally {
       if (!silent) setLoading(false);
     }

@@ -13,6 +13,7 @@ import { formatSectionLabel } from "../utils/sections";
 import { useAppModal } from "../contexts/AppModalContext";
 import { usePolling } from "../hooks/useRealtimeFetch";
 import { useScrollIntoViewWhen } from "../hooks/useScrollIntoViewWhen";
+import { friendlyError } from "../utils/friendlyError";
 
 const STATUS_STYLES = {
   pending: {
@@ -63,7 +64,7 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
       setRequests(rows);
       if (!silent) setSelectedIds(new Set());
     } catch (err) {
-      setError(err.message || "Failed to load retake requests.");
+      setError(friendlyError(err, "Failed to load retake requests."));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -140,7 +141,7 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
       await loadRequests();
       onUpdated?.();
     } catch (err) {
-      appModal.error(err.message || `Failed to ${verb} retake requests.`);
+      appModal.error(friendlyError(err, `Failed to ${verb} retake requests.`));
     } finally {
       setProcessing(false);
     }

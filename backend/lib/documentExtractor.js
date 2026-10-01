@@ -178,39 +178,6 @@ async function extractPptxText(file) {
 
   const joined = parts.join("\n\n").trim();
 
-  // #region agent log
-  try {
-    const fsLog = require("fs");
-    const logPath = require("path").join(
-      __dirname,
-      "..",
-      "..",
-      "debug-c88187.log"
-    );
-    fsLog.appendFileSync(
-      logPath,
-      `${JSON.stringify({
-        sessionId: "c88187",
-        runId: "pptx-debug",
-        hypothesisId: "H4",
-        location: "documentExtractor.js:extractPptxText",
-        message: "pptx extract result",
-        data: {
-          name: file?.originalname || "",
-          mime: file?.mimetype || "",
-          bytes: buffer.length,
-          xmlParts: xmlNames.length,
-          sampleParts: xmlNames.slice(0, 8),
-          textLen: joined.length,
-          preview: joined.slice(0, 120),
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    // ignore debug log failures
-  }
-  // #endregion
 
   return joined;
 }

@@ -19,6 +19,7 @@ import {
   mergeClassificationSourceText,
 } from "../utils/assessmentAi";
 import { assessmentInputClass } from "../utils/assessmentFormStyles";
+import { friendlyError } from "../utils/friendlyError";
 import Select from "./ui/Select";
 import FormatMultiSelect from "./ui/FormatMultiSelect";
 
@@ -68,9 +69,7 @@ function questionCountWarning(value) {
 function normalizeErrorMessage(error, fallback = "AI generation failed.") {
   if (!error) return fallback;
   if (error?.name === "AbortError") return "";
-  if (typeof error === "string") return error || fallback;
-  if (typeof error.message === "string" && error.message.trim()) return error.message;
-  return fallback;
+  return friendlyError(error, fallback);
 }
 
 function formatDocumentKind(kind) {
@@ -243,21 +242,6 @@ export default function AssessmentAiGenerator({
 
     // New upload → hide any leftover completed progress bar.
     onProgress?.(null);
-    // #region agent log
-    fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
-      body: JSON.stringify({
-        sessionId: "c88187",
-        runId: "ux-progress",
-        hypothesisId: "H1",
-        location: "AssessmentAiGenerator.jsx:addFiles",
-        message: "cleared progress on file add",
-        data: { acceptedCount: accepted.length },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     setFiles((prev) => {
       const next = [...prev];
@@ -289,21 +273,6 @@ export default function AssessmentAiGenerator({
     setLoading(true);
     // Drop any leftover 100% "done" bar before status/auth work starts.
     onProgress?.(null);
-    // #region agent log
-    fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
-      body: JSON.stringify({
-        sessionId: "c88187",
-        runId: "ux-progress",
-        hypothesisId: "H1",
-        location: "AssessmentAiGenerator.jsx:runGeneration",
-        message: "cleared progress at generation start",
-        data: {},
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -314,9 +283,10 @@ export default function AssessmentAiGenerator({
       setAiReady(latestStatus);
 
       if (!latestStatus.configured) {
-        const message =
-          latestStatus.error ||
-          "AI is not ready. Add GEMINI_API_KEY to backend/.env, then restart the backend.";
+        const message = friendlyError(
+          latestStatus.error,
+          "AI question generation isn't available right now. Please contact the system administrator."
+        );
         reportError(message);
         onError?.(message);
         return;
@@ -354,26 +324,6 @@ export default function AssessmentAiGenerator({
         return;
       }
       const message = normalizeErrorMessage(error);
-      // #region agent log
-      fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c88187" },
-        body: JSON.stringify({
-          sessionId: "c88187",
-          runId: "pptx-debug",
-          hypothesisId: "H5",
-          location: "AssessmentAiGenerator.jsx:runGeneration:catch",
-          message: "generation/classify error",
-          data: {
-            err: String(message || "").slice(0, 240),
-            fileNames: files.map((f) => String(f?.name || "").slice(0, 60)),
-            fileTypes: files.map((f) => String(f?.type || "").slice(0, 80)),
-            fileSizes: files.map((f) => Number(f?.size) || 0),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       if (message) {
         reportError(message);
         onError?.(message);
@@ -448,49 +398,6 @@ export default function AssessmentAiGenerator({
         ({ onProgress, onQuestionGenerated, signal }) => {
           const mergedSource =
             mergeClassificationSourceText(documentAnalysis) || undefined;
-          // #region agent log
-          fetch("/__agent_debug_log", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: "c88187",
-              runId: "pre-fix",
-              hypothesisId: "B",
-              location: "AssessmentAiGenerator.jsx:sourceGenerate",
-              message: "phase2 source generate click",
-              data: {
-                mergedSourceLen: String(mergedSource || "").length,
-                hasAnalysis: Boolean(documentAnalysis),
-                hasDocuments: Array.isArray(documentAnalysis?.documents),
-                questionCount: resolvedQuestionCount,
-                formats: selectedFormats,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "c88187",
-            },
-            body: JSON.stringify({
-              sessionId: "c88187",
-              runId: "pre-fix",
-              hypothesisId: "B",
-              location: "AssessmentAiGenerator.jsx:sourceGenerate",
-              message: "phase2 source generate click",
-              data: {
-                mergedSourceLen: String(mergedSource || "").length,
-                hasAnalysis: Boolean(documentAnalysis),
-                hasDocuments: Array.isArray(documentAnalysis?.documents),
-                questionCount: resolvedQuestionCount,
-                formats: selectedFormats,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
           return generateAssessmentFromDocument({
             files: sourceFiles,
             sourceText: mergedSource,

@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const router = express.Router();
 const { createAnonClient, createUserClient } = require("../lib/supabaseClient");
 const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
+const { publicErrorMessage } = require("../lib/publicError");
 
 const generateInviteCode = () =>
   crypto.randomBytes(4).toString("hex");
@@ -51,7 +52,7 @@ console.log({
 
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: publicErrorMessage(err) });
   }
 });
 
@@ -75,7 +76,7 @@ router.get("/teacher/:teacherId", async (req, res) => {
   console.error(err);
 
   res.status(500).json({
-    error: err.message,
+    error: publicErrorMessage(err),
   });
 }
 });
@@ -97,7 +98,7 @@ router.get("/:subjectId", async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: publicErrorMessage(err) });
   }
 });
 
@@ -229,7 +230,7 @@ const joinSubject = async (req, res) => {
       if (error.code === "42501") {
         return res.status(500).json({
           error:
-            "Enrollment is not configured yet. Add SUPABASE_SERVICE_ROLE_KEY to backend/.env and restart the backend.",
+            publicErrorMessage("Enrollment is not configured yet. Add SUPABASE_SERVICE_ROLE_KEY to backend/.env and restart the backend."),
         });
       }
       if (error.code === "23505") {
@@ -258,7 +259,7 @@ const joinSubject = async (req, res) => {
     });
   } catch (err) {
     console.error("JOIN SUBJECT ERROR:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: publicErrorMessage(err) });
   }
 };
 
@@ -289,7 +290,7 @@ router.get("/:subjectId/assessments", async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: publicErrorMessage(err) });
   }
 });
 
@@ -309,7 +310,7 @@ router.get("/:subjectId/students", async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: publicErrorMessage(err) });
   }
 });
 //
@@ -335,7 +336,7 @@ router.delete("/:subjectId", async (req, res) => {
     console.error(err);
 
     res.status(500).json({
-      error: err.message,
+      error: publicErrorMessage(err),
     });
   }
 });

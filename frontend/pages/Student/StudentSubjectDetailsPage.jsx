@@ -19,6 +19,7 @@ import {
 } from "../../utils/supabaseData";
 import PanelContentSkeleton from "../../components/ui/PanelContentSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
+import { friendlyError } from "../../utils/friendlyError";
 
 export default function StudentSubjectDetails() {
   const { theme } = useTheme();
@@ -58,7 +59,7 @@ export default function StudentSubjectDetails() {
       setClassmates(classmatesData);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to load subject details.");
+      setError(friendlyError(err, "Failed to load subject details."));
     } finally {
       if (!silent) setLoading(false);
     }

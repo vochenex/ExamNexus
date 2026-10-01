@@ -9,15 +9,24 @@ export const DEV_SOURCE_RAW = import.meta.glob(
     "../layouts/**/*.{jsx,js}",
     "../hooks/**/*.{jsx,js}",
     "../utils/**/*.{jsx,js}",
+    "../contexts/**/*.{jsx,js}",
+    "../config/**/*.{jsx,js}",
+    "../*.{jsx,js}",
   ],
+  { query: "?raw", import: "default", eager: true }
+);
+
+/** Stylesheets + Tailwind config for the Ctrl+E inspector's CSS / animation lookup. */
+export const DEV_STYLE_RAW = import.meta.glob(
+  ["../styles/**/*.css", "../*.css", "../../tailwind.config.js"],
   { query: "?raw", import: "default", eager: true }
 );
 
 export function globKeyToFrontendPath(key) {
   // e.g. ../components/AssessmentAiGenerator.jsx → frontend/components/AssessmentAiGenerator.jsx
-  const cleaned = String(key || "")
-    .replace(/^\.\.\//, "")
-    .replace(/\\/g, "/");
+  const raw = String(key || "").replace(/\\/g, "/");
+  if (raw.startsWith("../../")) return raw.slice("../../".length);
+  const cleaned = raw.replace(/^\.\.\//, "");
   return cleaned.startsWith("frontend/")
     ? cleaned
     : `frontend/${cleaned}`;

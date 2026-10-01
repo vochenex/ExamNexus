@@ -18,6 +18,7 @@ import {
   updateAdminAnnouncementComment,
   deleteAdminAnnouncementComment,
 } from "../../utils/supabaseData";
+import { friendlyError } from "../../utils/friendlyError";
 
 /**
  * Shared student/faculty view for admin announcements.
@@ -42,7 +43,7 @@ export default function PlatformAnnouncements() {
       setAnnouncements(rows);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to load admin announcements.");
+      setError(friendlyError(err, "Failed to load admin announcements."));
     } finally {
       if (!silent) setLoading(false);
     }

@@ -9,6 +9,7 @@ import {
   fetchStudentIntegrityAlerts,
 } from "../utils/supabaseData";
 import { usePolling } from "../hooks/useRealtimeFetch";
+import { friendlyError } from "../utils/friendlyError";
 
 function formatSubmittedAt(value) {
   if (!value) return "Submitted";
@@ -35,7 +36,7 @@ export default function ExamAutoSubmittedPanel({ examId }) {
       const rows = await fetchExamAutoSubmittedStudents(examId);
       setStudents(rows);
     } catch (err) {
-      setError(err.message || "Failed to load auto-submitted students.");
+      setError(friendlyError(err, "Failed to load auto-submitted students."));
     } finally {
       if (!silent) setLoading(false);
     }

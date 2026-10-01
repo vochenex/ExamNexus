@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { createAnonClient } = require("../lib/supabaseClient");
+const { publicErrorMessage } = require("../lib/publicError");
 
 router.get("/:examId", async (req, res) => {
   try {
@@ -78,7 +79,7 @@ router.get("/:examId", async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: publicErrorMessage(err, "Could not load analytics.") });
   }
 });
 

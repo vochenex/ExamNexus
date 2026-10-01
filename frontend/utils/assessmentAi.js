@@ -2,6 +2,7 @@ import { getAuthSession } from "./authUser";
 import { resolvePromptGenerationSettings } from "./promptPreferences";
 
 import { API_BASE, isLocalApiBase } from "./apiBase.js";
+import { FRIENDLY_MESSAGES, friendlyError } from "./friendlyError";
 
 const AI_REQUEST_TIMEOUT_MS = 600000;
 /** Keep each hosted API round small so Groq/Vercel do not truncate mid-JSON. */
@@ -13,55 +14,22 @@ const DOCUMENT_ROUND_DELAY_MS = 2500;
 const DOCUMENT_MAX_ROUND_ATTEMPTS = 3;
 const DOCUMENT_MAX_SOFT_FAILURES = 4;
 
-// #region agent log
-function dbgLog(hypothesisId, location, message, data = {}) {
-  const payload = {
-    sessionId: "c88187",
-    runId: "pre-fix",
-    hypothesisId,
-    location,
-    message,
-    data: { apiBase: API_BASE, ...data },
-    timestamp: Date.now(),
-  };
-  const body = JSON.stringify(payload);
-  // Same-origin Vite middleware (works on local http://localhost)
-  fetch("/__agent_debug_log", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  }).catch(() => {});
-  // Cursor ingest (works when page is not HTTPS-blocking localhost)
-  fetch("http://127.0.0.1:7404/ingest/16c09aed-9525-4476-93da-1f883bb22b41", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "c88187",
-    },
-    body,
-  }).catch(() => {});
-}
-// #endregion
 
 function backendUnreachableMessage() {
-  if (isLocalApiBase()) {
-    return `Cannot reach the backend at ${API_BASE}. On a local APK, start the backend (npm start in backend/), keep the phone on the same Wi‑Fi, and rebuild. For public users, deploy to Vercel and build with npm run cap:apk:prod.`;
+  if (import.meta.env.DEV) {
+    console.warn(
+      isLocalApiBase()
+        ? `[assessmentAi] Backend unreachable at ${API_BASE} — is \`npm start\` running in backend/?`
+        : `[assessmentAi] Backend unreachable at ${API_BASE} — check /api/health.`
+    );
   }
-  return `Cannot reach the backend at ${API_BASE}. Check that the API is online (Vercel /api/health), then try again.`;
+  return FRIENDLY_MESSAGES.network;
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const externalSignal = options.signal;
-  // #region agent log
-  const startedAt = Date.now();
-  const path = String(url || "").replace(/^https?:\/\/[^/]+/i, "");
-  dbgLog("A", "assessmentAi.js:fetchWithTimeout:start", "request start", {
-    path,
-    timeoutMs,
-  });
-  // #endregion
 
   const onExternalAbort = () => controller.abort();
   if (externalSignal) {
@@ -79,48 +47,18 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = AI_REQUEST_TIMEOU
       ...options,
       signal: controller.signal,
     });
-    // #region agent log
-    dbgLog("A", "assessmentAi.js:fetchWithTimeout:ok", "request finished", {
-      path,
-      timeoutMs,
-      status: res.status,
-      ms: Date.now() - startedAt,
-    });
-    // #endregion
     return res;
   } catch (error) {
     if (error?.name === "AbortError") {
       if (externalSignal?.aborted) {
-        // #region agent log
-        dbgLog("E", "assessmentAi.js:fetchWithTimeout:userAbort", "user cancelled", {
-          path,
-          ms: Date.now() - startedAt,
-        });
-        // #endregion
         const cancelled = new Error("Generation cancelled.");
         cancelled.name = "AbortError";
         throw cancelled;
       }
-      // #region agent log
-      dbgLog("A", "assessmentAi.js:fetchWithTimeout:clientTimeout", "client abort timeout", {
-        path,
-        timeoutMs,
-        ms: Date.now() - startedAt,
-      });
-      // #endregion
       throw new Error(
         "The server timed out analyzing this document. Try a shorter file, or wait and try again."
       );
     }
-    // #region agent log
-    dbgLog("C", "assessmentAi.js:fetchWithTimeout:network", "network error", {
-      path,
-      timeoutMs,
-      ms: Date.now() - startedAt,
-      name: error?.name || "",
-      message: String(error?.message || "").slice(0, 180),
-    });
-    // #endregion
     throw error;
   } finally {
     clearTimeout(timer);
@@ -241,16 +179,6 @@ function startWaitingProgress({ onProgress, phase, total, floorPercent = 3, stat
     // Keep crawling while Gemini works so the bar does not look frozen at ~72%.
     percent = Math.min(cap, percent + 1.2);
     highest = Math.max(highest, Math.round(percent));
-    // #region agent log
-    if (highest === 72 || highest === 80 || highest >= cap) {
-      dbgLog("H2", "assessmentAi.js:startWaitingProgress", "waiting crawl tick", {
-        phase,
-        status,
-        highest,
-        cap,
-      });
-    }
-    // #endregion
     onProgress?.({
       phase,
       current: 0,
@@ -349,9 +277,10 @@ export async function fetchAssessmentAiStatus() {
     if (!status.configured) {
       return {
         ...status,
-        error:
-          status.error ||
-          "AI is not ready. Add GEMINI_DOCUMENT_API_KEY (or GEMINI_API_KEY) for documents and a separate GEMINI_PROMPT_API_KEY for prompts to backend/.env, then restart the backend.",
+        error: friendlyError(
+          status.error,
+          "AI question generation isn't available right now. Please contact the system administrator."
+        ),
       };
     }
 
@@ -378,7 +307,7 @@ export async function fetchAssessmentAiStatus() {
       configured: false,
       error: isBackendUnreachable(error)
         ? backendUnreachableMessage()
-        : error.message,
+        : friendlyError(error, "Could not check if AI generation is available."),
     };
   }
 }
@@ -626,13 +555,6 @@ export async function classifyAssessmentDocument({ file, files, signal, onProgre
     throw new Error("Choose a PDF, Word (.docx), or PowerPoint (.pptx) file to upload.");
   }
 
-  // #region agent log
-  dbgLog("D", "assessmentAi.js:classifyAssessmentDocument:start", "classify start", {
-    fileCount: list.length,
-    sizes: list.map((f) => Number(f?.size) || 0),
-    names: list.map((f) => String(f?.name || "").slice(0, 40)),
-  });
-  // #endregion
 
   // Start the crawl immediately — auth/upload can hang before any other progress.
   const stopWaiting = startWaitingProgress({
@@ -648,11 +570,6 @@ export async function classifyAssessmentDocument({ file, files, signal, onProgre
     if (!session?.access_token) {
       throw new Error("Your session expired. Please sign in again.");
     }
-    // #region agent log
-    dbgLog("E", "assessmentAi.js:classifyAssessmentDocument:auth", "auth ready", {
-      hasToken: true,
-    });
-    // #endregion
 
     const postClassify = async (uploadFiles) => {
       const formData = new FormData();
@@ -685,23 +602,6 @@ export async function classifyAssessmentDocument({ file, files, signal, onProgre
       if (!res.ok) {
         throw new Error(formatApiError(payload, "Failed to classify document", res.status));
       }
-      // #region agent log
-      dbgLog("D", "assessmentAi.js:classifyAssessmentDocument:ok", "classify ok", {
-        status: res.status,
-        isQuestionnaire: Boolean(payload?.isQuestionnaire),
-        mixed: Boolean(payload?.mixed),
-        docs: Array.isArray(payload?.documents) ? payload.documents.length : 0,
-        textLen: Array.isArray(payload?.documents)
-          ? payload.documents.reduce(
-              (sum, d) => sum + String(d?.text || "").length,
-              0
-            )
-          : 0,
-        failures: Array.isArray(payload?.failures) ? payload.failures : [],
-        names: list.map((f) => String(f?.name || "").slice(0, 60)),
-        mimes: list.map((f) => String(f?.type || "").slice(0, 80)),
-      });
-      // #endregion
       return payload;
     };
 
@@ -838,7 +738,12 @@ function chunkTextForQuestionnaire(text, maxChars = QUESTIONNAIRE_CHUNK_CHARS) {
 
 function isTimeoutLikeError(error) {
   const message = String(error?.message || "").toLowerCase();
-  if (message.includes("quota") || message.includes("rate limit") || message.includes("429")) {
+  if (
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("busy right now") ||
+    message.includes("429")
+  ) {
     return false;
   }
   return (
@@ -888,7 +793,6 @@ async function analyzeDocumentTextRound({
   }
 
   // Hosted functions die near 60s — fail sooner so questionnaire convert can chunk.
-  const startedAt = Date.now();
   const res = await fetchAuthedWithRetry(
     `${API_BASE}/assessment-ai/analyze-document-text`,
     {
@@ -910,14 +814,6 @@ async function analyzeDocumentTextRound({
   );
 
   const payload = await res.json().catch(() => ({}));
-  // #region agent log
-  dbgLog("C", "assessmentAi.js:analyzeDocumentTextRound", "analyze-document-text result", {
-    status: res.status,
-    ms: Date.now() - startedAt,
-    error: String(payload?.error || "").slice(0, 180),
-    questionCount: Array.isArray(payload?.questions) ? payload.questions.length : 0,
-  });
-  // #endregion
   if (!res.ok) {
     throw new Error(formatApiError(payload, "Failed to analyze document", res.status));
   }
@@ -1399,15 +1295,6 @@ export async function generateAssessmentFromDocument({
   signal,
 }) {
   const requested = Number(questionCount);
-  // #region agent log
-  dbgLog("B", "assessmentAi.js:generateAssessmentFromDocument", "generate entry", {
-    isQuestionnaire: Boolean(isQuestionnaire),
-    questionCount: requested,
-    sourceTextLen: String(sourceText || "").trim().length,
-    fileCount: Array.isArray(files) ? files.length : files || file ? 1 : 0,
-    formats: Array.isArray(formats) ? formats : [],
-  });
-  // #endregion
 
   if (!isQuestionnaire && Number.isFinite(requested) && requested > 0) {
     return generateSourceMaterialBatched({
@@ -1523,13 +1410,6 @@ async function generateSourceMaterialBatched({
   });
 
   let rawSource = String(providedSourceText || "").trim();
-  // #region agent log
-  dbgLog("B", "assessmentAi.js:generateSourceMaterialBatched", "source path", {
-    providedLen: rawSource.length,
-    willExtract: !rawSource,
-    total,
-  });
-  // #endregion
   if (!rawSource) {
     const stopExtractWait = startWaitingProgress({
       onProgress: emitProgress,
@@ -1539,9 +1419,6 @@ async function generateSourceMaterialBatched({
       status: "waiting",
     });
     try {
-      // #region agent log
-      dbgLog("B", "assessmentAi.js:generateSourceMaterialBatched:extract", "extract fallback start", {});
-      // #endregion
       rawSource = await extractDocumentsText({ file, files, fileIndexes, signal });
     } finally {
       stopExtractWait();
@@ -1653,17 +1530,8 @@ async function generateSourceMaterialBatched({
             const isQuota =
               res.status === 429 ||
               message.includes("quota") ||
-              message.includes("rate limit");
-            // #region agent log
-            dbgLog("H5", "assessmentAi.js:generateSourceMaterialBatched:round", "round response", {
-              status: res.status,
-              isQuota,
-              roundAttempts,
-              need,
-              have: allQuestions.length,
-              err: String(lastError.message || "").slice(0, 160),
-            });
-            // #endregion
+              message.includes("rate limit") ||
+              message.includes("busy right now");
             // Quota will not recover across soft-fail rounds — stop immediately.
             if (isQuota) {
               throw lastError;
@@ -1796,7 +1664,7 @@ async function generateSourceMaterialBatched({
       warning:
         finalQuestions.length < total
           ? `Generated ${finalQuestions.length} of ${total} source questions${
-              lastError?.message ? ` (${lastError.message})` : ""
+              lastError?.message ? ` (${friendlyError(lastError).replace(/\.$/, "")})` : ""
             }. You can generate again to add more.`
           : null,
       mode: "document_source_material_client_batched",

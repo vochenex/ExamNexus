@@ -14,6 +14,7 @@ import {
   deleteAnnouncementComment,
 } from "../utils/supabaseData";
 import PanelContentSkeleton from "./ui/PanelContentSkeleton";
+import { friendlyError } from "../utils/friendlyError";
 
 function formatCommentTime(value) {
   if (!value) return "";
@@ -430,7 +431,7 @@ export default function AnnouncementCard({
       setHeartCount(result.heart_count);
       notifyParentQuietly();
     } catch (err) {
-      error(err.message || "Could not update reaction.");
+      error(friendlyError(err, "Could not update reaction."));
     }
   };
 
@@ -542,7 +543,7 @@ export default function AnnouncementCard({
       lastCountRef.current = Math.max(0, lastCountRef.current - 1);
       setCommentText(body);
       if (replySnapshot) setReplyTo(replySnapshot);
-      error(err.message || "Could not post comment.");
+      error(friendlyError(err, "Could not post comment."));
     } finally {
       postingLockRef.current = false;
       setSubmitting(false);
@@ -581,7 +582,7 @@ export default function AnnouncementCard({
       cancelEdit();
       notifyParentQuietly();
     } catch (err) {
-      error(err.message || "Could not update comment.");
+      error(friendlyError(err, "Could not update comment."));
     } finally {
       setSavingEdit(false);
     }
@@ -659,7 +660,7 @@ export default function AnnouncementCard({
         return next;
       });
       setFocusCommentKey((prev) => (prev === commentKey ? null : prev));
-      error(err.message || "Could not delete comment.");
+      error(friendlyError(err, "Could not delete comment."));
     }
   };
 
@@ -726,7 +727,7 @@ export default function AnnouncementCard({
             : row
         )
       );
-      error(err.message || "Could not update comment reaction.");
+      error(friendlyError(err, "Could not update comment reaction."));
     } finally {
       reactionBusyRef.current.delete(comment.id);
     }
@@ -748,7 +749,7 @@ export default function AnnouncementCard({
       await removeAnnouncement(announcement.id);
       onDeleted?.(announcement.id);
     } catch (err) {
-      error(err.message || "Could not delete announcement.");
+      error(friendlyError(err, "Could not delete announcement."));
     }
   };
 

@@ -17,6 +17,7 @@ import {
   slugifyFilename,
 } from "../utils/assessmentReport";
 import { iconButton } from "../utils/themeButtons";
+import { friendlyError } from "../utils/friendlyError";
 
 async function finishExport(result, success, warning, sharedMsg, downloadMsg) {
   if (!result?.ok) {
@@ -101,7 +102,7 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
         "Assessment report saved."
       );
     } catch (err) {
-      error(err.message || "Export failed.");
+      error(friendlyError(err, "Export failed."));
     } finally {
       setExporting("");
     }
@@ -153,7 +154,7 @@ export default function FacultyExportPanel({ teacherSchoolId }) {
         "Results CSV saved to your downloads."
       );
     } catch (err) {
-      error(err.message || "Export failed.");
+      error(friendlyError(err, "Export failed."));
     } finally {
       setExporting("");
     }

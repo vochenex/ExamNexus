@@ -1,12 +1,13 @@
 import { AlertCircle } from "lucide-react";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 import { secondaryButtonSm } from "../../utils/themeButtons";
+import { friendlyError } from "../../utils/friendlyError";
 
 export function formatAdminError(err) {
-  const message = err?.message || String(err || "Unknown error");
+  const message = err?.message || String(err || "");
 
   if (message.includes("Admin access required")) {
-    return "Your account is not recognized as an admin. Run database/create_admin_account.sql in Supabase.";
+    return "Your account does not have admin access.";
   }
   if (
     message.includes("password_reset") ||
@@ -14,21 +15,10 @@ export function formatAdminError(err) {
     message.includes("Password reset functions") ||
     message.includes("Password reset is not set up")
   ) {
-    return "Password reset is not available yet. Run database/admin_platform_fixes.sql in Supabase SQL Editor, then Project Settings → API → Reload schema, and click Retry.";
-  }
-  if (
-    message.includes("Could not find the function") ||
-    message.includes("schema cache") ||
-    message.includes("does not exist") ||
-    message.includes("PGRST202")
-  ) {
-    return "A database function is missing or Supabase has a stale schema cache. Re-run database/admin_platform_fixes.sql, reload the API schema in Supabase, then click Retry.";
-  }
-  if (message.includes("JWT") || message.includes("session")) {
-    return "Your session expired. Please log out and sign in again.";
+    return "Password reset isn't set up yet. Please contact the system administrator.";
   }
 
-  return message;
+  return friendlyError(err, "Could not load this page. Please try again.");
 }
 
 export default function AdminPageError({ theme, message, onRetry }) {

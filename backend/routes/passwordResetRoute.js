@@ -1,6 +1,7 @@
 const express = require("express");
 const { createUserClient } = require("../lib/supabaseClient");
 const { getSupabaseAdmin } = require("../lib/supabaseAdmin");
+const { publicErrorMessage } = require("../lib/publicError");
 
 const router = express.Router();
 
@@ -51,7 +52,7 @@ async function requireAdmin(req, res, next) {
     next();
   } catch (err) {
     console.error("requireAdmin error:", err);
-    res.status(500).json({ error: err.message || "Authorization failed" });
+    res.status(500).json({ error: publicErrorMessage(err, "Could not verify your account. Please sign in again.") });
   }
 }
 
@@ -72,7 +73,7 @@ router.post("/complete", requireAdmin, async (req, res) => {
     if (!admin) {
       return res.status(503).json({
         error:
-          "Password reset service is unavailable. Add SUPABASE_SERVICE_ROLE_KEY to backend/.env and restart the server.",
+          publicErrorMessage("Password reset service is unavailable. Add SUPABASE_SERVICE_ROLE_KEY to backend/.env and restart the server."),
       });
     }
 
@@ -83,7 +84,7 @@ router.post("/complete", requireAdmin, async (req, res) => {
       .maybeSingle();
 
     if (requestError) {
-      return res.status(500).json({ error: requestError.message });
+      return res.status(500).json({ error: publicErrorMessage(requestError, "Could not load the password reset request.") });
     }
 
     if (!requestRow || requestRow.status !== "pending") {
@@ -100,7 +101,7 @@ router.post("/complete", requireAdmin, async (req, res) => {
     );
 
     if (updateError) {
-      const msg = updateError.message || "Failed to update password";
+      const msg = publicErrorMessage(updateError, "Failed to update password.");
       if (/user not found|not found/i.test(msg)) {
         return res.status(404).json({
           error:
@@ -163,7 +164,7 @@ router.post("/complete", requireAdmin, async (req, res) => {
     });
   } catch (err) {
     console.error("Password reset complete error:", err);
-    res.status(500).json({ error: err.message || "Failed to reset password" });
+    res.status(500).json({ error: publicErrorMessage(err, "Failed to reset password.") });
   }
 });
 
