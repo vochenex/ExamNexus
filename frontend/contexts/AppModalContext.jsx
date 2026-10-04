@@ -69,10 +69,14 @@ export function AppModalProvider({ children }) {
     (entry) =>
       new Promise((resolve) => {
         const id = `toast-${Date.now()}-${(toastSeq += 1)}`;
+        // Notices resolve as soon as they're shown so callers can close modals in sync
+        // with the banner; only confirm/choice wait for the user's answer.
+        const waitsForAnswer = entry.mode === "confirm" || entry.mode === "choice";
+        if (!waitsForAnswer) resolve(true);
         const next = {
           id,
           leaving: false,
-          resolve,
+          resolve: waitsForAnswer ? resolve : null,
           ...entry,
         };
         setToasts((current) => [next, ...current].slice(0, 4));
@@ -96,17 +100,23 @@ export function AppModalProvider({ children }) {
   }, []);
 
   // Navigating via the tab bar must never leave a modal overlay eating touches.
+  // Plain notices (success/error) don't block input, so they survive navigation.
   useEffect(() => {
     setModal((current) => {
       current?.resolve?.(false);
       return null;
     });
     setToasts((current) => {
-      current.forEach((item) => item.resolve?.(item.mode === "confirm" ? false : "cancel"));
-      return [];
+      const kept = [];
+      for (const item of current) {
+        if (item.mode === "confirm" || item.mode === "choice") {
+          item.resolve?.(item.mode === "confirm" ? false : "cancel");
+        } else {
+          kept.push(item);
+        }
+      }
+      return kept.length === current.length ? current : kept;
     });
-    timersRef.current.forEach((timer) => window.clearTimeout(timer));
-    timersRef.current.clear();
     forceUnlockBodyScroll();
   }, [location.pathname]);
 

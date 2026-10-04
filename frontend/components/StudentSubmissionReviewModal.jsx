@@ -263,6 +263,19 @@ export default function StudentSubmissionReviewModal({
           </button>
         </div>
 
+        {saveNotice && (
+          <div
+            role="status"
+            className={`mx-5 mt-4 rounded-xl border px-4 py-3 text-sm font-medium ${
+              theme === "dark"
+                ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                : "border-emerald-300 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            {saveNotice}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
             <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
@@ -398,16 +411,6 @@ export default function StudentSubmissionReviewModal({
                 );
               })}
             </div>
-          )}
-
-          {saveNotice && (
-            <p
-              className={`mt-3 text-sm ${
-                theme === "dark" ? "text-emerald-400" : "text-emerald-700"
-              }`}
-            >
-              {saveNotice}
-            </p>
           )}
 
           {error && reviewItems.length > 0 && (

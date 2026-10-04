@@ -4,7 +4,7 @@ import { Flag } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAssessmentLockdown } from "../../contexts/AssessmentLockdownContext";
-import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { secondaryButton } from "../../utils/themeButtons";
 import AssessmentQuestionInput from "../../components/AssessmentQuestionInput";
 import AssessmentQuestionNav from "../../components/AssessmentQuestionNav";
 import AssessmentLockdownModal from "../../components/AssessmentLockdownModal";
@@ -1441,7 +1441,7 @@ function TakeAssessmentExperience() {
             >
               Back to assessments
             </button>
-            <button type="button" onClick={continueExam} className={primaryButton(theme)}>
+            <button type="button" onClick={continueExam} className="en-btn-primary">
               Continue assessment
             </button>
           </div>
@@ -1606,7 +1606,7 @@ function TakeAssessmentExperience() {
                   <button
                     type="button"
                     onClick={goToNextUnanswered}
-                    className={primaryButton(theme)}
+                    className="en-btn-primary"
                   >
                     Next question
                   </button>
@@ -1617,7 +1617,7 @@ function TakeAssessmentExperience() {
                     type="button"
                     disabled={submitting || interactionLocked}
                     onClick={() => setConfirmSubmitOpen(true)}
-                    className={primaryButton(theme, "disabled:opacity-60")}
+                    className="en-btn-primary"
                   >
                     {submitting ? "Submitting..." : "Submit"}
                   </button>

@@ -28,7 +28,7 @@ import {
 import { getCachedExamNexusUser } from "../../utils/authUser";
 import { DEFAULT_SITE_META } from "../../utils/pageMeta";
 import usePageMeta from "../../hooks/usePageMeta";
-import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { secondaryButton } from "../../utils/themeButtons";
 import "../../styles/home.css";
 
 const ROLES = [
@@ -162,7 +162,7 @@ export default function HomePage() {
                   exam integrity.
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  <ProgressLink to={dashboardTo || "/auth"} className={primaryButton(theme)}>
+                  <ProgressLink to={dashboardTo || "/auth"} className="en-btn-primary">
                     {dashboardTo ? "Go to dashboard" : "Start for free"}
                     <ArrowRight size={18} />
                   </ProgressLink>
@@ -374,7 +374,7 @@ export default function HomePage() {
                   <p className={`mb-4 text-sm lg:text-base ${mutedText}`}>
                     Students and faculty need an approved account to use the platform.
                   </p>
-                  <ProgressLink to="/auth" className={primaryButton(theme, "text-sm px-4 py-2")}>
+                  <ProgressLink to="/auth" className="en-btn-primary text-sm px-4 py-2">
                     Login / Register
                   </ProgressLink>
                 </div>
@@ -400,7 +400,7 @@ export default function HomePage() {
                   platform built for your campus.
                 </p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
-                  <ProgressLink to={dashboardTo || "/auth"} className={primaryButton(theme)}>
+                  <ProgressLink to={dashboardTo || "/auth"} className="en-btn-primary">
                     {dashboardTo ? "Open dashboard" : "Create account"}
                   </ProgressLink>
                   <ProgressLink to="/auth" className={secondaryButton(theme)}>

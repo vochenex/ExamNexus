@@ -4,7 +4,7 @@
  * - Stamps every host JSX element (and lucide-react icons) under frontend/ with
  *   `data-en-src="frontend/path.jsx:line:col"`.
  * - Adds `data-en-fx` listing the helpers / state / handlers each dynamic prop
- *   uses (e.g. `className:primaryButtonFull,theme;onClick:handleLogoClick`).
+ *   uses (e.g. `className:secondaryButton,theme;onClick:handleLogoClick`).
  * - Component usages get `data-en-use` / `data-en-usefx` props instead, which the
  *   inspector reads from React fibers (so `<ProgressButton className={...}>`
  *   still points back to the page that styled it).

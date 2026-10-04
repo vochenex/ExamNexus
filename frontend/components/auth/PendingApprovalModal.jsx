@@ -1,6 +1,5 @@
 import { AlertTriangle } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
-import { primaryButton } from "../../utils/themeButtons";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import ModalPortal from "../ui/ModalPortal";
 
@@ -64,7 +63,7 @@ export default function PendingApprovalModal({ notice, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className={`${primaryButton(theme)} mt-6 w-full`}
+          className="en-btn-primary mt-6 w-full"
         >
           {notice.confirmLabel || "OK"}
         </button>

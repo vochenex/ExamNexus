@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import {
@@ -25,7 +25,7 @@ import { loadProfileForUser, resolveSchoolId } from "../../utils/authProfile";
 import { broadcastProfileUpdate } from "../../utils/profileEvents";
 import { isFacultyRole, hasCustomProfilePhoto } from "../../utils/avatar";
 import { isAdminUser, fetchAdminDashboardStats } from "../../utils/adminData";
-import { primaryButton, secondaryButton, dangerButton } from "../../utils/themeButtons";
+import { secondaryButton, dangerButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 import {
@@ -191,10 +191,19 @@ export default function Profile() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const passwordSuccessTimerRef = useRef(null);
   const pageTopRef = useRef(null);
-  const passwordFeedbackRef = useScrollIntoViewWhen(Boolean(passwordMessage), {
+  const passwordFeedbackRef = useScrollIntoViewWhen(Boolean(passwordMessage) && passwordStatus !== "success", {
     deps: [passwordMessage, passwordStatus],
   });
   const [profileLoading, setProfileLoading] = useState(true);
+  const location = useLocation();
+
+  useEffect(() => {
+    if (profileLoading || location.hash !== "#change-password") return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("change-password")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [profileLoading, location.hash]);
 
   const scrollProfileToTop = () => {
     const mainScroller =
@@ -570,9 +579,9 @@ export default function Profile() {
         return;
       }
 
-      let { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      // Also clears the temp_password flag set by admin bulk imports.
+      const passwordUpdate = { password: newPassword, data: { temp_password: false } };
+      let { data: updateData, error: updateError } = await supabase.auth.updateUser(passwordUpdate);
 
       // If the project requires a recent login on the active session, re-auth
       // on the shared client only as a fallback.
@@ -591,9 +600,7 @@ export default function Profile() {
           setPasswordMessage("Current password is incorrect.");
           return;
         }
-        ({ error: updateError } = await supabase.auth.updateUser({
-          password: newPassword,
-        }));
+        ({ data: updateData, error: updateError } = await supabase.auth.updateUser(passwordUpdate));
       }
 
       if (updateError) {
@@ -608,9 +615,11 @@ export default function Profile() {
         // ignore
       }
 
+      if (updateData?.user) setAuthUser(updateData.user);
       setPasswordForm({ current: "", new: "", confirm: "" });
       setPasswordStatus("success");
       setPasswordMessage("Password updated successfully.");
+      scrollProfileToTop();
       passwordSuccessTimerRef.current = window.setTimeout(() => {
         setPasswordStatus("idle");
         setPasswordMessage("");
@@ -649,8 +658,11 @@ export default function Profile() {
         theme === "dark" ? "text-white" : "en-bg-page text-gray-900"
       }`}
     >
-      {(saveSuccess || saveStatus === "saving" || saveStatus === "error") && (
-        <div className="mb-4">
+      {(saveSuccess ||
+        passwordStatus === "success" ||
+        saveStatus === "saving" ||
+        saveStatus === "error") && (
+        <div className="mb-4 space-y-2">
           {saveSuccess && (
             <div
               role="status"
@@ -661,6 +673,18 @@ export default function Profile() {
               }`}
             >
               Profile saved successfully.
+            </div>
+          )}
+          {passwordStatus === "success" && (
+            <div
+              role="status"
+              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                theme === "dark"
+                  ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                  : "border-emerald-300 en-bg-skeleton text-emerald-700"
+              }`}
+            >
+              {passwordMessage || "Password updated successfully."}
             </div>
           )}
           {saveStatus === "saving" && (
@@ -729,7 +753,7 @@ export default function Profile() {
                 setSaveSuccess(false);
                 setSaveStatus("idle");
               }}
-              className={`flex items-center gap-1.5 ${primaryButton(theme, "px-3 py-2 text-xs sm:text-sm")}`}
+              className="en-btn-primary gap-1.5 px-3 py-2 text-xs sm:text-sm"
             >
               <Pencil size={14} />
               Edit Profile
@@ -1193,8 +1217,20 @@ export default function Profile() {
               theme === "dark" ? "border-white/10" : "border-emerald-100"
             }`}
           >
-            <div>
+            <div id="change-password" className="scroll-mt-24">
               <SectionTitle theme={theme}>Change password</SectionTitle>
+              {authUser?.user_metadata?.temp_password === true && (
+                <p
+                  className={`mb-2 rounded-lg border px-3 py-2 text-xs sm:text-sm ${
+                    theme === "dark"
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                      : "border-amber-200 bg-amber-50 text-amber-900"
+                  }`}
+                >
+                  You're using a temporary password from the admin. Enter it as your current password, then choose a
+                  new one.
+                </p>
+              )}
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
                 {[
                   {
@@ -1257,24 +1293,16 @@ export default function Profile() {
                   type="button"
                   onClick={handleChangePassword}
                   disabled={passwordStatus === "saving"}
-                  className={`${primaryButton(theme, "px-4 py-2 text-sm")} w-full xl:w-auto`}
+                  className="en-btn-primary en-btn-primary-sm w-full rounded-xl xl:w-auto"
                 >
                   {passwordStatus === "saving" ? "Updating..." : "Update password"}
                 </button>
               </div>
-              {passwordMessage && (
+              {passwordMessage && passwordStatus !== "success" && (
                 <p
                   ref={passwordFeedbackRef}
                   role="status"
-                  className={`mt-2 text-xs sm:text-sm ${
-                    passwordStatus === "success"
-                      ? theme === "dark"
-                        ? "text-emerald-400"
-                        : "text-emerald-700"
-                      : theme === "dark"
-                        ? "text-red-400"
-                        : "text-red-600"
-                  }`}
+                  className={`mt-2 text-xs sm:text-sm ${theme === "dark" ? "text-red-400" : "text-red-600"}`}
                 >
                   {passwordMessage}
                 </p>
@@ -1289,7 +1317,7 @@ export default function Profile() {
                 onClick={() => handleSave(editProfile)}
                 loading={saveStatus === "saving"}
                 loadingLabel="Saving…"
-                className={primaryButton(theme, "px-4 py-2 text-sm")}
+                className="en-btn-primary en-btn-primary-sm rounded-xl"
               >
                 Save changes
               </ProgressButton>

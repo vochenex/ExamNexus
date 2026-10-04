@@ -22,6 +22,8 @@ const analyticsRoute = require("./routes/analyticsRoute");
 const passwordResetRoute = require("./routes/passwordResetRoute");
 const assessmentAiRoute = require("./routes/assessmentAiRoute");
 const pushRoute = require("./routes/pushRoute");
+const adminStudentsRoute = require("./routes/adminStudentsRoute");
+const adminUsersRoute = require("./routes/adminUsersRoute");
 const { getSupabaseAdmin } = require("./lib/supabaseAdmin");
 const { getAiServiceStatus } = require("./lib/aiProvider");
 const { isPushConfigured, getPushApiMode } = require("./lib/pushSender");
@@ -377,6 +379,8 @@ function createApp() {
   app.use("/password-reset", passwordResetRoute);
   app.use("/assessment-ai", assessmentAiRoute);
   app.use("/push", pushRoute);
+  app.use("/admin", adminStudentsRoute);
+  app.use("/admin", adminUsersRoute);
 
   app.use((err, req, res, _next) => {
     console.error("GLOBAL EXPRESS ERROR:", err);

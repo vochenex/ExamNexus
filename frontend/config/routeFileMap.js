@@ -34,6 +34,11 @@ export const ROUTE_FILE_MAP = [
     file: "frontend/pages/Admin/AdminAccountsPage.jsx",
   },
   {
+    match: /^\/admin\/accounts\/import$/,
+    label: "Admin student import (.xlsx)",
+    file: "frontend/pages/Admin/AdminStudentImportPage.jsx",
+  },
+  {
     match: /^\/admin\/password-resets$/,
     label: "Admin password resets",
     file: "frontend/pages/Admin/AdminPasswordResetsPage.jsx",

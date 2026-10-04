@@ -3,7 +3,7 @@ import { Archive, Check, Search, X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ModalShell from "./ui/ModalShell";
 import Select from "./ui/Select";
-import { primaryButton, secondaryButton } from "../utils/themeButtons";
+import { secondaryButton } from "../utils/themeButtons";
 import {
   bankRowToBuilderQuestion,
   fetchQuestionBank,
@@ -308,7 +308,7 @@ export default function QuestionBankPicker({ open, onClose, onImport, filterType
                 type="button"
                 onClick={handleImport}
                 disabled={selectedIds.size === 0}
-                className={primaryButton(theme, selectedIds.size === 0 ? "opacity-50" : "")}
+                className={`en-btn-primary ${selectedIds.size === 0 ? "opacity-50" : ""}`}
               >
                 Import selected
               </button>

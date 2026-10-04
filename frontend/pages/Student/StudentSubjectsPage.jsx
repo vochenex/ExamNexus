@@ -3,7 +3,7 @@ import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../layouts/ThemeContext";
 import { CheckCircle2, XCircle, Plus, LogOut } from "lucide-react";
-import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { secondaryButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { resolveStudentId } from "../../utils/authUser";
 import {
@@ -345,7 +345,7 @@ export default function StudentSubjects() {
             setEnrollError("");
             setEnrollSuccess("");
           }}
-          className={`shrink-0 self-start sm:mt-1 flex items-center gap-2 ${primaryButton(theme)}`}
+          className="en-btn-primary shrink-0 self-start sm:mt-1"
         >
           <Plus size={18} />
           Enroll Subject
@@ -552,7 +552,7 @@ export default function StudentSubjects() {
               <div
                 ref={enrollErrorRef}
                 role="status"
-                className="mb-4 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/30 px-3 py-2 text-red-500 text-sm"
+                className="mb-4 flex items-start gap-2 rounded-xl bg-violet-500/10 border border-violet-500/30 px-3 py-2 text-violet-500 text-sm"
               >
                 <XCircle size={18} className="shrink-0 mt-0.5" />
                 <span>{enrollError}</span>
@@ -574,7 +574,7 @@ export default function StudentSubjects() {
                 loading={enrolling}
                 loadingLabel="Joining…"
                 disabled={!inviteCode.trim()}
-                className={primaryButton(theme)}
+                className="en-btn-primary"
               >
                 Join Subject
               </ProgressButton>

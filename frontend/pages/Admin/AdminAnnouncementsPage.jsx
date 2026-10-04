@@ -34,7 +34,6 @@ import {
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import AlertBanner from "../../components/ui/AlertBanner";
 import { pageShellClass, panelClass } from "../../utils/themeInputs";
-import { primaryButton } from "../../utils/themeButtons";
 import { friendlyError } from "../../utils/friendlyError";
 
 function formatAdminPublishBanner(audience) {
@@ -210,7 +209,7 @@ export default function AdminAnnouncements() {
             <option value="students">Students only</option>
           </Select>
         </div>
-        <button type="submit" disabled={saving} className={primaryButton(theme, "disabled:opacity-60")}>
+        <button type="submit" disabled={saving} className="en-btn-primary">
           {saving ? "Publishing..." : "Publish announcement"}
         </button>
       </form>

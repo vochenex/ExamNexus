@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, RotateCcw, XCircle } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import { panelClass } from "../utils/themeInputs";
-import { primaryButtonSm, dangerButton } from "../utils/themeButtons";
+import { dangerButton } from "../utils/themeButtons";
 import ProgressButton from "./ui/ProgressButton";
 import ProfileAvatar from "./ProfileAvatar";
 import {
@@ -258,10 +258,7 @@ export default function ExamRetakeRequestsPanel({ examId, onUpdated }) {
                 loadingLabel="Approving…"
                 disabled={selectedIds.size === 0}
                 onClick={() => handleReview("approve")}
-                className={primaryButtonSm(
-                  theme,
-                  "w-full justify-center gap-2 px-5 py-2.5 text-sm font-semibold sm:w-auto sm:min-w-[9.5rem]"
-                )}
+                className="en-btn-primary en-btn-primary-sm w-full justify-center gap-2 px-5 py-2.5 text-sm font-semibold sm:w-auto sm:min-w-[9.5rem]"
                 aria-label="Approve selected retake requests"
                 title="Approve selected"
               >

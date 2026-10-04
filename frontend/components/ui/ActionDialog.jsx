@@ -1,5 +1,5 @@
 import { useTheme } from "../../layouts/ThemeContext";
-import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { secondaryButton } from "../../utils/themeButtons";
 import { motion } from "../../utils/motion";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import ModalPortal from "./ModalPortal";
@@ -98,7 +98,7 @@ export default function ActionDialog({
             className={
               tone === "danger"
                 ? "rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
-                : primaryButton(theme, "disabled:opacity-60")
+                : "en-btn-primary"
             }
           >
             {loading ? "Please wait..." : confirmLabel}

@@ -1,26 +1,4 @@
-export function primaryButton(theme, extra = "") {
-  return `
-    inline-flex items-center justify-center gap-2
-    px-6 py-3 rounded-xl font-semibold
-    transition-all duration-300
-    hover:-translate-y-0.5 active:scale-[0.98]
-    disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0
-    ${
-      theme === "dark"
-        ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-black hover:shadow-[0_0_30px_rgba(16,185,129,0.45)]"
-        : "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-emerald-500/30"
-    }
-    ${extra}
-  `;
-}
-
-export function primaryButtonSm(theme, extra = "") {
-  return primaryButton(theme, `px-4 py-2 text-sm rounded-lg ${extra}`);
-}
-
-export function primaryButtonFull(theme, extra = "") {
-  return primaryButton(theme, `w-full ${extra}`);
-}
+/* The primary button is a plain CSS class: .en-btn-primary / .en-btn-primary-sm in index.css. */
 
 export function secondaryButton(theme, extra = "") {
   return `

@@ -29,7 +29,6 @@ import {
   adminTdClass,
   adminThClass,
 } from "../../components/admin/adminTableStyles";
-import { primaryButton } from "../../utils/themeButtons";
 import { friendlyError } from "../../utils/friendlyError";
 
 export default function FacultyAnnouncementsHub() {
@@ -267,7 +266,7 @@ export default function FacultyAnnouncementsHub() {
         <button
           type="submit"
           disabled={posting}
-          className={primaryButton(theme, "disabled:opacity-60")}
+          className="en-btn-primary"
         >
           {posting ? "Publishing..." : "Publish announcement"}
         </button>

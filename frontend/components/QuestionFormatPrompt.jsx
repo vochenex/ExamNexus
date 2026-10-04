@@ -1,5 +1,5 @@
 import { useTheme } from "../layouts/ThemeContext";
-import { primaryButton, secondaryButton } from "../utils/themeButtons";
+import { secondaryButton } from "../utils/themeButtons";
 import { getFormatLabel } from "../utils/questionSections";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 import ModalPortal from "./ui/ModalPortal";
@@ -51,7 +51,7 @@ export default function QuestionFormatPrompt({
           <button type="button" onClick={onCancel} className={secondaryButton(theme)}>
             No, keep current section
           </button>
-          <button type="button" onClick={onConfirm} className={primaryButton(theme)}>
+          <button type="button" onClick={onConfirm} className="en-btn-primary">
             Yes, add section
           </button>
         </div>

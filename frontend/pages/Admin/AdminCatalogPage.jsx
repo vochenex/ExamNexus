@@ -23,7 +23,6 @@ import AdminPageError, { formatAdminError } from "../../components/admin/AdminPa
 import {
   iconButton,
   secondaryButtonSm,
-  primaryButton,
 } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { friendlyError } from "../../utils/friendlyError";
@@ -244,7 +243,7 @@ export default function AdminCatalog() {
           loading={saving}
           loadingLabel="Saving…"
           disabled={Boolean(deletingId)}
-          className={`${primaryButton(theme)} mt-3`}
+          className="en-btn-primary mt-3"
         >
           <Plus size={18} />
           {editingId ? "Update item" : "Save item"}

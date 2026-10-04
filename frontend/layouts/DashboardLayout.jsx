@@ -26,6 +26,7 @@ import PushEnableButton from "../components/pwa/PushEnableButton";
 import ExamNexusLogo from "../components/ExamNexusLogo";
 import ExamNexusBrand from "../components/ExamNexusBrand";
 import RequiredSchoolIdGate from "../components/RequiredSchoolIdGate";
+import TemporaryPasswordNotice from "../components/TemporaryPasswordNotice";
 import SidebarNavLink, { SidebarSection } from "../components/SidebarNavLink";
 import SidebarCollapseToggle from "../components/SidebarCollapseToggle";
 import AnimatedPage from "../components/ui/AnimatedPage";
@@ -409,6 +410,9 @@ export default function DashboardLayout() {
             <Outlet />
           </AnimatedPage>
           <RequiredSchoolIdGate theme={theme} onResolved={setSessionUser} />
+          {isStudent && accessState === "allowed" && !isLockdownActive && (
+            <TemporaryPasswordNotice profilePath="/student/profile" />
+          )}
         </div>
       </main>
 

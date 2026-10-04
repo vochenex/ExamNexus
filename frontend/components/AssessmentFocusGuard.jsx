@@ -1,6 +1,5 @@
 import { ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import { primaryButton } from "../utils/themeButtons";
 import { MAX_INTEGRITY_STRIKES } from "../utils/examIntegrity";
 import ModalPortal from "./ui/ModalPortal";
 
@@ -72,7 +71,7 @@ export default function AssessmentFocusGuard({
         <button
           type="button"
           onClick={onContinue}
-          className={`mt-6 w-full ${primaryButton(theme, "py-3")}`}
+          className="en-btn-primary mt-6 w-full py-3"
         >
           Return to assessment
         </button>

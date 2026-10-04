@@ -1,6 +1,5 @@
 import ProgressButton from "./ui/ProgressButton";
 import ToggleOptionRow from "./ui/ToggleOptionRow";
-import { primaryButton } from "../utils/themeButtons";
 import {
   formatDurationInputValue,
   parseDurationInput,
@@ -198,7 +197,7 @@ export default function AssessmentSettingsPanel({
         onClick={onPublish}
         loading={loading}
         loadingLabel="Saving..."
-        className={`${primaryButton(theme, "w-full justify-center px-4 py-3")} disabled:opacity-60`}
+        className="en-btn-primary w-full justify-center px-4 py-3"
       >
         {publishLabel}
       </ProgressButton>

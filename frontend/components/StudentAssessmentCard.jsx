@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RotateCcw, Trophy } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import { primaryButtonSm, secondaryButtonSm } from "../utils/themeButtons";
+import { secondaryButtonSm } from "../utils/themeButtons";
 import {
   canStudentTakeAssessment,
   canRequestRetake,
@@ -178,10 +178,7 @@ export default function StudentAssessmentCard({
             <button
               type="button"
               onClick={handleTakeAssessment}
-              className={primaryButtonSm(
-                theme,
-                "text-xs px-3 py-1.5 rounded-lg"
-              )}
+              className="en-btn-primary en-btn-primary-sm text-xs px-3 py-1.5 rounded-lg"
             >
               {assessment.retake_status === "approved" ? "Retake Assessment" : "Take Assessment"}
             </button>
@@ -234,7 +231,7 @@ export default function StudentAssessmentCard({
                 type="button"
                 disabled={requesting}
                 onClick={handleRequestRetake}
-                className={primaryButtonSm(theme, "text-xs px-3 py-1.5 rounded-lg")}
+                className="en-btn-primary en-btn-primary-sm text-xs px-3 py-1.5 rounded-lg"
               >
                 {requesting ? "Sending..." : "Submit request"}
               </button>

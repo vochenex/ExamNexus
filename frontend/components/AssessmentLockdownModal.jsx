@@ -1,6 +1,6 @@
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import { primaryButton, secondaryButton } from "../utils/themeButtons";
+import { secondaryButton } from "../utils/themeButtons";
 import { MAX_INTEGRITY_STRIKES } from "../utils/examIntegrity";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 import ModalPortal from "./ui/ModalPortal";
@@ -150,7 +150,7 @@ export default function AssessmentLockdownModal({
           <button type="button" onClick={onCancel} className={secondaryButton(theme)}>
             Go back
           </button>
-          <button type="button" onClick={onConfirm} className={primaryButton(theme)}>
+          <button type="button" onClick={onConfirm} className="en-btn-primary">
             Begin assessment
           </button>
         </div>

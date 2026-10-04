@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
-import { useTheme } from "../../layouts/ThemeContext";
 import ThemeToggle from "../ThemeToggle";
 import InstallIconButton from "../pwa/InstallIconButton";
 import ExamNexusBrand from "../ExamNexusBrand";
@@ -10,7 +9,6 @@ import { ProgressLink } from "../ProgressLink";
 import useMobileNav from "../../hooks/useMobileNav";
 import { isNativeApp } from "../../utils/platform";
 import { getCachedExamNexusUser } from "../../utils/authUser";
-import { primaryButton } from "../../utils/themeButtons";
 import { homeNavSectionFromHref, useHomeActiveSection } from "../../hooks/useHomeActiveSection";
 import {
   acquireScrollLock,
@@ -32,7 +30,6 @@ function dashboardPath(role) {
 }
 
 export default function HomeSiteHeader() {
-  const { theme } = useTheme();
   const location = useLocation();
   const mobileNav = useMobileNav();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -331,7 +328,7 @@ export default function HomeSiteHeader() {
               </ProgressLink>
               <ProgressLink
                 to={dashboardTo || "/auth"}
-                className={primaryButton(theme, "en-home-mobile-nav-cta w-full justify-center text-sm py-2.5")}
+                className="en-btn-primary en-home-mobile-nav-cta w-full justify-center text-sm py-2.5"
                 onClick={handleMobileNavClick}
               >
                 {dashboardTo ? "Open dashboard" : "Sign in to ExamNexus"}

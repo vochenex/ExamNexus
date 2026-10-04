@@ -82,8 +82,8 @@
 
 :is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-wrap,
 :is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-list {
-  touch-action: none !important;
-  overscroll-behavior: none !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-auth-card {

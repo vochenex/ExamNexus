@@ -28,7 +28,7 @@ import {
   rejectAdminPasswordResetRequest,
 } from "../../utils/passwordReset";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { iconButton, primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
+import { iconButton, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
 import { friendlyError } from "../../utils/friendlyError";
 
 const STATUSES = [
@@ -307,7 +307,7 @@ export default function AdminPasswordResets() {
               loading={bulkCompleting}
               loadingLabel="Approving..."
               disabled={bulkRejecting || actingId !== null || submitting}
-              className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
+              className={`en-btn-primary en-btn-primary-sm ${adminToolbarButtonClass()} text-xs px-3 py-1.5`}
               aria-label="Approve all pending resets"
               title="Approve all pending resets"
             >
@@ -514,7 +514,7 @@ export default function AdminPasswordResets() {
                 onClick={handleComplete}
                 loading={submitting}
                 loadingLabel="Saving..."
-                className={primaryButtonSm(theme)}
+                className="en-btn-primary en-btn-primary-sm"
               >
                 Apply reset
               </ProgressButton>
@@ -568,7 +568,7 @@ export default function AdminPasswordResets() {
                 <button
                   type="button"
                   onClick={() => setBulkResults(null)}
-                  className={primaryButtonSm(theme)}
+                  className="en-btn-primary en-btn-primary-sm"
                 >
                   Done
                 </button>

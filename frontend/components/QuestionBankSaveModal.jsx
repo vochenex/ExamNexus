@@ -3,7 +3,7 @@ import { Archive, Check, X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
 import ModalShell from "./ui/ModalShell";
 import ProgressButton from "./ui/ProgressButton";
-import { primaryButton, secondaryButton } from "../utils/themeButtons";
+import { secondaryButton } from "../utils/themeButtons";
 import { deserializeQuestion } from "../utils/assessmentQuestions";
 import { getQuestionBankTypeLabel, saveQuestionToBank } from "../utils/questionBank";
 import { friendlyError } from "../utils/friendlyError";
@@ -243,7 +243,7 @@ export default function QuestionBankSaveModal({
                 loading={saving}
                 loadingLabel="Saving…"
                 disabled={selectedIds.size === 0}
-                className={primaryButton(theme, "disabled:opacity-50")}
+                className="en-btn-primary disabled:opacity-50"
               >
                 Save selected
               </ProgressButton>

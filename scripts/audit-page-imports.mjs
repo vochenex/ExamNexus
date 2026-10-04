@@ -39,9 +39,6 @@ const routes = [
 ];
 
 const THEME_BUTTONS = [
-  "primaryButton",
-  "primaryButtonSm",
-  "primaryButtonFull",
   "secondaryButton",
   "secondaryButtonSm",
   "dangerButton",

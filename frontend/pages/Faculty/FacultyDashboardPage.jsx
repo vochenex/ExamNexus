@@ -41,7 +41,6 @@ import {
 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import {
-  primaryButtonSm,
   secondaryButton,
   secondaryButtonSm,
 } from "../../utils/themeButtons";
@@ -510,7 +509,7 @@ export default function FacultyDashboard() {
                     setSelectedSubject(subject);
                     setShowAssessmentModal(true);
                   }}
-                  className={primaryButtonSm(theme)}
+                  className="en-btn-primary en-btn-primary-sm"
                 >
                   + Assessment
                 </button>

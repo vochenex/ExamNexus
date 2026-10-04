@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { useTheme } from "../../layouts/ThemeContext";
-import { primaryButton, secondaryButton } from "../../utils/themeButtons";
+import { secondaryButton } from "../../utils/themeButtons";
 import { motion } from "../../utils/motion";
 import ModalPortal from "./ModalPortal";
 import ProgressButton from "./ProgressButton";
@@ -236,7 +236,7 @@ export default function AppModal({
                       ? secondaryButton(theme, "w-full justify-center disabled:opacity-60")
                       : isDanger
                         ? "w-full rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
-                        : primaryButton(theme, "w-full justify-center disabled:opacity-60")
+                        : "en-btn-primary w-full justify-center"
                   }
                 >
                   {action.label}
@@ -266,7 +266,7 @@ export default function AppModal({
             className={
               tone === "danger" || tone === "error"
                 ? "rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
-                : primaryButton(theme, "disabled:opacity-60")
+                : "en-btn-primary"
             }
           >
             {confirmLabel}

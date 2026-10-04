@@ -2,7 +2,7 @@
 
 Quick locator while debugging. Local tip: amber **Debug · page file** badge shows the active page (`Ctrl+Shift+D`).
 
-**UI Inspector (`Ctrl+E`, dev only):** click any element to see its JSX file:line, the helpers/state it uses (e.g. `className → primaryButtonFull`), the component chain, colors, animations/keyframes, CSS rules, and hidden layers under the cursor; click a file chip to open it in Cursor. Includes a code search box. Files: `frontend/components/DevUiInspector.jsx`, `frontend/dev/uiInspector*.js`, `frontend/dev/examNexusUiInspectorPlugin.js` (Vite plugin that tags JSX with `data-en-src`).
+**UI Inspector (`Ctrl+E`, dev only):** click any element to see its JSX file:line, the helpers/state it uses (e.g. `className → secondaryButton`), the component chain, colors, animations/keyframes, CSS rules, and hidden layers under the cursor; click a file chip to open it in Cursor. Includes a code search box. Files: `frontend/components/DevUiInspector.jsx`, `frontend/dev/uiInspector*.js`, `frontend/dev/examNexusUiInspectorPlugin.js` (Vite plugin that tags JSX with `data-en-src`).
 
 ---
 
@@ -56,6 +56,7 @@ Quick locator while debugging. Local tip: amber **Debug · page file** badge sho
 |---|---|
 | `AdminDashboardPage.jsx` | Admin overview / stats cards |
 | `AdminAccountsPage.jsx` | Approve / manage accounts |
+| `AdminStudentImportPage.jsx` | `/admin/accounts/import` — bulk student accounts from .xlsx (`utils/studentXlsxImport.js`); students get a temp-password reminder (`components/TemporaryPasswordNotice.jsx`) |
 | `AdminPasswordResetsPage.jsx` | Forgot-password queue · set temp password · admin message |
 | `AdminSubjectsPage.jsx` | Manage subjects |
 | `AdminAssignedSubjectsPage.jsx` | Subject assignments |
@@ -209,6 +210,8 @@ AI generator · question builder · grading options · schedule · calendar · p
 | `routes/assessmentAiRoute.js` | AI generate from prompt / document |
 | `routes/analyticsRoute.js` | Analytics endpoints |
 | `routes/pushRoute.js` | Push notification APIs |
+| `routes/adminStudentsRoute.js` | Admin bulk student import (`POST /admin/students/import`) |
+| `routes/adminUsersRoute.js` | Promote to admin (`POST /admin/users/:id/promote`) and save own 3-digit admin ID (`POST /admin/me/admin-id`); frontend helper `utils/adminPromotion.js`, prompt in `components/RequiredSchoolIdGate.jsx` |
 | `routes/subjectsRoute.js` | Subject helpers |
 | `routes/extract.js` · `generate.js` | Doc extract / generate helpers |
 | `lib/aiProvider.js` | Groq + Gemini clients · retries |
@@ -216,7 +219,7 @@ AI generator · question builder · grading options · schedule · calendar · p
 | `lib/documentExtractor.js` · `documentBlocks.js` | File → text for AI |
 | `lib/supabaseAdmin.js` · `supabaseClient.js` | Service / user Supabase |
 | `lib/pushSender.js` | Send push |
-| `middleware/requireFaculty.js` · `verifyAccessToken.js` | Auth gates |
+| `middleware/requireFaculty.js` · `requireAdmin.js` · `verifyAccessToken.js` | Auth gates |
 | `controllers/` | `auth` · `exam` · `analytics` controllers |
 | `.env` | **Secrets — do not commit** |
 

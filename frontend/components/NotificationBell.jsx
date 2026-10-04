@@ -149,9 +149,15 @@ export default function NotificationBell({ compact = false }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [panelStyle, setPanelStyle] = useState(null);
   const closeTimerRef = useRef(0);
+  const panelShownRef = useRef(false);
 
-  const closePanel = () => {
-    if (!open && !visible) return;
+  useEffect(() => {
+    panelShownRef.current = open || visible;
+  }, [open, visible]);
+
+  const closePanel = useCallback(() => {
+    if (!panelShownRef.current) return;
+    panelShownRef.current = false;
     setShowClearConfirm(false);
     setClosing(true);
     setOpen(false);
@@ -161,10 +167,11 @@ export default function NotificationBell({ compact = false }) {
       setClosing(false);
       setPanelStyle(null);
     }, 320);
-  };
+  }, []);
 
   const openPanel = () => {
     window.clearTimeout(closeTimerRef.current);
+    panelShownRef.current = true;
     setClosing(false);
     setVisible(true);
     setOpen(true);
@@ -208,7 +215,7 @@ export default function NotificationBell({ compact = false }) {
   // Tab / route changes must dismiss the panel — otherwise it keeps eating touches.
   useEffect(() => {
     closePanel();
-  }, [location.pathname]);
+  }, [location.pathname, closePanel]);
 
   useLayoutEffect(() => {
     if (!visible || !triggerRef.current) {
@@ -264,7 +271,7 @@ export default function NotificationBell({ compact = false }) {
 
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, closePanel]);
 
   useEffect(
     () => () => {

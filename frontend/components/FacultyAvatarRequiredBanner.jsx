@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../layouts/ThemeContext";
 import { FACULTY_AVATAR_REQUIRED_MESSAGE } from "../utils/avatar";
-import { primaryButtonSm } from "../utils/themeButtons";
 import ProfileAvatar from "./ProfileAvatar";
 
 export default function FacultyAvatarRequiredBanner({ user }) {
@@ -30,7 +29,7 @@ export default function FacultyAvatarRequiredBanner({ user }) {
       <button
         type="button"
         onClick={() => navigate("/faculty/profile")}
-        className={primaryButtonSm(theme)}
+        className="en-btn-primary en-btn-primary-sm"
       >
         Upload Photo
       </button>

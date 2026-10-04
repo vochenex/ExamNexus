@@ -2,6 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Primary button — edit its look here.
+   Usage: className="en-btn-primary" (add en-btn-primary-sm for the compact size).
+   Dark theme is the default; html.light overrides below. Tailwind utilities added
+   next to it (w-full, text-xs, px-3, mt-4, ...) still win because this is in the
+   components layer. */
+@layer components {
+  .en-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    color: #000;
+    background-image: linear-gradient(to right, #10b981, #14b8a6, #06b6d4);
+    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+  }
+
+  .en-btn-primary:hover {
+    transform: translateY(-0.125rem);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.45);
+  }
+
+  .en-btn-primary:active {
+    transform: translateY(-0.125rem) scale(0.98);
+  }
+
+  .en-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  html.light .en-btn-primary {
+    color: #fff;
+  }
+
+  html.light .en-btn-primary:hover:not(:disabled) {
+    box-shadow:
+      0 10px 15px -3px rgba(16, 185, 129, 0.3),
+      0 4px 6px -4px rgba(16, 185, 129, 0.3);
+  }
+
+  .en-btn-primary-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border-radius: 0.5rem;
+  }
+}
+
 /* Light mode — "Emerald Glass (light)": mint/emerald tinted neutrals that
    relate to the dark theme, with the same emerald accent family. */
 html.light {
@@ -608,12 +662,12 @@ html:not(.light) .overflow-auto::-webkit-scrollbar-thumb {
 :is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-list {
   scrollbar-width: thin !important;
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior: none !important;
-  touch-action: none !important;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .en-saved-accounts-list * {
-  touch-action: none !important;
+  touch-action: pan-y !important;
 }
 
 :is(html.en-native-app, html.en-mobile-shell) .overflow-x-auto::-webkit-scrollbar,

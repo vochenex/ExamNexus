@@ -1,6 +1,5 @@
 import { Plus } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import { primaryButtonSm } from "../utils/themeButtons";
 import ProgressButton from "./ui/ProgressButton";
 import { YearLevelSelect } from "./YearLevelBadge";
 import SectionCountSelect from "./SectionCountSelect";
@@ -65,7 +64,7 @@ export default function FacultyCreateSubjectPanel({
             loading={creating}
             loadingLabel="Creating…"
             disabled={disabled || !name.trim()}
-            className={primaryButtonSm(theme, "w-full justify-center disabled:cursor-not-allowed disabled:opacity-50")}
+            className="en-btn-primary en-btn-primary-sm w-full justify-center disabled:opacity-50"
           >
             <Plus size={16} />
             Create subject

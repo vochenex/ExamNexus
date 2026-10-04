@@ -8,7 +8,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
-import { primaryButtonSm, secondaryButtonSm } from "../../utils/themeButtons";
+import { secondaryButtonSm } from "../../utils/themeButtons";
 import { resolveStudentId, isAuthSessionError } from "../../utils/authUser";
 import { fetchStudentAnalytics } from "../../utils/supabaseData";
 import { getAssessmentCategoryLabel } from "../../utils/assessmentCategories";
@@ -138,7 +138,7 @@ export default function StudentDashboard() {
             <button
               type="button"
               onClick={() => navigate("/student/assessments")}
-              className={primaryButtonSm(theme)}
+              className="en-btn-primary en-btn-primary-sm"
             >
               My Assessments
             </button>

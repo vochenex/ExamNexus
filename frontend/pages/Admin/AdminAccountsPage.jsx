@@ -1,5 +1,16 @@
-import { useCallback, useMemo, useState } from "react";
-import { Users, Pencil, Trash2, Check, CheckCheck, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Users,
+  Pencil,
+  Trash2,
+  Check,
+  CheckCheck,
+  Search,
+  FileSpreadsheet,
+  UserPlus,
+  ShieldCheck,
+} from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
 import { useAppModal } from "../../contexts/AppModalContext";
 import PageHeader from "../../components/ui/PageHeader";
@@ -22,6 +33,7 @@ import {
   adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
+import { ProgressLink } from "../../components/ProgressLink";
 import {
   deleteAdminUser,
   fetchAdminUsers,
@@ -31,11 +43,11 @@ import {
   updateAdminUser,
 } from "../../utils/adminData";
 import { removeSavedAccountMatch } from "../../utils/savedAccounts";
+import { promoteUserToAdmin } from "../../utils/adminPromotion";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { iconButton, primaryButtonSm, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
+import { iconButton, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
-import { friendlyError } from "../../utils/friendlyError";
 
 const ROLES = ["Student", "Faculty", "Admin"];
 const STATUSES = [
@@ -89,9 +101,19 @@ function clearLocalSavedLogin(user) {
 export default function AdminAccounts() {
   const { theme } = useTheme();
   const { success, error, confirm } = useAppModal();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [importedEmails, setImportedEmails] = useState(
+    () =>
+      new Set(
+        (location.state?.importedEmails || []).map((email) => String(email).trim().toLowerCase())
+      )
+  );
   const [users, setUsers] = useState([]);
   const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState(() =>
+    location.state?.importedEmails?.length ? "" : "pending"
+  );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState(null);
@@ -100,6 +122,7 @@ export default function AdminAccounts() {
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [promotingId, setPromotingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
@@ -118,16 +141,31 @@ export default function AdminAccounts() {
 
   const pendingCount = pendingUsers.length;
 
+  // Clear router state so a refresh doesn't re-highlight; the Set above keeps it for this visit.
+  useEffect(() => {
+    if (location.state?.importedEmails) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, navigate]);
+
+  const isImported = useCallback(
+    (user) => importedEmails.has(String(user?.email || "").trim().toLowerCase()),
+    [importedEmails]
+  );
+
   const visibleUsers = useMemo(() => {
     const trimmed = searchQuery.trim().toLowerCase();
-    if (!trimmed) return users;
-    return users.filter((user) => {
-      const name = `${user.first_name || ""} ${user.last_name || ""}`.trim().toLowerCase();
-      const id = String(user.school_id || "").toLowerCase();
-      const email = String(user.email || "").toLowerCase();
-      return name.includes(trimmed) || id.includes(trimmed) || email.includes(trimmed);
-    });
-  }, [users, searchQuery]);
+    const matched = !trimmed
+      ? users
+      : users.filter((user) => {
+          const name = `${user.first_name || ""} ${user.last_name || ""}`.trim().toLowerCase();
+          const id = String(user.school_id || "").toLowerCase();
+          const email = String(user.email || "").toLowerCase();
+          return name.includes(trimmed) || id.includes(trimmed) || email.includes(trimmed);
+        });
+    if (importedEmails.size === 0) return matched;
+    return [...matched].sort((a, b) => Number(isImported(b)) - Number(isImported(a)));
+  }, [users, searchQuery, importedEmails, isImported]);
 
   const selectableVisibleUsers = useMemo(
     () =>
@@ -162,6 +200,7 @@ export default function AdminAccounts() {
     bulkDeleting ||
     reviewingId !== null ||
     deletingId !== null ||
+    promotingId !== null ||
     saving;
 
   const load = useCallback(async (silent = false, overrides = {}) => {
@@ -234,16 +273,21 @@ export default function AdminAccounts() {
       return;
     }
 
+    const original = users.find((user) => user.id === editing.id);
+    const becomingAdmin = role === "admin" && !isAdminRole(original);
+
     try {
       setSaving(true);
       await updateAdminUser(editing.id, editing);
+      // Same flow as the Promote button so they're asked for a 3-digit admin ID at sign-in.
+      if (becomingAdmin) await promoteUserToAdmin(editing.id);
       setEditing(null);
-      await load(true);
       setSaving(false);
-      await success("Account updated successfully.");
+      success("Account updated successfully.");
+      await load(true);
     } catch (err) {
       setSaving(false);
-      error(friendlyError(err, "Failed to update account."));
+      error(err.message || "Failed to update account.");
     }
   };
 
@@ -261,12 +305,12 @@ export default function AdminAccounts() {
     try {
       setReviewingId(user.id);
       await reviewAdminAccount(user.id, "approve");
-      await load(true);
       setReviewingId(null);
-      await success("Account approved.");
+      success("Account approved.");
+      await load(true);
     } catch (err) {
       setReviewingId(null);
-      error(friendlyError(err, "Failed to approve account."));
+      error(err.message || "Failed to approve account.");
     }
   };
 
@@ -290,12 +334,12 @@ export default function AdminAccounts() {
         await reviewAdminAccount(user.id, "approve");
       }
       const count = pendingUsers.length;
-      await load(true);
       setBulkApproving(false);
-      await success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
+      success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
+      await load(true);
     } catch (err) {
       setBulkApproving(false);
-      error(friendlyError(err, "Failed to approve all accounts."));
+      error(err.message || "Failed to approve all accounts.");
     }
   };
 
@@ -322,12 +366,44 @@ export default function AdminAccounts() {
       }
       const count = selectedPendingUsers.length;
       setSelectedIds(new Set());
-      await load(true);
       setBulkApproving(false);
-      await success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
+      success(`Approved ${count} account${count === 1 ? "" : "s"}.`);
+      await load(true);
     } catch (err) {
       setBulkApproving(false);
-      error(friendlyError(err, "Failed to approve selected accounts."));
+      error(err.message || "Failed to approve selected accounts.");
+    }
+  };
+
+  const handlePromote = async (user) => {
+    const name = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email;
+    const ok = await confirm({
+      title: "Promote to admin?",
+      message: `Give ${name} full administrator access? The next time they sign in they'll be asked to enter their 3-digit admin ID number.`,
+      tone: "warning",
+      confirmLabel: "Promote",
+    });
+    if (!ok) return;
+
+    try {
+      setPromotingId(user.id);
+      await promoteUserToAdmin(user.id);
+      setUsers((prev) =>
+        prev.map((row) =>
+          row.id === user.id ? { ...row, role: "Admin", account_status: "approved" } : row
+        )
+      );
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(user.id);
+        return next;
+      });
+      setPromotingId(null);
+      success(`${name} is now an admin. They'll set a 3-digit admin ID at their next sign-in.`);
+      await load(true);
+    } catch (err) {
+      setPromotingId(null);
+      error(err.message || "Failed to promote account.");
     }
   };
 
@@ -360,14 +436,14 @@ export default function AdminAccounts() {
         return next;
       });
       setDeletingId(null);
+      setBulkDeleting(false);
+      success(successLabel);
       setStatusFilter("deleted");
       await load(true, { status: "deleted" });
-      setBulkDeleting(false);
-      await success(successLabel);
     } catch (err) {
       setDeletingId(null);
       setBulkDeleting(false);
-      error(friendlyError(err, "Failed to delete account."));
+      error(err.message || "Failed to delete account.");
     }
   };
 
@@ -396,12 +472,12 @@ export default function AdminAccounts() {
         return next;
       });
       setDeletingId(null);
+      success("Account moved to Deleted (kept 7 days).");
       setStatusFilter("deleted");
       await load(true, { status: "deleted" });
-      await success("Account moved to Deleted (kept 7 days).");
     } catch (err) {
       setDeletingId(null);
-      error(friendlyError(err, "Failed to delete account."));
+      error(err.message || "Failed to delete account.");
     }
   };
 
@@ -439,10 +515,42 @@ export default function AdminAccounts() {
         icon={Users}
         title="Manage accounts"
         subtitle="Review new signup requests and manage user roles, academic info, and access."
+        actions={
+          <ProgressLink
+            to="/admin/accounts/import"
+            className={secondaryButtonSm(theme, "inline-flex items-center gap-1.5")}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Import students
+          </ProgressLink>
+        }
       />
 
       {loadError && (
         <AdminPageError theme={theme} message={loadError} onRetry={() => load()} />
+      )}
+
+      {importedEmails.size > 0 && (
+        <div
+          className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+            theme === "dark"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          <span className="inline-flex items-center gap-2">
+            <UserPlus size={16} className="shrink-0" />
+            {importedEmails.size} new student account{importedEmails.size === 1 ? "" : "s"} added.
+            They're highlighted at the top of the list.
+          </span>
+          <button
+            type="button"
+            onClick={() => setImportedEmails(new Set())}
+            className="text-xs font-semibold underline-offset-2 hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
       )}
 
       {statusFilter === "deleted" && (
@@ -505,42 +613,12 @@ export default function AdminAccounts() {
             loading={bulkApproving}
             loadingLabel="Approving..."
             disabled={busy && !bulkApproving}
-            className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
+            className={`en-btn-primary en-btn-primary-sm ${adminToolbarButtonClass()} text-xs px-3 py-1.5`}
             aria-label="Approve all pending accounts"
             title="Approve all pending accounts"
           >
             <CheckCheck size={14} />
             Approve all
-          </ProgressButton>
-        )}
-        {selectedPendingUsers.length > 0 && (
-          <ProgressButton
-            type="button"
-            onClick={handleApproveSelected}
-            loading={bulkApproving}
-            loadingLabel="Approving..."
-            disabled={busy && !bulkApproving}
-            className={primaryButtonSm(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
-            aria-label="Approve selected accounts"
-            title="Approve selected accounts"
-          >
-            <Check size={14} />
-            Approve selected ({selectedPendingUsers.length})
-          </ProgressButton>
-        )}
-        {selectedVisibleUsers.length > 0 && (
-          <ProgressButton
-            type="button"
-            onClick={handleDeleteSelected}
-            loading={bulkDeleting}
-            loadingLabel="Deleting..."
-            disabled={busy && !bulkDeleting}
-            className={dangerButton(theme, `${adminToolbarButtonClass()} text-xs px-3 py-1.5`)}
-            aria-label="Delete selected accounts"
-            title="Delete selected accounts"
-          >
-            <Trash2 size={14} />
-            Delete selected ({selectedVisibleUsers.length})
           </ProgressButton>
         )}
         {selectableVisibleUsers.length > 0 && (
@@ -556,6 +634,48 @@ export default function AdminAccounts() {
           >
             <Trash2 size={14} />
             Delete all
+          </ProgressButton>
+        )}
+        {/* Selection buttons sit last and keep their slot while hidden, so ticking a row never shifts the layout. */}
+        {(statusFilter === "" || statusFilter === "pending") && pendingCount > 0 && (
+          <ProgressButton
+            type="button"
+            onClick={handleApproveSelected}
+            loading={bulkApproving}
+            loadingLabel="Approving..."
+            disabled={selectedPendingUsers.length === 0 || (busy && !bulkApproving)}
+            aria-hidden={selectedPendingUsers.length === 0 || undefined}
+            tabIndex={selectedPendingUsers.length === 0 ? -1 : undefined}
+            className={`en-btn-primary en-btn-primary-sm ${adminToolbarButtonClass()} text-xs px-3 py-1.5 ${
+              selectedPendingUsers.length === 0 ? "invisible" : ""
+            }`}
+            aria-label="Approve selected accounts"
+            title="Approve selected accounts"
+          >
+            <Check size={14} />
+            Approve selected ({selectedPendingUsers.length})
+          </ProgressButton>
+        )}
+        {selectableVisibleUsers.length > 0 && (
+          <ProgressButton
+            type="button"
+            onClick={handleDeleteSelected}
+            loading={bulkDeleting}
+            loadingLabel="Deleting..."
+            disabled={selectedVisibleUsers.length === 0 || (busy && !bulkDeleting)}
+            aria-hidden={selectedVisibleUsers.length === 0 || undefined}
+            tabIndex={selectedVisibleUsers.length === 0 ? -1 : undefined}
+            className={dangerButton(
+              theme,
+              `${adminToolbarButtonClass()} text-xs px-3 py-1.5 ${
+                selectedVisibleUsers.length === 0 ? "invisible" : ""
+              }`
+            )}
+            aria-label="Delete selected accounts"
+            title="Delete selected accounts"
+          >
+            <Trash2 size={14} />
+            Delete selected ({selectedVisibleUsers.length})
           </ProgressButton>
         )}
         </div>
@@ -574,7 +694,7 @@ export default function AdminAccounts() {
         </div>
       ) : (
         <div className={adminTableInnerClass()}>
-          <table className={`${adminTableClass(theme)} min-w-[42rem] sm:min-w-[56rem] lg:min-w-[76rem]`}>
+          <table className={`${adminTableClass(theme)} min-w-[76rem]`}>
             <thead>
               <tr>
                 <th className={`${adminThClass(theme)} w-10`}>
@@ -605,9 +725,15 @@ export default function AdminAccounts() {
                   const isAdmin = isAdminRole(user);
                   const canSelect = !isAdmin && user.id !== currentUser.id && !isDeleted;
                   const daysLeft = isDeleted ? getDeletedAccountDaysLeft(user) : null;
+                  const isNew = isImported(user);
 
                   return (
-                    <tr key={user.id}>
+                    <tr
+                      key={user.id}
+                      className={
+                        isNew ? (theme === "dark" ? "bg-emerald-500/10" : "bg-emerald-50") : undefined
+                      }
+                    >
                       <td className={adminTdClass(theme)}>
                         <input
                           type="checkbox"
@@ -623,6 +749,17 @@ export default function AdminAccounts() {
                       </td>
                       <td className={`${adminTdClass(theme)} min-w-[11rem] whitespace-nowrap`}>
                         {[user.first_name, user.last_name].filter(Boolean).join(" ") || "—"}
+                        {isNew && (
+                          <span
+                            className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                              theme === "dark"
+                                ? "bg-emerald-500/20 text-emerald-300"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            New
+                          </span>
+                        )}
                       </td>
                       <td className={`${adminTdClass(theme)} min-w-[14rem] break-all`}>
                         {user.email}
@@ -667,6 +804,21 @@ export default function AdminAccounts() {
                             >
                               <Pencil size={16} />
                             </button>
+                          )}
+                          {!isAdmin && !isDeleted && (
+                            <ProgressButton
+                              type="button"
+                              loading={promotingId === user.id}
+                              loadingLabel="Promoting account"
+                              iconOnly
+                              disabled={busy && promotingId !== user.id}
+                              onClick={() => handlePromote(user)}
+                              className={iconButton(theme, "secondary")}
+                              aria-label={`Promote ${user.email} to admin`}
+                              title="Promote to admin"
+                            >
+                              <ShieldCheck size={16} />
+                            </ProgressButton>
                           )}
                           {!isAdmin && !isDeleted && (
                             <ProgressButton
@@ -793,7 +945,7 @@ export default function AdminAccounts() {
                 loading={saving}
                 loadingLabel="Saving..."
                 disabled={deletingId !== null}
-                className={primaryButtonSm(theme)}
+                className="en-btn-primary en-btn-primary-sm"
               >
                 Save changes
               </ProgressButton>
@@ -801,7 +953,6 @@ export default function AdminAccounts() {
           </div>
         </div>
         </ModalPortal>
-      )}
-    </div>
+      )}    </div>
   );
 }

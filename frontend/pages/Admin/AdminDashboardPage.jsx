@@ -17,7 +17,6 @@ import PageHeader from "../../components/ui/PageHeader";
 import { PageLoadingSkeleton } from "../../components/ui/PageLoadingSkeleton";
 import { usePolling } from "../../hooks/useRealtimeFetch";
 import { fetchAdminDashboardAnalytics, fetchAdminDashboardStats } from "../../utils/adminData";
-import { primaryButtonSm } from "../../utils/themeButtons";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { adminNoticeClass } from "../../components/admin/adminTableStyles";
 import { AdminStatBadge, AdminVerticalBarChart } from "../../components/admin/AdminBarChart";
@@ -124,7 +123,7 @@ function AdminToolCard({ tool, stats, theme, onOpen }) {
           {tool.getDetail(stats)}
         </p>
       )}
-      <span className={`mt-3 inline-flex ${primaryButtonSm(theme, "text-xs")}`}>Open</span>
+      <span className="en-btn-primary en-btn-primary-sm mt-3 text-xs">Open</span>
     </button>
   );
 }

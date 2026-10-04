@@ -13,6 +13,7 @@ import {
 import ModalPortal from "./ui/ModalPortal";
 import { useScrollIntoViewWhen } from "../hooks/useScrollIntoViewWhen";
 import { friendlyError } from "../utils/friendlyError";
+import { isAdminIdRequired, saveOwnAdminId } from "../utils/adminPromotion";
 
 function inputClass(theme) {
   return `w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-emerald-400 ${
@@ -46,6 +47,7 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [promotedAdmin, setPromotedAdmin] = useState(false);
   const errorRef = useScrollIntoViewWhen(Boolean(error), { deps: [error] });
 
   useEffect(() => {
@@ -77,13 +79,24 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
         // Fall back to cached profile if the refresh fails.
       }
 
+      let adminIdPending = false;
+      if (normalizeRole(profile.role) === "admin") {
+        try {
+          const { data } = await supabase.auth.getSession();
+          adminIdPending = isAdminIdRequired(data?.session?.user);
+        } catch {
+          // Without a session the dashboard guard signs the user out anyway.
+        }
+      }
+
       if (cancelled) return;
 
       setUser(profile);
+      setPromotedAdmin(adminIdPending);
 
       // Faculty with a valid 5-digit ID skips this gate entirely.
       // Only legacy 3-digit (or missing/invalid) faculty IDs are prompted.
-      if (!profileNeedsSchoolIdGate(profile)) {
+      if (!adminIdPending && !profileNeedsSchoolIdGate(profile)) {
         setRequired(false);
         setChecking(false);
         onResolved?.(profile);
@@ -123,6 +136,27 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
     if (role === "faculty" && oldSchoolId === validation.normalized && oldSchoolId.length === 5) {
       setRequired(false);
       onResolved?.(user);
+      return;
+    }
+
+    if (role === "admin") {
+      try {
+        setSaving(true);
+        setError("");
+        const saved = await saveOwnAdminId(validation.normalized);
+        // Pull the cleared admin_id_required flag into the local session.
+        await supabase.auth.refreshSession().catch(() => {});
+        const nextUser = { ...user, ...(saved || {}), school_id: validation.normalized };
+        localStorage.setItem("examnexus_user", JSON.stringify(nextUser));
+        setUser(nextUser);
+        setPromotedAdmin(false);
+        setRequired(false);
+        onResolved?.(nextUser);
+      } catch (err) {
+        setError(friendlyError(err, "Could not save your admin ID."));
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -273,14 +307,20 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
           </div>
 
           <h2 className="text-xl font-bold">
-            {isFacultyLegacyUpgrade ? "Update your School ID" : "School ID required"}
+            {promotedAdmin
+              ? "Set your admin ID"
+              : isFacultyLegacyUpgrade
+                ? "Update your School ID"
+                : "School ID required"}
           </h2>
           <p
             className={`mt-2 text-sm ${
               theme === "dark" ? "text-gray-300" : "text-gray-600"
             }`}
           >
-            {isFacultyLegacyUpgrade
+            {promotedAdmin
+              ? "You've been promoted to administrator. Enter your 3-digit admin ID number to continue. If you skip this, you will be logged out."
+              : isFacultyLegacyUpgrade
               ? "Your account still has a 3-digit School ID. Enter your full 5-digit faculty ID to continue. Your subjects will stay linked to your account. If you skip this, you will be logged out."
               : role === "faculty"
                 ? "Faculty School IDs must be exactly 5 digits. Enter your 5-digit ID to continue. Your subjects will stay linked to your account. If you skip this, you will be logged out."
@@ -301,7 +341,7 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
           ) : null}
 
           <label className="mt-5 block text-sm font-semibold" htmlFor="required-school-id">
-            School ID
+            {promotedAdmin ? "Admin ID number" : "School ID"}
           </label>
           <input
             id="required-school-id"
@@ -339,7 +379,9 @@ export default function RequiredSchoolIdGate({ theme, onResolved }) {
               <Save size={16} />
               {saving
                 ? "Saving..."
-                : isFacultyLegacyUpgrade
+                : promotedAdmin
+                  ? "Save admin ID"
+                  : isFacultyLegacyUpgrade
                   ? "Update School ID"
                   : "Save School ID"}
             </button>

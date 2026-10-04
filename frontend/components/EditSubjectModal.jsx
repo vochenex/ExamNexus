@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useTheme } from "../layouts/ThemeContext";
-import { primaryButton, secondaryButton } from "../utils/themeButtons";
+import { secondaryButton } from "../utils/themeButtons";
 import { YearLevelSelect } from "./YearLevelBadge";
 import SectionCountSelect from "./SectionCountSelect";
 import { updateSubject } from "../utils/supabaseData";
@@ -194,7 +194,7 @@ export default function EditSubjectModal({
             onClick={handleSave}
             loading={saving}
             loadingLabel="Saving..."
-            className={primaryButton(theme, "disabled:opacity-50")}
+            className="en-btn-primary disabled:opacity-50"
           >
             Save Changes
           </ProgressButton>

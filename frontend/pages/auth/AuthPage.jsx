@@ -10,7 +10,6 @@ import {
   Copy,
 } from "lucide-react";
 import { useTheme } from "../../layouts/ThemeContext";
-import { primaryButtonFull } from "../../utils/themeButtons";
 import { supabase } from "../../supabaseClient";
 import {
   buildSignupMetadata,
@@ -88,8 +87,6 @@ export default function ExamNexusAuth() {
   const lastNoticeKeyRef = useRef(null);
   const formPanelRef = useRef(null);
   const authBodyRef = useRef(null);
-  const savedListRef = useRef(null);
-  const savedAccountsWrapRef = useRef(null);
   const savedAccountsBlockRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
@@ -104,8 +101,6 @@ export default function ExamNexusAuth() {
   const [rememberMe, setRememberMe] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState(() => getSavedAccounts());
   const [savedOpen, setSavedOpen] = useState(false);
-  const [savedScrollUp, setSavedScrollUp] = useState(false);
-  const [savedScrollDown, setSavedScrollDown] = useState(false);
   const [pinSession, setPinSession] = useState(null);
   const [pinError, setPinError] = useState("");
   const [pinBusy, setPinBusy] = useState(false);
@@ -146,21 +141,6 @@ export default function ExamNexusAuth() {
     if (authView !== "signup" || !formPanelRef.current) return;
     formPanelRef.current.scrollTop = 0;
   }, [authView]);
-
-  const updateSavedScrollState = () => {
-    const list = savedListRef.current;
-    if (!list) {
-      setSavedScrollUp(false);
-      setSavedScrollDown(false);
-      return;
-    }
-
-    const overflow = list.scrollHeight > list.clientHeight + 2;
-    setSavedScrollUp(overflow && list.scrollTop > 4);
-    setSavedScrollDown(
-      overflow && list.scrollTop + list.clientHeight < list.scrollHeight - 4
-    );
-  };
 
   const [form, setForm] = useState({
   firstName: "",
@@ -217,84 +197,6 @@ export default function ExamNexusAuth() {
   useEffect(() => {
     if (!savedOpen || authView !== "login") return undefined;
 
-    updateSavedScrollState();
-    const list = savedListRef.current;
-    const wrap = savedAccountsWrapRef.current;
-    if (!list || !wrap) return undefined;
-
-    let lastTouchY = 0;
-
-    const applyListScroll = (deltaY) => {
-      if (!deltaY) return;
-      const max = Math.max(0, list.scrollHeight - list.clientHeight);
-      list.scrollTop = Math.min(max, Math.max(0, list.scrollTop + deltaY));
-      updateSavedScrollState();
-    };
-
-    // Own the gesture entirely so email/password (and page) never move.
-    const onWheel = (event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      applyListScroll(event.deltaY);
-    };
-
-    const onTouchStart = (event) => {
-      lastTouchY = event.touches[0]?.clientY ?? 0;
-    };
-
-    const onTouchMove = (event) => {
-      const touchY = event.touches[0]?.clientY ?? lastTouchY;
-      const delta = lastTouchY - touchY;
-      lastTouchY = touchY;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      applyListScroll(delta);
-    };
-
-    const authBody = authBodyRef.current;
-    const formPanel = formPanelRef.current;
-    const lockedBodyScroll = authBody?.scrollTop ?? 0;
-    const lockedPanelScroll = formPanel?.scrollTop ?? 0;
-    const lockedWindowScroll = window.scrollY || window.pageYOffset || 0;
-
-    const freezeParents = () => {
-      if (authBody && authBody.scrollTop !== lockedBodyScroll) {
-        authBody.scrollTop = lockedBodyScroll;
-      }
-      if (formPanel && formPanel.scrollTop !== lockedPanelScroll) {
-        formPanel.scrollTop = lockedPanelScroll;
-      }
-      if ((window.scrollY || window.pageYOffset || 0) !== lockedWindowScroll) {
-        window.scrollTo(0, lockedWindowScroll);
-      }
-    };
-
-    const trapOptions = { capture: true, passive: false };
-
-    list.addEventListener("scroll", updateSavedScrollState, { passive: true });
-    wrap.addEventListener("wheel", onWheel, trapOptions);
-    wrap.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
-    wrap.addEventListener("touchmove", onTouchMove, trapOptions);
-    authBody?.addEventListener("scroll", freezeParents, { passive: true });
-    formPanel?.addEventListener("scroll", freezeParents, { passive: true });
-    window.addEventListener("scroll", freezeParents, { passive: true });
-    window.addEventListener("resize", updateSavedScrollState);
-
-    return () => {
-      list.removeEventListener("scroll", updateSavedScrollState);
-      wrap.removeEventListener("wheel", onWheel, trapOptions);
-      wrap.removeEventListener("touchstart", onTouchStart, { capture: true });
-      wrap.removeEventListener("touchmove", onTouchMove, trapOptions);
-      authBody?.removeEventListener("scroll", freezeParents);
-      formPanel?.removeEventListener("scroll", freezeParents);
-      window.removeEventListener("scroll", freezeParents);
-      window.removeEventListener("resize", updateSavedScrollState);
-    };
-  }, [savedOpen, savedAccounts.length, authView]);
-
-  useEffect(() => {
-    if (!savedOpen || authView !== "login") return undefined;
-
     const authBody = authBodyRef.current;
     const formPanel = formPanelRef.current;
 
@@ -342,16 +244,24 @@ export default function ExamNexusAuth() {
       setSavedOpen(false);
     };
 
-    root.addEventListener("focusin", onFocusIn);
-    return () => root.removeEventListener("focusin", onFocusIn);
-  }, [savedOpen, authView]);
+    const onPointerDown = (event) => {
+      if (savedAccountsBlockRef.current?.contains(event.target)) return;
+      setSavedOpen(false);
+    };
 
-  const scrollSavedAccounts = (direction) => {
-    savedListRef.current?.scrollBy({
-      top: direction * 88,
-      behavior: "smooth",
-    });
-  };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setSavedOpen(false);
+    };
+
+    root.addEventListener("focusin", onFocusIn);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      root.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [savedOpen, authView]);
 
   // Keep the focused field visible above the on-screen keyboard (native app only).
   useEffect(() => {
@@ -1272,6 +1182,20 @@ function getAuthInputProps(theme) {
   </p>
 
           <form onSubmit={handleSubmit}>
+            {successMessage && (
+              <div
+                ref={feedbackRef}
+                role="status"
+                className={`mb-4 rounded-xl border p-3 text-center text-sm font-medium ${
+                  theme === "dark"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                    : "border-emerald-300 bg-emerald-50 text-emerald-800"
+                }`}
+              >
+                ✓ {successMessage}
+              </div>
+            )}
+
             {authView === "forgot" ? (
               <div className="space-y-4">
                 <div
@@ -1515,45 +1439,28 @@ function getAuthInputProps(theme) {
                 ) : (
                 <div className="space-y-4">
                   {authView === "login" && savedAccounts.length > 0 && (
-                    <div
-                      ref={savedAccountsBlockRef}
-                      className={`overflow-hidden rounded-xl border ${
-                        theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200 bg-emerald-50/40"
-                      }`}
-                    >
+                    <div ref={savedAccountsBlockRef} className="relative z-30">
                       <button
                         type="button"
                         onClick={() => setSavedOpen((open) => !open)}
-                        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-semibold"
+                        aria-expanded={savedOpen}
+                        aria-haspopup="listbox"
+                        className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold ${
+                          theme === "dark" ? "border-white/10 bg-white/[0.03]" : "border-emerald-200 bg-emerald-50/40"
+                        }`}
                       >
                         <span>Saved accounts ({savedAccounts.length})</span>
                         {savedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </button>
                       {savedOpen && (
                         <div
-                          ref={savedAccountsWrapRef}
-                          className="en-saved-accounts-wrap border-t border-inherit"
+                          className={`en-saved-accounts-wrap en-saved-accounts-dropdown rounded-xl border shadow-2xl ${
+                            theme === "dark"
+                              ? "border-white/10 bg-[#0b1512] shadow-black/60"
+                              : "border-emerald-200 bg-white shadow-emerald-900/10"
+                          }`}
                         >
-                          {savedScrollUp && (
-                            <div className="flex justify-center px-2 pt-1">
-                              <button
-                                type="button"
-                                aria-label="Scroll saved accounts up"
-                                onClick={() => scrollSavedAccounts(-1)}
-                                className={`rounded-md p-1 ${
-                                  theme === "dark"
-                                    ? "text-emerald-300 hover:bg-white/10"
-                                    : "text-teal-700 hover:bg-white/80"
-                                }`}
-                              >
-                                <ChevronUp size={16} />
-                              </button>
-                            </div>
-                          )}
-                          <div
-                            ref={savedListRef}
-                            className="en-saved-accounts-list space-y-1 px-2 pb-2 pt-1"
-                          >
+                          <div className="en-saved-accounts-list space-y-1 p-2">
                           {savedAccounts.map((account) => {
                             const label =
                               [account.first_name, account.last_name].filter(Boolean).join(" ") ||
@@ -1640,22 +1547,6 @@ function getAuthInputProps(theme) {
                             );
                           })}
                           </div>
-                          {savedScrollDown && (
-                            <div className="flex justify-center px-2 pb-2">
-                              <button
-                                type="button"
-                                aria-label="Scroll saved accounts down"
-                                onClick={() => scrollSavedAccounts(1)}
-                                className={`rounded-md p-1 ${
-                                  theme === "dark"
-                                    ? "text-emerald-300 hover:bg-white/10"
-                                    : "text-teal-700 hover:bg-white/80"
-                                }`}
-                              >
-                                <ChevronDown size={16} />
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -1828,25 +1719,12 @@ function getAuthInputProps(theme) {
   </div>
 )}
 
-{successMessage && (
-  <div
-    ref={feedbackRef}
-    className={`mb-4 rounded-xl border p-3 text-center text-sm animate-pulse ${
-      theme === "dark"
-        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-        : "border-emerald-300 bg-emerald-50 text-emerald-800"
-    }`}
-  >
-    ✓ {successMessage}
-  </div>
-)}
-
             {authView !== "signup" ? (
             <ProgressButton
   type="submit"
   loading={loading}
   loadingLabel="Please wait..."
-  className={`${primaryButtonFull(theme)} mt-6`}
+  className="en-btn-primary w-full mt-6"
 >
   {authView === "forgot"
     ? forgotMode === "update"

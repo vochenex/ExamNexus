@@ -40,6 +40,7 @@ const TakeAssessmentPage = lazy(() => import("./pages/Student/TakeAssessmentPage
 const StudentResultDetailPage = lazy(() => import("./pages/Student/StudentResultDetailPage"));
 const AdminDashboardPage = lazy(() => import("./pages/Admin/AdminDashboardPage"));
 const AdminAccountsPage = lazy(() => import("./pages/Admin/AdminAccountsPage"));
+const AdminStudentImportPage = lazy(() => import("./pages/Admin/AdminStudentImportPage"));
 const AdminSubjectsPage = lazy(() => import("./pages/Admin/AdminSubjectsPage"));
 const AdminAssignedSubjectsPage = lazy(() => import("./pages/Admin/AdminAssignedSubjectsPage"));
 const AdminCatalogPage = lazy(() => import("./pages/Admin/AdminCatalogPage"));
@@ -72,6 +73,7 @@ export default function App() {
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/accounts" element={<AdminAccountsPage />} />
+            <Route path="/admin/accounts/import" element={<AdminStudentImportPage />} />
             <Route path="/admin/password-resets" element={<AdminPasswordResetsPage />} />
             <Route path="/admin/subjects" element={<AdminSubjectsPage />} />
             <Route path="/admin/assigned-subjects" element={<AdminAssignedSubjectsPage />} />

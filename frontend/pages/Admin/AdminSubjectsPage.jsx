@@ -24,7 +24,7 @@ import {
 } from "../../components/admin/adminTableStyles";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
-import { iconButton, primaryButton } from "../../utils/themeButtons";
+import { iconButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { DEFAULT_SECTION_COUNT } from "../../utils/sections";
 import { DEFAULT_YEAR_LEVEL } from "../../utils/yearLevels";
@@ -280,7 +280,7 @@ export default function AdminSubjects() {
               loading={creating}
               loadingLabel="Creating…"
               disabled={!form.name.trim() || !form.teacherSchoolId || Boolean(deletingId)}
-              className={`${primaryButton(theme)} w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-60`}
+              className="en-btn-primary w-full sm:w-auto"
             >
               <Plus size={18} />
               Create subject

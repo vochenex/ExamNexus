@@ -30,6 +30,10 @@ const SIDEBAR_ROOT_PATHS = new Set([
 
 const BACK_TARGET_RULES = [
   {
+    pattern: /^\/admin\/accounts\/import$/,
+    target: () => "/admin/accounts",
+  },
+  {
     pattern: /^\/faculty\/edit-assessment\/([^/]+)$/,
     target: (match) => `/faculty/assessment/${match[1]}`,
   },

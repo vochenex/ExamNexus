@@ -48,7 +48,7 @@ export function parseLoc(value) {
   };
 }
 
-/** `className:primaryButtonFull,theme;onClick:go` → [{ attr, names }] */
+/** `className:secondaryButton,theme;onClick:go` → [{ attr, names }] */
 export function parseFx(value) {
   return String(value || "")
     .split(";")

@@ -2,7 +2,6 @@ import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import AuthRoleToggle from "./AuthRoleToggle";
 import AuthNativeSelect from "./AuthNativeSelect";
 import ProgressButton from "../ui/ProgressButton";
-import { primaryButtonFull } from "../../utils/themeButtons";
 import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
 import { CRMCC_EMAIL_PLACEHOLDER, buildCrmcEmail, nameUsesNonAsciiEmailChars } from "../../utils/schoolEmail";
@@ -302,7 +301,7 @@ export default function SignupWizard({
         type="submit"
         loading={loading}
         loadingLabel="Creating account..."
-        className={`${primaryButtonFull(theme)} en-signup-submit mt-5`}
+        className="en-btn-primary w-full en-signup-submit mt-5"
       >
         Create account
       </ProgressButton>
