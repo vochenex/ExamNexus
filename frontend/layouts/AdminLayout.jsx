@@ -1,4 +1,5 @@
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import DevPageOutlet from "../components/DevPageOutlet";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -31,6 +32,7 @@ import useMobileNav from "../hooks/useMobileNav";
 import useSidebarCollapsed from "../hooks/useSidebarCollapsed";
 import useSidebarPendingBadges from "../hooks/useSidebarPendingBadges";
 import useConnectionStatus from "../hooks/useConnectionStatus";
+import { useActiveSessionHeartbeat } from "../hooks/useActiveSessionHeartbeat";
 import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
 import HeaderBackButton from "../components/HeaderBackButton";
@@ -46,6 +48,7 @@ export default function AdminLayout() {
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
   const pendingBadges = useSidebarPendingBadges("admin");
   const { status: connectionStatus } = useConnectionStatus({ fast: true });
+  useActiveSessionHeartbeat();
   const nativeApp = isNativeApp();
   const [user, setUser] = useState(() =>
     JSON.parse(localStorage.getItem("examnexus_user") || "{}")
@@ -278,7 +281,7 @@ export default function AdminLayout() {
           }`}
         >
           <ConnectionStatusBanner status={connectionStatus} className="mb-4" />
-          <Outlet />
+          <DevPageOutlet />
           <RequiredSchoolIdGate theme={theme} onResolved={setUser} />
         </div>
       </main>

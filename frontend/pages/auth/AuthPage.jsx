@@ -56,6 +56,12 @@ import { useAppModal } from "../../contexts/AppModalContext";
 import useMobileNav from "../../hooks/useMobileNav";
 import { isNativeApp } from "../../utils/platform";
 import {
+  SESSION_CONFLICT_NOTICE,
+  claimActiveSession,
+  discardThisSession,
+  formatLastActive,
+} from "../../utils/activeSession";
+import {
   clearRememberedPassword,
   decryptRememberedPassword,
   encryptRememberedPassword,
@@ -98,6 +104,7 @@ export default function ExamNexusAuth() {
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [pendingReviewMessage, setPendingReviewMessage] = useState("");
+  const [sessionConflict, setSessionConflict] = useState(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState(() => getSavedAccounts());
   const [savedOpen, setSavedOpen] = useState(false);
@@ -109,6 +116,7 @@ export default function ExamNexusAuth() {
   const [showTempPassword, setShowTempPassword] = useState(false);
   const forgotResultRef = useRef(null);
   const feedbackRef = useRef(null);
+  const formRef = useRef(null);
   const draftPinRef = useRef("");
 
   useEffect(() => {
@@ -124,7 +132,13 @@ export default function ExamNexusAuth() {
   }, []);
 
   useEffect(() => {
-    if (!resetStatusResult && !successMessage && !serverError && !pendingReviewMessage) {
+    if (
+      !resetStatusResult &&
+      !successMessage &&
+      !serverError &&
+      !pendingReviewMessage &&
+      !sessionConflict
+    ) {
       return;
     }
 
@@ -135,7 +149,7 @@ export default function ExamNexusAuth() {
     }, 80);
 
     return () => window.clearTimeout(timer);
-  }, [resetStatusResult, successMessage, serverError, pendingReviewMessage]);
+  }, [resetStatusResult, successMessage, serverError, pendingReviewMessage, sessionConflict]);
 
   useEffect(() => {
     if (authView !== "signup" || !formPanelRef.current) return;
@@ -319,7 +333,16 @@ export default function ExamNexusAuth() {
 
     clearAuthNotice();
     setServerError("");
-    setPendingReviewMessage(notice.message || notice.title || "");
+    if (notice.kind === SESSION_CONFLICT_NOTICE) {
+      setPendingReviewMessage("");
+      setSessionConflict({
+        deviceLabel: notice.deviceLabel || "another device",
+        secondsAgo: notice.secondsAgo || 0,
+        signedOutHere: true,
+      });
+    } else {
+      setPendingReviewMessage(notice.message || notice.title || "");
+    }
     setAuthView("login");
     setIsLogin(true);
 
@@ -339,6 +362,31 @@ export default function ExamNexusAuth() {
     clearAuthNotice();
     await supabase.auth.signOut();
     localStorage.removeItem("examnexus_user");
+  };
+
+  /** Second login while the account is active elsewhere: drop only this new session. */
+  const refuseActiveElsewhere = async (conflict) => {
+    await discardThisSession();
+    setLoading(false);
+    setServerError("");
+    setPendingReviewMessage("");
+    setSessionConflict({
+      deviceLabel: conflict.deviceLabel,
+      secondsAgo: conflict.secondsAgo,
+      signedOutHere: false,
+    });
+  };
+
+  const retryAfterSessionConflict = () => {
+    setSessionConflict(null);
+    if (form.email && form.password) formRef.current?.requestSubmit();
+  };
+
+  const exitAfterSessionConflict = () => {
+    setSessionConflict(null);
+    setForm((current) => ({ ...current, password: "" }));
+    setShowPassword(false);
+    if (!isNativeApp()) navigate("/", { replace: true });
   };
 
   const handleRoleChange = (role) => {
@@ -513,6 +561,7 @@ function getAuthInputProps(theme) {
     setErrors({});
     setServerError("");
     setPendingReviewMessage("");
+    setSessionConflict(null);
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
@@ -526,6 +575,7 @@ function getAuthInputProps(theme) {
     setErrors({});
     setServerError("");
     setPendingReviewMessage("");
+    setSessionConflict(null);
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
@@ -541,6 +591,7 @@ function getAuthInputProps(theme) {
     setErrors({});
     setServerError("");
     setPendingReviewMessage("");
+    setSessionConflict(null);
     setSuccessMessage("");
     setForgotMode("send");
     setResetStatusResult(null);
@@ -720,6 +771,12 @@ function getAuthInputProps(theme) {
           return false;
         }
 
+        const sessionClaim = await claimActiveSession();
+        if (!sessionClaim.ok) {
+          await refuseActiveElsewhere(sessionClaim);
+          return false;
+        }
+
         saveSignupSchoolIdCache(data.user.id, profile.school_id);
         localStorage.setItem("examnexus_user", JSON.stringify(profile));
         clearPasswordResetTemporaryPassword().catch(() => {});
@@ -784,6 +841,7 @@ function getAuthInputProps(theme) {
       setLoading(true);
     }
     setPendingReviewMessage("");
+    setSessionConflict(null);
 
     // LOGIN
     if (isLogin) {
@@ -826,6 +884,12 @@ function getAuthInputProps(theme) {
 
       if (!isAccountApproved(profile) && !isAdminUser(profile)) {
         await blockPendingAccess(profile);
+        return;
+      }
+
+      const sessionClaim = await claimActiveSession();
+      if (!sessionClaim.ok) {
+        await refuseActiveElsewhere(sessionClaim);
         return;
       }
 
@@ -1181,7 +1245,7 @@ function getAuthInputProps(theme) {
         : "Fill in all three sections, then create your account."}
   </p>
 
-          <form onSubmit={handleSubmit}>
+          <form ref={formRef} onSubmit={handleSubmit}>
             {successMessage && (
               <div
                 ref={feedbackRef}
@@ -1193,6 +1257,56 @@ function getAuthInputProps(theme) {
                 }`}
               >
                 ✓ {successMessage}
+              </div>
+            )}
+
+            {sessionConflict && (
+              <div
+                ref={feedbackRef}
+                role="alert"
+                className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-relaxed ${
+                  theme === "dark"
+                    ? "border-amber-500/40 bg-amber-500/10 text-amber-100"
+                    : "border-amber-300 bg-amber-50 text-amber-900"
+                }`}
+              >
+                <p className="font-semibold">
+                  {sessionConflict.signedOutHere
+                    ? "You were signed out on this device"
+                    : "This account is already logged in"}
+                </p>
+                <p className="mt-1 opacity-90">
+                  {sessionConflict.signedOutHere
+                    ? `This account is now logged in and active on ${sessionConflict.deviceLabel}.`
+                    : `It is currently active on ${sessionConflict.deviceLabel} (last active ${formatLastActive(
+                        sessionConflict.secondsAgo
+                      )}).`}{" "}
+                  Log out there to continue here, or exit.
+                </p>
+                <p className="mt-1 text-xs opacity-75">
+                  If that device was closed without logging out, you can sign in here after about 2
+                  minutes.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={retryAfterSessionConflict}
+                    className="en-btn-primary px-4 py-1.5 text-xs"
+                  >
+                    Try again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exitAfterSessionConflict}
+                    className={`rounded-lg border px-4 py-1.5 text-xs font-medium ${
+                      theme === "dark"
+                        ? "border-white/15 text-gray-200 hover:bg-white/10"
+                        : "border-gray-300 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    Exit
+                  </button>
+                </div>
               </div>
             )}
 

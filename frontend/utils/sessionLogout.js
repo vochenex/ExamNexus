@@ -21,6 +21,13 @@ export async function clearLocalSessionAndLogout({
   }
 
   try {
+    const { releaseActiveSession } = await import("./activeSession");
+    await releaseActiveSession();
+  } catch {
+    // ignore — the active-session claim expires on its own
+  }
+
+  try {
     await supabase.auth.signOut();
   } catch {
     // Ignore sign-out network errors; still clear local session below.

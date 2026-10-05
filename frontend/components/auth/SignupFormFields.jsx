@@ -1,5 +1,5 @@
 import Select from "../ui/Select";
-import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
+import { getCoursesForDepartment, useAcademicCatalog } from "../../utils/academicOptions";
 import { getSchoolIdHelpText, getSchoolIdRule } from "../../utils/schoolIdRules";
 import { buildCrmcEmail, nameUsesNonAsciiEmailChars } from "../../utils/schoolEmail";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
@@ -64,6 +64,7 @@ export default function SignupFormFields({
   onFieldChange,
 }) {
   const isStudent = form.role === "Student";
+  const departments = useAcademicCatalog();
   const courses = getCoursesForDepartment(form.department);
   const schoolIdRule = getSchoolIdRule(form.role);
   const showAsciiEmailHint = nameUsesNonAsciiEmailChars(form.firstName, form.lastName);
@@ -199,7 +200,7 @@ export default function SignupFormFields({
               onChange={onFieldChange}
             >
               <option value="">Select department</option>
-              {DEPARTMENTS.map((dept) => (
+              {departments.map((dept) => (
                 <option key={dept.value} value={dept.value}>
                   {dept.label}
                 </option>

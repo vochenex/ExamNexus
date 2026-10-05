@@ -46,7 +46,7 @@ import { removeSavedAccountMatch } from "../../utils/savedAccounts";
 import { promoteUserToAdmin } from "../../utils/adminPromotion";
 import { pageShellClass, inputClass, panelClass } from "../../utils/themeInputs";
 import { iconButton, secondaryButtonSm, dangerButton } from "../../utils/themeButtons";
-import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
+import { getCoursesForDepartment, useAcademicCatalog } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
 
 const ROLES = ["Student", "Faculty", "Admin"];
@@ -234,10 +234,8 @@ export default function AdminAccounts() {
 
   usePolling(load, [roleFilter, statusFilter]);
 
-  const courses = useMemo(
-    () => getCoursesForDepartment(editing?.department),
-    [editing?.department]
-  );
+  const departments = useAcademicCatalog();
+  const courses = getCoursesForDepartment(editing?.department);
 
   const toggleSelected = (userId) => {
     setSelectedIds((prev) => {
@@ -900,7 +898,7 @@ export default function AdminAccounts() {
                 }
               >
                 <option value="">Department</option>
-                {DEPARTMENTS.map((d) => (
+                {departments.map((d) => (
                   <option key={d.value} value={d.value}>
                     {d.label}
                   </option>

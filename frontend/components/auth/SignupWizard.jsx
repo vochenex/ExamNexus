@@ -2,7 +2,7 @@ import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import AuthRoleToggle from "./AuthRoleToggle";
 import AuthNativeSelect from "./AuthNativeSelect";
 import ProgressButton from "../ui/ProgressButton";
-import { DEPARTMENTS, getCoursesForDepartment } from "../../utils/academicOptions";
+import { getCoursesForDepartment, useAcademicCatalog } from "../../utils/academicOptions";
 import { YEAR_LEVELS } from "../../utils/yearLevels";
 import { CRMCC_EMAIL_PLACEHOLDER, buildCrmcEmail, nameUsesNonAsciiEmailChars } from "../../utils/schoolEmail";
 import { getSchoolIdHelpText, getSchoolIdRule } from "../../utils/schoolIdRules";
@@ -22,6 +22,7 @@ export default function SignupWizard({
   loading,
 }) {
   const isStudent = form.role === "Student";
+  const departments = useAcademicCatalog();
   const courses = getCoursesForDepartment(form.department);
   const schoolIdRule = getSchoolIdRule(form.role);
   const showAsciiEmailHint = nameUsesNonAsciiEmailChars(form.firstName, form.lastName);
@@ -155,7 +156,7 @@ export default function SignupWizard({
                 theme={theme}
               >
                 <option value="">Select department</option>
-                {DEPARTMENTS.map((dept) => (
+                {departments.map((dept) => (
                   <option key={dept.value} value={dept.value}>
                     {dept.label}
                   </option>

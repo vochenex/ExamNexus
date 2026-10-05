@@ -29,10 +29,10 @@ import { secondaryButton, dangerButton } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { useScrollIntoViewWhen } from "../../hooks/useScrollIntoViewWhen";
 import {
-  DEPARTMENTS,
   getCoursesForDepartment,
   getDepartmentLabel,
   getCourseLabel,
+  useAcademicCatalog,
 } from "../../utils/academicOptions";
 import { YEAR_LEVELS, normalizeYearLevel, getYearLevelLabel } from "../../utils/yearLevels";
 import ProfileAvatar from "../../components/ProfileAvatar";
@@ -245,6 +245,7 @@ export default function Profile() {
   const isStudent = isStudentRole(profile.role);
   const isFaculty = isFacultyRole(profile.role);
   const isAdmin = isAdminUser(profile);
+  const departments = useAcademicCatalog();
   const courses = getCoursesForDepartment(editProfile.department);
   const selectedCourseValue = courses.some((course) => course.value === editProfile.course)
     ? editProfile.course
@@ -1109,7 +1110,7 @@ export default function Profile() {
                     theme={theme}
                   >
                     <option value="">Select department</option>
-                    {DEPARTMENTS.map((dept) => (
+                    {departments.map((dept) => (
                       <option key={dept.value} value={dept.value}>
                         {dept.label}
                       </option>

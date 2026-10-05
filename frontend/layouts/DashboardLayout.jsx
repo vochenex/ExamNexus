@@ -1,4 +1,5 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import DevPageOutlet from "../components/DevPageOutlet";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -35,6 +36,7 @@ import useMobileNav from "../hooks/useMobileNav";
 import useSidebarCollapsed from "../hooks/useSidebarCollapsed";
 import useSidebarPendingBadges from "../hooks/useSidebarPendingBadges";
 import useConnectionStatus from "../hooks/useConnectionStatus";
+import { useActiveSessionHeartbeat } from "../hooks/useActiveSessionHeartbeat";
 import ConnectionStatusBanner from "../components/ConnectionStatusBanner";
 import { isNativeApp } from "../utils/platform";
 import { useAssessmentLockdown } from "../contexts/AssessmentLockdownContext";
@@ -63,6 +65,7 @@ export default function DashboardLayout() {
     enabled: !isLockdownActive,
     fast: true,
   });
+  useActiveSessionHeartbeat();
   const isStudent = user.role?.toLowerCase() === "student";
   const showHeaderBack = shouldShowHeaderBack(location.pathname);
 
@@ -407,7 +410,7 @@ export default function DashboardLayout() {
             <ConnectionStatusBanner status={connectionStatus} className="mb-4" />
           )}
           <AnimatedPage>
-            <Outlet />
+            <DevPageOutlet />
           </AnimatedPage>
           <RequiredSchoolIdGate theme={theme} onResolved={setSessionUser} />
           {isStudent && accessState === "allowed" && !isLockdownActive && (

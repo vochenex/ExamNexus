@@ -4,6 +4,8 @@ Quick locator while debugging. Local tip: amber **Debug · page file** badge sho
 
 **UI Inspector (`Ctrl+E`, dev only):** click any element to see its JSX file:line, the helpers/state it uses (e.g. `className → secondaryButton`), the component chain, colors, animations/keyframes, CSS rules, and hidden layers under the cursor; click a file chip to open it in Cursor. Includes a code search box. Files: `frontend/components/DevUiInspector.jsx`, `frontend/dev/uiInspector*.js`, `frontend/dev/examNexusUiInspectorPlugin.js` (Vite plugin that tags JSX with `data-en-src`).
 
+**Dev-only feature toggles (in the inspector):** "Remove page" blanks the current route; "Disable this feature" (on any selected element: button, link, input, dropdown, card, section…) keeps it visible and clickable but ignores every click, keystroke, drop and submit inside it, with no navigation or progress bar; "Remove this feature" does the same and also hides it (`display: none` via an injected style tag); "Page bg" recolors the whole page background (body + detected full-page wrappers) on this page only or on all pages; the selected element's "Background color" section offers This element / Entire page / All pages (the last two set the same whole-page background; page-only wins over all pages). All are stored in this browser's localStorage (`en_dev_overrides_v1`), listed under "Dev changes" with Restore / Restore all, and flagged by a red corner pill when the inspector is closed. They do nothing in production builds. Files: `frontend/dev/devOverrides.js` (store), `frontend/dev/devClickBlocker.js` (capture-phase event blocker, installed from `AppBootstrap.jsx`), `frontend/components/DevPageOutlet.jsx` (used in place of `<Outlet />` in both layouts; `DevPageGate` wraps `/` and `/auth`).
+
 ---
 
 ## Top level
@@ -189,7 +191,7 @@ AI generator · question builder · grading options · schedule · calendar · p
 
 | Group | Files / focus |
 |---|---|
-| **Auth / session** | `authUser` · `authProfile` · `authSignup` · `authNotice` · `sessionLogout` · `sessionReset` · `savedAccounts` · `schoolEmail` · `schoolIdRules` · `avatar` · `passwordReset` |
+| **Auth / session** | `authUser` · `authProfile` · `authSignup` · `authNotice` · `sessionLogout` · `sessionReset` · `activeSession` (single-device login; heartbeat in `hooks/useActiveSessionHeartbeat`) · `savedAccounts` · `schoolEmail` · `schoolIdRules` · `avatar` · `passwordReset` |
 | **Supabase / API** | `supabaseData` (big data layer) · `supabaseErrors` · `apiBase` · `adminData` |
 | **Assessments** | `assessmentQuestions` · `assessmentTake` · `assessmentStatus` · `assessmentAi` · `assessmentReport` · `assessmentDuration` · `assessmentCategories` · `aiQuestionMapper` · `questionBank` · `questionGrading` · `questionSections` · `promptPreferences` |
 | **Exams / integrity** | `examIntegrity` · `examAnalytics` · `facultyGrading` · `questionTimeAnalytics` |
@@ -231,6 +233,7 @@ AI generator · question builder · grading options · schedule · calendar · p
 |---|---|
 | **Password reset** | `password_reset_requests.sql` · `password_reset_user_reveal.sql` |
 | **Users / signup / admin** | `users_signup_policies` · `admin_*` · `create_admin_account` · `fix_admin_login_*` |
+| **Single active session** | `single_active_session.sql` — `active_sessions` table + `claim_active_session` / `release_active_session` RPCs (one logged-in device per account) |
 | **Subjects / sections** | `subject_*` · `enroll_student` · `classmates_*` |
 | **Exams / questions** | `question_*` · `assessment_category` · `exam_*` · `question_bank` |
 | **Results / analytics** | `student_*` · `faculty_exam_analytics_*` · `faculty_save_scores_*` |

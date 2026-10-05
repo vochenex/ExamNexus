@@ -4,6 +4,7 @@ import ProtectedRoute from "./guards/ProtectedRoute";
 import AdminRouteGuard from "./components/AdminRouteGuard";
 import RouteFallback from "./components/RouteFallback";
 import WebOnlyHomeRoute from "./components/WebOnlyHomeRoute";
+import { DevPageGate } from "./components/DevPageOutlet";
 
 function RedirectToStudentAnnouncements() {
   const location = useLocation();
@@ -60,11 +61,20 @@ export default function App() {
           path="/"
           element={
             <WebOnlyHomeRoute>
-              <HomePage />
+              <DevPageGate>
+                <HomePage />
+              </DevPageGate>
             </WebOnlyHomeRoute>
           }
         />
-        <Route path="/auth" element={<AuthPage />} />
+        <Route
+          path="/auth"
+          element={
+            <DevPageGate>
+              <AuthPage />
+            </DevPageGate>
+          }
+        />
         {/* Legacy notification / push target — never existed as a real page. */}
         <Route path="/login" element={<UnknownRouteRedirect />} />
 

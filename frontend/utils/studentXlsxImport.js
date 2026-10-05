@@ -1,6 +1,6 @@
 import { API_BASE } from "./apiBase.js";
 import { getAuthSession } from "./authUser";
-import { DEPARTMENTS, getCoursesForDepartment } from "./academicOptions";
+import { getCoursesForDepartment, isKnownDepartment, loadAcademicCatalog } from "./academicOptions";
 import { YEAR_LEVEL_LABELS } from "./yearLevels";
 import { buildCrmcEmail } from "./schoolEmail";
 import { getSchoolIdRule } from "./schoolIdRules";
@@ -131,17 +131,19 @@ function eligibilityReasons(row, rawName) {
 
   if (!row.department) {
     reasons.push("No department");
-  } else if (!DEPARTMENTS.some((d) => d.value === row.department)) {
-    reasons.push(`Unknown department "${row.department}"`);
+  } else if (!isKnownDepartment(row.department)) {
+    reasons.push(`Department "${row.department}" does not exist (add it on Departments & courses)`);
   }
 
   if (!row.course) {
     reasons.push("No course");
   } else if (
-    DEPARTMENTS.some((d) => d.value === row.department) &&
+    isKnownDepartment(row.department) &&
     !getCoursesForDepartment(row.department).some((c) => c.value === row.course)
   ) {
-    reasons.push(`Course "${row.course}" is not under ${row.department}`);
+    reasons.push(
+      `Course "${row.course}" does not exist under ${row.department} (add it on Departments & courses)`
+    );
   }
 
   if (!row.yearRaw) reasons.push("No year level");
@@ -167,6 +169,8 @@ export async function readStudentWorkbook(file) {
     console.warn("xlsx read failed:", err);
     throw new Error("This file could not be read. Make sure it is a valid Excel (.xlsx) file.");
   }
+
+  await loadAcademicCatalog({ force: true });
 
   const rows = (table || []).filter((cells) => cells.some((cell) => cellText(cell)));
   if (!rows.length) return { missing: REQUIRED_COLUMN_LABELS, tooMany: false, eligible: [], ineligible: [] };

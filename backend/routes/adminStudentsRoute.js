@@ -12,6 +12,44 @@ const CONCURRENCY = 4;
 const EMAIL_DOMAIN = "crmc.en.com";
 const YEAR_LEVELS = new Set(["1st_year", "2nd_year", "3rd_year", "4th_year"]);
 const DEFAULT_AVATAR_PATH = "/default-avatar.svg";
+/** Admin catalog codes (uppercased): letters/digits, optionally with spaces, dots, &, / or -. */
+const CATALOG_CODE = /^[A-Z0-9][A-Z0-9 .&/-]{0,23}$/;
+
+/**
+ * Active departments → Set of course codes, from the admin "Departments & courses" page.
+ * Returns null when the catalog can't be read so imports still work on projects without it.
+ */
+async function loadCatalog(admin) {
+  const { data, error } = await admin
+    .from("school_catalog")
+    .select("item_type, code, parent_code, is_active")
+    .in("item_type", ["department", "course"]);
+  if (error || !Array.isArray(data)) return null;
+
+  const coursesByDepartment = new Map();
+  for (const item of data) {
+    if (item.is_active === false || item.item_type !== "department") continue;
+    coursesByDepartment.set(String(item.code || "").trim().toUpperCase(), new Set());
+  }
+  if (!coursesByDepartment.size) return null;
+
+  for (const item of data) {
+    if (item.is_active === false || item.item_type !== "course") continue;
+    const parent = String(item.parent_code || "").trim().toUpperCase();
+    coursesByDepartment.get(parent)?.add(String(item.code || "").trim().toUpperCase());
+  }
+  return coursesByDepartment;
+}
+
+function catalogError(catalog, student) {
+  if (!catalog) return "";
+  const courses = catalog.get(student.department);
+  if (!courses) return `Department "${student.department}" does not exist.`;
+  if (!courses.has(student.course)) {
+    return `Course "${student.course}" does not exist under ${student.department}.`;
+  }
+  return "";
+}
 
 /** Mirrors buildCrmcEmail in frontend/utils/schoolEmail.js. */
 function sanitizeNamePart(value) {
@@ -42,8 +80,8 @@ function normalizeStudent(raw) {
   let error = "";
   if (!firstName || !lastName || !email) error = "First and last name are required.";
   else if (!/^\d{9,13}$/.test(schoolId)) error = "School ID must be 9 to 13 numbers.";
-  else if (!/^[A-Z]{2,12}$/.test(department)) error = "Department is missing or invalid.";
-  else if (!/^[A-Z]{2,12}$/.test(course)) error = "Course is missing or invalid.";
+  else if (!CATALOG_CODE.test(department)) error = "Department is missing or invalid.";
+  else if (!CATALOG_CODE.test(course)) error = "Course is missing or invalid.";
   else if (!YEAR_LEVELS.has(yearLevel)) error = "Year level is missing or invalid.";
 
   return {
@@ -294,6 +332,10 @@ router.post("/students/import", requireAdmin, async (req, res) => {
 
     const admin = getSupabaseAdmin();
     const students = input.map(normalizeStudent);
+    const catalog = await loadCatalog(admin);
+    for (const student of students) {
+      if (!student.error) student.error = catalogError(catalog, student);
+    }
     const valid = students.filter((s) => !s.error);
     const { takenIds, takenEmails } = await findExisting(admin, valid);
 

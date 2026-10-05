@@ -91,7 +91,24 @@ function NativeEntryRedirect() {
   return null;
 }
 
+function useDevClickBlocker() {
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    let cancelled = false;
+    let uninstall = null;
+    import("../dev/devClickBlocker").then(({ installDevClickBlocker }) => {
+      if (!cancelled) uninstall = installDevClickBlocker();
+    });
+    return () => {
+      cancelled = true;
+      uninstall?.();
+    };
+  }, []);
+}
+
 export default function AppBootstrap() {
+  useDevClickBlocker();
+
   return (
     <>
       <App />

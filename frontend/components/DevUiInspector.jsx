@@ -1,5 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useLocation } from "react-router-dom";
+import {
+  FEATURE_DISABLED,
+  FEATURE_REMOVED,
+  activeFeatureKeys,
+  activeStyleOverrides,
+  PAGE_BACKGROUND_KEY,
+  backgroundOverridesFor,
+  clearBackground,
+  clearPageBackground,
+  pageBackgroundFor,
+  setPageBackground,
+  featureKeyFor,
+  featureModeFor,
+  findDisabledFeature,
+  isPageRemoved,
+  resolveFeatureTarget,
+  resolveStyleTarget,
+  restoreAllOverrides,
+  restoreFeature,
+  restorePage,
+  restoreStyle,
+  setBackground,
+  routeFor,
+  setInspectorPicking,
+  toggleFeature,
+  togglePage,
+  useDevOverrides,
+} from "../dev/devOverrides";
 import {
   describeElement,
   elementLabel,
@@ -28,6 +57,151 @@ const KIND_LABEL = {
 };
 
 const MINIMIZED_KEY = "examnexus_ui_inspector_min";
+const DISABLED_MARK = "data-en-dev-disabled";
+const REMOVED_STYLE_ID = "en-dev-removed-features";
+const BACKGROUND_STYLE_ID = "en-dev-background-overrides";
+const PAGE_BG_MARK = "data-en-dev-page-bg";
+
+/**
+ * Adds (2,0,0) specificity without needing real ids, so overrides beat the app's own
+ * `!important` theme rules (e.g. `html:not(.light) .en-home-shell.min-h-screen…` in index.css).
+ */
+const BOOST = ":not(#en-dev-boost):not(#en-dev-boost)";
+
+function featureSelector(keys) {
+  return keys
+    .map((key) => `[data-en-use="${CSS.escape(key)}"]${BOOST}, [data-en-src="${CSS.escape(key)}"]${BOOST}`)
+    .join(", ");
+}
+
+function syncStyleTag(id, css) {
+  let style = document.getElementById(id);
+  if (!css) {
+    style?.remove();
+    return;
+  }
+  if (!style) {
+    style = document.createElement("style");
+    style.id = id;
+    document.head.appendChild(style);
+  }
+  style.textContent = css;
+}
+
+let colorCanvas = null;
+
+/** Any CSS color (rgb, hex, oklch from Tailwind v4, color-mix…) → { r, g, b, a }. */
+function parseRgba(value) {
+  const text = String(value || "").trim();
+  if (!text || text === "transparent") return null;
+  const match = text.match(/^rgba?\(([^)]+)\)$/);
+  if (match) {
+    const [r, g, b, a = "1"] = match[1].split(/[\s,/]+/).filter(Boolean);
+    const alpha = a.endsWith("%") ? parseFloat(a) / 100 : Number(a);
+    return { r: Number(r), g: Number(g), b: Number(b), a: alpha };
+  }
+  if (!colorCanvas) {
+    colorCanvas = document.createElement("canvas");
+    colorCanvas.width = 1;
+    colorCanvas.height = 1;
+  }
+  const ctx = colorCanvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.clearRect(0, 0, 1, 1);
+  ctx.fillStyle = "rgba(0, 0, 0, 0)";
+  ctx.fillStyle = text;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+  return { r, g, b, a: a / 255 };
+}
+
+function toHex({ r, g, b }) {
+  return `#${[r, g, b].map((n) => Math.round(n).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function effectiveOpacity(el) {
+  let opacity = 1;
+  for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+    opacity *= Number(getComputedStyle(node).opacity) || 0;
+  }
+  return opacity;
+}
+
+/** Ignore see-through tints (bg-white/5, blurred glows, 3% grid lines) — they are not "the" color. */
+function solidBackground(el) {
+  const color = parseRgba(getComputedStyle(el).backgroundColor);
+  return color && color.a >= 0.5 && effectiveOpacity(el) >= 0.5 ? color : null;
+}
+
+/**
+ * The background the user actually sees on `el`: its own solid color, otherwise the first
+ * solid layer painted underneath it (page shell, fixed backdrop, ancestor…).
+ */
+function visibleBackground(el) {
+  if (!el?.isConnected) return { hex: "#ffffff", painter: null };
+  const own = solidBackground(el);
+  if (own) return { hex: toHex(own), painter: el };
+
+  const rect = el.getBoundingClientRect();
+  const x = (Math.max(rect.left, 0) + Math.min(rect.right, window.innerWidth)) / 2;
+  const y = (Math.max(rect.top, 0) + Math.min(rect.bottom, window.innerHeight)) / 2;
+  const stack = document.elementsFromPoint(x, y).filter((node) => !isInspectorNode(node));
+  const index = stack.indexOf(el);
+  const ancestors = [];
+  for (let node = el.parentElement; node; node = node.parentElement) ancestors.push(node);
+  const candidates = index >= 0 ? [...stack.slice(index + 1), ...ancestors] : ancestors;
+
+  for (const node of candidates) {
+    const color = solidBackground(node);
+    if (color) return { hex: toHex(color), painter: node };
+  }
+  return { hex: "#ffffff", painter: null };
+}
+
+/** A wrapper paints the page when it is opaque and has a solid color or a gradient of its own. */
+function paintsPage(el) {
+  const style = getComputedStyle(el);
+  if (style.position === "fixed" || effectiveOpacity(el) < 0.5) return false;
+  const color = parseRgba(style.backgroundColor);
+  return Boolean((color && color.a >= 0.85) || style.backgroundImage.includes("gradient("));
+}
+
+/**
+ * Full-page background layers on the current screen: wrappers at least ~viewport-sized
+ * (page shells, layout <main>, auth backdrop) that paint a background. Cards, headers,
+ * sidebars, modals and see-through overlays are skipped.
+ */
+function findPageBackgroundLayers() {
+  const root = document.getElementById("root") || document.body;
+  const minWidth = window.innerWidth * 0.7;
+  const minHeight = window.innerHeight * 0.7;
+  const layers = [];
+  const walk = (el, depth) => {
+    if (depth > 8) return;
+    for (const child of el.children) {
+      if (isInspectorNode(child)) continue;
+      if (getComputedStyle(child).display === "contents") {
+        walk(child, depth + 1);
+        continue;
+      }
+      const rect = child.getBoundingClientRect();
+      if (rect.width < minWidth || rect.height < minHeight) continue;
+      if (paintsPage(child)) layers.push(child);
+      walk(child, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return layers;
+}
+
+function pageBackgroundHex() {
+  for (const layer of findPageBackgroundLayers()) {
+    const color = parseRgba(getComputedStyle(layer).backgroundColor);
+    if (color && color.a >= 0.5) return toHex(color);
+  }
+  const body = parseRgba(getComputedStyle(document.body).backgroundColor);
+  return body && body.a > 0 ? toHex(body) : "#ffffff";
+}
 
 function readMinimized() {
   try {
@@ -273,6 +447,88 @@ function Chips({ items, tone = "slate" }) {
   );
 }
 
+function SmallButton({ onClick, title, tone = "default", children }) {
+  const color =
+    tone === "danger"
+      ? "bg-red-500/20 text-red-200 hover:bg-red-500/35"
+      : tone === "good"
+        ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/35"
+        : "bg-white/10 text-slate-200 hover:bg-white/20";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`shrink-0 rounded px-2 py-0.5 text-[11px] ${color}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DisabledFeatures({ overrides }) {
+  const total = overrides.pages.length + overrides.features.length + overrides.styles.length;
+  if (!total) return null;
+  return (
+    <Section title={`Dev changes (${total})`}>
+      {overrides.pages.map((page) => (
+        <div key={`page:${page.match}`} className="flex items-center gap-1 text-[11px]">
+          <span className="shrink-0 rounded bg-red-500/15 px-1 text-[9.5px] uppercase text-red-200">page</span>
+          <span className="min-w-0 flex-1 truncate text-slate-200" title={page.match}>
+            {page.label}
+          </span>
+          <SmallButton tone="good" onClick={() => restorePage(page.match)}>
+            Restore
+          </SmallButton>
+        </div>
+      ))}
+      {overrides.features.map((feature) => (
+        <div key={`feat:${feature.key}:${feature.route}`} className="flex items-center gap-1 text-[11px]">
+          <span
+            className={`shrink-0 rounded px-1 font-mono text-[9.5px] ${
+              feature.mode === FEATURE_REMOVED ? "bg-red-500/15 text-red-200" : "bg-amber-500/15 text-amber-200"
+            }`}
+            title={feature.mode === FEATURE_REMOVED ? "Removed (hidden and not working)" : "Disabled (visible, not working)"}
+          >
+            {feature.mode === FEATURE_REMOVED ? "removed" : "off"} · {feature.tag || "feature"}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-slate-200" title={`${feature.key}\non ${feature.routeLabel}`}>
+            “{feature.label}” <span className="text-slate-500">· {feature.routeLabel}</span>
+          </span>
+          <SmallButton tone="good" onClick={() => restoreFeature(feature.key, feature.route)}>
+            Restore
+          </SmallButton>
+        </div>
+      ))}
+      {overrides.styles.map((style) => (
+        <div key={`style:${style.key}:${style.route}`} className="flex items-center gap-1 text-[11px]">
+          <span className="shrink-0 rounded bg-sky-500/15 px-1 font-mono text-[9.5px] text-sky-200">
+            bg · {style.tag || "element"}
+          </span>
+          <span
+            className="h-3 w-3 shrink-0 rounded-sm border border-white/30"
+            style={{ background: style.value }}
+            title={style.value}
+          />
+          <span className="min-w-0 flex-1 truncate text-slate-200" title={`${style.key}\n${style.value} on ${style.routeLabel}`}>
+            “{style.label}” <span className="text-slate-500">· {style.routeLabel}</span>
+          </span>
+          <SmallButton tone="good" onClick={() => restoreStyle(style.key, style.route)}>
+            Restore
+          </SmallButton>
+        </div>
+      ))}
+      <SmallButton
+        tone="danger"
+        onClick={restoreAllOverrides}
+        title="Bring back every removed page, disabled/removed feature and original background"
+      >
+        Restore all
+      </SmallButton>
+    </Section>
+  );
+}
+
 function LogicList({ logic, onOpen, onCopy }) {
   if (!logic?.length) return null;
   return logic.map(({ attr, items }) => (
@@ -322,6 +578,11 @@ export default function DevUiInspector() {
   const [side, setSide] = useState("right");
   const [notice, setNotice] = useState("");
   const [minimized, setMinimized] = useState(readMinimized);
+  const [bgDraft, setBgDraft] = useState({ el: null, value: "" });
+  const [pageBgDraft, setPageBgDraft] = useState({ route: "", value: "" });
+  const { pathname } = useLocation();
+  const overrides = useDevOverrides();
+  const disabledCount = overrides.pages.length + overrides.features.length + overrides.styles.length;
 
   const toggleMinimized = useCallback(() => {
     setMinimized((value) => {
@@ -412,6 +673,92 @@ export default function DevUiInspector() {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, []);
+
+  useEffect(() => {
+    setInspectorPicking(open && !paused);
+    return () => setInspectorPicking(false);
+  }, [open, paused]);
+
+  useEffect(() => {
+    if (!open || !overrides.features.length) return undefined;
+    const mark = () => {
+      const selector = featureSelector(activeFeatureKeys(window.location.pathname, FEATURE_DISABLED));
+      const matches = new Set(
+        selector
+          ? [...document.querySelectorAll(selector)].filter((el) => !isInspectorNode(el))
+          : []
+      );
+      document.querySelectorAll(`[${DISABLED_MARK}]`).forEach((el) => {
+        if (!matches.has(el)) el.removeAttribute(DISABLED_MARK);
+      });
+      matches.forEach((el) => {
+        if (!el.hasAttribute(DISABLED_MARK)) el.setAttribute(DISABLED_MARK, "");
+      });
+    };
+    mark();
+    const timer = window.setInterval(mark, 600);
+    return () => {
+      window.clearInterval(timer);
+      document.querySelectorAll(`[${DISABLED_MARK}]`).forEach((el) => el.removeAttribute(DISABLED_MARK));
+    };
+  }, [open, overrides, pathname]);
+
+  useEffect(() => {
+    const selector = featureSelector(activeFeatureKeys(pathname, FEATURE_REMOVED));
+    syncStyleTag(REMOVED_STYLE_ID, selector ? `${selector} { display: none !important; }` : "");
+  }, [overrides, pathname]);
+
+  const pageBackgroundActive = activeStyleOverrides(pathname).some(
+    (style) => style.key === PAGE_BACKGROUND_KEY
+  );
+
+  useEffect(() => {
+    const backgrounds = activeStyleOverrides(pathname).filter(
+      (style) => style.prop === "background" && CSS.supports("color", style.value)
+    );
+    const rule = (selector, value) =>
+      `${selector} { background-color: ${value} !important; background-image: none !important; }`;
+    const css = [
+      ...backgrounds
+        .filter((style) => style.key === PAGE_BACKGROUND_KEY)
+        .map((style) => rule(`html${BOOST}, body${BOOST}, [${PAGE_BG_MARK}]${BOOST}`, style.value)),
+      ...backgrounds
+        .filter((style) => style.key !== PAGE_BACKGROUND_KEY)
+        .map((style) => rule(featureSelector([style.key]), style.value)),
+    ].join("\n");
+    syncStyleTag(BACKGROUND_STYLE_ID, css);
+  }, [overrides, pathname]);
+
+  useEffect(() => {
+    if (!pageBackgroundActive) return undefined;
+    const mark = () => {
+      const minWidth = window.innerWidth * 0.7;
+      const minHeight = window.innerHeight * 0.7;
+      const keep = new Set(findPageBackgroundLayers());
+      document.querySelectorAll(`[${PAGE_BG_MARK}]`).forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.width >= minWidth && rect.height >= minHeight) keep.add(el);
+        else el.removeAttribute(PAGE_BG_MARK);
+      });
+      keep.forEach((el) => {
+        if (!el.hasAttribute(PAGE_BG_MARK)) el.setAttribute(PAGE_BG_MARK, "");
+      });
+    };
+    mark();
+    const timer = window.setInterval(mark, 700);
+    return () => {
+      window.clearInterval(timer);
+      document.querySelectorAll(`[${PAGE_BG_MARK}]`).forEach((el) => el.removeAttribute(PAGE_BG_MARK));
+    };
+  }, [pageBackgroundActive, pathname]);
+
+  useEffect(
+    () => () => {
+      document.getElementById(REMOVED_STYLE_ID)?.remove();
+      document.getElementById(BACKGROUND_STYLE_ID)?.remove();
+    },
+    []
+  );
 
   useEffect(() => {
     if (!open) return undefined;
@@ -520,16 +867,101 @@ export default function DevUiInspector() {
 
   useEffect(() => () => window.clearTimeout(noticeTimerRef.current), []);
 
-  if (!open) return null;
+  if (!open) {
+    if (!disabledCount) return null;
+    return createPortal(
+      <button
+        type="button"
+        data-en-inspector=""
+        onClick={() => {
+          setOpen(true);
+          setPaused(true);
+        }}
+        title="Dev-only overrides are active — click to open the inspector and restore them"
+        className="fixed bottom-2 left-2 z-[2147483003] rounded-full bg-red-600/80 px-2.5 py-0.5 font-mono text-[10px] text-white opacity-60 shadow transition-opacity hover:opacity-100"
+      >
+        {disabledCount} dev change{disabledCount === 1 ? "" : "s"} active
+      </button>,
+      document.body
+    );
+  }
 
   const info = details?.el === selected ? details : null;
   const trimmedQuery = query.trim();
   const searchItems = trimmedQuery.length >= 2 && results.q === trimmedQuery ? results.items : null;
+  const currentRoute = routeFor(pathname);
+  const pageRemoved = isPageRemoved(pathname);
+  const pageBgSaved = pageBackgroundFor(pathname);
+  const pageBgValue =
+    pageBgDraft.route === currentRoute.match && pageBgDraft.value
+      ? pageBgDraft.value
+      : pageBgSaved.page?.value || pageBgSaved.all?.value || pageBackgroundHex();
+  const pageBgValid = typeof CSS !== "undefined" && CSS.supports("color", pageBgValue);
+  const applyPageBackground = (scope) => {
+    if (!pageBgValid) return;
+    setPageBackground(pathname, pageBgValue, scope);
+    flash(
+      scope === "all"
+        ? `Page background ${pageBgValue} on every page (dev only)`
+        : `Page background ${pageBgValue} on ${currentRoute.label} only (dev only)`
+    );
+  };
+  const featureTarget =
+    selected?.isConnected && !isInspectorNode(selected) ? resolveFeatureTarget(selected) : null;
+  const featureKey = featureTarget ? featureKeyFor(featureTarget) : "";
+  const featureMode = featureKey ? featureModeFor(featureTarget, pathname) : null;
+  const featureDisabled = featureMode === FEATURE_DISABLED;
+  const featureRemoved = featureMode === FEATURE_REMOVED;
+  const disabledAncestor =
+    featureKey && !featureMode ? findDisabledFeature(featureTarget.parentElement, pathname) : null;
+  const ancestorRemoved = disabledAncestor ? featureModeFor(disabledAncestor, pathname) === FEATURE_REMOVED : false;
+  const styleTarget = selected?.isConnected && !isInspectorNode(selected) ? resolveStyleTarget(selected) : null;
+  const backgroundSaved = styleTarget ? backgroundOverridesFor(styleTarget, pathname) : {};
+  const backgroundSeen = styleTarget ? visibleBackground(styleTarget) : { hex: "#ffffff", painter: null };
+  const backgroundPainter =
+    backgroundSeen.painter && backgroundSeen.painter !== styleTarget ? backgroundSeen.painter : null;
+  const backgroundValue =
+    bgDraft.el === styleTarget && bgDraft.value
+      ? bgDraft.value
+      : backgroundSaved.page?.value ||
+        backgroundSaved.all?.value ||
+        (backgroundPainter ? pageBgSaved.page?.value || pageBgSaved.all?.value : "") ||
+        backgroundSeen.hex;
+  const backgroundValid = typeof CSS !== "undefined" && CSS.supports("color", backgroundValue);
+  const hasAnyBackground = Boolean(
+    backgroundSaved.page || backgroundSaved.all || pageBgSaved.page || pageBgSaved.all
+  );
+  /** "element" = only the selected element on this page; "page" / "all" = the whole page background. */
+  const applyBackground = (scope) => {
+    if (!styleTarget || !backgroundValid) return;
+    if (scope === "element") {
+      setBackground(styleTarget, pathname, backgroundValue, "page");
+      flash(`This element is now ${backgroundValue} on ${currentRoute.label} (dev only)`);
+      return;
+    }
+    // The selected element's own color would sit on top of the new page color.
+    if (backgroundSaved.page || backgroundSaved.all) clearBackground(styleTarget, pathname);
+    setPageBackground(pathname, backgroundValue, scope);
+    setPageBgDraft({ route: "", value: "" });
+    flash(
+      scope === "all"
+        ? `Whole background is now ${backgroundValue} on every page (dev only)`
+        : `Whole background of ${currentRoute.label} is now ${backgroundValue} (dev only)`
+    );
+  };
+  const resetBackgrounds = () => {
+    if (styleTarget) clearBackground(styleTarget, pathname);
+    clearPageBackground(pathname);
+    setBgDraft({ el: null, value: "" });
+    setPageBgDraft({ route: "", value: "" });
+    flash("Background colors reset to original");
+  };
 
   return createPortal(
     <div data-en-inspector="">
       <style>{`
         html.en-ui-inspecting, html.en-ui-inspecting *:not([data-en-inspector] *) { cursor: crosshair !important; }
+        [${DISABLED_MARK}] { outline: 2px dashed rgba(248, 113, 113, 0.9) !important; outline-offset: 2px !important; }
       `}</style>
 
       <div
@@ -610,6 +1042,73 @@ export default function DevUiInspector() {
             placeholder="Find in code…"
             className="w-full rounded border border-white/10 bg-black/40 px-1.5 py-1 text-[11px] text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
           />
+          <div className="mt-1 flex items-center gap-1 text-[11px]">
+            <span className="min-w-0 flex-1 truncate text-slate-400" title={currentRoute.match}>
+              Page: <span className={pageRemoved ? "text-red-300" : "text-slate-200"}>{currentRoute.label}</span>
+            </span>
+            <SmallButton
+              tone={pageRemoved ? "good" : "danger"}
+              onClick={() => {
+                const removed = togglePage(pathname);
+                flash(removed ? `Removed ${currentRoute.label} (dev only)` : `Restored ${currentRoute.label}`);
+              }}
+              title={
+                pageRemoved
+                  ? "Show this page again"
+                  : "Render a blank slate on this route (local dev only, stored in this browser)"
+              }
+            >
+              {pageRemoved ? "Restore page" : "Remove page"}
+            </SmallButton>
+          </div>
+          <div className="mt-1 flex items-center gap-1 text-[11px]">
+            <span className="shrink-0 text-slate-400">Page bg</span>
+            <input
+              type="color"
+              value={/^#[0-9a-f]{6}$/i.test(pageBgValue) ? pageBgValue : "#ffffff"}
+              onChange={(event) => setPageBgDraft({ route: currentRoute.match, value: event.target.value })}
+              className="h-5 w-6 shrink-0 cursor-pointer rounded border border-white/20 bg-transparent p-0"
+              title="Pick the page background color"
+            />
+            <input
+              value={pageBgValue}
+              onChange={(event) => setPageBgDraft({ route: currentRoute.match, value: event.target.value.trim() })}
+              className={`w-[4.75rem] min-w-0 rounded border bg-black/40 px-1 py-px font-mono text-[10.5px] text-white focus:outline-none ${
+                pageBgValid ? "border-white/10 focus:border-emerald-400/50" : "border-red-400/60"
+              }`}
+            />
+            <SmallButton
+              tone="good"
+              onClick={() => applyPageBackground("page")}
+              title={`Whole background of ${currentRoute.label} only — other pages stay the same`}
+            >
+              This page
+            </SmallButton>
+            <SmallButton
+              onClick={() => applyPageBackground("all")}
+              title="Whole background of every page (home, login, dashboards…)"
+            >
+              All pages
+            </SmallButton>
+            {pageBgSaved.page || pageBgSaved.all ? (
+              <SmallButton
+                tone="danger"
+                onClick={() => {
+                  clearPageBackground(pathname);
+                  setPageBgDraft({ route: "", value: "" });
+                  flash("Page background reset");
+                }}
+                title="Remove the page-only and all-pages background changes"
+              >
+                ↺
+              </SmallButton>
+            ) : null}
+          </div>
+          {pageBgSaved.page && pageBgSaved.all ? (
+            <p className="mt-0.5 text-[10px] text-slate-500">
+              This page {pageBgSaved.page.value} overrides all pages {pageBgSaved.all.value} here.
+            </p>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto pb-1.5">
@@ -654,7 +1153,138 @@ export default function DevUiInspector() {
                     ↑ Select parent
                   </button>
                 ) : null}
+                {featureKey ? (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <SmallButton
+                      tone={featureDisabled ? "good" : "danger"}
+                      onClick={() => {
+                        const mode = toggleFeature(featureTarget, pathname, FEATURE_DISABLED);
+                        flash(mode ? "Feature disabled on this page (dev only)" : "Feature enabled");
+                      }}
+                      title={
+                        featureDisabled
+                          ? "Let this feature work again"
+                          : "Keep it visible but ignore every click, keystroke and submit inside it on this page (local dev only)"
+                      }
+                    >
+                      {featureDisabled ? "Enable feature" : "Disable this feature"}
+                    </SmallButton>
+                    <SmallButton
+                      tone={featureRemoved ? "good" : "danger"}
+                      onClick={() => {
+                        const mode = toggleFeature(featureTarget, pathname, FEATURE_REMOVED);
+                        flash(mode ? "Feature removed from this page (dev only)" : "Feature restored");
+                      }}
+                      title={
+                        featureRemoved
+                          ? "Show this feature again and let it work"
+                          : "Hide it from this page and stop everything inside it (local dev only) — restore from Dev changes"
+                      }
+                    >
+                      {featureRemoved ? "Restore feature" : "Remove this feature"}
+                    </SmallButton>
+                    {featureTarget !== selected ? (
+                      <span className="text-[10px] text-slate-500">
+                        applies to the enclosing &lt;{featureTarget.tagName.toLowerCase()}&gt;
+                      </span>
+                    ) : null}
+                    {disabledAncestor ? (
+                      <span className="text-[10px] text-red-300/80">
+                        already off — inside a {ancestorRemoved ? "removed" : "disabled"} &lt;
+                        {disabledAncestor.tagName.toLowerCase()}&gt;
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </Section>
+
+              {styleTarget && featureKeyFor(styleTarget) ? (
+                <Section title="Background color (dev only)">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={/^#[0-9a-f]{6}$/i.test(backgroundValue) ? backgroundValue : "#ffffff"}
+                      onChange={(event) => setBgDraft({ el: styleTarget, value: event.target.value })}
+                      className="h-6 w-8 shrink-0 cursor-pointer rounded border border-white/20 bg-transparent p-0"
+                      title="Pick a color"
+                    />
+                    <input
+                      value={backgroundValue}
+                      onChange={(event) => setBgDraft({ el: styleTarget, value: event.target.value.trim() })}
+                      placeholder="#1e293b, red, rgb(…)"
+                      className={`min-w-0 flex-1 rounded border bg-black/40 px-1.5 py-0.5 font-mono text-[11px] text-white focus:outline-none ${
+                        backgroundValid ? "border-white/10 focus:border-emerald-400/50" : "border-red-400/60"
+                      }`}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <SmallButton
+                      onClick={() => applyBackground("element")}
+                      title={`Only the selected element, only on ${currentRoute.label}`}
+                    >
+                      This element
+                    </SmallButton>
+                    <SmallButton
+                      tone="good"
+                      onClick={() => applyBackground("page")}
+                      title={`The whole background of ${currentRoute.label} (top to bottom); other pages stay the same`}
+                    >
+                      Entire page
+                    </SmallButton>
+                    <SmallButton
+                      tone="good"
+                      onClick={() => applyBackground("all")}
+                      title="The whole background of every page — home, login, dashboards, profile…"
+                    >
+                      All pages
+                    </SmallButton>
+                    {hasAnyBackground ? (
+                      <SmallButton
+                        tone="danger"
+                        onClick={resetBackgrounds}
+                        title="Undo this element's color and the page background (this page and all pages)"
+                      >
+                        Reset
+                      </SmallButton>
+                    ) : null}
+                  </div>
+                  {hasAnyBackground ? (
+                    <p className="text-[10px] text-slate-500">
+                      {[
+                        backgroundSaved.page && `This element: ${backgroundSaved.page.value}`,
+                        backgroundSaved.all && `This element (legacy, everywhere): ${backgroundSaved.all.value}`,
+                        pageBgSaved.page && `This page: ${pageBgSaved.page.value}`,
+                        pageBgSaved.all && `All pages: ${pageBgSaved.all.value}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {pageBgSaved.page && pageBgSaved.all ? " (this page wins here)" : ""}
+                    </p>
+                  ) : null}
+                  {styleTarget !== selected ? (
+                    <p className="text-[10px] text-slate-500">
+                      applies to the enclosing &lt;{styleTarget.tagName.toLowerCase()}&gt;
+                    </p>
+                  ) : null}
+                  {backgroundPainter && !backgroundSaved.page && !backgroundSaved.all ? (
+                    <div className="flex flex-wrap items-center gap-1 text-[10px] text-slate-400">
+                      <span className="min-w-0">
+                        This element is see-through — the color shown is painted behind it by{" "}
+                        <span className="font-mono text-amber-200">{elementLabel(backgroundPainter)}</span>.
+                        Use “Entire page” or “All pages” to recolor the whole background.
+                      </span>
+                      {resolveStyleTarget(backgroundPainter) === backgroundPainter ? (
+                        <SmallButton
+                          onClick={() => selectElement(backgroundPainter)}
+                          title="Inspect the layer that paints this color (changing it there affects everything it covers)"
+                        >
+                          Select that layer
+                        </SmallButton>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </Section>
+              ) : null}
 
               {info.logic.length ? (
                 <Section title="Logic this element uses">
@@ -775,6 +1405,7 @@ export default function DevUiInspector() {
               Click an element to inspect. Green chips open in Cursor.
             </p>
           )}
+          <DisabledFeatures overrides={overrides} />
         </div>
 
         {notice ? (

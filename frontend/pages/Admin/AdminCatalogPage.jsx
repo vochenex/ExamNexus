@@ -26,6 +26,7 @@ import {
 } from "../../utils/themeButtons";
 import ProgressButton from "../../components/ui/ProgressButton";
 import { friendlyError } from "../../utils/friendlyError";
+import { loadAcademicCatalog } from "../../utils/academicOptions";
 
 const TABS = [
   { id: "department", label: "Departments" },
@@ -65,6 +66,7 @@ export default function AdminCatalog() {
       setLoadError("");
       const rows = await fetchAdminCatalog();
       setCatalog(rows);
+      loadAcademicCatalog({ force: true });
     } catch (err) {
       console.error(err);
       setCatalog([]);
@@ -120,8 +122,8 @@ export default function AdminCatalog() {
       await upsertAdminCatalogItem({
         id: editingId || null,
         item_type: tab,
-        code: form.code,
-        label: form.label,
+        code: form.code.trim().toUpperCase(),
+        label: form.label.trim(),
         parent_code: tab === "course" ? form.parent_code : null,
       });
       await success(editingId ? "Catalog item updated." : "Catalog item saved.");

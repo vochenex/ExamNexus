@@ -17,7 +17,7 @@ import {
   adminTableInnerClass,
 } from "../../components/admin/adminTableStyles";
 import { pageShellClass, inputClass } from "../../utils/themeInputs";
-import { DEPARTMENTS, getDepartmentLabel } from "../../utils/academicOptions";
+import { getDepartmentLabel, useAcademicCatalog } from "../../utils/academicOptions";
 import AdminPageError, { formatAdminError } from "../../components/admin/AdminPageError";
 
 function facultySortKey(subject) {
@@ -33,6 +33,7 @@ export default function AdminAssignedSubjects() {
   const [loadError, setLoadError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const departments = useAcademicCatalog();
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -124,7 +125,7 @@ export default function AdminAssignedSubjects() {
             className="w-full min-w-0 sm:w-auto sm:max-w-[14rem]"
           >
             <option value="">All departments</option>
-            {DEPARTMENTS.map((dept) => (
+            {departments.map((dept) => (
               <option key={dept.value} value={dept.value}>
                 {dept.shortLabel}
               </option>
