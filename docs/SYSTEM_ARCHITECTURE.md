@@ -127,7 +127,7 @@ Anon key plus the signed-in user’s JWT. RLS policies in `database/*.sql` decid
 | Storage | Bucket `avatars`. Upload from `frontend/pages/shared/ProfilePage.jsx`, then `update_user_avatar`. |
 | Catalog | `school_catalog`, `password_reset_requests` (user side is RPCs; admin completion is Express) |
 
-Legacy Express exam routes in `createApp.js` (`GET /exams`, `POST /manual-exam`, `GET/PUT/DELETE /exam/:examId`) and `GET /analytics/:examId` are **not** called by the UI. The UI uses Supabase for those.
+`GET /analytics/:examId` is **not** called by the UI. The UI reads exams and analytics through Supabase.
 
 ### 3.2 Frontend ↔ Express (privileged path)
 
