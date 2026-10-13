@@ -94,8 +94,11 @@ export default function ProtectedRoute({ allowedRoles }) {
     );
   }
 
-  if (allowedRoles?.length && !allowedRoles.includes(role)) {
-    const normalizedRole = String(role || "").toLowerCase();
+  const rawRole = String(role || "").trim().toLowerCase();
+  // Anything that isn't admin/faculty lands on the student dashboard, so treat it as
+  // student here too — otherwise a blank/unknown role would redirect in a loop.
+  const normalizedRole = rawRole === "admin" || rawRole === "faculty" ? rawRole : "student";
+  if (allowedRoles?.length && !allowedRoles.includes(normalizedRole)) {
     if (normalizedRole === "admin") return <Navigate to="/admin/dashboard" replace />;
     if (normalizedRole === "faculty") return <Navigate to="/faculty/dashboard" replace />;
     return <Navigate to="/student/dashboard" replace />;

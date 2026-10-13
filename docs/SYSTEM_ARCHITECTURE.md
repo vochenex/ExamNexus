@@ -154,8 +154,6 @@ Faculty AI routes send the user’s Bearer token. `requireFaculty` checks an app
 
 Document text never leaves the server for a third-party OCR product. Extraction is local: `pdf-parse`, Mammoth (`.docx`), JSZip (`.pptx`) in `backend/lib/`. The extracted text is what Gemini receives.
 
-`backend/routes/generate.js` (OpenAI) and `backend/routes/extract.js` are **not mounted**.
-
 ---
 
 ## 4. External API keys

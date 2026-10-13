@@ -2,11 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Primary button — edit its look here.
+/* Primary button — edit its look here (changes EVERY primary button).
    Usage: className="en-btn-primary" (add en-btn-primary-sm for the compact size).
    Dark theme is the default; html.light overrides below. Tailwind utilities added
    next to it (w-full, text-xs, px-3, mt-4, ...) still win because this is in the
-   components layer. */
+   components layer.
+   To recolor ONE button only, see "Per-button colors" right below this block. */
 @layer components {
   .en-btn-primary {
     display: inline-flex;
@@ -54,6 +55,35 @@
     line-height: 1.25rem;
     border-radius: 0.5rem;
   }
+}
+
+/* Per-button colors — recolor one button without changing the others.
+   On that button's JSX:
+     import { buttonColors } from "../utils/themeButtons";
+     <button className="en-btn-primary" style={buttonColors({ bg: "#ef4444", text: "#fff" })}>
+   Keys: bg, hoverBg, text, border, glow (bg/hoverBg accept gradients). Works on
+   en-btn-primary and every themeButtons.js helper (secondary, danger, icon, header
+   action). Only variables present in that button's inline style are applied, so
+   unset keys keep the shared look. :not(#en-btn-boost) lifts specificity over
+   theme rules such as html.light .en-btn-primary. */
+:is(.en-btn-primary, .en-btn-secondary, .en-btn-danger, .en-btn-icon, .en-header-action-btn)[style*="--btn-bg:"]:not(#en-btn-boost) {
+  background: var(--btn-bg) !important;
+}
+
+:is(.en-btn-primary, .en-btn-secondary, .en-btn-danger, .en-btn-icon, .en-header-action-btn)[style*="--btn-hover-bg:"]:hover:not(:disabled):not(#en-btn-boost) {
+  background: var(--btn-hover-bg) !important;
+}
+
+:is(.en-btn-primary, .en-btn-secondary, .en-btn-danger, .en-btn-icon, .en-header-action-btn)[style*="--btn-text:"]:not(#en-btn-boost) {
+  color: var(--btn-text) !important;
+}
+
+:is(.en-btn-primary, .en-btn-secondary, .en-btn-danger, .en-btn-icon, .en-header-action-btn)[style*="--btn-border:"]:not(#en-btn-boost) {
+  border: 1px solid var(--btn-border) !important;
+}
+
+:is(.en-btn-primary, .en-btn-secondary, .en-btn-danger, .en-btn-icon, .en-header-action-btn)[style*="--btn-glow:"]:hover:not(:disabled):not(#en-btn-boost) {
+  box-shadow: 0 0 24px var(--btn-glow) !important;
 }
 
 /* Light mode — "Emerald Glass (light)": mint/emerald tinted neutrals that

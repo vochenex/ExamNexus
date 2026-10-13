@@ -1,7 +1,32 @@
 /* The primary button is a plain CSS class: .en-btn-primary / .en-btn-primary-sm in index.css. */
 
+const BUTTON_COLOR_VARS = {
+  bg: "--btn-bg",
+  hoverBg: "--btn-hover-bg",
+  text: "--btn-text",
+  border: "--btn-border",
+  glow: "--btn-glow",
+};
+
+/**
+ * Recolors ONE button; every other button keeps the shared look.
+ *   <button className="en-btn-primary" style={buttonColors({ bg: "#ef4444", text: "#fff" })}>
+ *   <button className={secondaryButton(theme)} style={buttonColors({ border: "#f59e0b" })}>
+ * Keys: bg, hoverBg, text, border, glow — bg/hoverBg accept gradients.
+ * Works on en-btn-primary and every helper in this file (rules in index.css, "Per-button colors").
+ * Pass the button's existing style as the second argument to keep it.
+ */
+export function buttonColors(colors = {}, style = {}) {
+  const next = { ...style };
+  for (const [key, cssVar] of Object.entries(BUTTON_COLOR_VARS)) {
+    if (colors[key]) next[cssVar] = colors[key];
+  }
+  return next;
+}
+
 export function secondaryButton(theme, extra = "") {
   return `
+    en-btn-secondary
     inline-flex items-center justify-center gap-2
     px-6 py-3 rounded-xl font-semibold
     transition-all duration-300
@@ -22,6 +47,7 @@ export function secondaryButtonSm(theme, extra = "") {
 
 export function dangerButton(theme, extra = "") {
   return `
+    en-btn-danger
     inline-flex items-center justify-center gap-2
     px-6 py-3 rounded-xl font-semibold
     transition-all duration-300
@@ -51,6 +77,7 @@ export function headerActionButtonClass(theme, { compact = false, inverted = fal
 /** Compact square button — icon only; pair with aria-label and title. */
 export function iconButton(theme, variant = "secondary", extra = "") {
   const base = `
+    en-btn-icon
     inline-flex items-center justify-center shrink-0
     p-2 rounded-lg
     transition-all duration-200

@@ -28,8 +28,7 @@ Quick locator while debugging. Local tip: amber **Debug · page file** badge sho
 | File | Key points |
 |---|---|
 | `main.jsx` | App boot, providers, PWA/native init |
-| `App.jsx` | Route table — URL → page component |
-| `App.css` | Legacy/app-level CSS leftovers |
+| `App.jsx` | Route table — URL → page component; admin, faculty and student pages each sit behind their own role guard |
 | `index.css` | Global CSS variables, shells, shared UI |
 | `supabaseClient.js` | Browser Supabase client |
 
@@ -145,11 +144,8 @@ Quick locator while debugging. Local tip: amber **Debug · page file** badge sho
 | `useRealtimeFetch.js` | Polling / realtime-ish refresh |
 | `useSidebarCollapsed.js` | Desktop sidebar collapse preference |
 | `useMobileNav.js` | When bottom tab bar replaces sidebar |
-| `useProgressNavigate.js` | Navigate with progress bar |
 | `usePageMeta.js` | Document title / meta |
-| `usePageLoader.js` | Page loading helpers |
 | `useInstallPrompt.js` | PWA install prompt state |
-| `useBlockingAppSplash.js` | Block UI behind splash |
 | `useHomeActiveSection.js` | Home page section spy |
 | `useScrollReveal.js` | Scroll reveal animations |
 | `useModalDismiss.js` | Esc / outside click dismiss |
@@ -175,7 +171,7 @@ Quick locator while debugging. Local tip: amber **Debug · page file** badge sho
 `AppBootstrap` · `RouteFallback` · `WebOnlyHomeRoute` · `NavigationProgressOverlay` · `LogoSplashScreen` · `ThemeToggle` · `NotificationBell` · `BackButton` · `ProgressLink` · `SidebarNavLink` · `SidebarCollapseToggle` · `NativeAuthHeader` · `NativeBackBridge` · `RequiredSchoolIdGate` · `ExamNexusLogo` · `ExamNexusBrand` · `ProfileAvatar` · `AvatarLightbox` · `DefaultAvatarIcon`
 
 ### Auth / home subfolders
-- `auth/` — `SignupFormFields` · `PendingApprovalModal`
+- `auth/` — `SignupWizard` (multi-step signup)
 - `home/` — header · footer · team · banner · illustrations · scroll reveal · bottom bar
 - `mobile/` — `MobileTabBar` · `mobileNav` config
 - `pwa/` — install button · chooser · iOS sheet · update prompt
@@ -215,14 +211,12 @@ AI generator · question builder · grading options · schedule · calendar · p
 | `routes/adminStudentsRoute.js` | Admin bulk student import (`POST /admin/students/import`) |
 | `routes/adminUsersRoute.js` | Promote to admin (`POST /admin/users/:id/promote`) and save own 3-digit admin ID (`POST /admin/me/admin-id`); frontend helper `utils/adminPromotion.js`, prompt in `components/RequiredSchoolIdGate.jsx` |
 | `routes/subjectsRoute.js` | Subject helpers |
-| `routes/extract.js` · `generate.js` | Doc extract / generate helpers |
 | `lib/aiProvider.js` | Groq + Gemini clients · retries |
 | `lib/assessmentAiGenerator.js` | Question generation logic |
 | `lib/documentExtractor.js` · `documentBlocks.js` | File → text for AI |
 | `lib/supabaseAdmin.js` · `supabaseClient.js` | Service / user Supabase |
 | `lib/pushSender.js` | Send push |
 | `middleware/requireFaculty.js` · `requireAdmin.js` · `verifyAccessToken.js` | Auth gates |
-| `controllers/` | `auth` · `exam` · `analytics` controllers |
 | `.env` | **Secrets — do not commit** |
 
 ---

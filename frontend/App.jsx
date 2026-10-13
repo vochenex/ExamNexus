@@ -95,13 +95,25 @@ export default function App() {
           </Route>
         </Route>
 
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={["faculty"]} />}>
           <Route element={<DashboardLayout />}>
             <Route path="/faculty/profile" element={<ProfilePage />} />
             <Route path="/faculty/dashboard" element={<FacultyDashboardPage />} />
             <Route path="/faculty/exports" element={<FacultyExportsPage />} />
             <Route path="/faculty/admin-announcements" element={<PlatformAnnouncementsPage />} />
             <Route path="/faculty/platform-announcements" element={<PlatformAnnouncementsPage />} />
+            <Route path="/faculty/announcements" element={<FacultyAnnouncementsHubPage />} />
+            <Route path="/faculty/question-bank" element={<QuestionBankPage />} />
+            <Route path="/faculty/create-assessment" element={<CreateAssessmentPage />} />
+            <Route path="/faculty/edit-assessment/:examId" element={<EditAssessmentPage />} />
+            <Route path="/faculty/subject/:subjectId" element={<FacultySubjectDetailsPage />} />
+            <Route path="/faculty/subject/:subjectId/social" element={<FacultySubjectSocialPage />} />
+            <Route path="/faculty/assessment/:examId" element={<FacultyAssessmentDetailsPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
+          <Route element={<DashboardLayout />}>
             <Route path="/student/dashboard" element={<StudentDashboardPage />} />
             <Route path="/student/profile" element={<ProfilePage />} />
             <Route
@@ -121,13 +133,6 @@ export default function App() {
             <Route path="/student/subject/:subjectId" element={<StudentSubjectDetailsPage />} />
             <Route path="/student/subject/:subjectId/social" element={<StudentSubjectSocialPage />} />
             <Route path="/student/announcements" element={<StudentAnnouncementsHubPage />} />
-            <Route path="/faculty/announcements" element={<FacultyAnnouncementsHubPage />} />
-            <Route path="/faculty/question-bank" element={<QuestionBankPage />} />
-            <Route path="/faculty/create-assessment" element={<CreateAssessmentPage />} />
-            <Route path="/faculty/edit-assessment/:examId" element={<EditAssessmentPage />} />
-            <Route path="/faculty/subject/:subjectId" element={<FacultySubjectDetailsPage />} />
-            <Route path="/faculty/subject/:subjectId/social" element={<FacultySubjectSocialPage />} />
-            <Route path="/faculty/assessment/:examId" element={<FacultyAssessmentDetailsPage />} />
           </Route>
         </Route>
 
